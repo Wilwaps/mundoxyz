@@ -1,0 +1,204 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+
+const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+// Configure axios defaults
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+axios.defaults.withCredentials = true;
+
+// Add request interceptor
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for existing session
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (token && storedUser) {
+        try {
+          // Validate token with backend
+          const response = await axios.get('/roles/me');
+          const userData = JSON.parse(storedUser);
+          setUser({
+            ...userData,
+            roles: response.data.roles.map(r => r.name)
+          });
+        } catch (error) {
+          console.error('Session validation failed:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  const loginWithTelegram = async () => {
+    try {
+      setLoading(true);
+      
+      // Get Telegram WebApp data
+      const tg = window.Telegram?.WebApp;
+      if (!tg?.initData) {
+        throw new Error('Telegram WebApp no disponible');
+      }
+
+      const response = await axios.post('/auth/login-telegram', {
+        initData: tg.initData
+      });
+
+      const { token, user: userData } = response.data;
+      
+      // Store token and user
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      setUser(userData);
+      toast.success('¡Bienvenido a MUNDOXYZ!');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.error || 'Error al iniciar sesión');
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithCredentials = async (username, password) => {
+    try {
+      setLoading(true);
+      
+      const response = await axios.post('/auth/login-email', {
+        email: username,
+        password
+      });
+
+      const { token, user: userData } = response.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      setUser(userData);
+      toast.success('¡Bienvenido a MUNDOXYZ!');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.error || 'Error al iniciar sesión');
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await axios.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      window.location.href = '/login';
+    }
+  };
+
+  const updateUser = (userData) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
+  const refreshUser = async () => {
+    try {
+      const response = await axios.get(`/profile/${user.id}`);
+      const updatedUser = {
+        ...user,
+        ...response.data,
+        coins_balance: response.data.stats?.coins_balance || 0,
+        fires_balance: response.data.stats?.fires_balance || 0
+      };
+      updateUser(updatedUser);
+      return updatedUser;
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+      return null;
+    }
+  };
+
+  const hasRole = (role) => {
+    return user?.roles?.includes(role) || false;
+  };
+
+  const isAdmin = () => {
+    return hasRole('admin') || hasRole('tote');
+  };
+
+  const isTote = () => {
+    return hasRole('tote');
+  };
+
+  const value = {
+    user,
+    loading,
+    loginWithTelegram,
+    loginWithCredentials,
+    logout,
+    updateUser,
+    refreshUser,
+    hasRole,
+    isAdmin,
+    isTote
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};

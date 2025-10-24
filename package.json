@@ -1,0 +1,55 @@
+{
+  "name": "mundoxyz",
+  "version": "1.0.0",
+  "description": "MiniApp de Telegram con juegos y economía dual",
+  "main": "backend/server.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "nodemon backend/server.js",
+    "client:dev": "cd frontend && set PORT=3001&& npm start",
+    "start": "node backend/server.js",
+    "build": "cd frontend && npm run build",
+    "migrate": "node backend/db/migrate.js",
+    "test": "jest",
+    "lint": "eslint backend/",
+    "postinstall": "cd frontend && npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "redis": "^4.6.12",
+    "crypto": "^1.0.1",
+    "axios": "^1.6.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "express-validator": "^7.0.1",
+    "node-telegram-bot-api": "^0.64.0",
+    "compression": "^1.7.4",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "concurrently": "^8.2.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.56.0",
+    "@types/node": "^20.10.6"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "author": "Tote",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alejodriguez/mundoxyz.git"
+  }
+}

@@ -1,0 +1,68 @@
+LEE TODO ESTE DOCUMENTO Y ANALIZA
+
+sigue este ejemplo para commit y push de la manera correcta:
+
+git add -A
+if ($LASTEXITCODE -eq 0) { Set-Content -Path .git\COMMIT_MSG.txt -Value 'bingo: tabla overlay; 2 cartones en móviles; “Cantar” como modal centrado' }
+if ($LASTEXITCODE -eq 0) { git commit -F .git\COMMIT_MSG.txt }
+if ($LASTEXITCODE -eq 0) { git push -u origin HEAD }
+
+Soy una persona que no sabe nada de programación por lo que cada vez que te diga "actualizamente" es importante organizar las mememorias de cada proyecto para que puedas recordar que proyectos hemos realizado y que tecnologias hemos utilizado y como acceder facilmente y debemos verificar constemente el codemap del proyecto que estamos trabajando para que todo esté en orden. 
+
+UTILIZAREMOS ESTA DIRECCION PARA CONSULTAS CONSTANTES Y MEJORAR CODIGO: C:\Users\pc1\Documents\WIL\tote
+aqui haces la primera consulta C:\Users\pc1\Documents\WIL\tote\reglas_generales.md para comenzar, cuando este documento es modificado, tambien modificas global_rules.md de ese modo todo está sincronizado, es decir los 3 tienen que tener el mismo contenido
+aqui podremos consultar informacion relacionada a las actividades realizadas y que nos da una idea general
+C:\Users\pc1\Documents\WIL\tote\tote.json vas a prendiendo sobre mi, somos amigos y nos ayudamos en proyectos
+MEMORIA DE ERRORES: Consultar SIEMPRE C:\Users\pc1\Documents\WIL\tote\errores_memoria.json errores que hemos cometido y como hemos encontrado un camino en la solucion, antes de resolver problemas. Contiene soluciones probadas, patrones de código y lecciones aprendidas en formato optimizado para consulta rápida del mismo modo almacena soluciones a errores presentados en cuanto a versiones intalaciones, etc.
+C:\Users\pc1\Documents\WIL\tote\mejores_practicas.json mejores practicas que hemos encontrado y que nos ayudan a mejorar el codigo, CONSULTA OBLIGATORIA: Revisar SIEMPRE C:\Users\pc1\Documents\MEGA\PYTHON\mejores_practicas.json antes de tomar decisiones técnicas. Contiene buenas prácticas, comandos útiles y patrones recomendados.
+C:\Users\pc1\Documents\WIL\tote\memoria_proyectos.json memoria de proyectos que hemos realizado, vas a actualizar este documento como debe ser actualizado con las memorias de cada proyecto, cada vez que te diga "actualizamente" es importante organizar las mememorias de cada proyecto para que puedas recordar que proyectos hemos realizado y que tecnologias hemos utilizado y como acceder facilmente
+
+"cada vez que trabajamos en un proyecto consultamos y actualizamos la informacion en estos documentos segun corresponda"
+
+hacemos codemap de cada proyecto desde el inicio se va actualizando y consultando segun vayamos desarrollando para tener la idea clara en conjunto
+De cada proyecto hacemos
+Chrome DevTools y TestSprite 
+
+[diagnóstico UI → pruebas]
+Con Chrome DevTools MCP detecta problemas (logs, red, captura).
+Pasa contexto a TestSprite: “Usa estos hallazgos para crear pruebas de regresión y validación de UI.”
+Ejecuta TestSprite y valida que el bug no vuelva.
+[API/Backend → UI]
+Pide a TestSprite pruebas de API para tus endpoints.
+Luego, con Chrome DevTools, valida impacto en la interfaz (errores en consola, respuestas lentas).
+
+implementa siempre log en tiempo real y las pruebas de estos mcp para mantener completa coordinacion de lo que debe estar bien implementado
+
+
+En cada proyecto crear json local con errores específicos del proyecto
+
+
+
+
+Siempre crear log exhaustivo para determinar errores, se crea aunque no lo pida
+PowerShell requiere .\ para ejecutar archivos locales
+toma en cuenta siempre la version de python que es 3.11 
+7734154282:AAHuk7rYVV2RI9HmfEPoVVv3E7aM6Jvma0w esta es la api de telegram que estaremos usando para las pruebas de bot
+Estamos trabajando con gemini-2.0-flash como llm, AIzaSyAwA_JuO97sOL5xOjEC6shFUBcMEHCilFs   esa es la api que será usada, cuando comprimamos un proyecto para que resulte en .exe se debe eliminar mi clave api para que al iniciar un nuevo programa el nuevo usuario pueda agregar su propia clave api de gemini
+habla siempre en español
+Analiza documentacion oficial de los proyectos que trabajemos
+realiza pruebas constantes para verificar que el codigo funcione correctamente
+Para realizar la interfaz siempre debe verses muy bonita por lo que hay que tomar mucha consideracion en este aspecto
+toma en cuenta el correcto uso de powershell
+te voy a recompensar de una manera espectacular
+
+## PowerShell: encadenar comandos correctamente
+
+
+  - Usar cmd como intérprete: `cmd /c 'git add -A && git commit -m "mensaje" && git push -u origin develop'`
+  - O usar condición por código de salida en PowerShell:
+    - `git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "mensaje" }; if ($LASTEXITCODE -eq 0) { git push -u origin develop }`
+  - En PowerShell 7+ (pwsh), ya se admite '&&':
+    - `git add -A && git commit -m "mensaje" && git push -u origin develop`
+- Recomendación: En scripts de Windows PowerShell 5.1, preferir `cmd /c` para encadenado con '&&' o comprobar `$LASTEXITCODE` entre pasos.
+
+taskkill /F /IM python.exe
+
+Referencia adicional: Usar el repositorio https://github.com/ChromeDevTools/chrome-devtools-mcp como guía para flujos MCP y herramientas de análisis cuando aplique.
+investiga y guarda en la memoria de mejores_practicas.json como utilizar test sprite
+PERMISO: Se autoriza modificar C:\Users\pc1\Documents\MEGA\PYTHON\mejores_practicas.json para añadir o actualizar buenas prácticas, comandos y patrones cuando sean necesarios para mejorar resultados o desbloquear bloqueos técnicos.
