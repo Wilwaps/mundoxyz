@@ -24,7 +24,6 @@ const gameRoutes = require('./routes/games');
 const bingoRoutes = require('./routes/bingo');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
-const migrateRoutes = require('./routes/migrate');
 
 // Create Express app
 const app = express();
@@ -154,7 +153,6 @@ app.use('/api/games/bingo', bingoRoutes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/migrate', migrateRoutes); // TEMPORAL - Eliminar después
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
