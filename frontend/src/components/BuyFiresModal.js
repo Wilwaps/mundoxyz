@@ -4,6 +4,7 @@ import { X, ShoppingCart, Copy, Check, Send } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import PasswordRequiredModal from './PasswordRequiredModal';
 
 const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
@@ -14,6 +15,7 @@ const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [copiedBank, setCopiedBank] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const bankData = `0102 Venezuela
 20827955
@@ -72,6 +74,12 @@ Pago`;
   const handleSubmit = async () => {
     if (!validate()) return;
 
+    // Require password before submitting
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordConfirmed = async () => {
+    setShowPasswordModal(false);
     setLoading(true);
     try {
       const response = await axios.post('/economy/request-fires', formData);
@@ -92,6 +100,7 @@ Pago`;
   const handleClose = () => {
     setFormData({ amount: '', bank_reference: '' });
     setErrors({});
+    setShowPasswordModal(false);
     onClose();
   };
 
@@ -102,6 +111,7 @@ Pago`;
   };
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -252,6 +262,14 @@ Pago`;
         </motion.div>
       )}
     </AnimatePresence>
+
+    <PasswordRequiredModal
+      isOpen={showPasswordModal}
+      onClose={() => setShowPasswordModal(false)}
+      onSuccess={handlePasswordConfirmed}
+      action="comprar fuegos"
+    />
+  </>
   );
 };
 

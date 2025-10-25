@@ -21,11 +21,13 @@ import FiresHistoryModal from '../components/FiresHistoryModal';
 import SendFiresModal from '../components/SendFiresModal';
 import BuyFiresModal from '../components/BuyFiresModal';
 import ReceiveFiresModal from '../components/ReceiveFiresModal';
+import MyDataModal from '../components/MyDataModal';
 
 const Profile = () => {
   const queryClient = useQueryClient();
   const { user, logout, refreshUser } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showMyData, setShowMyData] = useState(false);
   const [showFiresHistory, setShowFiresHistory] = useState(false);
   const [showSendFires, setShowSendFires] = useState(false);
   const [showBuyFires, setShowBuyFires] = useState(false);
@@ -291,6 +293,15 @@ const Profile = () => {
           )}
         </div>
 
+        {/* My Data Button */}
+        <button
+          onClick={() => setShowMyData(true)}
+          className="w-full py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <User size={18} className="text-accent" />
+          <span>Mis Datos</span>
+        </button>
+
         {/* Password Button */}
         <button
           onClick={() => setShowPasswordModal(true)}
@@ -350,6 +361,11 @@ const Profile = () => {
         isOpen={showReceiveFires} 
         onClose={() => setShowReceiveFires(false)}
         walletId={user?.wallet_id || walletId}
+      />
+
+      <MyDataModal
+        isOpen={showMyData}
+        onClose={() => setShowMyData(false)}
       />
     </div>
   );

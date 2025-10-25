@@ -444,4 +444,281 @@ router.get('/:userId/transactions', verifyToken, async (req, res) => {
   }
 });
 
+// Update user profile (display_name, nickname, email, bio)
+router.put('/:userId/update-profile', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { display_name, nickname, email, bio } = req.body;
+
+    // Verify permissions
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    // Display name
+    if (display_name !== undefined) {
+      updates.push(`display_name = $${paramCount++}`);
+      values.push(display_name);
+    }
+
+    // Nickname (validate unique and no offensive words)
+    if (nickname !== undefined && nickname !== null && nickname !== '') {
+      const { containsOffensiveWords } = require('../utils/offensive-words');
+      
+      if (nickname.length > 20) {
+        return res.status(400).json({ error: 'El alias no puede tener más de 20 caracteres' });
+      }
+
+      if (await containsOffensiveWords(nickname)) {
+        return res.status(400).json({ error: 'El alias contiene palabras no permitidas' });
+      }
+
+      // Check if unique
+      const existing = await query(
+        'SELECT id FROM users WHERE nickname = $1 AND id != $2',
+        [nickname, userId]
+      );
+
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'Este alias ya está en uso' });
+      }
+
+      updates.push(`nickname = $${paramCount++}`);
+      values.push(nickname);
+    }
+
+    // Email (validate unique)
+    if (email !== undefined) {
+      const existing = await query(
+        'SELECT id FROM users WHERE email = $1 AND id != $2',
+        [email, userId]
+      );
+
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'Este email ya está en uso' });
+      }
+
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+
+    // Bio
+    if (bio !== undefined) {
+      if (bio.length > 500) {
+        return res.status(400).json({ error: 'La biografía no puede tener más de 500 caracteres' });
+      }
+      updates.push(`bio = $${paramCount++}`);
+      values.push(bio);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No hay campos para actualizar' });
+    }
+
+    // Execute update
+    values.push(userId);
+    const result = await query(
+      `UPDATE users 
+       SET ${updates.join(', ')}, updated_at = NOW() 
+       WHERE id = $${paramCount}
+       RETURNING id, username, display_name, nickname, email, bio`,
+      values
+    );
+
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    logger.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Error al actualizar perfil' });
+  }
+});
+
+// Check if password is correct
+router.post('/:userId/check-password', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { password } = req.body;
+
+    // Verify permissions
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Get user
+    const result = await query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = result.rows[0];
+
+    // If no password set
+    if (!user.password_hash) {
+      return res.status(400).json({ 
+        error: 'No tienes contraseña establecida',
+        requiresPasswordCreation: true
+      });
+    }
+
+    // Verify password
+    const bcrypt = require('bcrypt');
+    const isValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+
+    res.json({ success: true, valid: true });
+
+  } catch (error) {
+    logger.error('Error checking password:', error);
+    res.status(500).json({ error: 'Error al verificar contraseña' });
+  }
+});
+
+// Check if nickname is available
+router.get('/check-nickname/:nickname', verifyToken, async (req, res) => {
+  try {
+    const { nickname } = req.params;
+
+    if (!nickname || nickname.length > 20) {
+      return res.json({ available: false, reason: 'Longitud inválida' });
+    }
+
+    // Check offensive words
+    const { containsOffensiveWords } = require('../utils/offensive-words');
+    if (await containsOffensiveWords(nickname)) {
+      return res.json({ available: false, reason: 'Contiene palabras no permitidas' });
+    }
+
+    // Check if in use
+    const result = await query(
+      'SELECT id FROM users WHERE nickname = $1',
+      [nickname]
+    );
+
+    res.json({ 
+      available: result.rows.length === 0,
+      reason: result.rows.length > 0 ? 'Ya está en uso' : null
+    });
+
+  } catch (error) {
+    logger.error('Error checking nickname:', error);
+    res.status(500).json({ error: 'Error al verificar alias' });
+  }
+});
+
+// Start Telegram linking (generate token)
+router.post('/:userId/link-telegram', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Verify permissions
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Generate unique token
+    const crypto = require('crypto');
+    const linkToken = crypto.randomBytes(32).toString('hex');
+    
+    // Save session (expires in 15 minutes)
+    await query(
+      `INSERT INTO telegram_link_sessions (user_id, link_token, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
+      [userId, linkToken]
+    );
+
+    // Bot URL
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'mundoxyz_bot';
+    const telegramUrl = `https://t.me/${botUsername}?start=${linkToken}`;
+
+    res.json({
+      success: true,
+      linkToken,
+      telegramUrl,
+      expiresIn: 900 // 15 minutes in seconds
+    });
+
+  } catch (error) {
+    logger.error('Error creating telegram link:', error);
+    res.status(500).json({ error: 'Error al crear enlace' });
+  }
+});
+
+// Link Telegram manually (user provides tg_id)
+router.post('/:userId/link-telegram-manual', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { tg_id } = req.body;
+
+    // Verify permissions
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Validate tg_id
+    if (!tg_id || isNaN(tg_id)) {
+      return res.status(400).json({ error: 'ID de Telegram inválido' });
+    }
+
+    // Check if already in use
+    const existing = await query(
+      'SELECT id FROM users WHERE tg_id = $1 AND id != $2',
+      [tg_id, userId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Este ID de Telegram ya está vinculado a otra cuenta' });
+    }
+
+    // Update user
+    await query(
+      'UPDATE users SET tg_id = $1, updated_at = NOW() WHERE id = $2',
+      [tg_id, userId]
+    );
+
+    res.json({ success: true, message: 'Telegram vinculado exitosamente' });
+
+  } catch (error) {
+    logger.error('Error linking telegram manually:', error);
+    res.status(500).json({ error: 'Error al vincular Telegram' });
+  }
+});
+
+// Unlink Telegram
+router.post('/:userId/unlink-telegram', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Verify permissions
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Update user
+    await query(
+      'UPDATE users SET tg_id = NULL, updated_at = NOW() WHERE id = $1',
+      [userId]
+    );
+
+    res.json({ success: true, message: 'Telegram desvinculado exitosamente' });
+
+  } catch (error) {
+    logger.error('Error unlinking telegram:', error);
+    res.status(500).json({ error: 'Error al desvincular Telegram' });
+  }
+});
+
 module.exports = router;

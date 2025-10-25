@@ -224,6 +224,20 @@ async function startServer() {
         logger.error('Failed to initialize Redis:', error);
       }
     })();
+
+    // Initialize Telegram bot
+    (async () => {
+      try {
+        const bot = require('./bot/telegram-bot');
+        if (bot) {
+          logger.info('✅ Telegram bot started');
+        } else {
+          logger.warn('⚠️  Telegram bot not initialized (missing token)');
+        }
+      } catch (error) {
+        logger.error('Failed to initialize Telegram bot:', error);
+      }
+    })();
     
   } catch (error) {
     logger.error('Failed to start server:', error);

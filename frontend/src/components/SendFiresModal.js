@@ -5,17 +5,19 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import PasswordRequiredModal from './PasswordRequiredModal';
 
 const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
-  const [step, setStep] = useState('form'); // 'form' or 'confirm'
+  const [step, setStep] = useState('form'); // 'form', 'confirm', or 'password'
   const [formData, setFormData] = useState({
     to_wallet_id: '',
     amount: ''
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const commission = formData.amount ? (parseFloat(formData.amount) * 0.05).toFixed(2) : '0.00';
   const total = formData.amount ? (parseFloat(formData.amount) + parseFloat(commission)).toFixed(2) : '0.00';
@@ -109,10 +111,15 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleContinue = () => {
+  const handleNext = () => {
     if (validate()) {
-      setStep('confirm');
+      setShowPasswordModal(true);
     }
+  };
+
+  const handlePasswordConfirmed = () => {
+    setShowPasswordModal(false);
+    setStep('confirm');
   };
 
   const handleConfirm = async () => {
@@ -138,9 +145,10 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
   };
 
   const handleClose = () => {
-    setStep('form');
     setFormData({ to_wallet_id: '', amount: '' });
     setErrors({});
+    setStep('form');
+    setShowPasswordModal(false);
     onClose();
   };
 
@@ -151,6 +159,7 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
   };
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -345,6 +354,14 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
         </motion.div>
       )}
     </AnimatePresence>
+
+    <PasswordRequiredModal
+      isOpen={showPasswordModal}
+      onClose={() => setShowPasswordModal(false)}
+      onSuccess={handlePasswordConfirmed}
+      action="enviar fuegos"
+    />
+  </>
   );
 };
 
