@@ -23,7 +23,6 @@ const gameRoutes = require('./routes/games');
 const bingoRoutes = require('./routes/bingo');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
-const healthRoutes = require('./routes/health');
 
 // Create Express app
 const app = express();
@@ -127,8 +126,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // API Routes
-app.use('/health', healthRoutes);
-app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/economy', economyRoutes);
