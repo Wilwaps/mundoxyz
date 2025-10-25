@@ -31,30 +31,55 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
 
   const handlePaste = async () => {
     try {
-      // Intentar leer del clipboard
+      // Primero intentar API moderna de clipboard
       if (navigator.clipboard && navigator.clipboard.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text && text.trim()) {
-          setFormData(prev => ({ ...prev, to_wallet_id: text.trim() }));
-          toast.success('Dirección pegada');
-        } else {
-          toast.error('El portapapeles está vacío');
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim()) {
+            setFormData(prev => ({ ...prev, to_wallet_id: text.trim() }));
+            toast.success('Dirección pegada');
+            return;
+          }
+        } catch (clipboardError) {
+          // Si falla, continuar con método alternativo
+          console.log('Clipboard API fallida, usando método alternativo');
         }
-      } else {
-        // Fallback: mostrar mensaje para pegar manualmente
-        toast.error('Por favor, pega manualmente la dirección', {
-          duration: 3000
-        });
-        // Enfocar el input para facilitar el pegado manual
-        document.querySelector('input[name="to_wallet_id"]')?.focus();
+      }
+
+      // Método alternativo: usar execCommand (funciona en más dispositivos)
+      const input = document.querySelector('input[name="to_wallet_id"]');
+      if (input) {
+        // Enfocar el input
+        input.focus();
+        input.select();
+        
+        // Intentar ejecutar paste command
+        const success = document.execCommand('paste');
+        
+        if (success) {
+          // Dar un momento para que el navegador pegue
+          setTimeout(() => {
+            if (input.value && input.value.trim()) {
+              toast.success('Dirección pegada');
+            }
+          }, 100);
+        } else {
+          // Si execCommand no funciona, mostrar ayuda
+          toast('Mantén presionado y selecciona "Pegar"', {
+            icon: '👆',
+            duration: 2500
+          });
+        }
       }
     } catch (error) {
-      console.error('Clipboard error:', error);
-      // Si falla, sugerir pegado manual
-      toast.error('Pega manualmente la dirección en el campo', {
-        duration: 3000
+      console.error('Paste error:', error);
+      // Último recurso: guiar al usuario
+      const input = document.querySelector('input[name="to_wallet_id"]');
+      input?.focus();
+      toast('Toca el campo y pega manualmente', {
+        icon: '✍️',
+        duration: 2500
       });
-      document.querySelector('input[name="to_wallet_id"]')?.focus();
     }
   };
 
@@ -182,6 +207,14 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
                       name="to_wallet_id"
                       value={formData.to_wallet_id}
                       onChange={handleChange}
+                      onPaste={(e) => {
+                        // Permitir pegado nativo y mostrar confirmación
+                        setTimeout(() => {
+                          if (e.target.value && e.target.value.trim()) {
+                            toast.success('Dirección pegada', { duration: 1500 });
+                          }
+                        }, 50);
+                      }}
                       className={`input-glass flex-1 ${errors.to_wallet_id ? 'border-red-500' : ''}`}
                       placeholder="Pega la dirección aquí"
                     />
