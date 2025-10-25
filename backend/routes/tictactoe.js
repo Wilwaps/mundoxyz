@@ -12,13 +12,7 @@ const {
   awardGameXP 
 } = require('../utils/tictactoe');
 
-// Socket IO instance (will be set from server)
-let io = null;
-
-// Set socket IO instance
-router.setIO = (socketIO) => {
-  io = socketIO;
-};
+// Socket IO will be accessed through req.io
 
 // POST /api/tictactoe/create - Crear nueva sala
 router.post('/create', verifyToken, async (req, res) => {
@@ -257,8 +251,8 @@ router.post('/join/:code', verifyToken, async (req, res) => {
       });
       
       // Emit socket event
-      if (io) {
-        io.to(`tictactoe:${code}`).emit('room:player-joined', {
+      if (req.io) {
+        req.io.to(`tictactoe:${code}`).emit('room:player-joined', {
           roomCode: code,
           playerId: userId,
           username: req.user.username
@@ -340,8 +334,8 @@ router.post('/room/:code/ready', verifyToken, async (req, res) => {
         logger.info('Tictactoe game started', { roomId: room.id, code });
         
         // Emit socket event for game start
-        if (io) {
-          io.to(`tictactoe:${code}`).emit('room:game-started', {
+        if (req.io) {
+          req.io.to(`tictactoe:${code}`).emit('room:game-started', {
             roomCode: code
           });
         }
@@ -516,8 +510,8 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
         });
         
         // Emit socket event for game over
-        if (io) {
-          io.to(`tictactoe:${code}`).emit('room:game-over', {
+        if (req.io) {
+          req.io.to(`tictactoe:${code}`).emit('room:game-over', {
             roomCode: code,
             winner: winResult.winner,
             winnerId,

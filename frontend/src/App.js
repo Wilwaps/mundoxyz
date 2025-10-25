@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -66,8 +67,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <div className="App min-h-screen bg-background-dark text-text font-display">
+        <SocketProvider>
+          <Router>
+            <div className="App min-h-screen bg-background-dark text-text font-display">
             <Toaster
               position="top-center"
               toastOptions={{
@@ -120,6 +122,7 @@ function App() {
             </Routes>
           </div>
         </Router>
+      </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

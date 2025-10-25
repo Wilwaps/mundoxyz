@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const { createServer } = require('http');
+const { Server } = require('socket.io');
 const logger = require('./utils/logger');
 const config = require('./config/config');
 const { initDatabase } = require('./db');
@@ -30,6 +31,52 @@ const tictactoeRoutes = require('./routes/tictactoe');
 // Create Express app
 const app = express();
 const server = createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: function(origin, callback) {
+      // Allow same origins as Express CORS
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        config.server.frontendUrl,
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'https://web.telegram.org',
+        'https://telegram.org',
+        /^https:\/\/.*\.telegram\.org$/,
+        /^https?:\/\/.*\.up\.railway\.app$/
+      ];
+
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (!allowed) return false;
+        if (allowed instanceof RegExp) return allowed.test(origin);
+        return allowed === origin;
+      });
+
+      callback(null, isAllowed);
+    },
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
+});
+
+// Socket.IO connection handler
+io.on('connection', (socket) => {
+  logger.info('New socket connection:', socket.id);
+  
+  // Initialize TicTacToe socket handlers
+  const { initTicTacToeSocket } = require('./socket/tictactoe');
+  initTicTacToeSocket(io, socket);
+  
+  socket.on('disconnect', () => {
+    logger.info('Socket disconnected:', socket.id);
+  });
+});
+
+// Make io available to routes
+app.set('io', io);
 
 // Readiness flags
 let dbReady = false;
@@ -154,7 +201,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/games/bingo', bingoRoutes);
-app.use('/api/tictactoe', tictactoeRoutes);
+app.use('/api/tictactoe', (req, res, next) => {
+  req.io = io;
+  next();
+}, tictactoeRoutes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
