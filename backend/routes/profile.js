@@ -548,9 +548,16 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    // Get user
+    // Get user and potential hashes from both sources (compatibilidad)
     const result = await query(
-      'SELECT password_hash FROM users WHERE id = $1',
+      `SELECT 
+         u.id,
+         u.password_hash AS u_hash,
+         ai.password_hash AS ai_hash
+       FROM users u
+       LEFT JOIN auth_identities ai 
+         ON ai.user_id = u.id AND ai.provider = 'email'
+       WHERE u.id = $1`,
       [userId]
     );
 
@@ -558,10 +565,11 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    const user = result.rows[0];
+    const row = result.rows[0];
+    const storedHash = row.ai_hash || row.u_hash || null;
 
-    // If no password set
-    if (!user.password_hash) {
+    // If no password set anywhere
+    if (!storedHash) {
       return res.status(400).json({ 
         error: 'No tienes contraseña establecida',
         requiresPasswordCreation: true
@@ -569,8 +577,8 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     }
 
     // Verify password
-    const bcrypt = require('bcrypt');
-    const isValid = await bcrypt.compare(password, user.password_hash);
+    const bcrypt = require('bcryptjs');
+    const isValid = await bcrypt.compare(password, storedHash);
 
     if (!isValid) {
       return res.status(401).json({ error: 'Contraseña incorrecta' });

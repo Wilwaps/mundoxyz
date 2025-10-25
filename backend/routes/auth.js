@@ -727,53 +727,70 @@ router.put('/change-password', async (req, res) => {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
-    // Validaciones
-    if (!current_password || !new_password || !new_password_confirm) {
-      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    // Validaciones comunes
+    if (!new_password || !new_password_confirm) {
+      return res.status(400).json({ error: 'Los campos de nueva contraseña son requeridos' });
     }
-
     if (new_password !== new_password_confirm) {
       return res.status(400).json({ error: 'Las contraseñas nuevas no coinciden' });
     }
-
     if (new_password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
 
-    if (current_password === new_password) {
-      return res.status(400).json({ error: 'La nueva contraseña debe ser diferente a la actual' });
-    }
-
-    // Obtener contraseña actual
-    const result = await query(
-      'SELECT password_hash FROM auth_identities WHERE user_id = $1 AND provider = \'email\'',
+    // Obtener hash actual desde auth_identities o users (compatibilidad)
+    const aiRes = await query(
+      "SELECT password_hash FROM auth_identities WHERE user_id = $1 AND provider = 'email'",
+      [userId]
+    );
+    const userRes = await query(
+      'SELECT password_hash FROM users WHERE id = $1',
       [userId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario sin contraseña configurada' });
-    }
+    const existingHash = aiRes.rows[0]?.password_hash || userRes.rows[0]?.password_hash || null;
 
-    // Verificar contraseña actual
-    const passwordMatch = await bcrypt.compare(current_password, result.rows[0].password_hash);
-    if (!passwordMatch) {
-      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    // Si YA tiene contraseña, validar current_password
+    if (existingHash) {
+      if (!current_password) {
+        return res.status(400).json({ error: 'Contraseña actual requerida' });
+      }
+      const ok = await bcrypt.compare(current_password, existingHash);
+      if (!ok) {
+        return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+      }
+      if (current_password === new_password) {
+        return res.status(400).json({ error: 'La nueva contraseña debe ser diferente a la actual' });
+      }
     }
 
     // Hash nueva contraseña
     const newPasswordHash = await bcrypt.hash(new_password, 10);
 
-    // Actualizar contraseña
-    await query(
-      'UPDATE auth_identities SET password_hash = $1, updated_at = NOW() WHERE user_id = $2 AND provider = \'email\'',
-      [newPasswordHash, userId]
-    );
+    // Guardar en auth_identities si existe registro, si no en users
+    if (aiRes.rows.length > 0) {
+      await query(
+        "UPDATE auth_identities SET password_hash = $1, updated_at = NOW() WHERE user_id = $2 AND provider = 'email'",
+        [newPasswordHash, userId]
+      );
+    } else if (userRes.rows.length > 0) {
+      await query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [newPasswordHash, userId]
+      );
+    } else {
+      // No hay registros previos: permitir establecer contraseña por primera vez
+      await query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [newPasswordHash, userId]
+      );
+    }
 
-    logger.info('Password changed successfully', { userId });
+    logger.info(existingHash ? 'Password changed successfully' : 'Password set successfully', { userId });
 
     res.json({
       success: true,
-      message: 'Contraseña actualizada correctamente'
+      message: existingHash ? 'Contraseña actualizada correctamente' : '¡Contraseña establecida correctamente!'
     });
 
   } catch (error) {
