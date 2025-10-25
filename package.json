@@ -10,6 +10,7 @@
     "start": "node backend/server.js",
     "build": "cd frontend && npm run build",
     "migrate": "node backend/db/migrate.js",
+    "migrate:profile": "node backend/scripts/migrate-profile-fields.js",
     "test": "jest",
     "lint": "eslint backend/",
     "postinstall": "cd frontend && npm install"
