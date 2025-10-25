@@ -1,27 +1,26 @@
-const { query, initDatabase, closeDatabase } = require('../db');
+const express = require('express');
+const router = express.Router();
+const { query } = require('../db');
 const logger = require('../utils/logger');
 
-async function runMigration() {
+// ENDPOINT TEMPORAL PARA MIGRACIÓN
+// ELIMINAR DESPUÉS DE EJECUTAR
+router.post('/run-profile-migration', async (req, res) => {
   try {
-    // Inicializar conexión a la base de datos
-    await initDatabase();
-    logger.info('🚀 Iniciando migración de campos de perfil...');
+    logger.info('🚀 Iniciando migración de campos de perfil desde API...');
+    const results = [];
 
     // 1. Agregar campos a users
-    logger.info('1/5 Agregando columnas nickname y bio a users...');
+    logger.info('1/5 Agregando columnas...');
     await query(`
       ALTER TABLE users 
         ADD COLUMN IF NOT EXISTS nickname VARCHAR(20) UNIQUE,
         ADD COLUMN IF NOT EXISTS bio VARCHAR(500)
     `);
-    logger.info('✅ Columnas agregadas');
+    results.push('✅ Columnas agregadas');
 
-    // Crear índice
-    await query(`
-      CREATE INDEX IF NOT EXISTS idx_users_nickname 
-      ON users(nickname) WHERE nickname IS NOT NULL
-    `);
-    logger.info('✅ Índice de nickname creado');
+    await query(`CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname) WHERE nickname IS NOT NULL`);
+    results.push('✅ Índice de nickname creado');
 
     // 2. Crear tabla telegram_link_sessions
     logger.info('2/5 Creando tabla telegram_link_sessions...');
@@ -35,13 +34,12 @@ async function runMigration() {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    logger.info('✅ Tabla telegram_link_sessions creada');
+    results.push('✅ Tabla telegram_link_sessions creada');
 
-    // Crear índices
     await query(`CREATE INDEX IF NOT EXISTS idx_telegram_link_token ON telegram_link_sessions(link_token)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_telegram_link_user_id ON telegram_link_sessions(user_id)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_telegram_link_expires ON telegram_link_sessions(expires_at) WHERE used = FALSE`);
-    logger.info('✅ Índices creados');
+    results.push('✅ Índices creados');
 
     // 3. Crear tabla offensive_words
     logger.info('3/5 Creando tabla offensive_words...');
@@ -52,11 +50,10 @@ async function runMigration() {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    logger.info('✅ Tabla offensive_words creada');
+    results.push('✅ Tabla offensive_words creada');
 
-    // Crear índice
     await query(`CREATE INDEX IF NOT EXISTS idx_offensive_words_word ON offensive_words(LOWER(word))`);
-    logger.info('✅ Índice creado');
+    results.push('✅ Índice creado');
 
     // 4. Insertar palabras ofensivas
     logger.info('4/5 Insertando palabras ofensivas...');
@@ -72,13 +69,13 @@ async function runMigration() {
       try {
         await query(`INSERT INTO offensive_words (word) VALUES ($1) ON CONFLICT (word) DO NOTHING`, [word]);
       } catch (err) {
-        // Ignorar errores de duplicados
+        // Ignorar duplicados
       }
     }
-    logger.info(`✅ ${words.length} palabras ofensivas insertadas`);
+    results.push(`✅ ${words.length} palabras ofensivas insertadas`);
 
     // 5. Crear función de limpieza
-    logger.info('5/5 Creando función de limpieza...');
+    logger.info('5/5 Creando función...');
     await query(`
       CREATE OR REPLACE FUNCTION clean_expired_telegram_sessions()
       RETURNS void AS $$
@@ -88,43 +85,38 @@ async function runMigration() {
       END;
       $$ LANGUAGE plpgsql
     `);
-    logger.info('✅ Función creada');
+    results.push('✅ Función creada');
 
     // Verificación
-    logger.info('🔍 Verificando migración...');
-    
     const colsResult = await query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'users' AND column_name IN ('nickname', 'bio')
     `);
-    logger.info(`✅ Columnas en users: ${colsResult.rows.map(r => r.column_name).join(', ')}`);
-
+    
     const sessionsResult = await query(`SELECT COUNT(*) FROM telegram_link_sessions`);
-    logger.info(`✅ Sesiones Telegram: ${sessionsResult.rows[0].count}`);
-
     const wordsResult = await query(`SELECT COUNT(*) FROM offensive_words`);
-    logger.info(`✅ Palabras ofensivas: ${wordsResult.rows[0].count}`);
 
-    logger.info('🎉 ¡Migración completada exitosamente!');
-    
-    // Cerrar conexión
-    if (closeDatabase) {
-      await closeDatabase();
-    }
-    
-    process.exit(0);
+    results.push(`✅ Columnas en users: ${colsResult.rows.map(r => r.column_name).join(', ')}`);
+    results.push(`✅ Sesiones Telegram: ${sessionsResult.rows[0].count}`);
+    results.push(`✅ Palabras ofensivas: ${wordsResult.rows[0].count}`);
+
+    logger.info('🎉 Migración completada exitosamente');
+
+    res.json({
+      success: true,
+      message: '🎉 ¡Migración completada exitosamente!',
+      results
+    });
 
   } catch (error) {
     logger.error('❌ Error en migración:', error);
-    
-    // Cerrar conexión en caso de error
-    if (closeDatabase) {
-      await closeDatabase();
-    }
-    
-    process.exit(1);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
   }
-}
+});
 
-runMigration();
+module.exports = router;
