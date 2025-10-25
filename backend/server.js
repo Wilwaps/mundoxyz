@@ -82,8 +82,12 @@ app.set('io', io);
 let dbReady = false;
 let redisReady = false;
 
-// Trust proxy
-if (config.server.trustProxyHops) {
+// Trust proxy - Always enable in production (Railway, Heroku, etc.)
+// This is required for rate limiting and getting correct client IPs
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy (Railway)
+  logger.info('Trust proxy enabled for production');
+} else if (config.server.trustProxyHops) {
   app.set('trust proxy', config.server.trustProxyHops);
 }
 

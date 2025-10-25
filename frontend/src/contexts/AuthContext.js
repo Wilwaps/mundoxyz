@@ -13,7 +13,8 @@ export const useAuth = () => {
 };
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || '/api';
+// baseURL should be empty or root URL, routes already include /api prefix
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || '';
 axios.defaults.withCredentials = true;
 
 // Add request interceptor
