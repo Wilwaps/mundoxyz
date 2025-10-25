@@ -34,12 +34,19 @@ const TicTacToeLobby = () => {
     queryKey: ['user-balance'],
     queryFn: async () => {
       if (!user) return { coins_balance: 0, fires_balance: 0 };
-      const response = await axios.get('/api/economy/balance');
-      return response.data;
+      try {
+        const response = await axios.get('/api/economy/balance');
+        console.log('Balance fetched:', response.data); // Debug log
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        return { coins_balance: 0, fires_balance: 0 };
+      }
     },
     enabled: !!user,
     refetchInterval: 5000, // Refetch balance every 5 seconds
-    staleTime: 2000
+    staleTime: 0, // Don't cache, always fresh
+    cacheTime: 0 // Don't keep old data in cache
   });
   
   // Create room mutation
@@ -91,8 +98,9 @@ const TicTacToeLobby = () => {
         return;
       }
     } else if (createForm.mode === 'fires') {
-      if (!balance?.fires_balance || balance.fires_balance < 1) {
-        toast.error(`No tienes suficientes fires. Balance actual: ${balance?.fires_balance || 0}`);
+      const firesBalance = parseFloat(balance?.fires_balance || 0);
+      if (firesBalance < 1) {
+        toast.error(`No tienes suficientes fires. Balance actual: ${firesBalance.toFixed(2)} 🔥`);
         return;
       }
     }
@@ -334,7 +342,7 @@ const TicTacToeLobby = () => {
                       placeholder="1-1000 Coins"
                     />
                     <div className="mt-2 text-xs text-text/60">
-                      Balance: {balance?.coins_balance || 0} 🪙
+                      Balance: {balance?.coins_balance?.toFixed(2) || '0.00'} 🪙
                     </div>
                   </div>
                 ) : (
@@ -344,7 +352,7 @@ const TicTacToeLobby = () => {
                       <Flame size={20} className="text-fire-orange" />
                     </div>
                     <div className="mt-2 text-xs text-text/60">
-                      Balance: {balance?.fires_balance || 0} 🔥
+                      Balance: {balance?.fires_balance?.toFixed(2) || '0.00'} 🔥
                     </div>
                   </div>
                 )}

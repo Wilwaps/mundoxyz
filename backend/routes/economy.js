@@ -11,12 +11,12 @@ router.get('/balance', verifyToken, async (req, res) => {
     
     const result = await query(
       `SELECT 
-        coins_balance,
-        fires_balance,
-        total_coins_earned,
-        total_coins_spent,
-        total_fires_earned,
-        total_fires_spent
+        COALESCE(coins_balance, 0)::numeric as coins_balance,
+        COALESCE(fires_balance, 0)::numeric as fires_balance,
+        COALESCE(total_coins_earned, 0)::numeric as total_coins_earned,
+        COALESCE(total_coins_spent, 0)::numeric as total_coins_spent,
+        COALESCE(total_fires_earned, 0)::numeric as total_fires_earned,
+        COALESCE(total_fires_spent, 0)::numeric as total_fires_spent
       FROM wallets 
       WHERE user_id = $1`,
       [userId]
@@ -42,14 +42,23 @@ router.get('/balance', verifyToken, async (req, res) => {
     }
     
     const wallet = result.rows[0];
-    res.json({
+    
+    const balanceData = {
       coins_balance: parseFloat(wallet.coins_balance || 0),
       fires_balance: parseFloat(wallet.fires_balance || 0),
       total_coins_earned: parseFloat(wallet.total_coins_earned || 0),
       total_coins_spent: parseFloat(wallet.total_coins_spent || 0),
       total_fires_earned: parseFloat(wallet.total_fires_earned || 0),
       total_fires_spent: parseFloat(wallet.total_fires_spent || 0)
+    };
+    
+    logger.info('Fetched user balance', { 
+      userId, 
+      username: req.user.username,
+      balanceData 
     });
+    
+    res.json(balanceData);
     
   } catch (error) {
     logger.error('Error fetching user balance:', error);
