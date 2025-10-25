@@ -93,6 +93,176 @@ router.post('/login-telegram', async (req, res) => {
   }
 });
 
+// Login with Email/Username (Dev and regular)
+router.post('/login-email', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const identifier = (email || '').trim();
+
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Email/usuario y contraseña son requeridos' });
+    }
+
+    // Fast path: admin via env headers equivalent
+    if (
+      config.admin.username &&
+      config.admin.code &&
+      identifier.toLowerCase() === String(config.admin.username).toLowerCase() &&
+      password === config.admin.code
+    ) {
+      // Ensure admin user exists with roles
+      const userId = await transaction(async (client) => {
+        let uid = null;
+        const ures = await client.query(
+          'SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1',
+          [config.admin.username]
+        );
+        if (ures.rows.length > 0) {
+          uid = ures.rows[0].id;
+        } else {
+          const ins = await client.query(
+            'INSERT INTO users (id, username, display_name, is_verified, first_seen_at, last_seen_at) ' +
+            'VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING id',
+            [uuidv4(), config.admin.username, config.admin.username]
+          );
+          uid = ins.rows[0].id;
+          await client.query(
+            'INSERT INTO wallets (user_id, coins_balance, fires_balance) VALUES ($1, 0, 0) ON CONFLICT DO NOTHING',
+            [uid]
+          );
+        }
+
+        // Assign roles admin and tote
+        const rAdmin = await client.query('SELECT id FROM roles WHERE name = $1', ['admin']);
+        const rTote = await client.query('SELECT id FROM roles WHERE name = $1', ['tote']);
+        if (rAdmin.rows.length) {
+          await client.query(
+            'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [uid, rAdmin.rows[0].id]
+          );
+        }
+        if (rTote.rows.length) {
+          await client.query(
+            'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [uid, rTote.rows[0].id]
+          );
+        }
+
+        return uid;
+      });
+
+      // Generate tokens and session
+      const token = generateToken(userId);
+      const refreshToken = generateRefreshToken(userId);
+
+      await query(
+        'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
+        "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
+        [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+      );
+
+      // Get user data
+      const userResult = await query(
+        'SELECT u.*, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+        'FROM users u ' +
+        'LEFT JOIN wallets w ON w.user_id = u.id ' +
+        'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
+        'LEFT JOIN roles r ON r.id = ur.role_id ' +
+        'WHERE u.id = $1 ' +
+        'GROUP BY u.id, w.coins_balance, w.fires_balance',
+        [userId]
+      );
+
+      const user = userResult.rows[0];
+
+      // Set cookie
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: config.security.cookieSecure,
+        sameSite: 'none',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.json({
+        success: true,
+        token,
+        refreshToken,
+        user: {
+          id: user.id,
+          tg_id: user.tg_id,
+          username: user.username,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url,
+          coins_balance: user.coins_balance || 0,
+          fires_balance: user.fires_balance || 0,
+          roles: user.roles?.filter(Boolean) || []
+        }
+      });
+    }
+
+    // Regular email/username login with stored password
+    const result = await query(
+      'SELECT u.id, u.username, u.email, ai.password_hash, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'FROM users u ' +
+      "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
+      'LEFT JOIN wallets w ON w.user_id = u.id ' +
+      'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
+      'LEFT JOIN roles r ON r.id = ur.role_id ' +
+      'WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1) OR ai.provider_uid = $1 ' +
+      'GROUP BY u.id, ai.password_hash, w.coins_balance, w.fires_balance',
+      [identifier]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const row = result.rows[0];
+    if (!row.password_hash) {
+      return res.status(401).json({ error: 'Usuario sin contraseña configurada' });
+    }
+
+    const ok = await bcrypt.compare(password, row.password_hash);
+    if (!ok) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const userId = row.id;
+    const token = generateToken(userId);
+    const refreshToken = generateRefreshToken(userId);
+
+    await query(
+      'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
+      "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
+      [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+    );
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: config.security.cookieSecure,
+      sameSite: 'none',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    return res.json({
+      success: true,
+      token,
+      refreshToken,
+      user: {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        coins_balance: row.coins_balance || 0,
+        fires_balance: row.fires_balance || 0,
+        roles: (row.roles || []).filter(Boolean)
+      }
+    });
+  } catch (error) {
+    logger.error('Email login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
 // Login with Telegram Widget
 router.post('/login-telegram-widget', async (req, res) => {
   try {

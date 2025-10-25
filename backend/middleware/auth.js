@@ -184,6 +184,21 @@ function adminAuth(req, res, next) {
     return next();
   }
 
+  // Try to populate req.user from JWT if missing
+  if (!req.user && (req.headers.authorization || req.headers['x-session-id'] || req.cookies?.token)) {
+    try {
+      return verifyToken(req, res, () => {
+        if (req.user && (req.user.roles?.includes('admin') || req.user.roles?.includes('tote'))) {
+          req.isAdmin = true;
+          return next();
+        }
+        return res.status(403).json({ error: 'Admin authentication required' });
+      });
+    } catch (e) {
+      return res.status(403).json({ error: 'Admin authentication required' });
+    }
+  }
+
   // Check if authenticated user has admin role
   if (req.user && (req.user.roles?.includes('admin') || req.user.roles?.includes('tote'))) {
     req.isAdmin = true;
