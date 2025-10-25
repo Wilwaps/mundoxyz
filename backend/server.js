@@ -180,23 +180,31 @@ app.use((req, res) => {
 // Initialize services and start server
 async function startServer() {
   try {
-    // Initialize database
-    await initDatabase();
-    logger.info('✅ Database connected');
-    
-    // Initialize Redis
-    await initRedis();
-    logger.info('✅ Redis connected');
-    
-    // Start server
     const PORT = config.server.port;
-    const HOST = config.server.host;
-    
-    server.listen(PORT, HOST, () => {
-      logger.info(`🚀 Server running on http://${HOST}:${PORT}`);
+
+    server.listen(PORT, () => {
+      logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📱 Telegram Bot: @${config.telegram.botUsername}`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
     });
+
+    (async () => {
+      try {
+        await initDatabase();
+        logger.info('✅ Database connected');
+      } catch (error) {
+        logger.error('Failed to initialize database:', error);
+      }
+    })();
+
+    (async () => {
+      try {
+        await initRedis();
+        logger.info('✅ Redis connected');
+      } catch (error) {
+        logger.error('Failed to initialize Redis:', error);
+      }
+    })();
     
   } catch (error) {
     logger.error('Failed to start server:', error);
