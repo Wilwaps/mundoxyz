@@ -10,11 +10,13 @@
 | Aspecto | Especificación |
 |---------|----------------|
 | **Jugadores** | 2 (1v1) |
-| **Duración** | 2-5 minutos |
-| **Modos** | Amistoso (gratis), Coins, Fires |
-| **Apuesta Min/Max** | 10 - 1,000 |
-| **Comisión Casa** | 10% del pot |
-| **Premio** | 90% del pot al ganador (45% c/u en empate) |
+| **Duración por Turno** | 15 segundos |
+| **Modo:** | Selector (Coins / Fires) |
+| **Apuesta Coins:** | Input numérico (1-1000) - Si elige Coins |
+| **Apuesta Fires:** | Fijo 1 Fire (no editable) - Si elige Fires |
+| **Comisión Casa** | Sin comisión (0%) |
+| **Premio Ganador** | 100% del pot total |
+| **Empate** | 50% cada jugador |
 | **XP** | 1 XP a ambos jugadores |
 
 ---
@@ -24,7 +26,7 @@
 ### Tabla: `tictactoe_rooms`
 ```sql
 - id, code (6 chars), host_id
-- mode (friendly/coins/fires), bet_amount
+- mode (coins/fires), bet_amount
 - status (waiting/ready/playing/finished)
 - player_x_id, player_o_id (X=host, O=invitado)
 - player_x_ready, player_o_ready
@@ -32,7 +34,7 @@
 - board (JSONB 3x3)
 - moves_history (JSONB)
 - winner_id, winner_symbol, winning_line, is_draw
-- pot_coins, pot_fires, prize_*, commission_*
+- pot_coins, pot_fires, prize_*
 - xp_awarded (bool)
 - timestamps (created, started, finished, expires)
 ```
@@ -63,36 +65,40 @@
 POST   /create                  → Crear sala
 POST   /join/:code              → Unirse a sala
 POST   /room/:code/ready        → Marcar listo
-POST   /room/:code/move         → Hacer jugada
+POST   /room/:code/move         → Hacer jugada (con timer 15 seg)
 GET    /rooms/public            → Listar salas públicas
 GET    /room/:code              → Detalles de sala
 DELETE /room/:code/leave        → Salir de sala
+POST   /room/:code/timeout      → Manejar timeout de turno
 ```
 
 ### Flujo Económico
 
 **Al unirse:**
 ```javascript
-if (mode !== 'friendly') {
-  await deductBalance(userId, mode, betAmount);
-  await addToPot(roomId, mode, betAmount);
-}
+// Siempre deducir apuesta (no hay modo gratis)
+const betAmount = mode === 'fires' ? 1 : requestedBetAmount;
+await deductBalance(userId, mode, betAmount);
+await addToPot(roomId, mode, betAmount);
 ```
+
+**Validaciones:**
+- Balance suficiente (siempre requerido)
+- Modo Coins: apuesta entre 1-1,000
+- Modo Fires: apuesta fija en 1 (no editable)
 
 **Al finalizar:**
 ```javascript
 const potTotal = room.pot_coins || room.pot_fires;
-const commission = potTotal * 0.1;
-const prize = potTotal - commission;
+// Sin comisión - 100% al ganador
 
 if (winnerId) {
-  await addBalance(winnerId, currency, prize);
+  await addBalance(winnerId, currency, potTotal);
 } else {
-  await addBalance(playerXId, currency, prize / 2);
-  await addBalance(playerOId, currency, prize / 2);
+  // Empate: 50% cada uno
+  await addBalance(playerXId, currency, potTotal / 2);
+  await addBalance(playerOId, currency, potTotal / 2);
 }
-
-await addBalance(HOUSE_WALLET, currency, commission);
 ```
 
 ### Otorgar XP
@@ -116,7 +122,7 @@ if (gameOver && !room.xp_awarded) {
 **`/lobby`** - TicTacToeLobby.js
 - Botón "Crear Sala" (modal)
 - Lista salas públicas disponibles
-- Filtros por modo
+- Filtros por modo (todos/coins/fires)
 
 **`/tictactoe/:code`** - TicTacToeRoom.js
 - Header (código, modo, pot)
@@ -202,8 +208,9 @@ CREATE INDEX idx_tictactoe_rooms_visibility ...
 
 ## 🚀 VENTAJAS DEL SISTEMA
 
-✅ **Economía completa** → 3 modos (gratis, coins, fires)  
-✅ **Comisión** → 10% para la casa  
+✅ **Economía directa** → 2 modos (Coins 1-1000, Fires fijo 1)  
+✅ **Sin comisión** → 100% al ganador (más justo)  
+✅ **Timer por turno** → 15 seg (partidas dinámicas)  
 ✅ **XP integrado** → 1 XP por partida  
 ✅ **Salas públicas/privadas** → Flexibilidad  
 ✅ **Tiempo real** → WebSocket para UX fluida  
@@ -216,9 +223,9 @@ CREATE INDEX idx_tictactoe_rooms_visibility ...
 
 1. **¿Aprobar plan?** → Confirmar especificaciones
 2. **Ejecutar migración SQL** → Crear tablas en Railway
-3. **Implementar backend** → Endpoints y lógica
+3. **Implementar backend** → Endpoints, lógica y timer
 4. **Implementar frontend** → UI y WebSocket
-5. **Testing completo** → 3 modos, economía, XP
+5. **Testing completo** → 2 modos, economía sin comisión, timer, XP
 6. **Deploy a producción** → Push GitHub → Railway
 
 ---

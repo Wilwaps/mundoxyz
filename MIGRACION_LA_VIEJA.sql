@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   
   -- Host y configuración
   host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  mode VARCHAR(20) NOT NULL CHECK (mode IN ('friendly', 'coins', 'fires')),
-  bet_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (bet_amount >= 0),
+  mode VARCHAR(20) NOT NULL CHECK (mode IN ('coins', 'fires')),
+  bet_amount NUMERIC(10,2) NOT NULL DEFAULT 1 CHECK (bet_amount >= 1),
   visibility VARCHAR(20) NOT NULL CHECK (visibility IN ('public', 'private')) DEFAULT 'public',
   
   -- Estado
@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   board JSONB DEFAULT '[[null,null,null],[null,null,null],[null,null,null]]',
   moves_history JSONB DEFAULT '[]', -- [{player, symbol, row, col, timestamp, moveNumber}]
   
+  -- Timer (15 segundos por turno)
+  time_left_seconds INTEGER DEFAULT 15 CHECK (time_left_seconds >= 0 AND time_left_seconds <= 15),
+  last_move_at TIMESTAMP,
+  
   -- Resultado
   winner_id UUID REFERENCES users(id) ON DELETE SET NULL,
   winner_symbol VARCHAR(1) CHECK (winner_symbol IN ('X', 'O', NULL)),
@@ -43,8 +47,6 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   pot_fires NUMERIC(10,2) DEFAULT 0,
   prize_coins NUMERIC(10,2) DEFAULT 0,
   prize_fires NUMERIC(10,2) DEFAULT 0,
-  commission_coins NUMERIC(10,2) DEFAULT 0,
-  commission_fires NUMERIC(10,2) DEFAULT 0,
   
   -- Experiencia
   xp_awarded BOOLEAN DEFAULT FALSE,
@@ -58,8 +60,8 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   -- Constraints
   CONSTRAINT valid_players CHECK (player_x_id IS NOT NULL OR player_o_id IS NOT NULL),
   CONSTRAINT valid_bet CHECK (
-    (mode = 'friendly' AND bet_amount = 0) OR
-    (mode IN ('coins', 'fires') AND bet_amount >= 10 AND bet_amount <= 1000)
+    (mode = 'coins' AND bet_amount >= 1 AND bet_amount <= 1000) OR
+    (mode = 'fires' AND bet_amount = 1)
   )
 );
 
