@@ -2,11 +2,24 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const net = require('net');
 const { query, transaction } = require('../db');
 const { verifyTelegramWebAppData, verifyTelegramWidgetData, formatUserIdentifier } = require('../services/telegramAuth');
 const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+
+// Helper to sanitize IP into a valid PostgreSQL inet or null
+function getClientIp(req) {
+  try {
+    const hdr = req.headers['x-forwarded-for'];
+    const cand = (hdr ? String(hdr).split(',')[0] : req.ip || '').trim();
+    if (net.isIP(cand)) return cand;
+    // Express sometimes returns IPv6 mapped IPv4 like ::ffff:127.0.0.1 which is valid
+    if (cand.startsWith('::ffff:') && net.isIP(cand)) return cand;
+  } catch (_) {}
+  return null;
+}
 
 // Login with Telegram WebApp
 router.post('/login-telegram', async (req, res) => {
@@ -39,14 +52,14 @@ router.post('/login-telegram', async (req, res) => {
     await query(
       'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
       'VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL \'7 days\')',
-      [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+      [userId, token, refreshToken, getClientIp(req), req.headers['user-agent']]
     );
 
     // Log connection
     await query(
       'INSERT INTO connection_logs (user_id, event_type, ip_address, user_agent, method, path, status_code) ' +
       'VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [userId, 'login', req.ip, req.headers['user-agent'], 'POST', '/api/auth/login-telegram', 200]
+      [userId, 'login', getClientIp(req), req.headers['user-agent'], 'POST', '/api/auth/login-telegram', 200]
     );
 
     // Get user data
@@ -163,7 +176,7 @@ router.post('/login-email', async (req, res) => {
       await query(
         'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
         "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
-        [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+        [userId, token, refreshToken, getClientIp(req), req.headers['user-agent']]
       );
 
       logger.info('login-email admin session created', { userId });
@@ -245,7 +258,7 @@ router.post('/login-email', async (req, res) => {
     await query(
       'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
       "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
-      [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+      [userId, token, refreshToken, getClientIp(req), req.headers['user-agent']]
     );
 
     res.cookie('token', token, {
@@ -307,7 +320,7 @@ router.post('/login-telegram-widget', async (req, res) => {
     await query(
       'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
       'VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL \'7 days\')',
-      [userId, token, refreshToken, req.ip, req.headers['user-agent']]
+      [userId, token, refreshToken, getClientIp(req), req.headers['user-agent']]
     );
 
     // Get user data

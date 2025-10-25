@@ -19,6 +19,7 @@ const economyRoutes = require('./routes/economy');
 const welcomeRoutes = require('./routes/welcome');
 const adminRoutes = require('./routes/admin');
 const rolesRoutes = require('./routes/roles');
+const healthRoutes = require('./routes/health');
 const gameRoutes = require('./routes/games');
 const bingoRoutes = require('./routes/bingo');
 const rafflesRoutes = require('./routes/raffles');
@@ -27,6 +28,10 @@ const marketRoutes = require('./routes/market');
 // Create Express app
 const app = express();
 const server = createServer(app);
+
+// Readiness flags
+let dbReady = false;
+let redisReady = false;
 
 // Trust proxy
 if (config.server.trustProxyHops) {
@@ -56,22 +61,25 @@ app.use(helmet({
 // CORS configuration
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
+    // Allow requests with no origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
-    
-    // Allow Telegram origins
+
     const allowedOrigins = [
       config.server.frontendUrl,
+      'http://localhost:3000',
+      'http://localhost:3001',
       'https://web.telegram.org',
       'https://telegram.org',
-      /^https:\/\/.*\.telegram\.org$/
+      /^https:\/\/.*\.telegram\.org$/,
+      /^https?:\/\/.*\.up\.railway\.app$/
     ];
-    
+
     const isAllowed = allowedOrigins.some(allowed => {
+      if (!allowed) return false;
       if (allowed instanceof RegExp) return allowed.test(origin);
       return allowed === origin;
     });
-    
+
     if (isAllowed) {
       callback(null, true);
     } else {
@@ -101,6 +109,14 @@ const limiter = rateLimit({
     }
     return false;
   }
+});
+
+// Block API requests until DB is ready
+app.use('/api', (req, res, next) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: 'Service initializing, please retry' });
+  }
+  next();
 });
 
 app.use('/api/', limiter);
@@ -136,6 +152,7 @@ app.use('/api/games', gameRoutes);
 app.use('/api/games/bingo', bingoRoutes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/health', healthRoutes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
@@ -191,6 +208,7 @@ async function startServer() {
     (async () => {
       try {
         await initDatabase();
+        dbReady = true;
         logger.info('✅ Database connected');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
@@ -200,6 +218,7 @@ async function startServer() {
     (async () => {
       try {
         await initRedis();
+        redisReady = true;
         logger.info('✅ Redis connected');
       } catch (error) {
         logger.error('Failed to initialize Redis:', error);

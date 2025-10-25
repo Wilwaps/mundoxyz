@@ -51,8 +51,15 @@ const logger = winston.createLogger({
   ]
 });
 
-// Add console transport for non-production environments
-if (process.env.NODE_ENV !== 'production') {
+// Add console transport (also in production, with JSON) so logs aparezcan en Railway
+if (process.env.NODE_ENV === 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+      winston.format.json()
+    )
+  }));
+} else {
   logger.add(new winston.transports.Console({
     format: consoleFormat
   }));
