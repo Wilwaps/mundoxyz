@@ -703,4 +703,79 @@ async function findOrCreateTelegramUser(telegramData) {
   }
 }
 
+// Change password
+router.put('/change-password', async (req, res) => {
+  try {
+    const { current_password, new_password, new_password_confirm } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+
+    // Decode token to get user_id
+    const jwt = require('jsonwebtoken');
+    let userId;
+    try {
+      const decoded = jwt.verify(token, config.security.jwtSecret);
+      userId = decoded.id;
+    } catch (error) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    // Validaciones
+    if (!current_password || !new_password || !new_password_confirm) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    }
+
+    if (new_password !== new_password_confirm) {
+      return res.status(400).json({ error: 'Las contraseñas nuevas no coinciden' });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    if (current_password === new_password) {
+      return res.status(400).json({ error: 'La nueva contraseña debe ser diferente a la actual' });
+    }
+
+    // Obtener contraseña actual
+    const result = await query(
+      'SELECT password_hash FROM auth_identities WHERE user_id = $1 AND provider = \'email\'',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario sin contraseña configurada' });
+    }
+
+    // Verificar contraseña actual
+    const passwordMatch = await bcrypt.compare(current_password, result.rows[0].password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    }
+
+    // Hash nueva contraseña
+    const newPasswordHash = await bcrypt.hash(new_password, 10);
+
+    // Actualizar contraseña
+    await query(
+      'UPDATE auth_identities SET password_hash = $1, updated_at = NOW() WHERE user_id = $2 AND provider = \'email\'',
+      [newPasswordHash, userId]
+    );
+
+    logger.info('Password changed successfully', { userId });
+
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada correctamente'
+    });
+
+  } catch (error) {
+    logger.error('Change password error:', error);
+    res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+});
+
 module.exports = router;

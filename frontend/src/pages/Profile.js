@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -11,18 +11,42 @@ import {
   Calendar,
   Award,
   TrendingUp,
-  LogOut
+  LogOut,
+  Lock,
+  Key
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PasswordChangeModal from '../components/PasswordChangeModal';
+import FiresHistoryModal from '../components/FiresHistoryModal';
+import SendFiresModal from '../components/SendFiresModal';
+import BuyFiresModal from '../components/BuyFiresModal';
+import ReceiveFiresModal from '../components/ReceiveFiresModal';
 
 const Profile = () => {
   const { user, logout, refreshUser } = useAuth();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showFiresHistory, setShowFiresHistory] = useState(false);
+  const [showSendFires, setShowSendFires] = useState(false);
+  const [showBuyFires, setShowBuyFires] = useState(false);
+  const [showReceiveFires, setShowReceiveFires] = useState(false);
+  const [walletId, setWalletId] = useState(null);
 
   // Fetch user stats
   const { data: stats } = useQuery({
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       const response = await axios.get(`/profile/${user.id}/stats`);
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
+  // Fetch wallet ID
+  const { data: walletData } = useQuery({
+    queryKey: ['user-wallet', user?.id],
+    queryFn: async () => {
+      const response = await axios.get(`/profile/${user.id}`);
+      setWalletId(response.data.wallet_id);
       return response.data;
     },
     enabled: !!user?.id
@@ -89,7 +113,7 @@ const Profile = () => {
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className="glass-panel p-4 text-center cursor-pointer"
-            onClick={handleRefreshBalance}
+            onClick={() => setShowFiresHistory(true)}
           >
             <Flame className="w-8 h-8 mx-auto mb-2 text-fire-orange" />
             <div className="text-2xl font-bold text-fire-orange">{user?.fires_balance || 0}</div>
@@ -235,7 +259,7 @@ const Profile = () => {
       >
         <h3 className="text-lg font-bold mb-4">Información de Cuenta</h3>
         
-        <div className="space-y-3">
+        <div className="space-y-3 mb-4">
           <div className="flex items-center gap-2 text-text/60">
             <Calendar size={16} />
             <span className="text-sm">
@@ -250,6 +274,15 @@ const Profile = () => {
             </div>
           )}
         </div>
+
+        {/* Password Button */}
+        <button
+          onClick={() => setShowPasswordModal(true)}
+          className="w-full py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <Lock size={18} className="text-violet" />
+          <span>Cambiar Contraseña</span>
+        </button>
       </motion.div>
 
       {/* Logout Button */}
@@ -263,6 +296,45 @@ const Profile = () => {
         <LogOut size={20} />
         Cerrar Sesión
       </motion.button>
+
+      {/* Modals */}
+      <PasswordChangeModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+      />
+      
+      <FiresHistoryModal 
+        isOpen={showFiresHistory} 
+        onClose={() => setShowFiresHistory(false)}
+        onOpenSend={() => setShowSendFires(true)}
+        onOpenBuy={() => setShowBuyFires(true)}
+        onOpenReceive={() => setShowReceiveFires(true)}
+      />
+      
+      <SendFiresModal 
+        isOpen={showSendFires} 
+        onClose={() => setShowSendFires(false)}
+        currentBalance={user?.fires_balance || 0}
+        onSuccess={() => {
+          refreshUser();
+          setShowFiresHistory(true);
+        }}
+      />
+      
+      <BuyFiresModal 
+        isOpen={showBuyFires} 
+        onClose={() => setShowBuyFires(false)}
+        onSuccess={() => {
+          toast.success('Solicitud enviada exitosamente');
+          setShowFiresHistory(true);
+        }}
+      />
+      
+      <ReceiveFiresModal 
+        isOpen={showReceiveFires} 
+        onClose={() => setShowReceiveFires(false)}
+        walletId={walletId}
+      />
     </div>
   );
 };

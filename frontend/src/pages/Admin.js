@@ -12,7 +12,11 @@ import {
   DollarSign,
   Activity,
   Shield,
-  Award
+  Award,
+  Flame,
+  CheckCircle,
+  XCircle,
+  Clock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -322,6 +326,246 @@ const AdminWelcome = () => {
   );
 };
 
+// Fire Requests Component
+const AdminFireRequests = () => {
+  const [selectedStatus, setSelectedStatus] = useState('pending');
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewAction, setReviewAction] = useState(null);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['fire-requests', selectedStatus],
+    queryFn: async () => {
+      const response = await axios.get('/economy/fire-requests', {
+        params: { status: selectedStatus, limit: 50 }
+      });
+      return response.data;
+    }
+  });
+
+  const handleReview = (request, action) => {
+    setSelectedRequest(request);
+    setReviewAction(action);
+    setShowReviewModal(true);
+  };
+
+  const handleConfirmReview = async () => {
+    try {
+      if (reviewAction === 'approve') {
+        await axios.put(`/economy/fire-requests/${selectedRequest.id}/approve`, {
+          review_notes: reviewNotes
+        });
+        toast.success('Solicitud aprobada exitosamente');
+      } else {
+        await axios.put(`/economy/fire-requests/${selectedRequest.id}/reject`, {
+          review_notes: reviewNotes
+        });
+        toast.success('Solicitud rechazada');
+      }
+      setShowReviewModal(false);
+      setReviewNotes('');
+      refetch();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Error al procesar solicitud');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <Flame className="text-fire-orange" />
+        Solicitudes de Fuegos
+      </h2>
+
+      {/* Status Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {['pending', 'approved', 'rejected', 'all'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setSelectedStatus(status)}
+            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+              selectedStatus === status
+                ? 'bg-violet/20 text-violet'
+                : 'bg-glass hover:bg-glass-hover'
+            }`}
+          >
+            {status === 'pending' && '⏳ Pendientes'}
+            {status === 'approved' && '✅ Aprobadas'}
+            {status === 'rejected' && '❌ Rechazadas'}
+            {status === 'all' && '📋 Todas'}
+          </button>
+        ))}
+      </div>
+
+      {/* Requests List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+        </div>
+      ) : !data?.requests || data.requests.length === 0 ? (
+        <div className="card-glass text-center py-12">
+          <Clock size={48} className="mx-auto text-text/30 mb-3" />
+          <p className="text-text/60">No hay solicitudes {selectedStatus === 'all' ? '' : selectedStatus}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {data.requests.map((request) => (
+            <motion.div
+              key={request.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-glass"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-bold text-lg">{request.username}</span>
+                    {request.status === 'pending' && (
+                      <span className="text-xs px-2 py-1 bg-warning/20 text-warning rounded-full">
+                        Pendiente
+                      </span>
+                    )}
+                    {request.status === 'approved' && (
+                      <span className="text-xs px-2 py-1 bg-success/20 text-success rounded-full">
+                        Aprobada
+                      </span>
+                    )}
+                    {request.status === 'rejected' && (
+                      <span className="text-xs px-2 py-1 bg-error/20 text-error rounded-full">
+                        Rechazada
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-text/60 mb-1">
+                    📧 {request.email}
+                  </p>
+                  <p className="text-xs text-text/40">
+                    📅 {formatDate(request.created_at)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-fire-orange">
+                    {parseFloat(request.amount).toFixed(2)} 🔥
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-panel p-3 mb-4">
+                <div className="text-sm">
+                  <span className="text-text/60">Referencia:</span>
+                  <span className="ml-2 font-mono text-accent">{request.reference}</span>
+                </div>
+              </div>
+
+              {request.review_notes && (
+                <div className="bg-glass/50 p-3 rounded-lg mb-4">
+                  <p className="text-xs text-text/60 mb-1">Notas de revisión:</p>
+                  <p className="text-sm">{request.review_notes}</p>
+                  {request.reviewer_username && (
+                    <p className="text-xs text-text/40 mt-1">
+                      Por: {request.reviewer_username} • {formatDate(request.reviewed_at)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {request.status === 'pending' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleReview(request, 'reject')}
+                    className="flex-1 py-3 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <XCircle size={18} />
+                    Rechazar
+                  </button>
+                  <button
+                    onClick={() => handleReview(request, 'approve')}
+                    className="flex-1 py-3 px-4 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={18} />
+                    Aprobar
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md card-glass p-6"
+          >
+            <h3 className="text-xl font-bold mb-4">
+              {reviewAction === 'approve' ? '✅ Aprobar Solicitud' : '❌ Rechazar Solicitud'}
+            </h3>
+
+            <div className="glass-panel p-4 mb-4">
+              <p className="text-sm text-text/60 mb-1">Usuario:</p>
+              <p className="font-bold mb-3">{selectedRequest.username}</p>
+              <p className="text-sm text-text/60 mb-1">Cantidad:</p>
+              <p className="text-2xl font-bold text-fire-orange mb-3">
+                {parseFloat(selectedRequest.amount).toFixed(2)} 🔥
+              </p>
+              <p className="text-sm text-text/60 mb-1">Referencia:</p>
+              <p className="font-mono text-accent">{selectedRequest.reference}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-text/80 mb-2">
+                Notas (opcional)
+              </label>
+              <textarea
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                className="input-glass w-full h-24 resize-none"
+                placeholder={reviewAction === 'approve' ? 'Ej: Referencia verificada' : 'Ej: Referencia inválida'}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReviewModal(false);
+                  setReviewNotes('');
+                }}
+                className="flex-1 py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReview}
+                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${
+                  reviewAction === 'approve'
+                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                    : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                }`}
+              >
+                Confirmar {reviewAction === 'approve' ? 'Aprobación' : 'Rechazo'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Main Admin Component
 const Admin = () => {
   const { isAdmin } = useAuth();
@@ -369,6 +613,17 @@ const Admin = () => {
             <Gift size={18} />
             Bienvenida
           </NavLink>
+          <NavLink
+            to="/admin/fire-requests"
+            className={({ isActive }) => 
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+              }`
+            }
+          >
+            <Flame size={18} />
+            Solicitudes
+          </NavLink>
         </div>
       </nav>
 
@@ -377,6 +632,7 @@ const Admin = () => {
         <Route index element={<AdminStats />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="welcome" element={<AdminWelcome />} />
+        <Route path="fire-requests" element={<AdminFireRequests />} />
       </Routes>
     </div>
   );
