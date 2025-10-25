@@ -12,6 +12,14 @@ const {
   awardGameXP 
 } = require('../utils/tictactoe');
 
+// Socket IO instance (will be set from server)
+let io = null;
+
+// Set socket IO instance
+router.setIO = (socketIO) => {
+  io = socketIO;
+};
+
 // POST /api/tictactoe/create - Crear nueva sala
 router.post('/create', verifyToken, async (req, res) => {
   try {
@@ -248,6 +256,15 @@ router.post('/join/:code', verifyToken, async (req, res) => {
         player: req.user.username
       });
       
+      // Emit socket event
+      if (io) {
+        io.to(`tictactoe:${code}`).emit('room:player-joined', {
+          roomCode: code,
+          playerId: userId,
+          username: req.user.username
+        });
+      }
+      
       return { success: true };
     });
     
@@ -321,6 +338,13 @@ router.post('/room/:code/ready', verifyToken, async (req, res) => {
         );
         
         logger.info('Tictactoe game started', { roomId: room.id, code });
+        
+        // Emit socket event for game start
+        if (io) {
+          io.to(`tictactoe:${code}`).emit('room:game-started', {
+            roomCode: code
+          });
+        }
         
         return { success: true, gameStarted: true };
       }
@@ -490,6 +514,17 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
           winner: winResult.winner,
           isDraw: winResult.isDraw
         });
+        
+        // Emit socket event for game over
+        if (io) {
+          io.to(`tictactoe:${code}`).emit('room:game-over', {
+            roomCode: code,
+            winner: winResult.winner,
+            winnerId,
+            isDraw: winResult.isDraw,
+            winningLine: winResult.line
+          });
+        }
         
         return {
           gameOver: true,

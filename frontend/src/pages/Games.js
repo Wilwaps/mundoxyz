@@ -91,7 +91,7 @@ const Games = () => {
     if (gameId === 'bingo' || gameId === 'raffles') {
       navigate(`/${gameId}`);
     } else if (gameId === 'tictactoe') {
-      navigate('/lobby');
+      navigate('/tictactoe/lobby');
     }
   };
 
@@ -144,9 +144,50 @@ const Games = () => {
       </div>
 
       {/* Active Games Section */}
-      {activeGames && (activeGames.bingo?.length > 0 || activeGames.raffles?.length > 0) && (
+      {activeGames && (activeGames.tictactoe?.length > 0 || activeGames.bingo?.length > 0 || activeGames.raffles?.length > 0) && (
         <div className="mt-8">
           <h2 className="text-xl font-bold mb-4 text-text/80">Partidas Activas</h2>
+          
+          {/* Active TicTacToe Rooms */}
+          {activeGames.tictactoe?.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3 text-violet">Salas de La Vieja</h3>
+              <div className="space-y-3">
+                {activeGames.tictactoe.map((room) => (
+                  <motion.div
+                    key={room.id}
+                    whileHover={{ x: 5 }}
+                    className="glass-panel p-4 cursor-pointer"
+                    onClick={() => navigate(`/tictactoe/room/${room.code}`)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-semibold text-text">Sala {room.code}</h4>
+                        <p className="text-sm text-text/60">
+                          Host: {room.host_username} • Modo: {room.mode}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-text/60">
+                          {room.player_o_username ? '2/2' : '1/2'} jugadores
+                        </div>
+                        {room.mode === 'coins' && room.pot_coins > 0 && (
+                          <div className="text-sm text-accent">
+                            🪙 {room.pot_coins}
+                          </div>
+                        )}
+                        {room.mode === 'fires' && room.pot_fires > 0 && (
+                          <div className="text-sm text-fire-orange">
+                            🔥 {room.pot_fires}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Active Bingo Rooms */}
           {activeGames.bingo?.length > 0 && (

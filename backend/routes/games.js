@@ -41,22 +41,36 @@ router.get('/list', optionalAuth, async (req, res) => {
       }
     ];
 
-    // Get active rooms count for each game
-    const tictactoeCount = await query(
-      "SELECT COUNT(*) as count FROM tictactoe_rooms WHERE status IN ('waiting', 'ready', 'playing')"
-    );
+    // Get active rooms count for each game (with error handling)
+    try {
+      const tictactoeCount = await query(
+        "SELECT COUNT(*) as count FROM tictactoe_rooms WHERE status IN ('waiting', 'ready', 'playing')"
+      );
+      games[0].active_rooms = parseInt(tictactoeCount.rows[0].count);
+    } catch (err) {
+      logger.warn('Tictactoe table not found:', err.message);
+      games[0].active_rooms = 0;
+    }
     
-    const bingoCount = await query(
-      "SELECT COUNT(*) as count FROM bingo_rooms WHERE status IN ('waiting', 'ready', 'playing')"
-    );
+    try {
+      const bingoCount = await query(
+        "SELECT COUNT(*) as count FROM bingo_rooms WHERE status IN ('waiting', 'ready', 'playing')"
+      );
+      games[1].active_rooms = parseInt(bingoCount.rows[0].count);
+    } catch (err) {
+      logger.warn('Bingo table not found:', err.message);
+      games[1].active_rooms = 0;
+    }
     
-    const raffleCount = await query(
-      "SELECT COUNT(*) as count FROM raffles WHERE status IN ('pending', 'active')"
-    );
-
-    games[0].active_rooms = parseInt(tictactoeCount.rows[0].count);
-    games[1].active_rooms = parseInt(bingoCount.rows[0].count);
-    games[2].active_rooms = parseInt(raffleCount.rows[0].count);
+    try {
+      const raffleCount = await query(
+        "SELECT COUNT(*) as count FROM raffles WHERE status IN ('pending', 'active')"
+      );
+      games[2].active_rooms = parseInt(raffleCount.rows[0].count);
+    } catch (err) {
+      logger.warn('Raffles table not found:', err.message);
+      games[2].active_rooms = 0;
+    }
 
     res.json(games);
 
@@ -202,6 +216,38 @@ router.get('/active', async (req, res) => {
     const { type } = req.query;
 
     const games = {};
+
+    // Get active tictactoe rooms
+    if (!type || type === 'tictactoe') {
+      try {
+        const tictactoeResult = await query(
+          `SELECT 
+            r.id,
+            r.code,
+            r.mode,
+            r.bet_amount,
+            r.status,
+            r.pot_coins,
+            r.pot_fires,
+            r.visibility,
+            ux.username as player_x_username,
+            uo.username as player_o_username,
+            u.username as host_username
+          FROM tictactoe_rooms r
+          LEFT JOIN users ux ON ux.id = r.player_x_id
+          LEFT JOIN users uo ON uo.id = r.player_o_id
+          JOIN users u ON u.id = r.host_id
+          WHERE r.status IN ('waiting', 'ready', 'playing') 
+            AND r.visibility = 'public'
+          ORDER BY r.created_at DESC
+          LIMIT 20`
+        );
+        games.tictactoe = tictactoeResult.rows;
+      } catch (err) {
+        logger.warn('Tictactoe table not found in active games:', err.message);
+        games.tictactoe = [];
+      }
+    }
 
     // Get active bingo rooms
     if (!type || type === 'bingo') {

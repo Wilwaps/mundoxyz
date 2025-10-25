@@ -16,6 +16,8 @@ import Upcoming from './pages/Upcoming';
 import BingoRoom from './pages/BingoRoom';
 import RaffleDetails from './pages/RaffleDetails';
 import Admin from './pages/Admin';
+import TicTacToeLobby from './pages/TicTacToeLobby';
+import TicTacToeRoom from './pages/TicTacToeRoom';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -111,6 +113,8 @@ function App() {
                 <Route path="roles" element={<Roles />} />
                 <Route path="upcoming" element={<Upcoming />} />
                 <Route path="bingo/:code" element={<BingoRoom />} />
+                <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
+                <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
                 <Route path="admin/*" element={<Admin />} />
               </Route>
             </Routes>
