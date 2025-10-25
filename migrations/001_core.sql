@@ -39,10 +39,10 @@ CREATE TABLE IF NOT EXISTS users (
   last_seen_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_users_tg_id ON users(tg_id) WHERE tg_id IS NOT NULL;
-CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
-CREATE INDEX idx_users_username ON users(username) WHERE username IS NOT NULL;
-CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_tg_id ON users(tg_id) WHERE tg_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
 
 -- Auth identities table
 CREATE TABLE IF NOT EXISTS auth_identities (
@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS auth_identities (
   UNIQUE(provider, provider_uid)
 );
 
-CREATE INDEX idx_auth_identities_user_id ON auth_identities(user_id);
-CREATE INDEX idx_auth_identities_provider ON auth_identities(provider);
+CREATE INDEX IF NOT EXISTS idx_auth_identities_user_id ON auth_identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_identities_provider ON auth_identities(provider);
 
 -- User roles junction table
 CREATE TABLE IF NOT EXISTS user_roles (
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
   PRIMARY KEY(user_id, role_id)
 );
 
-CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
 
 -- Wallets table
 CREATE TABLE IF NOT EXISTS wallets (
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS wallets (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_wallets_user_id ON wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets(user_id);
 
 -- Wallet transactions table
 CREATE TABLE IF NOT EXISTS wallet_transactions (
@@ -104,10 +104,10 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_wallet_tx_wallet_id ON wallet_transactions(wallet_id);
-CREATE INDEX idx_wallet_tx_type ON wallet_transactions(type);
-CREATE INDEX idx_wallet_tx_created_at ON wallet_transactions(created_at);
-CREATE INDEX idx_wallet_tx_reference ON wallet_transactions(reference) WHERE reference IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_type ON wallet_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_created_at ON wallet_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference ON wallet_transactions(reference) WHERE reference IS NOT NULL;
 
 -- User sessions table
 CREATE TABLE IF NOT EXISTS user_sessions (
@@ -125,9 +125,9 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   last_activity_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_token ON user_sessions(session_token);
-CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 
 -- Connection logs table
 CREATE TABLE IF NOT EXISTS connection_logs (
@@ -146,9 +146,9 @@ CREATE TABLE IF NOT EXISTS connection_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_connection_logs_user_id ON connection_logs(user_id) WHERE user_id IS NOT NULL;
-CREATE INDEX idx_connection_logs_created_at ON connection_logs(created_at);
-CREATE INDEX idx_connection_logs_event_type ON connection_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_connection_logs_user_id ON connection_logs(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_connection_logs_created_at ON connection_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_connection_logs_event_type ON connection_logs(event_type);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -159,8 +159,18 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN
+    CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
 
-CREATE TRIGGER update_wallets_updated_at BEFORE UPDATE ON wallets
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_wallets_updated_at') THEN
+    CREATE TRIGGER update_wallets_updated_at BEFORE UPDATE ON wallets
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;

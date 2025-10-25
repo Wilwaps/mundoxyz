@@ -36,10 +36,10 @@ CREATE TABLE IF NOT EXISTS supply_txs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_supply_txs_type ON supply_txs(type);
-CREATE INDEX idx_supply_txs_user_id ON supply_txs(user_id) WHERE user_id IS NOT NULL;
-CREATE INDEX idx_supply_txs_created_at ON supply_txs(created_at);
-CREATE INDEX idx_supply_txs_hash ON supply_txs(transaction_hash);
+CREATE INDEX IF NOT EXISTS idx_supply_txs_type ON supply_txs(type);
+CREATE INDEX IF NOT EXISTS idx_supply_txs_user_id ON supply_txs(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_supply_txs_created_at ON supply_txs(created_at);
+CREATE INDEX IF NOT EXISTS idx_supply_txs_hash ON supply_txs(transaction_hash);
 
 -- Welcome events table
 CREATE TABLE IF NOT EXISTS welcome_events (
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS welcome_events (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_welcome_events_active ON welcome_events(is_active);
-CREATE INDEX idx_welcome_events_dates ON welcome_events(starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS idx_welcome_events_active ON welcome_events(is_active);
+CREATE INDEX IF NOT EXISTS idx_welcome_events_dates ON welcome_events(starts_at, ends_at);
 
 -- Welcome event claims tracking
 CREATE TABLE IF NOT EXISTS welcome_event_claims (
@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS welcome_event_claims (
   PRIMARY KEY(event_id, user_id)
 );
 
-CREATE INDEX idx_welcome_claims_user ON welcome_event_claims(user_id);
-CREATE INDEX idx_welcome_claims_claimed_at ON welcome_event_claims(claimed_at);
+CREATE INDEX IF NOT EXISTS idx_welcome_claims_user ON welcome_event_claims(user_id);
+CREATE INDEX IF NOT EXISTS idx_welcome_claims_claimed_at ON welcome_event_claims(claimed_at);
 
 -- Welcome event history/audit
 CREATE TABLE IF NOT EXISTS welcome_event_history (
@@ -88,8 +88,8 @@ CREATE TABLE IF NOT EXISTS welcome_event_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_welcome_history_event ON welcome_event_history(event_id);
-CREATE INDEX idx_welcome_history_action ON welcome_event_history(action);
+CREATE INDEX IF NOT EXISTS idx_welcome_history_event ON welcome_event_history(event_id);
+CREATE INDEX IF NOT EXISTS idx_welcome_history_action ON welcome_event_history(action);
 
 -- Fire requests table (users request fires from tote)
 CREATE TABLE IF NOT EXISTS fire_requests (
@@ -107,9 +107,9 @@ CREATE TABLE IF NOT EXISTS fire_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_fire_requests_user ON fire_requests(user_id);
-CREATE INDEX idx_fire_requests_status ON fire_requests(status);
-CREATE INDEX idx_fire_requests_created ON fire_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_user ON fire_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_status ON fire_requests(status);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_created ON fire_requests(created_at);
 
 -- Market redeems table (users redeem fires for real money)
 CREATE TABLE IF NOT EXISTS market_redeems (
@@ -135,16 +135,31 @@ CREATE TABLE IF NOT EXISTS market_redeems (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_market_redeems_user ON market_redeems(user_id);
-CREATE INDEX idx_market_redeems_status ON market_redeems(status);
-CREATE INDEX idx_market_redeems_created ON market_redeems(created_at);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_user ON market_redeems(user_id);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_status ON market_redeems(status);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_created ON market_redeems(created_at);
 
 -- Triggers for updated_at
-CREATE TRIGGER update_welcome_events_updated_at BEFORE UPDATE ON welcome_events
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_welcome_events_updated_at') THEN
+    CREATE TRIGGER update_welcome_events_updated_at BEFORE UPDATE ON welcome_events
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
 
-CREATE TRIGGER update_fire_requests_updated_at BEFORE UPDATE ON fire_requests
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_fire_requests_updated_at') THEN
+    CREATE TRIGGER update_fire_requests_updated_at BEFORE UPDATE ON fire_requests
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
 
-CREATE TRIGGER update_market_redeems_updated_at BEFORE UPDATE ON market_redeems
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_market_redeems_updated_at') THEN
+    CREATE TRIGGER update_market_redeems_updated_at BEFORE UPDATE ON market_redeems
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;

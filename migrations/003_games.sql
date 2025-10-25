@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS raffles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_raffles_code ON raffles(code);
-CREATE INDEX idx_raffles_host ON raffles(host_id);
-CREATE INDEX idx_raffles_status ON raffles(status);
-CREATE INDEX idx_raffles_visibility ON raffles(visibility);
-CREATE INDEX idx_raffles_created ON raffles(created_at);
+CREATE INDEX IF NOT EXISTS idx_raffles_code ON raffles(code);
+CREATE INDEX IF NOT EXISTS idx_raffles_host ON raffles(host_id);
+CREATE INDEX IF NOT EXISTS idx_raffles_status ON raffles(status);
+CREATE INDEX IF NOT EXISTS idx_raffles_visibility ON raffles(visibility);
+CREATE INDEX IF NOT EXISTS idx_raffles_created ON raffles(created_at);
 
 -- Raffle numbers table
 CREATE TABLE IF NOT EXISTS raffle_numbers (
@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS raffle_numbers (
   UNIQUE(raffle_id, number_idx)
 );
 
-CREATE INDEX idx_raffle_numbers_raffle ON raffle_numbers(raffle_id);
-CREATE INDEX idx_raffle_numbers_state ON raffle_numbers(state);
-CREATE INDEX idx_raffle_numbers_owner ON raffle_numbers(owner_id) WHERE owner_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_raffle_numbers_raffle ON raffle_numbers(raffle_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_numbers_state ON raffle_numbers(state);
+CREATE INDEX IF NOT EXISTS idx_raffle_numbers_owner ON raffle_numbers(owner_id) WHERE owner_id IS NOT NULL;
 
 -- Raffle participants table
 CREATE TABLE IF NOT EXISTS raffle_participants (
@@ -69,9 +69,9 @@ CREATE TABLE IF NOT EXISTS raffle_participants (
   UNIQUE(raffle_id, user_id)
 );
 
-CREATE INDEX idx_raffle_participants_raffle ON raffle_participants(raffle_id);
-CREATE INDEX idx_raffle_participants_user ON raffle_participants(user_id);
-CREATE INDEX idx_raffle_participants_status ON raffle_participants(status);
+CREATE INDEX IF NOT EXISTS idx_raffle_participants_raffle ON raffle_participants(raffle_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_participants_user ON raffle_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_participants_status ON raffle_participants(status);
 
 -- Raffle pending requests
 CREATE TABLE IF NOT EXISTS raffle_pending_requests (
@@ -88,8 +88,8 @@ CREATE TABLE IF NOT EXISTS raffle_pending_requests (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_raffle_requests_raffle ON raffle_pending_requests(raffle_id);
-CREATE INDEX idx_raffle_requests_status ON raffle_pending_requests(status);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_raffle ON raffle_pending_requests(raffle_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_status ON raffle_pending_requests(status);
 
 -- Bingo rooms table
 CREATE TABLE IF NOT EXISTS bingo_rooms (
@@ -120,10 +120,10 @@ CREATE TABLE IF NOT EXISTS bingo_rooms (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_bingo_rooms_code ON bingo_rooms(code);
-CREATE INDEX idx_bingo_rooms_host ON bingo_rooms(host_id);
-CREATE INDEX idx_bingo_rooms_status ON bingo_rooms(status);
-CREATE INDEX idx_bingo_rooms_visibility ON bingo_rooms(visibility);
+CREATE INDEX IF NOT EXISTS idx_bingo_rooms_code ON bingo_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_bingo_rooms_host ON bingo_rooms(host_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_rooms_status ON bingo_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_bingo_rooms_visibility ON bingo_rooms(visibility);
 
 -- Bingo players table
 CREATE TABLE IF NOT EXISTS bingo_players (
@@ -141,9 +141,9 @@ CREATE TABLE IF NOT EXISTS bingo_players (
   UNIQUE(room_id, user_id)
 );
 
-CREATE INDEX idx_bingo_players_room ON bingo_players(room_id);
-CREATE INDEX idx_bingo_players_user ON bingo_players(user_id);
-CREATE INDEX idx_bingo_players_status ON bingo_players(status);
+CREATE INDEX IF NOT EXISTS idx_bingo_players_room ON bingo_players(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_players_user ON bingo_players(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_players_status ON bingo_players(status);
 
 -- Bingo cards table
 CREATE TABLE IF NOT EXISTS bingo_cards (
@@ -159,9 +159,9 @@ CREATE TABLE IF NOT EXISTS bingo_cards (
   claim_ref VARCHAR(255)
 );
 
-CREATE INDEX idx_bingo_cards_room ON bingo_cards(room_id);
-CREATE INDEX idx_bingo_cards_player ON bingo_cards(player_id);
-CREATE INDEX idx_bingo_cards_winner ON bingo_cards(is_winner) WHERE is_winner = true;
+CREATE INDEX IF NOT EXISTS idx_bingo_cards_room ON bingo_cards(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_cards_player ON bingo_cards(player_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_cards_winner ON bingo_cards(is_winner) WHERE is_winner = true;
 
 -- Bingo draws history
 CREATE TABLE IF NOT EXISTS bingo_draws (
@@ -173,8 +173,8 @@ CREATE TABLE IF NOT EXISTS bingo_draws (
   drawn_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_bingo_draws_room ON bingo_draws(room_id);
-CREATE INDEX idx_bingo_draws_order ON bingo_draws(room_id, draw_order);
+CREATE INDEX IF NOT EXISTS idx_bingo_draws_room ON bingo_draws(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_draws_order ON bingo_draws(room_id, draw_order);
 
 -- Bingo claims (when players claim victory)
 CREATE TABLE IF NOT EXISTS bingo_claims (
@@ -193,9 +193,9 @@ CREATE TABLE IF NOT EXISTS bingo_claims (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_bingo_claims_room ON bingo_claims(room_id);
-CREATE INDEX idx_bingo_claims_player ON bingo_claims(player_id);
-CREATE INDEX idx_bingo_claims_status ON bingo_claims(status);
+CREATE INDEX IF NOT EXISTS idx_bingo_claims_room ON bingo_claims(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_claims_player ON bingo_claims(player_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_claims_status ON bingo_claims(status);
 
 -- Game history/stats table
 CREATE TABLE IF NOT EXISTS game_stats (
@@ -215,15 +215,30 @@ CREATE TABLE IF NOT EXISTS game_stats (
   UNIQUE(user_id, game_type)
 );
 
-CREATE INDEX idx_game_stats_user ON game_stats(user_id);
-CREATE INDEX idx_game_stats_type ON game_stats(game_type);
+CREATE INDEX IF NOT EXISTS idx_game_stats_user ON game_stats(user_id);
+CREATE INDEX IF NOT EXISTS idx_game_stats_type ON game_stats(game_type);
 
 -- Triggers
-CREATE TRIGGER update_raffles_updated_at BEFORE UPDATE ON raffles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_raffles_updated_at') THEN
+    CREATE TRIGGER update_raffles_updated_at BEFORE UPDATE ON raffles
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
 
-CREATE TRIGGER update_bingo_rooms_updated_at BEFORE UPDATE ON bingo_rooms
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_bingo_rooms_updated_at') THEN
+    CREATE TRIGGER update_bingo_rooms_updated_at BEFORE UPDATE ON bingo_rooms
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
 
-CREATE TRIGGER update_game_stats_updated_at BEFORE UPDATE ON game_stats
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_game_stats_updated_at') THEN
+    CREATE TRIGGER update_game_stats_updated_at BEFORE UPDATE ON game_stats
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END$$;
