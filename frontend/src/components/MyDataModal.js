@@ -32,10 +32,16 @@ const MyDataModal = ({ isOpen, onClose }) => {
       await axios.post(`/profile/${user.id}/check-password`, { password: 'dummy-check' });
       return true; // Tiene contraseña (aunque falló la verificación)
     } catch (err) {
+      // Si devuelve requiresPasswordCreation (400), NO tiene contraseña
       if (err.response?.data?.requiresPasswordCreation) {
-        return false; // NO tiene contraseña
+        return false;
       }
-      return true; // Cualquier otro error = tiene contraseña
+      // Si devuelve 401 (Unauthorized), SÍ tiene contraseña (pero es incorrecta)
+      if (err.response?.status === 401) {
+        return true;
+      }
+      // Cualquier otro error, asumir que tiene contraseña por seguridad
+      return true;
     }
   };
 

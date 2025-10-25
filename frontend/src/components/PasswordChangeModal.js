@@ -32,14 +32,19 @@ const PasswordChangeModal = ({ isOpen, onClose }) => {
     try {
       // Intentar verificar con password vacío para detectar si tiene password
       await axios.post(`/profile/${user.id}/check-password`, { password: 'dummy-check' });
-      // Si llega aquí, tiene password (aunque falló la verificación)
+      // Si llega aquí sin error, tiene password (aunque falló la verificación)
       setHasPassword(true);
     } catch (err) {
-      // Si devuelve requiresPasswordCreation, NO tiene password
+      // Si devuelve requiresPasswordCreation (400), NO tiene password
       if (err.response?.data?.requiresPasswordCreation) {
         setHasPassword(false);
-      } else {
-        // Cualquier otro error significa que SÍ tiene password
+      } 
+      // Si devuelve 401 (Unauthorized), significa que SÍ tiene password (pero es incorrecta)
+      else if (err.response?.status === 401) {
+        setHasPassword(true);
+      }
+      // Cualquier otro error, asumir que tiene password por seguridad
+      else {
         setHasPassword(true);
       }
     }
