@@ -7,10 +7,32 @@ let client = null;
 // Initialize Redis connection
 async function initRedis() {
   try {
+    // Skip Redis in production if not explicitly configured
+    if (process.env.NODE_ENV === 'production' && 
+        (!process.env.REDIS_HOST || process.env.REDIS_HOST === 'localhost')) {
+      logger.warn('Redis not configured for production. Running without cache.');
+      return null;
+    }
+
+    // Skip Redis in development if explicitly disabled
+    if (process.env.REDIS_ENABLED === 'false') {
+      logger.info('Redis explicitly disabled.');
+      return null;
+    }
+
     const redisConfig = {
       socket: {
         host: config.redis.host,
-        port: config.redis.port
+        port: config.redis.port,
+        connectTimeout: 5000,
+        reconnectStrategy: (retries) => {
+          // Stop reconnecting after 3 attempts
+          if (retries > 3) {
+            logger.warn('Redis reconnect attempts exhausted. Disabling Redis.');
+            return false; // Stop reconnecting
+          }
+          return Math.min(retries * 100, 3000);
+        }
       }
     };
 
@@ -26,7 +48,7 @@ async function initRedis() {
 
     // Error handling
     client.on('error', (err) => {
-      logger.error('Redis Client Error:', err);
+      logger.error('Redis Client Error:', err.message);
     });
 
     client.on('connect', () => {
@@ -38,19 +60,32 @@ async function initRedis() {
     });
 
     client.on('end', () => {
-      logger.info('Redis Client Connection Closed');
+      logger.warn('Redis Client Connection Closed');
     });
 
     client.on('reconnecting', () => {
-      logger.info('Redis Client Reconnecting...');
+      logger.warn('Redis Client Reconnecting...');
     });
 
-    // Connect to Redis
-    await client.connect();
+    // Connect to Redis with timeout
+    await Promise.race([
+      client.connect(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+      )
+    ]);
 
+    logger.info('Redis initialized successfully');
     return client;
   } catch (error) {
-    logger.error('Failed to initialize Redis:', error);
+    logger.warn('Failed to initialize Redis (running without cache):', error.message);
+    // Cleanup failed client
+    if (client) {
+      try {
+        await client.disconnect();
+      } catch (_) {}
+      client = null;
+    }
     // Don't throw - Redis is optional, app can work without it
     return null;
   }
