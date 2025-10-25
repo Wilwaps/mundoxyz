@@ -4,6 +4,59 @@ const { query, transaction } = require('../db');
 const { verifyToken, requireAdmin, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
+// Get user balance
+router.get('/balance', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const result = await query(
+      `SELECT 
+        coins_balance,
+        fires_balance,
+        total_coins_earned,
+        total_coins_spent,
+        total_fires_earned,
+        total_fires_spent
+      FROM wallets 
+      WHERE user_id = $1`,
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      // Create wallet if doesn't exist
+      await query(
+        `INSERT INTO wallets (user_id, coins_balance, fires_balance) 
+         VALUES ($1, 0, 0) 
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+      
+      return res.json({
+        coins_balance: 0,
+        fires_balance: 0,
+        total_coins_earned: 0,
+        total_coins_spent: 0,
+        total_fires_earned: 0,
+        total_fires_spent: 0
+      });
+    }
+    
+    const wallet = result.rows[0];
+    res.json({
+      coins_balance: parseFloat(wallet.coins_balance || 0),
+      fires_balance: parseFloat(wallet.fires_balance || 0),
+      total_coins_earned: parseFloat(wallet.total_coins_earned || 0),
+      total_coins_spent: parseFloat(wallet.total_coins_spent || 0),
+      total_fires_earned: parseFloat(wallet.total_fires_earned || 0),
+      total_fires_spent: parseFloat(wallet.total_fires_spent || 0)
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching user balance:', error);
+    res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
+
 // Get supply overview
 router.get('/supply', async (req, res) => {
   try {

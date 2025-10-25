@@ -30,14 +30,16 @@ const TicTacToeLobby = () => {
   });
   
   // Fetch user balance
-  const { data: balance } = useQuery({
+  const { data: balance, refetch: refetchBalance } = useQuery({
     queryKey: ['user-balance'],
     queryFn: async () => {
       if (!user) return { coins_balance: 0, fires_balance: 0 };
       const response = await axios.get('/api/economy/balance');
       return response.data;
     },
-    enabled: !!user
+    enabled: !!user,
+    refetchInterval: 5000, // Refetch balance every 5 seconds
+    staleTime: 2000
   });
   
   // Create room mutation
@@ -48,6 +50,7 @@ const TicTacToeLobby = () => {
     },
     onSuccess: (data) => {
       toast.success('Sala creada exitosamente');
+      refetchBalance(); // Refrescar balance después de crear sala
       navigate(`/tictactoe/room/${data.room.code}`);
     },
     onError: (error) => {
@@ -63,6 +66,7 @@ const TicTacToeLobby = () => {
     },
     onSuccess: (data, code) => {
       toast.success('Te has unido a la sala');
+      refetchBalance(); // Refrescar balance después de unirse
       navigate(`/tictactoe/room/${code}`);
     },
     onError: (error) => {
@@ -87,8 +91,8 @@ const TicTacToeLobby = () => {
         return;
       }
     } else if (createForm.mode === 'fires') {
-      if (balance?.fires_balance < 1) {
-        toast.error('No tienes suficientes fires');
+      if (!balance?.fires_balance || balance.fires_balance < 1) {
+        toast.error(`No tienes suficientes fires. Balance actual: ${balance?.fires_balance || 0}`);
         return;
       }
     }
