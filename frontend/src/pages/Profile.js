@@ -29,7 +29,14 @@ const Profile = () => {
   const [showSendFires, setShowSendFires] = useState(false);
   const [showBuyFires, setShowBuyFires] = useState(false);
   const [showReceiveFires, setShowReceiveFires] = useState(false);
-  const [walletId, setWalletId] = useState(null);
+  const [walletId, setWalletId] = useState(user?.wallet_id || null);
+
+  // Sync walletId when user changes
+  React.useEffect(() => {
+    if (user?.wallet_id) {
+      setWalletId(user.wallet_id);
+    }
+  }, [user?.wallet_id]);
 
   // Fetch user stats
   const { data: stats } = useQuery({
@@ -333,7 +340,7 @@ const Profile = () => {
       <ReceiveFiresModal 
         isOpen={showReceiveFires} 
         onClose={() => setShowReceiveFires(false)}
-        walletId={walletId}
+        walletId={user?.wallet_id || walletId}
       />
     </div>
   );
