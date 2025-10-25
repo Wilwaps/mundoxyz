@@ -182,13 +182,33 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     try {
       const response = await axios.get(`/profile/${user.id}`);
+      const profileData = response.data;
+      
+      // Construir usuario actualizado con TODOS los campos nuevos
       const updatedUser = {
-        ...user,
-        ...response.data,
-        wallet_id: response.data.wallet_id,
-        coins_balance: response.data.stats?.coins_balance || 0,
-        fires_balance: response.data.stats?.fires_balance || 0
+        id: profileData.id,
+        username: profileData.username,
+        display_name: profileData.display_name,
+        nickname: profileData.nickname,
+        bio: profileData.bio,
+        email: profileData.email,
+        tg_id: profileData.tg_id,
+        avatar_url: profileData.avatar_url,
+        locale: profileData.locale,
+        is_verified: profileData.is_verified,
+        created_at: profileData.created_at,
+        last_seen_at: profileData.last_seen_at,
+        roles: profileData.roles || user.roles || [],
+        wallet_id: profileData.wallet_id,
+        // Balances del stats
+        coins_balance: profileData.stats?.coins_balance || 0,
+        fires_balance: profileData.stats?.fires_balance || 0,
+        total_coins_earned: profileData.stats?.total_coins_earned || 0,
+        total_fires_earned: profileData.stats?.total_fires_earned || 0,
+        total_coins_spent: profileData.total_coins_spent || 0,
+        total_fires_spent: profileData.total_fires_spent || 0
       };
+      
       updateUser(updatedUser);
       return updatedUser;
     } catch (error) {

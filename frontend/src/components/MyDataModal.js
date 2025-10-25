@@ -4,11 +4,13 @@ import { X, User, Mail, MessageCircle, Save, Check, AlertCircle, ExternalLink } 
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import TelegramLinkModal from './TelegramLinkModal';
 import PasswordRequiredModal from './PasswordRequiredModal';
 
 const MyDataModal = ({ isOpen, onClose }) => {
   const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({
     display_name: '',
@@ -114,7 +116,12 @@ const MyDataModal = ({ isOpen, onClose }) => {
     try {
       await axios.put(`/profile/${user.id}/update-profile`, formData);
       toast.success('Perfil actualizado exitosamente');
+      
+      // Actualizar usuario y refrescar todas las queries
       await refreshUser();
+      queryClient.invalidateQueries(['user-stats', user.id]);
+      queryClient.invalidateQueries(['user-profile', user.id]);
+      
       setHasChanges(false);
       onClose();
     } catch (error) {
@@ -151,7 +158,11 @@ const MyDataModal = ({ isOpen, onClose }) => {
     try {
       await axios.post(`/profile/${user.id}/unlink-telegram`);
       toast.success('Telegram desvinculado');
+      
+      // Actualizar usuario y refrescar queries
       await refreshUser();
+      queryClient.invalidateQueries(['user-stats', user.id]);
+      queryClient.invalidateQueries(['user-profile', user.id]);
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error al desvincular');
     }

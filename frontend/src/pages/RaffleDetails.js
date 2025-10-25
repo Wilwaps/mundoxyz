@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -11,6 +11,7 @@ const RaffleDetails = () => {
   const { code } = useParams();
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedNumbers, setSelectedNumbers] = useState(new Set());
 
   const { data: raffle, isLoading, refetch } = useQuery({
@@ -31,6 +32,8 @@ const RaffleDetails = () => {
       setSelectedNumbers(new Set());
       refetch();
       refreshUser();
+      queryClient.invalidateQueries(['user-stats', user.id]);
+      queryClient.invalidateQueries(['raffles']);
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al comprar números');

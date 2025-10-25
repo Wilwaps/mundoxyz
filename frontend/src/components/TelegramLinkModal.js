@@ -4,9 +4,11 @@ import { X, Send, Copy, Check, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const TelegramLinkModal = ({ isOpen, onClose }) => {
   const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
   const [method, setMethod] = useState('bot'); // 'bot' or 'manual'
   const [manualId, setManualId] = useState('');
   const [botToken, setBotToken] = useState('');
@@ -44,6 +46,8 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
           clearInterval(interval);
           setChecking(false);
           toast.success('¡Telegram vinculado exitosamente!');
+          queryClient.invalidateQueries(['user-stats', user.id]);
+          queryClient.invalidateQueries(['user-profile', user.id]);
           onClose();
         }
       } catch (error) {
@@ -70,6 +74,8 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
       await axios.post(`/profile/${user.id}/link-telegram-manual`, { tg_id: manualId });
       toast.success('Telegram vinculado exitosamente');
       await refreshUser();
+      queryClient.invalidateQueries(['user-stats', user.id]);
+      queryClient.invalidateQueries(['user-profile', user.id]);
       handleClose();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error al vincular');

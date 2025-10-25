@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, Clock, CheckCircle, XCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 const Market = () => {
   const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [redeemData, setRedeemData] = useState({
     cedula: '',
@@ -42,6 +43,8 @@ const Market = () => {
         bank_account: ''
       });
       refreshUser();
+      queryClient.invalidateQueries(['my-redeems']);
+      queryClient.invalidateQueries(['user-stats', user.id]);
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al crear solicitud');
