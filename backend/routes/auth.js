@@ -722,7 +722,7 @@ router.put('/change-password', async (req, res) => {
     let userId;
     try {
       const decoded = jwt.verify(token, config.security.jwtSecret);
-      userId = decoded.id;
+      userId = decoded.userId; // el payload usa 'userId'
     } catch (error) {
       return res.status(401).json({ error: 'Token inválido' });
     }
@@ -738,17 +738,12 @@ router.put('/change-password', async (req, res) => {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
 
-    // Obtener hash actual desde auth_identities o users (compatibilidad)
+    // Obtener hash actual desde auth_identities (provider='email')
     const aiRes = await query(
       "SELECT password_hash FROM auth_identities WHERE user_id = $1 AND provider = 'email'",
       [userId]
     );
-    const userRes = await query(
-      'SELECT password_hash FROM users WHERE id = $1',
-      [userId]
-    );
-
-    const existingHash = aiRes.rows[0]?.password_hash || userRes.rows[0]?.password_hash || null;
+    const existingHash = aiRes.rows[0]?.password_hash || null;
 
     // Si YA tiene contraseña, validar current_password
     if (existingHash) {
@@ -767,22 +762,19 @@ router.put('/change-password', async (req, res) => {
     // Hash nueva contraseña
     const newPasswordHash = await bcrypt.hash(new_password, 10);
 
-    // Guardar en auth_identities si existe registro, si no en users
+    // Guardar SIEMPRE en auth_identities (provider='email'). Crear fila si no existe
     if (aiRes.rows.length > 0) {
       await query(
-        "UPDATE auth_identities SET password_hash = $1, updated_at = NOW() WHERE user_id = $2 AND provider = 'email'",
-        [newPasswordHash, userId]
-      );
-    } else if (userRes.rows.length > 0) {
-      await query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        "UPDATE auth_identities SET password_hash = $1 WHERE user_id = $2 AND provider = 'email'",
         [newPasswordHash, userId]
       );
     } else {
-      // No hay registros previos: permitir establecer contraseña por primera vez
+      // Obtener email/username para provider_uid (puede ser null si no hay email)
+      const info = await query('SELECT email, username FROM users WHERE id = $1', [userId]);
+      const providerUid = info.rows[0]?.email || info.rows[0]?.username || String(userId);
       await query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-        [newPasswordHash, userId]
+        "INSERT INTO auth_identities (user_id, provider, provider_uid, password_hash, created_at) VALUES ($1, 'email', $2, $3, NOW())",
+        [userId, providerUid, newPasswordHash]
       );
     }
 
