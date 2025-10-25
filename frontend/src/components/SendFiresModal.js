@@ -284,7 +284,7 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
 
                 {/* Continue Button */}
                 <button
-                  onClick={handleContinue}
+                  onClick={handleNext}
                   className="w-full btn-primary"
                 >
                   Continuar
