@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
@@ -328,6 +328,7 @@ const AdminWelcome = () => {
 
 // Fire Requests Component
 const AdminFireRequests = () => {
+  const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -363,6 +364,14 @@ const AdminFireRequests = () => {
         });
         toast.success('Solicitud rechazada');
       }
+      
+      // Invalidar todas las queries relevantes para actualizar en tiempo real
+      queryClient.invalidateQueries(['fire-requests']);
+      queryClient.invalidateQueries(['user-stats']);
+      queryClient.invalidateQueries(['user-wallet']);
+      queryClient.invalidateQueries(['wallet-transactions']);
+      queryClient.invalidateQueries(['admin-stats']);
+      
       setShowReviewModal(false);
       setReviewNotes('');
       refetch();

@@ -3,8 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, ArrowLeft, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../contexts/AuthContext';
 
 const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
   const [step, setStep] = useState('form'); // 'form' or 'confirm'
   const [formData, setFormData] = useState({
     to_wallet_id: '',
@@ -72,6 +76,13 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
     try {
       const response = await axios.post('/economy/transfer-fires', formData);
       toast.success(`${formData.amount} fuegos enviados exitosamente`);
+      
+      // Invalidar queries para actualizar datos en tiempo real
+      await refreshUser();
+      queryClient.invalidateQueries(['user-stats']);
+      queryClient.invalidateQueries(['user-wallet']);
+      queryClient.invalidateQueries(['wallet-transactions']);
+      
       onSuccess && onSuccess(response.data);
       handleClose();
     } catch (error) {

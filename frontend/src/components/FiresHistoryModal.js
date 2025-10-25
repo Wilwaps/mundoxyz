@@ -1,41 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Send, Download, ShoppingBag, Gift, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../contexts/AuthContext';
 
 const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenReceive }) => {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
   const pageSize = 25;
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchTransactions();
-    }
-  }, [isOpen, page]);
-
-  const fetchTransactions = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`/profile/${localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : ''}/transactions`, {
+  // Usar React Query para manejar transacciones con refetch automático
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ['wallet-transactions', user?.id, page],
+    queryFn: async () => {
+      if (!user?.id) return { transactions: [], total: 0 };
+      const response = await axios.get(`/profile/${user.id}/transactions`, {
         params: {
           currency: 'fires',
           limit: pageSize,
           offset: page * pageSize
         }
       });
-      setTransactions(response.data.transactions || []);
-      setTotal(response.data.total || 0);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast.error('Error al cargar historial');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data;
+    },
+    enabled: isOpen && !!user?.id,
+    refetchInterval: 5000, // Refetch cada 5 segundos cuando el modal está abierto
+    refetchIntervalInBackground: false
+  });
+
+  const transactions = data?.transactions || [];
+  const total = data?.total || 0;
 
   const getTransactionIcon = (type) => {
     switch (type) {

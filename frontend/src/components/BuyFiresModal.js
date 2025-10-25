@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Copy, Check, Send } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     amount: '',
     bank_reference: ''
@@ -74,6 +76,10 @@ Pago`;
     try {
       const response = await axios.post('/economy/request-fires', formData);
       toast.success('Solicitud enviada. Será revisada por un administrador.');
+      
+      // Invalidar queries de solicitudes
+      queryClient.invalidateQueries(['fire-requests']);
+      
       onSuccess && onSuccess(response.data);
       handleClose();
     } catch (error) {

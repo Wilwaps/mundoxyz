@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
@@ -23,6 +23,7 @@ import BuyFiresModal from '../components/BuyFiresModal';
 import ReceiveFiresModal from '../components/ReceiveFiresModal';
 
 const Profile = () => {
+  const queryClient = useQueryClient();
   const { user, logout, refreshUser } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showFiresHistory, setShowFiresHistory] = useState(false);
@@ -45,7 +46,9 @@ const Profile = () => {
       const response = await axios.get(`/profile/${user.id}/stats`);
       return response.data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 10000, // Refetch cada 10 segundos
+    refetchIntervalInBackground: false
   });
 
   // Fetch wallet ID
@@ -56,7 +59,9 @@ const Profile = () => {
       setWalletId(response.data.wallet_id);
       return response.data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 10000, // Refetch cada 10 segundos
+    refetchIntervalInBackground: false
   });
 
   // Fetch user games
@@ -77,6 +82,10 @@ const Profile = () => {
 
   const handleRefreshBalance = async () => {
     await refreshUser();
+    // Invalidar todas las queries para forzar actualización
+    queryClient.invalidateQueries(['user-stats', user?.id]);
+    queryClient.invalidateQueries(['user-wallet', user?.id]);
+    queryClient.invalidateQueries(['user-games', user?.id]);
     toast.success('Balance actualizado');
   };
 
