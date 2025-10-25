@@ -443,8 +443,8 @@ router.put('/:userId/update-profile', verifyToken, async (req, res) => {
     const { userId } = req.params;
     const { display_name, nickname, email, bio } = req.body;
 
-    // Verify permissions
-    if (req.user.id !== userId) {
+    // Verify permissions (comparar como string ya que userId puede ser UUID o username)
+    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -522,6 +522,10 @@ router.put('/:userId/update-profile', verifyToken, async (req, res) => {
       values
     );
 
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
     res.json({
       success: true,
       user: result.rows[0]
@@ -540,7 +544,7 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const { password } = req.body;
 
     // Verify permissions
-    if (req.user.id !== userId) {
+    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -618,7 +622,7 @@ router.post('/:userId/link-telegram', verifyToken, async (req, res) => {
     const { userId } = req.params;
 
     // Verify permissions
-    if (req.user.id !== userId) {
+    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -657,7 +661,7 @@ router.post('/:userId/link-telegram-manual', verifyToken, async (req, res) => {
     const { tg_id } = req.body;
 
     // Verify permissions
-    if (req.user.id !== userId) {
+    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -696,7 +700,7 @@ router.post('/:userId/unlink-telegram', verifyToken, async (req, res) => {
     const { userId } = req.params;
 
     // Verify permissions
-    if (req.user.id !== userId) {
+    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
