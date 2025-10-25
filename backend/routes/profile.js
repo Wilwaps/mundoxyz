@@ -24,6 +24,8 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         u.is_verified,
         u.created_at,
         u.last_seen_at,
+        u.nickname,
+        u.bio,
         w.id as wallet_id,
         w.coins_balance,
         w.fires_balance,
@@ -31,22 +33,12 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         w.total_fires_earned,
         w.total_coins_spent,
         w.total_fires_spent,
-        array_agg(DISTINCT r.name) as roles,
-        json_object_agg(
-          DISTINCT gs.game_type, 
-          json_build_object(
-            'games_played', gs.games_played,
-            'games_won', gs.games_won,
-            'fires_won', gs.fires_won,
-            'coins_won', gs.coins_won
-          )
-        ) FILTER (WHERE gs.game_type IS NOT NULL) as game_stats
+        array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) as roles
       FROM users u
       LEFT JOIN wallets w ON w.user_id = u.id
       LEFT JOIN user_roles ur ON ur.user_id = u.id
       LEFT JOIN roles r ON r.id = ur.role_id
-      LEFT JOIN game_stats gs ON gs.user_id = u.id
-      WHERE u.id = $1 OR u.tg_id = $1::bigint OR u.username = $1
+      WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
       GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, w.total_coins_earned, 
                w.total_fires_earned, w.total_coins_spent, w.total_fires_spent`,
       [userId]
@@ -74,17 +66,18 @@ router.get('/:userId', optionalAuth, async (req, res) => {
       id: user.id,
       username: user.username,
       display_name: user.display_name,
+      nickname: user.nickname,
+      bio: user.bio,
       avatar_url: user.avatar_url,
       created_at: user.created_at,
       last_seen_at: user.last_seen_at,
       is_verified: user.is_verified,
-      roles: user.roles?.filter(Boolean) || [],
+      roles: user.roles || [],
       stats: {
         coins_balance: user.coins_balance || 0,
         fires_balance: user.fires_balance || 0,
         total_coins_earned: user.total_coins_earned || 0,
-        total_fires_earned: user.total_fires_earned || 0,
-        games: user.game_stats || {}
+        total_fires_earned: user.total_fires_earned || 0
       }
     };
 
@@ -183,7 +176,7 @@ router.put('/:userId', verifyToken, async (req, res) => {
     const result = await query(
       `UPDATE users 
        SET ${updates.join(', ')}, updated_at = NOW() 
-       WHERE id = $${paramCount} OR tg_id = $${paramCount}::bigint OR username = $${paramCount}
+       WHERE id::text = $${paramCount} OR tg_id::text = $${paramCount} OR username = $${paramCount}
        RETURNING id, username, display_name, avatar_url, locale, email`,
       values
     );
@@ -223,7 +216,7 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
       LEFT JOIN raffles r ON r.id = rp.raffle_id
       LEFT JOIN bingo_players bp ON bp.user_id = u.id
       LEFT JOIN bingo_rooms b ON b.id = bp.room_id
-      WHERE u.id = $1 OR u.tg_id = $1::bigint OR u.username = $1
+      WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
       GROUP BY u.id`,
       [userId]
     );
