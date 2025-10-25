@@ -24,6 +24,19 @@ const MyDataModal = ({ isOpen, onClose }) => {
   const [pendingAction, setPendingAction] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Helper: Check if user has password
+  const checkHasPassword = async () => {
+    try {
+      await axios.post(`/profile/${user.id}/check-password`, { password: 'dummy-check' });
+      return true; // Tiene contraseña (aunque falló la verificación)
+    } catch (err) {
+      if (err.response?.data?.requiresPasswordCreation) {
+        return false; // NO tiene contraseña
+      }
+      return true; // Cualquier otro error = tiene contraseña
+    }
+  };
+
   // Initialize form data with user data
   useEffect(() => {
     if (user && isOpen) {
@@ -67,13 +80,24 @@ const MyDataModal = ({ isOpen, onClose }) => {
   };
 
   const handleSave = async () => {
-    // If email changed, require password
+    // If email changed, require password (only if user has password)
     if (formData.email !== user?.email) {
-      setPendingAction('save');
-      setShowPasswordModal(true);
-      return;
+      const hasPassword = await checkHasPassword();
+      if (hasPassword) {
+        setPendingAction('save');
+        setShowPasswordModal(true);
+        return;
+      } else {
+        // Usuario sin contraseña, sugerir establecer una
+        toast.error('Por seguridad, establece una contraseña antes de cambiar tu email', {
+          duration: 5000,
+          icon: '🔒'
+        });
+        return;
+      }
     }
 
+    // Direct save if email didn't change
     await saveProfile();
   };
 
@@ -109,9 +133,18 @@ const MyDataModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleUnlinkTelegram = () => {
-    setPendingAction('unlink-telegram');
-    setShowPasswordModal(true);
+  const handleUnlinkTelegram = async () => {
+    const hasPassword = await checkHasPassword();
+    if (hasPassword) {
+      setPendingAction('unlink-telegram');
+      setShowPasswordModal(true);
+    } else {
+      // Usuario sin contraseña, sugerir establecer una
+      toast.error('Por seguridad, establece una contraseña antes de desvincular Telegram', {
+        duration: 5000,
+        icon: '🔒'
+      });
+    }
   };
 
   const unlinkTelegram = async () => {
