@@ -185,6 +185,7 @@ export const AuthProvider = ({ children }) => {
       const updatedUser = {
         ...user,
         ...response.data,
+        wallet_id: response.data.wallet_id,
         coins_balance: response.data.stats?.coins_balance || 0,
         fires_balance: response.data.stats?.fires_balance || 0
       };

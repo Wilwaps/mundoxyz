@@ -64,13 +64,13 @@ router.post('/login-telegram', async (req, res) => {
 
     // Get user data
     const userResult = await query(
-      'SELECT u.*, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
       'WHERE u.id = $1 ' +
-      'GROUP BY u.id, w.coins_balance, w.fires_balance',
+      'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance',
       [userId]
     );
 
@@ -94,6 +94,7 @@ router.post('/login-telegram', async (req, res) => {
         username: user.username,
         display_name: user.display_name,
         avatar_url: user.avatar_url,
+        wallet_id: user.wallet_id,
         coins_balance: user.coins_balance || 0,
         fires_balance: user.fires_balance || 0,
         roles: user.roles?.filter(Boolean) || []
@@ -183,13 +184,13 @@ router.post('/login-email', async (req, res) => {
 
       // Get user data
       const userResult = await query(
-        'SELECT u.*, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+        'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
         'FROM users u ' +
         'LEFT JOIN wallets w ON w.user_id = u.id ' +
         'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
         'LEFT JOIN roles r ON r.id = ur.role_id ' +
         'WHERE u.id = $1 ' +
-        'GROUP BY u.id, w.coins_balance, w.fires_balance',
+        'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance',
         [userId]
       );
 
@@ -213,6 +214,7 @@ router.post('/login-email', async (req, res) => {
           username: user.username,
           display_name: user.display_name,
           avatar_url: user.avatar_url,
+          wallet_id: user.wallet_id,
           coins_balance: user.coins_balance || 0,
           fires_balance: user.fires_balance || 0,
           roles: user.roles?.filter(Boolean) || []
@@ -226,14 +228,14 @@ router.post('/login-email', async (req, res) => {
     // Regular email/username login with stored password
     logger.info('login-email regular path');
     const result = await query(
-      'SELECT u.id, u.username, u.email, ai.password_hash, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.id, u.username, u.email, ai.password_hash, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
       'FROM users u ' +
       "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
       'WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1) OR ai.provider_uid = $1 ' +
-      'GROUP BY u.id, ai.password_hash, w.coins_balance, w.fires_balance',
+      'GROUP BY u.id, ai.password_hash, w.id, w.coins_balance, w.fires_balance',
       [identifier]
     );
 
@@ -276,6 +278,7 @@ router.post('/login-email', async (req, res) => {
         id: row.id,
         username: row.username,
         email: row.email,
+        wallet_id: row.wallet_id,
         coins_balance: row.coins_balance || 0,
         fires_balance: row.fires_balance || 0,
         roles: (row.roles || []).filter(Boolean)
@@ -479,13 +482,13 @@ router.post('/login-telegram-widget', async (req, res) => {
 
     // Get user data
     const userResult = await query(
-      'SELECT u.*, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
       'WHERE u.id = $1 ' +
-      'GROUP BY u.id, w.coins_balance, w.fires_balance',
+      'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance',
       [userId]
     );
 
@@ -501,6 +504,7 @@ router.post('/login-telegram-widget', async (req, res) => {
         username: user.username,
         display_name: user.display_name,
         avatar_url: user.avatar_url,
+        wallet_id: user.wallet_id,
         coins_balance: user.coins_balance || 0,
         fires_balance: user.fires_balance || 0,
         roles: user.roles?.filter(Boolean) || []
