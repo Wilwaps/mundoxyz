@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   -- Experiencia
   xp_awarded BOOLEAN DEFAULT FALSE,
   
+  -- Sistema de Revancha
+  rematch_requested_by_x BOOLEAN DEFAULT FALSE,
+  rematch_requested_by_o BOOLEAN DEFAULT FALSE,
+  rematch_count INTEGER DEFAULT 0, -- Contador de revanchas consecutivas
+  is_rematch BOOLEAN DEFAULT FALSE, -- Si es una sala de revancha
+  original_room_id UUID REFERENCES tictactoe_rooms(id) ON DELETE SET NULL, -- Sala original
+  
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,

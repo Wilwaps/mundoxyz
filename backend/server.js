@@ -25,6 +25,7 @@ const gameRoutes = require('./routes/games');
 const bingoRoutes = require('./routes/bingo');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
+const tictactoeRoutes = require('./routes/tictactoe');
 
 // Create Express app
 const app = express();
@@ -153,6 +154,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/games/bingo', bingoRoutes);
+app.use('/api/tictactoe', tictactoeRoutes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);

@@ -11,12 +11,13 @@ router.get('/list', optionalAuth, async (req, res) => {
       {
         id: 'tictactoe',
         name: 'La Vieja',
-        description: 'El clásico juego de tres en raya',
+        description: 'Duelos rápidos de 3 en raya - 15 seg por turno',
         icon: '❌⭕',
-        modes: ['friendly', 'coins', 'fires'],
+        modes: ['coins', 'fires'],
         min_players: 2,
         max_players: 2,
-        status: 'available'
+        status: 'available',
+        features: ['timer', 'rematch', 'no_commission']
       },
       {
         id: 'bingo',
@@ -41,6 +42,10 @@ router.get('/list', optionalAuth, async (req, res) => {
     ];
 
     // Get active rooms count for each game
+    const tictactoeCount = await query(
+      "SELECT COUNT(*) as count FROM tictactoe_rooms WHERE status IN ('waiting', 'ready', 'playing')"
+    );
+    
     const bingoCount = await query(
       "SELECT COUNT(*) as count FROM bingo_rooms WHERE status IN ('waiting', 'ready', 'playing')"
     );
@@ -49,6 +54,7 @@ router.get('/list', optionalAuth, async (req, res) => {
       "SELECT COUNT(*) as count FROM raffles WHERE status IN ('pending', 'active')"
     );
 
+    games[0].active_rooms = parseInt(tictactoeCount.rows[0].count);
     games[1].active_rooms = parseInt(bingoCount.rows[0].count);
     games[2].active_rooms = parseInt(raffleCount.rows[0].count);
 

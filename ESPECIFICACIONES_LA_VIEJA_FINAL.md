@@ -20,6 +20,7 @@
 | **Premio al Ganador** | **100% del pot total** |
 | **En caso de Empate** | **50% cada jugador** |
 | **XP por Partida** | **1 XP a ambos jugadores** |
+| **Sistema de Revancha** | **Infinitas revanchas** (ambos deben aceptar) |
 
 ---
 
