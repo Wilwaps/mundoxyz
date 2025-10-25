@@ -31,11 +31,30 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      setFormData(prev => ({ ...prev, to_wallet_id: text.trim() }));
-      toast.success('Dirección pegada');
+      // Intentar leer del clipboard
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setFormData(prev => ({ ...prev, to_wallet_id: text.trim() }));
+          toast.success('Dirección pegada');
+        } else {
+          toast.error('El portapapeles está vacío');
+        }
+      } else {
+        // Fallback: mostrar mensaje para pegar manualmente
+        toast.error('Por favor, pega manualmente la dirección', {
+          duration: 3000
+        });
+        // Enfocar el input para facilitar el pegado manual
+        document.querySelector('input[name="to_wallet_id"]')?.focus();
+      }
     } catch (error) {
-      toast.error('Error al pegar');
+      console.error('Clipboard error:', error);
+      // Si falla, sugerir pegado manual
+      toast.error('Pega manualmente la dirección en el campo', {
+        duration: 3000
+      });
+      document.querySelector('input[name="to_wallet_id"]')?.focus();
     }
   };
 

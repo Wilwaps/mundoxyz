@@ -360,4 +360,88 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
   }
 });
 
+// Get user transactions with pagination
+router.get('/:userId/transactions', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { currency, limit = 25, offset = 0 } = req.query;
+
+    // Check permissions
+    const canView = 
+      req.user.id === userId ||
+      req.user.tg_id?.toString() === userId ||
+      req.user.username === userId ||
+      req.user.roles?.includes('admin') ||
+      req.user.roles?.includes('tote');
+
+    if (!canView) {
+      return res.status(403).json({ error: 'Cannot view this user\'s transactions' });
+    }
+
+    // Get user's wallet
+    const walletResult = await query(
+      'SELECT id FROM wallets WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (walletResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    const walletId = walletResult.rows[0].id;
+
+    // Build query with optional currency filter
+    let queryStr = `
+      SELECT 
+        wt.id,
+        wt.type,
+        wt.currency,
+        wt.amount,
+        wt.balance_after,
+        wt.description,
+        wt.created_at,
+        u2.username as related_username
+      FROM wallet_transactions wt
+      LEFT JOIN users u2 ON u2.id = wt.related_user_id
+      WHERE wt.wallet_id = $1
+    `;
+
+    const queryParams = [walletId];
+    let paramCount = 2;
+
+    if (currency) {
+      queryStr += ` AND wt.currency = $${paramCount}`;
+      queryParams.push(currency);
+      paramCount++;
+    }
+
+    queryStr += ` ORDER BY wt.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    queryParams.push(parseInt(limit), parseInt(offset));
+
+    const transactions = await query(queryStr, queryParams);
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) as total FROM wallet_transactions WHERE wallet_id = $1';
+    const countParams = [walletId];
+
+    if (currency) {
+      countQuery += ' AND currency = $2';
+      countParams.push(currency);
+    }
+
+    const countResult = await query(countQuery, countParams);
+
+    res.json({
+      transactions: transactions.rows,
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+  } catch (error) {
+    logger.error('Error fetching transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
 module.exports = router;
