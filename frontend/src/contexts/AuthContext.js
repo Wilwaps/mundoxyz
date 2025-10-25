@@ -136,6 +136,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (formData) => {
+    try {
+      setLoading(true);
+      
+      const response = await axios.post('/auth/register', {
+        username: formData.username,
+        email: formData.email,
+        emailConfirm: formData.emailConfirm,
+        password: formData.password,
+        passwordConfirm: formData.passwordConfirm,
+        tg_id: formData.tg_id || null
+      });
+
+      toast.success(response.data.message || '¡Registro exitoso!');
+      
+      return { success: true, user: response.data.user };
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error(error.response?.data?.error || 'Error al registrar usuario');
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await axios.post('/auth/logout');
@@ -188,6 +213,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     loginWithTelegram,
     loginWithCredentials,
+    register,
     logout,
     updateUser,
     refreshUser,

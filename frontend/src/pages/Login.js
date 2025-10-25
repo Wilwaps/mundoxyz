@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Sparkles, Zap } from 'lucide-react';
+import { Sparkles, Zap, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
@@ -146,6 +146,20 @@ const Login = () => {
               </div>
             </>
           )}
+
+          {/* Register Link */}
+          <div className="mt-6 pt-6 border-t border-glass">
+            <p className="text-center text-text/60 text-sm mb-3">
+              ¿No tienes cuenta todavía?
+            </p>
+            <Link
+              to="/register"
+              className="w-full btn-accent flex items-center justify-center gap-2"
+            >
+              <UserPlus size={20} />
+              Regístrate Ahora
+            </Link>
+          </div>
         </div>
 
         {/* Features */}

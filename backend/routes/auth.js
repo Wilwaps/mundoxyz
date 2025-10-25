@@ -289,6 +289,160 @@ router.post('/login-email', async (req, res) => {
   }
 });
 
+// Register new user with email
+router.post('/register', async (req, res) => {
+  try {
+    const { username, email, emailConfirm, password, passwordConfirm, tg_id } = req.body;
+
+    // Validaciones básicas
+    if (!username || !email || !emailConfirm || !password || !passwordConfirm) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos excepto ID Telegram' });
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Formato de email inválido' });
+    }
+
+    // Validar confirmación de email
+    if (email !== emailConfirm) {
+      return res.status(400).json({ error: 'Los emails no coinciden' });
+    }
+
+    // Validar confirmación de contraseña
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+    }
+
+    // Validar longitud de contraseña
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Validar username
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ error: 'El usuario debe tener entre 3 y 20 caracteres' });
+    }
+
+    // Validar caracteres del username (solo alfanuméricos y guiones bajos)
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ error: 'El usuario solo puede contener letras, números y guiones bajos' });
+    }
+
+    // Validar tg_id si se proporciona
+    let telegramId = null;
+    if (tg_id) {
+      const parsedTgId = parseInt(tg_id, 10);
+      if (isNaN(parsedTgId) || parsedTgId <= 0) {
+        return res.status(400).json({ error: 'ID de Telegram inválido' });
+      }
+      telegramId = parsedTgId;
+    }
+
+    const result = await transaction(async (client) => {
+      // Verificar si el username ya existe
+      const usernameCheck = await client.query(
+        'SELECT id FROM users WHERE LOWER(username) = LOWER($1)',
+        [username]
+      );
+
+      if (usernameCheck.rows.length > 0) {
+        throw new Error('El usuario ya está registrado');
+      }
+
+      // Verificar si el email ya existe
+      const emailCheck = await client.query(
+        'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
+
+      if (emailCheck.rows.length > 0) {
+        throw new Error('El email ya está registrado');
+      }
+
+      // Verificar si el tg_id ya existe (si se proporcionó)
+      if (telegramId) {
+        const tgCheck = await client.query(
+          'SELECT id FROM users WHERE tg_id = $1',
+          [telegramId]
+        );
+
+        if (tgCheck.rows.length > 0) {
+          throw new Error('El ID de Telegram ya está registrado');
+        }
+      }
+
+      // Hash de la contraseña
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Crear usuario
+      const userResult = await client.query(
+        `INSERT INTO users (username, email, tg_id, display_name, is_verified, created_at, first_seen_at, last_seen_at)
+         VALUES ($1, $2, $3, $4, false, NOW(), NOW(), NOW())
+         RETURNING id, username, email, tg_id`,
+        [username, email.toLowerCase(), telegramId, username]
+      );
+
+      const userId = userResult.rows[0].id;
+
+      // Crear auth_identity con contraseña
+      await client.query(
+        `INSERT INTO auth_identities (user_id, provider, provider_uid, password_hash, created_at)
+         VALUES ($1, 'email', $2, $3, NOW())`,
+        [userId, email.toLowerCase(), passwordHash]
+      );
+
+      // Crear wallet del usuario
+      await client.query(
+        `INSERT INTO wallets (id, user_id, fires_balance, coins_balance)
+         VALUES ($1, $2, 0, 0)`,
+        [uuidv4(), userId]
+      );
+
+      // Asignar rol de usuario regular
+      await client.query(
+        `INSERT INTO user_roles (user_id, role_id)
+         SELECT $1, id FROM roles WHERE name = 'user'
+         ON CONFLICT DO NOTHING`,
+        [userId]
+      );
+
+      // Registrar en supply_txs (registro de creación de cuenta)
+      await client.query(
+        `INSERT INTO supply_txs (type, currency, amount, user_id, user_ext, description, ip_address)
+         VALUES ('account_created', 'coins', 0, $1, $2, 'Nueva cuenta registrada', $3)`,
+        [userId, `email:${email}`, getClientIp(req)]
+      );
+
+      logger.info('User registered successfully', { userId, username, email });
+
+      return userResult.rows[0];
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Usuario registrado exitosamente. Por favor inicia sesión.',
+      user: {
+        id: result.id,
+        username: result.username,
+        email: result.email
+      }
+    });
+
+  } catch (error) {
+    logger.error('Registration error:', error);
+    
+    // Manejar errores específicos
+    if (error.message.includes('ya está registrado')) {
+      return res.status(409).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Error al registrar usuario' });
+  }
+});
+
 // Login with Telegram Widget
 router.post('/login-telegram-widget', async (req, res) => {
   try {
