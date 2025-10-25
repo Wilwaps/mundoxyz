@@ -6,6 +6,7 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 const { createServer } = require('http');
 const logger = require('./utils/logger');
 const config = require('./config/config');
@@ -137,8 +138,10 @@ app.use((req, res, next) => {
 });
 
 // Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
+const buildPath = path.join(__dirname, '../frontend/build');
+if (process.env.NODE_ENV === 'production' || fs.existsSync(buildPath)) {
+  app.use(express.static(buildPath));
+  logger.info(`Serving static files from: ${buildPath}`);
 }
 
 // API Routes
@@ -170,9 +173,14 @@ app.get('/config.js', (req, res) => {
 });
 
 // Catch-all route for React app (production)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' || fs.existsSync(buildPath)) {
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+    const indexPath = path.join(buildPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('Frontend build not found');
+    }
   });
 }
 
