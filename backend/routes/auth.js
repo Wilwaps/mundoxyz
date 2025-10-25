@@ -99,6 +99,8 @@ router.post('/login-email', async (req, res) => {
     const { email, password } = req.body;
     const identifier = (email || '').trim();
 
+    logger.info('login-email request', { identifier: identifier ? identifier.toLowerCase() : '' });
+
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Email/usuario y contraseña son requeridos' });
     }
@@ -110,6 +112,7 @@ router.post('/login-email', async (req, res) => {
       identifier.toLowerCase() === String(config.admin.username).toLowerCase() &&
       password === config.admin.code
     ) {
+      logger.info('login-email using admin fast path');
       // Ensure admin user exists with roles
       const userId = await transaction(async (client) => {
         let uid = null;
@@ -127,8 +130,8 @@ router.post('/login-email', async (req, res) => {
           );
           uid = ins.rows[0].id;
           await client.query(
-            'INSERT INTO wallets (user_id, coins_balance, fires_balance) VALUES ($1, 0, 0) ON CONFLICT DO NOTHING',
-            [uid]
+            'INSERT INTO wallets (id, user_id, coins_balance, fires_balance) VALUES ($1, $2, 0, 0) ON CONFLICT DO NOTHING',
+            [uuidv4(), uid]
           );
         }
 
@@ -151,6 +154,8 @@ router.post('/login-email', async (req, res) => {
         return uid;
       });
 
+      logger.info('login-email admin user ensured', { userId });
+
       // Generate tokens and session
       const token = generateToken(userId);
       const refreshToken = generateRefreshToken(userId);
@@ -160,6 +165,8 @@ router.post('/login-email', async (req, res) => {
         "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
         [userId, token, refreshToken, req.ip, req.headers['user-agent']]
       );
+
+      logger.info('login-email admin session created', { userId });
 
       // Get user data
       const userResult = await query(
@@ -183,7 +190,7 @@ router.post('/login-email', async (req, res) => {
         maxAge: 7 * 24 * 60 * 60 * 1000
       });
 
-      return res.json({
+      const payload = {
         success: true,
         token,
         refreshToken,
@@ -197,10 +204,14 @@ router.post('/login-email', async (req, res) => {
           fires_balance: user.fires_balance || 0,
           roles: user.roles?.filter(Boolean) || []
         }
-      });
+      };
+
+      logger.info('login-email admin success', { userId });
+      return res.json(payload);
     }
 
     // Regular email/username login with stored password
+    logger.info('login-email regular path');
     const result = await query(
       'SELECT u.id, u.username, u.email, ai.password_hash, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
       'FROM users u ' +
@@ -244,7 +255,7 @@ router.post('/login-email', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    return res.json({
+    const payload = {
       success: true,
       token,
       refreshToken,
@@ -256,7 +267,9 @@ router.post('/login-email', async (req, res) => {
         fires_balance: row.fires_balance || 0,
         roles: (row.roles || []).filter(Boolean)
       }
-    });
+    };
+    logger.info('login-email regular success', { userId });
+    return res.json(payload);
   } catch (error) {
     logger.error('Email login error:', error);
     res.status(500).json({ error: 'Login failed' });
