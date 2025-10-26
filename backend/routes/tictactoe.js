@@ -472,9 +472,9 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
         const finishedRoom = (await client.query('SELECT * FROM tictactoe_rooms WHERE id = $1', [room.id])).rows[0];
         await distributePrizes(finishedRoom, client.query.bind(client));
         
-        // XP temporalmente deshabilitado - utils/xp.js no existe
-        // const { awardXpBatch } = require('../utils/xp');
-        // await awardGameXP(finishedRoom, awardXpBatch);
+        // Otorgar XP
+        const { awardXpBatch } = require('../utils/xp');
+        await awardGameXP(finishedRoom, awardXpBatch);
         
         await client.query(
           'UPDATE tictactoe_rooms SET xp_awarded = TRUE WHERE id = $1',
@@ -549,9 +549,9 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
         // Distribuir premios
         await distributePrizes(finishedRoom, client.query.bind(client));
         
-        // Otorgar XP - temporalmente deshabilitado
-        // const { awardXpBatch } = require('../utils/xp');
-        // await awardGameXP(finishedRoom, awardXpBatch);
+        // Otorgar XP
+        const { awardXpBatch } = require('../utils/xp');
+        await awardGameXP(finishedRoom, awardXpBatch);
         
         await client.query(
           'UPDATE tictactoe_rooms SET xp_awarded = TRUE WHERE id = $1',
