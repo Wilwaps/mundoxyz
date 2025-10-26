@@ -108,14 +108,14 @@ const AdminUsers = () => {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (selectedRole) params.append('role', selectedRole);
-      const response = await axios.get(`/admin/users?${params}`);
+      const response = await axios.get(`/api/admin/users?${params}`);
       return response.data;
     }
   });
 
   const handleGrantRole = async (userId, role) => {
     try {
-      await axios.post('/roles/grant', { user_id: userId, role });
+      await axios.post('/api/roles/grant', { user_id: userId, role });
       toast.success(`Rol ${role} otorgado exitosamente`);
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error al otorgar rol');
@@ -338,7 +338,7 @@ const AdminFireRequests = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['fire-requests', selectedStatus],
     queryFn: async () => {
-      const response = await axios.get('/economy/fire-requests', {
+      const response = await axios.get('/api/economy/fire-requests', {
         params: { status: selectedStatus, limit: 50 }
       });
       return response.data;

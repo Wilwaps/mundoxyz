@@ -22,7 +22,7 @@ const Market = () => {
   const { data: redeems } = useQuery({
     queryKey: ['my-redeems'],
     queryFn: async () => {
-      const response = await axios.get('/market/my-redeems');
+      const response = await axios.get('/api/market/my-redeems');
       return response.data;
     }
   });
@@ -30,7 +30,7 @@ const Market = () => {
   // Redeem mutation
   const redeemMutation = useMutation({
     mutationFn: async (data) => {
-      return axios.post('/market/redeem-100-fire', data);
+      return axios.post('/api/market/redeem-100-fire', data);
     },
     onSuccess: () => {
       toast.success('Solicitud de canje creada exitosamente');

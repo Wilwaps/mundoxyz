@@ -12,7 +12,7 @@ const Roles = () => {
   const { data: myRoles } = useQuery({
     queryKey: ['my-roles'],
     queryFn: async () => {
-      const response = await axios.get('/roles/me');
+      const response = await axios.get('/api/roles/me');
       return response.data;
     }
   });

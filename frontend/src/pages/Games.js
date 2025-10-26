@@ -12,7 +12,7 @@ const Games = () => {
   const { data: games, isLoading } = useQuery({
     queryKey: ['games'],
     queryFn: async () => {
-      const response = await axios.get('/games/list');
+      const response = await axios.get('/api/games/list');
       return response.data;
     }
   });
@@ -21,7 +21,7 @@ const Games = () => {
   const { data: activeGames } = useQuery({
     queryKey: ['active-games'],
     queryFn: async () => {
-      const response = await axios.get('/games/active');
+      const response = await axios.get('/api/games/active');
       return response.data;
     },
     refetchInterval: 30000 // Refresh every 30 seconds

@@ -12,7 +12,7 @@ const Raffles = () => {
   const { data: raffles, isLoading } = useQuery({
     queryKey: ['raffles'],
     queryFn: async () => {
-      const response = await axios.get('/raffles');
+      const response = await axios.get('/api/raffles');
       return response.data;
     },
     refetchInterval: 30000

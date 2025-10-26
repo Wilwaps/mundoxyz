@@ -82,7 +82,7 @@ Pago`;
     setShowPasswordModal(false);
     setLoading(true);
     try {
-      const response = await axios.post('/economy/request-fires', formData);
+      const response = await axios.post('/api/economy/request-fires', formData);
       toast.success('Solicitud enviada. Será revisada por un administrador.');
       
       // Invalidar queries de solicitudes

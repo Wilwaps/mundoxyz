@@ -125,7 +125,7 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('/economy/transfer-fires', formData);
+      const response = await axios.post('/api/economy/transfer-fires', formData);
       toast.success(`${formData.amount} fuegos enviados exitosamente`);
       
       // Invalidar queries para actualizar datos en tiempo real
