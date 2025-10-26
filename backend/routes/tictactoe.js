@@ -759,6 +759,7 @@ router.get('/rooms/public', optionalAuth, async (req, res) => {
 router.get('/room/:code', optionalAuth, async (req, res) => {
   try {
     const { code } = req.params;
+    const userId = req.user?.id;
     
     const result = await query(
       `SELECT 
@@ -780,11 +781,83 @@ router.get('/room/:code', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Sala no encontrada' });
     }
     
-    res.json({ room: result.rows[0] });
+    const room = result.rows[0];
+    
+    // Verificar si el usuario es parte de la sala (para reconexión)
+    if (userId) {
+      const isPlayerX = room.player_x_id === userId;
+      const isPlayerO = room.player_o_id === userId;
+      
+      // Si el usuario es parte de la sala, permitir acceso incluso si salió
+      if (isPlayerX || isPlayerO) {
+        logger.info('Player reconnecting to room', { 
+          roomCode: code, 
+          userId, 
+          role: isPlayerX ? 'X' : 'O',
+          status: room.status 
+        });
+      }
+      
+      // Agregar flag de pertenencia
+      room.is_participant = isPlayerX || isPlayerO;
+      room.user_role = isPlayerX ? 'X' : (isPlayerO ? 'O' : null);
+    }
+    
+    res.json({ room });
     
   } catch (error) {
     logger.error('Error fetching room:', error);
     res.status(500).json({ error: 'Failed to fetch room' });
+  }
+});
+
+// GET /api/tictactoe/my-active-room - Obtener sala activa del usuario (para reconexión)
+router.get('/my-active-room', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Buscar salas activas donde el usuario es participante
+    const result = await query(
+      `SELECT 
+        r.*,
+        ux.username as player_x_username,
+        uo.username as player_o_username
+      FROM tictactoe_rooms r
+      LEFT JOIN users ux ON ux.id = r.player_x_id
+      LEFT JOIN users uo ON uo.id = r.player_o_id
+      WHERE (r.player_x_id = $1 OR r.player_o_id = $1)
+        AND r.status IN ('waiting', 'ready', 'playing')
+      ORDER BY r.created_at DESC
+      LIMIT 1`,
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.json({ activeRoom: null });
+    }
+    
+    const room = result.rows[0];
+    
+    logger.info('Active room found for user', {
+      userId,
+      roomCode: room.code,
+      status: room.status
+    });
+    
+    res.json({ 
+      activeRoom: {
+        code: room.code,
+        status: room.status,
+        mode: room.mode,
+        bet_amount: room.bet_amount,
+        is_host: room.player_x_id === userId,
+        opponent: room.player_x_id === userId ? room.player_o_username : room.player_x_username
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching active room:', error);
+    res.status(500).json({ error: 'Failed to fetch active room' });
   }
 });
 

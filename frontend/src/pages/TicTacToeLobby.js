@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle } from 'lucide-react';
+import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -17,6 +17,25 @@ const TicTacToeLobby = () => {
     visibility: 'public'
   });
   const [modeFilter, setModeFilter] = useState('all');
+  
+  // Fetch active room (para reconexión)
+  const { data: activeRoomData } = useQuery({
+    queryKey: ['my-active-room'],
+    queryFn: async () => {
+      if (!user) return { activeRoom: null };
+      try {
+        const response = await axios.get('/api/tictactoe/my-active-room');
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching active room:', error);
+        return { activeRoom: null };
+      }
+    },
+    enabled: !!user,
+    refetchInterval: 10000 // Check every 10 seconds
+  });
+  
+  const activeRoom = activeRoomData?.activeRoom;
   
   // Fetch public rooms
   const { data: rooms, isLoading, refetch } = useQuery({
@@ -132,6 +151,35 @@ const TicTacToeLobby = () => {
           Duelos rápidos de 3 en raya • 15 seg por turno • Sin comisión
         </p>
       </div>
+      
+      {/* Active Room Alert */}
+      {activeRoom && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-lg bg-violet/20 border border-violet/50"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-violet">¡Tienes una sala activa!</h3>
+              <p className="text-sm text-text/80">
+                Sala {activeRoom.code} • {activeRoom.mode === 'coins' ? '🪙' : '🔥'} {activeRoom.bet_amount} • 
+                Estado: {activeRoom.status === 'waiting' ? 'Esperando' : activeRoom.status === 'ready' ? 'Listo' : 'Jugando'}
+              </p>
+              {activeRoom.opponent && (
+                <p className="text-xs text-text/60">vs {activeRoom.opponent}</p>
+              )}
+            </div>
+            <button
+              onClick={() => navigate(`/tictactoe/room/${activeRoom.code}`)}
+              className="btn-primary flex items-center gap-2"
+            >
+              Volver a la sala
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </motion.div>
+      )}
       
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
