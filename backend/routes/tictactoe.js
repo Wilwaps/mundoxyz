@@ -11,6 +11,11 @@ const {
   distributePrizes,
   awardGameXP 
 } = require('../utils/tictactoe');
+const { 
+  closeUserPreviousRooms,
+  cleanupOrphanedRooms,
+  cleanupOldFinishedRooms 
+} = require('../utils/tictactoe-cleanup');
 
 // Socket IO will be accessed through req.io
 
@@ -88,6 +93,9 @@ router.post('/create', verifyToken, async (req, res) => {
          )`,
         [userId, mode, betAmount, balance, balance - betAmount]
       );
+      
+      // Cerrar salas anteriores del usuario
+      await closeUserPreviousRooms(userId, client);
       
       // Generar código único
       let code;
@@ -187,6 +195,9 @@ router.post('/join/:code', verifyToken, async (req, res) => {
       if (room.player_x_id === userId) {
         throw new Error('Ya eres el host de esta sala');
       }
+      
+      // Cerrar salas anteriores del usuario antes de unirse
+      await closeUserPreviousRooms(userId, client);
       
       // Verificar balance
       const walletResult = await client.query(
@@ -931,6 +942,68 @@ router.get('/stats/:userId', optionalAuth, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching stats:', error);
     res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// POST /api/tictactoe/cleanup/orphaned - Limpiar salas huérfanas (Admin)
+router.post('/cleanup/orphaned', verifyToken, async (req, res) => {
+  try {
+    // Verificar que el usuario es admin
+    const rolesResult = await query(
+      `SELECT r.name FROM roles r
+       JOIN user_roles ur ON ur.role_id = r.id
+       WHERE ur.user_id = $1`,
+      [req.user.id]
+    );
+    
+    const roles = rolesResult.rows.map(r => r.name);
+    if (!roles.includes('admin')) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+    }
+    
+    const maxAgeHours = parseInt(req.body.maxAgeHours) || 24;
+    const cleaned = await cleanupOrphanedRooms(maxAgeHours);
+    
+    res.json({
+      success: true,
+      message: `Se limpiaron ${cleaned} salas huérfanas`,
+      cleaned
+    });
+    
+  } catch (error) {
+    logger.error('Error cleaning orphaned rooms:', error);
+    res.status(500).json({ error: 'Failed to cleanup orphaned rooms' });
+  }
+});
+
+// POST /api/tictactoe/cleanup/old-finished - Limpiar salas finalizadas antiguas (Admin)
+router.post('/cleanup/old-finished', verifyToken, async (req, res) => {
+  try {
+    // Verificar que el usuario es admin
+    const rolesResult = await query(
+      `SELECT r.name FROM roles r
+       JOIN user_roles ur ON ur.role_id = r.id
+       WHERE ur.user_id = $1`,
+      [req.user.id]
+    );
+    
+    const roles = rolesResult.rows.map(r => r.name);
+    if (!roles.includes('admin')) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+    }
+    
+    const maxAgeDays = parseInt(req.body.maxAgeDays) || 30;
+    const deleted = await cleanupOldFinishedRooms(maxAgeDays);
+    
+    res.json({
+      success: true,
+      message: `Se eliminaron ${deleted} salas antiguas`,
+      deleted
+    });
+    
+  } catch (error) {
+    logger.error('Error deleting old finished rooms:', error);
+    res.status(500).json({ error: 'Failed to delete old finished rooms' });
   }
 });
 
