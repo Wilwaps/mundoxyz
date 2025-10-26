@@ -13,8 +13,13 @@ export const useAuth = () => {
 };
 
 // Configure axios defaults
-// baseURL should be empty or root URL, routes already include /api prefix
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || '';
+// In production, don't set baseURL if empty (routes already include /api)
+// In development, proxy in package.json handles routing to backend
+const apiUrl = process.env.REACT_APP_API_URL;
+if (apiUrl && apiUrl !== '') {
+  console.warn('Setting axios baseURL to:', apiUrl);
+  axios.defaults.baseURL = apiUrl;
+}
 axios.defaults.withCredentials = true;
 
 // Add request interceptor

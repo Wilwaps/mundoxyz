@@ -28,7 +28,9 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Create socket connection
-    const socketUrl = process.env.REACT_APP_API_URL || window.location.origin;
+    // Use window.location.origin for production or localhost for dev
+    const apiUrl = process.env.REACT_APP_API_URL || '';
+    const socketUrl = apiUrl.startsWith('http') ? apiUrl : window.location.origin;
     const newSocket = io(socketUrl, {
       auth: {
         userId: user.id,
