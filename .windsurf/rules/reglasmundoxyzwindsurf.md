@@ -2,6 +2,12 @@
 trigger: always_on
 ---
 
+RAILWAY NO TIENE QUERY!!
+
+crea un script mejorado para ejecucion con node para base de datos
+
+node Ejemplo.js "postgresql://postgres:jaUlzMfMxrTAXGtAWbYjTLBgJDSNxBPR@trolley.proxy.rlwy.net:28951/railway"
+
 Cuando se hace una modificación que debe debe representar cambios en produccion, se realiza commit y push a github
 
 https://confident-bravery-production-ce7b.up.railway.app/games
@@ -28,4 +34,3 @@ Si aun así quisieras usar Invoke-Expression, tendrías que escapar las comillas
 powershell
 Invoke-Expression "git commit -m `"feat: FASE 1 reconexión salas TicTacToe - backend y frontend`""
 Pero la forma recomendada es la primera: ejecuta git directamente desde PowerShell. Asegúrate también de estar ubicado en la raíz del repositorio antes de lanzar el commit.
-
