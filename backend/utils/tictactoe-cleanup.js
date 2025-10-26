@@ -106,8 +106,7 @@ async function cancelRoomAndRefund(room, client = null) {
     await executeQuery(`
       UPDATE tictactoe_rooms
       SET status = 'cancelled',
-          ended_at = NOW(),
-          updated_at = NOW()
+          finished_at = NOW()
       WHERE id = $1
     `, [room.id]);
     
@@ -190,7 +189,7 @@ async function cleanupOldFinishedRooms(maxAgeDays = 30) {
     const result = await query(`
       DELETE FROM tictactoe_rooms
       WHERE status IN ('finished', 'cancelled', 'abandoned')
-      AND ended_at < NOW() - INTERVAL '${maxAgeDays} days'
+      AND finished_at < NOW() - INTERVAL '${maxAgeDays} days'
       RETURNING id
     `);
     
