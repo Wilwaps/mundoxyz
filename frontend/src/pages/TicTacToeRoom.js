@@ -32,6 +32,10 @@ const TicTacToeRoom = () => {
     byMe: false,
     byOpponent: false
   });
+  const [connectionStatus, setConnectionStatus] = useState({
+    opponentDisconnected: false,
+    disconnectTimeout: null
+  });
   
   // Fetch room details
   const { data: roomData, refetch: refetchRoom } = useQuery({
@@ -157,6 +161,22 @@ const TicTacToeRoom = () => {
     }
   }, [room?.current_turn]);
   
+  // Join socket room
+  useEffect(() => {
+    if (!socket || !code || !user || !mySymbol) return;
+    
+    // Unirse a la sala con userId y role
+    socket.emit('tictactoe:join-room', {
+      roomCode: code,
+      userId: user.id,
+      role: mySymbol
+    });
+    
+    return () => {
+      socket.emit('tictactoe:leave-room', { roomCode: code });
+    };
+  }, [socket, code, user, mySymbol]);
+  
   // Socket listeners
   useEffect(() => {
     if (!socket || !code) return;
@@ -202,12 +222,62 @@ const TicTacToeRoom = () => {
       }
     };
     
+    const handlePlayerDisconnected = (data) => {
+      if (data.roomCode === code && data.userId !== user?.id) {
+        setConnectionStatus({
+          opponentDisconnected: true,
+          disconnectTimeout: data.timeoutSeconds
+        });
+        toast.error(`Oponente desconectado. Tiempo de espera: ${data.timeoutSeconds}s`, {
+          duration: 5000
+        });
+      }
+    };
+    
+    const handlePlayerReconnected = (data) => {
+      if (data.roomCode === code && data.userId !== user?.id) {
+        setConnectionStatus({
+          opponentDisconnected: false,
+          disconnectTimeout: null
+        });
+        toast.success('Oponente reconectado');
+      }
+    };
+    
+    const handleHostTransferred = (data) => {
+      if (data.roomCode === code) {
+        if (data.newHost === user?.id) {
+          toast.success('¡Ahora eres el host de la sala!', { duration: 5000 });
+          setMySymbol('X');
+        } else {
+          toast('El host ha sido transferido', { duration: 3000 });
+        }
+        refetchRoom();
+      }
+    };
+    
+    const handleRoomAbandoned = (data) => {
+      if (data.roomCode === code) {
+        toast.error(`Sala cancelada: ${data.reason}`, { duration: 5000 });
+        if (data.refunded) {
+          toast.success('Tu apuesta ha sido devuelta', { duration: 5000 });
+        }
+        setTimeout(() => {
+          navigate('/tictactoe/lobby');
+        }, 3000);
+      }
+    };
+    
     socket.on('room:player-joined', handlePlayerJoined);
     socket.on('room:player-ready', handlePlayerReady);
     socket.on('room:game-started', handleGameStarted);
     socket.on('room:move-made', handleMoveMade);
     socket.on('room:game-over', handleGameOver);
     socket.on('room:rematch-request', handleRematchRequest);
+    socket.on('room:player-disconnected', handlePlayerDisconnected);
+    socket.on('room:player-reconnected', handlePlayerReconnected);
+    socket.on('room:host-transferred', handleHostTransferred);
+    socket.on('room:abandoned', handleRoomAbandoned);
     
     return () => {
       socket.off('room:player-joined', handlePlayerJoined);
@@ -216,8 +286,12 @@ const TicTacToeRoom = () => {
       socket.off('room:move-made', handleMoveMade);
       socket.off('room:game-over', handleGameOver);
       socket.off('room:rematch-request', handleRematchRequest);
+      socket.off('room:player-disconnected', handlePlayerDisconnected);
+      socket.off('room:player-reconnected', handlePlayerReconnected);
+      socket.off('room:host-transferred', handleHostTransferred);
+      socket.off('room:abandoned', handleRoomAbandoned);
     };
-  }, [socket, code, user, rematchRequested]);
+  }, [socket, code, user, rematchRequested, navigate]);
   
   const handleCellClick = (row, col) => {
     if (!isMyTurn || board[row][col] || gameOver) return;
@@ -330,6 +404,28 @@ const TicTacToeRoom = () => {
           </div>
         </div>
       </div>
+      
+      {/* Disconnection Alert */}
+      {connectionStatus.opponentDisconnected && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-lg bg-error/20 border border-error/50"
+        >
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-error mt-0.5" size={20} />
+            <div className="flex-1">
+              <h3 className="font-bold text-error">Oponente desconectado</h3>
+              <p className="text-sm text-text/80 mt-1">
+                Esperando reconexión... Tiempo restante: {connectionStatus.disconnectTimeout}s
+              </p>
+              <p className="text-xs text-text/60 mt-1">
+                Si no se reconecta, la sala será gestionada automáticamente
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
       
       {/* Players */}
       <div className="grid grid-cols-3 gap-4 mb-6">
