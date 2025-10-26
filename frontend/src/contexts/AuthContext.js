@@ -13,13 +13,20 @@ export const useAuth = () => {
 };
 
 // Configure axios defaults
-// In production, don't set baseURL if empty (routes already include /api)
+// In production, REACT_APP_API_URL should be the backend URL (e.g., https://backend.railway.app)
 // In development, proxy in package.json handles routing to backend
 const apiUrl = process.env.REACT_APP_API_URL;
+
+// Only set baseURL if we have a valid URL (for production)
 if (apiUrl && apiUrl !== '') {
-  console.warn('Setting axios baseURL to:', apiUrl);
-  axios.defaults.baseURL = apiUrl;
+  // Remove trailing slash if present
+  const cleanUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+  console.log('Setting axios baseURL to:', cleanUrl);
+  axios.defaults.baseURL = cleanUrl;
+} else {
+  console.log('No API URL set, using relative paths (development mode)');
 }
+
 axios.defaults.withCredentials = true;
 
 // Add request interceptor

@@ -28,9 +28,21 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Create socket connection
-    // Use window.location.origin for production or localhost for dev
+    // Use REACT_APP_API_URL in production (backend URL) or window.location.origin in dev
     const apiUrl = process.env.REACT_APP_API_URL || '';
-    const socketUrl = apiUrl.startsWith('http') ? apiUrl : window.location.origin;
+    
+    // Determine the socket URL
+    let socketUrl;
+    if (apiUrl && apiUrl !== '') {
+      // Production: use the backend URL
+      socketUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      console.log('Socket connecting to backend:', socketUrl);
+    } else {
+      // Development: use current origin (proxied)
+      socketUrl = window.location.origin;
+      console.log('Socket connecting to origin:', socketUrl);
+    }
+    
     const newSocket = io(socketUrl, {
       auth: {
         userId: user.id,
