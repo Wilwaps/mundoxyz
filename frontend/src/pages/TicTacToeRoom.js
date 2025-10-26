@@ -312,8 +312,8 @@ const TicTacToeRoom = () => {
                 </span>
                 <span className="text-sm text-text/60">
                   Premio: {room?.mode === 'coins' 
-                    ? `${room.pot_coins} 🪙` 
-                    : `${room.pot_fires} 🔥`}
+                    ? `${room?.pot_coins || 0} 🪙` 
+                    : `${room?.pot_fires || 0} 🔥`}
                 </span>
               </div>
             </div>
@@ -407,8 +407,8 @@ const TicTacToeRoom = () => {
       {/* Ready Button */}
       {room?.status === 'ready' && mySymbol && (
         <div className="mb-6 text-center">
-          {((mySymbol === 'X' && !room.player_x_ready) || 
-            (mySymbol === 'O' && !room.player_o_ready)) && (
+          {((mySymbol === 'X' && !room?.player_x_ready) || 
+            (mySymbol === 'O' && !room?.player_o_ready)) && (
             <button
               onClick={() => markReadyMutation.mutate()}
               disabled={markReadyMutation.isPending}
@@ -464,18 +464,18 @@ const TicTacToeRoom = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center">
-                {room.winner_id ? (
+                {room?.winner_id ? (
                   <>
-                    {room.winner_id === user?.id ? (
+                    {room?.winner_id === user?.id ? (
                       <>
                         <Trophy size={64} className="text-success mx-auto mb-4" />
                         <h2 className="text-3xl font-bold mb-2 text-success">
                           ¡Victoria!
                         </h2>
                         <p className="text-text/80 mb-4">
-                          Has ganado {room.mode === 'coins' 
-                            ? `${room.prize_coins} 🪙` 
-                            : `${room.prize_fires} 🔥`}
+                          Has ganado {room?.mode === 'coins' 
+                            ? `${room?.prize_coins || 0} 🪙` 
+                            : `${room?.prize_fires || 0} 🔥`}
                         </p>
                       </>
                     ) : (
@@ -497,9 +497,9 @@ const TicTacToeRoom = () => {
                       ¡Empate!
                     </h2>
                     <p className="text-text/80 mb-4">
-                      Cada jugador recupera {room.mode === 'coins' 
-                        ? `${room.prize_coins / 2} 🪙` 
-                        : `${room.prize_fires / 2} 🔥`}
+                      Cada jugador recupera {room?.mode === 'coins' 
+                        ? `${(room?.prize_coins || 0) / 2} 🪙` 
+                        : `${(room?.prize_fires || 0) / 2} 🔥`}
                     </p>
                   </>
                 )}
@@ -511,9 +511,9 @@ const TicTacToeRoom = () => {
                 </div>
                 
                 {/* Rematch Section */}
-                {room.rematch_count !== undefined && (
+                {room?.rematch_count !== undefined && (
                   <p className="text-xs text-text/60 mb-4">
-                    Revancha #{room.rematch_count + 1}
+                    Revancha #{room?.rematch_count + 1}
                   </p>
                 )}
                 
