@@ -102,19 +102,28 @@ async function distributePrizes(room, query) {
     );
     
     // Registrar transacción
-    await query(
-      `INSERT INTO wallet_transactions 
-       (wallet_id, type, currency, amount, balance_before, balance_after, description, related_id)
-       VALUES (
-         (SELECT id FROM wallets WHERE user_id = $1),
-         'game_win', $2, $3, 
-         (SELECT ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} - $3 FROM wallets WHERE user_id = $1),
-         (SELECT ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} FROM wallets WHERE user_id = $1),
-         'Victoria en La Vieja - Sala ' || $4,
-         $5
-       )`,
-      [room.winner_id, currency, potTotal, room.code, room.id]
+    const walletResult = await query(
+      'SELECT id, ' + (currency === 'fires' ? 'fires_balance' : 'coins_balance') + ' as balance FROM wallets WHERE user_id = $1',
+      [room.winner_id]
     );
+    
+    if (walletResult.rows.length > 0) {
+      const wallet = walletResult.rows[0];
+      await query(
+        `INSERT INTO wallet_transactions 
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         VALUES ($1, 'game_win', $2, $3, $4, $5, $6, $7)`,
+        [
+          wallet.id,
+          currency,
+          potTotal,
+          parseFloat(wallet.balance) - potTotal,
+          parseFloat(wallet.balance),
+          'Victoria en La Vieja',
+          room.code
+        ]
+      );
+    }
     
     // Actualizar prize en room
     await query(
@@ -144,19 +153,28 @@ async function distributePrizes(room, query) {
         [refund, playerId]
       );
       
-      await query(
-        `INSERT INTO wallet_transactions 
-         (wallet_id, type, currency, amount, balance_before, balance_after, description, related_id)
-         VALUES (
-           (SELECT id FROM wallets WHERE user_id = $1),
-           'game_refund', $2, $3,
-           (SELECT ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} - $3 FROM wallets WHERE user_id = $1),
-           (SELECT ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} FROM wallets WHERE user_id = $1),
-           'Empate en La Vieja - Sala ' || $4,
-           $5
-         )`,
-        [playerId, currency, refund, room.code, room.id]
+      const walletResult = await query(
+        'SELECT id, ' + (currency === 'fires' ? 'fires_balance' : 'coins_balance') + ' as balance FROM wallets WHERE user_id = $1',
+        [playerId]
       );
+      
+      if (walletResult.rows.length > 0) {
+        const wallet = walletResult.rows[0];
+        await query(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           VALUES ($1, 'game_refund', $2, $3, $4, $5, $6, $7)`,
+          [
+            wallet.id,
+            currency,
+            refund,
+            parseFloat(wallet.balance) - refund,
+            parseFloat(wallet.balance),
+            'Empate en La Vieja',
+            room.code
+          ]
+        );
+      }
     }
     
     await query(
