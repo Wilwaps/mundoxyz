@@ -58,7 +58,7 @@ const Roles = () => {
         
         {myRoles?.roles?.length > 0 ? (
           <div className="space-y-3">
-            {myRoles.roles.map((role) => {
+            {(Array.isArray(myRoles.roles) ? myRoles.roles : []).map((role) => {
               const Icon = roleIcons[role.name] || Users;
               return (
                 <div key={role.id} className="glass-panel p-4">

@@ -143,7 +143,7 @@ const Profile = () => {
         {user?.roles?.length > 0 && (
           <div className="mt-4 pt-4 border-t border-glass">
             <div className="flex flex-wrap gap-2">
-              {user.roles.map((role) => (
+              {(Array.isArray(user.roles) ? user.roles : []).map((role) => (
                 <span key={role} className="badge-coins">
                   {role === 'tote' ? '👑' : role === 'admin' ? '⚙️' : '👤'} {role}
                 </span>
