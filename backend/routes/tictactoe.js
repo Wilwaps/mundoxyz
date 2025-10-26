@@ -672,12 +672,15 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
         const newRematchCount = updatedRoom.rematch_count + 1;
         const originalRoomId = updatedRoom.is_rematch ? updatedRoom.original_room_id : updatedRoom.id;
         
+        // Alternar turno inicial: en revanchas impares empieza O, en pares empieza X
+        const initialTurn = newRematchCount % 2 === 0 ? 'X' : 'O';
+        
         const newRoomResult = await client.query(
           `INSERT INTO tictactoe_rooms 
            (id, code, host_id, mode, bet_amount, visibility, 
             player_x_id, player_o_id, status, current_turn,
             pot_coins, pot_fires, rematch_count, is_rematch, original_room_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ready', 'X', $9, $10, $11, TRUE, $12)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'playing', $13, $9, $10, $11, TRUE, $12)
            RETURNING *`,
           [
             uuidv4(),
@@ -691,7 +694,8 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
             updatedRoom.mode === 'coins' ? updatedRoom.bet_amount * 2 : 0,
             updatedRoom.mode === 'fires' ? updatedRoom.bet_amount * 2 : 0,
             newRematchCount,
-            originalRoomId
+            originalRoomId,
+            initialTurn
           ]
         );
         
@@ -743,7 +747,8 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           oldRoomId: room.id,
           newRoomId: newRoom.id,
           newCode,
-          rematchCount: newRematchCount
+          rematchCount: newRematchCount,
+          initialTurn
         });
         
         // Emitir evento de socket para que ambos jugadores vayan a la nueva sala
@@ -753,6 +758,14 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           newRoomCode: newCode,
           rematchCount: newRematchCount
         });
+        
+        // Emitir evento de game-started para la nueva sala (después que lleguen)
+        setTimeout(() => {
+          io.to(`tictactoe:${newCode}`).emit('room:game-started', {
+            roomCode: newCode,
+            initialTurn
+          });
+        }, 2000);
         
         return {
           rematchAccepted: true,
