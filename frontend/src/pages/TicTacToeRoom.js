@@ -14,7 +14,7 @@ import toast from 'react-hot-toast';
 const TicTacToeRoom = () => {
   const { code } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
   
@@ -85,13 +85,14 @@ const TicTacToeRoom = () => {
         setGameOver(true);
         setShowGameOverModal(true);
         // Refrescar balance después de que termine el juego
-        setTimeout(() => {
+        setTimeout(async () => {
           queryClient.invalidateQueries(['balance']);
           queryClient.invalidateQueries(['economy']);
+          await refreshUser(); // Actualizar balance en el header
         }, 1000);
       }
     }
-  }, [roomData, user, gameOver, queryClient]);
+  }, [roomData, user, gameOver, queryClient, refreshUser]);
   
   // Mark ready mutation (solo invitado)
   const markReadyMutation = useMutation({
@@ -292,6 +293,17 @@ const TicTacToeRoom = () => {
       }
     };
     
+    const handleRematchAccepted = (data) => {
+      if (data.roomCode === code) {
+        toast.success(`¡Revancha aceptada! Redirigiendo a nueva sala...`);
+        // Actualizar balance antes de navegar
+        refreshUser();
+        setTimeout(() => {
+          navigate(`/tictactoe/room/${data.newRoomCode}`);
+        }, 1000);
+      }
+    };
+    
     const handleRoomAbandoned = (data) => {
       if (data.roomCode === code) {
         toast.error(`Sala cancelada: ${data.reason}`, { duration: 5000 });
@@ -310,6 +322,7 @@ const TicTacToeRoom = () => {
     socket.on('room:move-made', handleMoveMade);
     socket.on('room:game-over', handleGameOver);
     socket.on('room:rematch-request', handleRematchRequest);
+    socket.on('room:rematch-accepted', handleRematchAccepted);
     socket.on('room:player-disconnected', handlePlayerDisconnected);
     socket.on('room:player-reconnected', handlePlayerReconnected);
     socket.on('room:host-transferred', handleHostTransferred);
@@ -322,12 +335,13 @@ const TicTacToeRoom = () => {
       socket.off('room:move-made', handleMoveMade);
       socket.off('room:game-over', handleGameOver);
       socket.off('room:rematch-request', handleRematchRequest);
+      socket.off('room:rematch-accepted', handleRematchAccepted);
       socket.off('room:player-disconnected', handlePlayerDisconnected);
       socket.off('room:player-reconnected', handlePlayerReconnected);
       socket.off('room:host-transferred', handleHostTransferred);
       socket.off('room:abandoned', handleRoomAbandoned);
     };
-  }, [socket, code, user, rematchRequested, navigate]);
+  }, [socket, code, user, rematchRequested, navigate, refreshUser]);
   
   const handleCellClick = (row, col) => {
     if (!isMyTurn || board[row][col] || gameOver) return;

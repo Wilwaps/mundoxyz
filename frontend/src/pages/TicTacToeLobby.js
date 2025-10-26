@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 const TicTacToeLobby = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
     mode: 'coins',
@@ -75,9 +75,10 @@ const TicTacToeLobby = () => {
       const response = await axios.post('/api/tictactoe/create', data);
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success('Sala creada exitosamente');
-      refetchBalance(); // Refrescar balance después de crear sala
+      refetchBalance(); // Refrescar balance de la query
+      await refreshUser(); // Actualizar balance en el header
       navigate(`/tictactoe/room/${data.room.code}`);
     },
     onError: (error) => {
@@ -91,9 +92,10 @@ const TicTacToeLobby = () => {
       const response = await axios.post(`/api/tictactoe/join/${code}`);
       return response.data;
     },
-    onSuccess: (data, code) => {
+    onSuccess: async (data, code) => {
       toast.success('Te has unido a la sala');
-      refetchBalance(); // Refrescar balance después de unirse
+      refetchBalance(); // Refrescar balance de la query
+      await refreshUser(); // Actualizar balance en el header
       navigate(`/tictactoe/room/${code}`);
     },
     onError: (error) => {

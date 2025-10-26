@@ -746,6 +746,14 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           rematchCount: newRematchCount
         });
         
+        // Emitir evento de socket para que ambos jugadores vayan a la nueva sala
+        const io = req.app.get('io');
+        io.to(`tictactoe:${code}`).emit('room:rematch-accepted', {
+          roomCode: code,
+          newRoomCode: newCode,
+          rematchCount: newRematchCount
+        });
+        
         return {
           rematchAccepted: true,
           newRoomCode: newCode,
