@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Sparkles, UserPlus, Mail, Lock, User, MessageCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, UserPlus, Mail, Lock, User, MessageCircle, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MathCaptcha from '../components/MathCaptcha';
 
@@ -19,7 +19,8 @@ const Register = () => {
     emailConfirm: '',
     tg_id: '',
     password: '',
-    passwordConfirm: ''
+    passwordConfirm: '',
+    security_answer: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -76,6 +77,16 @@ const Register = () => {
           newErrors.passwordConfirm = 'Las contraseñas no coinciden';
         } else {
           delete newErrors.passwordConfirm;
+        }
+        break;
+
+      case 'security_answer':
+        if (value.length < 3) {
+          newErrors.security_answer = 'Mínimo 3 caracteres';
+        } else if (value.length > 255) {
+          newErrors.security_answer = 'Máximo 255 caracteres';
+        } else {
+          delete newErrors.security_answer;
         }
         break;
 
@@ -310,6 +321,28 @@ const Register = () => {
               </div>
               {errors.passwordConfirm && (
                 <p className="text-xs text-red-400 mt-1">{errors.passwordConfirm}</p>
+              )}
+            </div>
+
+            {/* Security Answer */}
+            <div>
+              <label className="block text-sm font-medium text-text/80 mb-2">
+                <Shield size={16} className="inline mr-2" />
+                Respuesta de Seguridad *
+              </label>
+              <input
+                type="text"
+                name="security_answer"
+                value={formData.security_answer}
+                onChange={handleChange}
+                placeholder="Ej: Nombre de tu primera mascota"
+                className={`input-glass w-full ${errors.security_answer ? 'border-red-500' : ''}`}
+              />
+              <p className="text-xs text-text/60 mt-1">
+                Esta respuesta te permitirá recuperar tu clave si la olvidas
+              </p>
+              {errors.security_answer && (
+                <p className="text-xs text-red-400 mt-1">{errors.security_answer}</p>
               )}
             </div>
 

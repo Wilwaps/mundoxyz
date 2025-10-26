@@ -1,0 +1,16 @@
+feat: FASE 2 sistema de abandono completo backend
+
+Utilidades (tictactoe.js):
+- refundBet: devolver apuesta a jugador
+- cancelRoomAndRefund: cancelar sala y devolver a ambos
+- transferHost: player_o se convierte en player_x
+
+Socket (tictactoe.js):
+- Tracking de conexiones por sala
+- Timeout de 30 segundos por desconexion
+- ESCENARIO 1: Ambos abandonan - cancela y devuelve
+- ESCENARIO 2: Solo host sin invitado - cancela y devuelve
+- ESCENARIO 3: Host con invitado - transfiere host
+- Eventos: player-disconnected, player-reconnected, host-transferred, room-abandoned
+
+Ahora el dinero esta protegido en todos los casos de abandono

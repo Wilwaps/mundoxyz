@@ -1,0 +1,19 @@
+feat: FASES 3+4 UX mejorada completa
+
+BACKEND:
+- Modificar endpoint ready: solo marca listo, no auto-inicia
+- Nuevo endpoint POST /room/:code/start: solo host puede iniciar
+- Validaciones: invitado debe estar listo primero
+
+FRONTEND:
+- Botón "Listo" solo para invitado (player_o) con animacion pulse
+- Efecto brillo verde en card cuando invitado listo
+- Check grande verde cuando invitado ready
+- Host ve estado del invitado claramente
+- Botón "Iniciar Partida" solo para host cuando invitado listo
+- Visualización pot mejorada:
+  * Waiting: premio + texto esperando
+  * Ready: premio grande + desglose host+invitado
+  * Playing: premio total animado con gradiente
+
+Experiencia clara con roles definidos y visualización transparente

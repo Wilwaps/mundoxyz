@@ -5,9 +5,10 @@ const { v4: uuidv4 } = require('uuid');
 const net = require('net');
 const { query, transaction } = require('../db');
 const { verifyTelegramWebAppData, verifyTelegramWidgetData, formatUserIdentifier } = require('../services/telegramAuth');
-const { generateToken, generateRefreshToken } = require('../middleware/auth');
+const { generateToken, generateRefreshToken, verifyToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+const { hashSecurityAnswer, compareSecurityAnswer, validateSecurityAnswer } = require('../utils/security');
 
 // Helper to sanitize IP into a valid PostgreSQL inet or null
 function getClientIp(req) {
@@ -301,11 +302,17 @@ router.post('/login-email', async (req, res) => {
 // Register new user with email
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, emailConfirm, password, passwordConfirm, tg_id } = req.body;
+    const { username, email, emailConfirm, password, passwordConfirm, tg_id, security_answer } = req.body;
 
     // Validaciones básicas
-    if (!username || !email || !emailConfirm || !password || !passwordConfirm) {
+    if (!username || !email || !emailConfirm || !password || !passwordConfirm || !security_answer) {
       return res.status(400).json({ error: 'Todos los campos son requeridos excepto ID Telegram' });
+    }
+    
+    // Validar respuesta de seguridad
+    const answerValidation = validateSecurityAnswer(security_answer);
+    if (!answerValidation.valid) {
+      return res.status(400).json({ error: answerValidation.error });
     }
 
     // Validar formato de email
@@ -385,13 +392,16 @@ router.post('/register', async (req, res) => {
 
       // Hash de la contraseña
       const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Hash de la respuesta de seguridad
+      const securityAnswerHash = await hashSecurityAnswer(security_answer);
 
       // Crear usuario
       const userResult = await client.query(
-        `INSERT INTO users (username, email, tg_id, display_name, is_verified, created_at, first_seen_at, last_seen_at)
-         VALUES ($1, $2, $3, $4, false, NOW(), NOW(), NOW())
+        `INSERT INTO users (username, email, tg_id, display_name, security_answer, is_verified, created_at, first_seen_at, last_seen_at)
+         VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW(), NOW())
          RETURNING id, username, email, tg_id`,
-        [username, email.toLowerCase(), telegramId, username]
+        [username, email.toLowerCase(), telegramId, username, securityAnswerHash]
       );
 
       const userId = userResult.rows[0].id;
@@ -797,6 +807,162 @@ router.put('/change-password', async (req, res) => {
   } catch (error) {
     logger.error('Change password error:', error);
     res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+});
+
+// POST /api/auth/reset-password-request - Solicitar reset de clave con respuesta de seguridad
+router.post('/reset-password-request', async (req, res) => {
+  try {
+    const { method, identifier, security_answer } = req.body;
+    
+    // Validaciones
+    if (!method || !identifier || !security_answer) {
+      return res.status(400).json({ error: 'Método, identificador y respuesta de seguridad requeridos' });
+    }
+    
+    if (method !== 'telegram' && method !== 'email') {
+      return res.status(400).json({ error: 'Método debe ser "telegram" o "email"' });
+    }
+    
+    // Validar formato de respuesta
+    const validation = validateSecurityAnswer(security_answer);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+    
+    // Buscar usuario por método
+    let userQuery;
+    if (method === 'telegram') {
+      userQuery = 'SELECT * FROM users WHERE telegram_id = $1';
+    } else {
+      userQuery = 'SELECT * FROM users WHERE email = $1';
+    }
+    
+    const userResult = await query(userQuery, [identifier]);
+    
+    if (userResult.rows.length === 0) {
+      // No revelar si el usuario existe o no (seguridad)
+      return res.status(400).json({ error: 'Datos incorrectos' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Verificar que tenga respuesta de seguridad configurada
+    if (!user.security_answer) {
+      return res.status(400).json({ 
+        error: 'Este usuario no tiene configurada una respuesta de seguridad. Contacta al soporte.' 
+      });
+    }
+    
+    // Comparar respuesta de seguridad
+    const isMatch = await compareSecurityAnswer(security_answer, user.security_answer);
+    
+    if (!isMatch) {
+      logger.warn('Failed security answer attempt', { 
+        userId: user.id, 
+        username: user.username 
+      });
+      return res.status(400).json({ error: 'Respuesta de seguridad incorrecta' });
+    }
+    
+    // Respuesta correcta: resetear clave a "123456"
+    const defaultPasswordHash = await bcrypt.hash('123456', 10);
+    
+    // Actualizar en auth_identities (provider='email')
+    const aiRes = await query(
+      "SELECT id FROM auth_identities WHERE user_id = $1 AND provider = 'email'",
+      [user.id]
+    );
+    
+    if (aiRes.rows.length > 0) {
+      await query(
+        "UPDATE auth_identities SET password_hash = $1 WHERE user_id = $2 AND provider = 'email'",
+        [defaultPasswordHash, user.id]
+      );
+    } else {
+      // Crear entrada si no existe
+      const providerUid = user.email || user.username || String(user.id);
+      await query(
+        "INSERT INTO auth_identities (user_id, provider, provider_uid, password_hash, created_at) VALUES ($1, 'email', $2, $3, NOW())",
+        [user.id, providerUid, defaultPasswordHash]
+      );
+    }
+    
+    logger.info('Password reset successful via security answer', {
+      userId: user.id,
+      username: user.username,
+      method
+    });
+    
+    res.json({
+      success: true,
+      message: 'Clave reseteada exitosamente a 123456',
+      username: user.username
+    });
+    
+  } catch (error) {
+    logger.error('Reset password request error:', error);
+    res.status(500).json({ error: 'Error al procesar solicitud de reset' });
+  }
+});
+
+// POST /api/auth/update-security-answer - Actualizar respuesta de seguridad (requiere auth)
+router.post('/update-security-answer', verifyToken, async (req, res) => {
+  try {
+    const { new_security_answer, current_password } = req.body;
+    
+    // Obtener userId del token (middleware verifyToken debe estar antes)
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+    
+    if (!new_security_answer || !current_password) {
+      return res.status(400).json({ error: 'Respuesta de seguridad y clave actual requeridas' });
+    }
+    
+    // Validar formato de respuesta
+    const validation = validateSecurityAnswer(new_security_answer);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+    
+    // Verificar clave actual
+    const aiRes = await query(
+      "SELECT password_hash FROM auth_identities WHERE user_id = $1 AND provider = 'email'",
+      [userId]
+    );
+    
+    if (aiRes.rows.length === 0 || !aiRes.rows[0].password_hash) {
+      return res.status(400).json({ error: 'No tienes clave configurada' });
+    }
+    
+    const isPasswordValid = await bcrypt.compare(current_password, aiRes.rows[0].password_hash);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    }
+    
+    // Hashear nueva respuesta de seguridad
+    const hashedAnswer = await hashSecurityAnswer(new_security_answer);
+    
+    // Actualizar en users
+    await query(
+      'UPDATE users SET security_answer = $1 WHERE id = $2',
+      [hashedAnswer, userId]
+    );
+    
+    logger.info('Security answer updated', { userId });
+    
+    res.json({
+      success: true,
+      message: 'Respuesta de seguridad actualizada correctamente'
+    });
+    
+  } catch (error) {
+    logger.error('Update security answer error:', error);
+    res.status(500).json({ error: 'Error al actualizar respuesta de seguridad' });
   }
 });
 

@@ -25,6 +25,9 @@ const MyDataModal = ({ isOpen, onClose }) => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [editingSecurityAnswer, setEditingSecurityAnswer] = useState(false);
+  const [newSecurityAnswer, setNewSecurityAnswer] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
 
   // Helper: Check if user has password
   const checkHasPassword = async () => {
@@ -174,6 +177,43 @@ const MyDataModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleUpdateSecurityAnswer = async () => {
+    // Validar
+    if (!newSecurityAnswer || newSecurityAnswer.trim().length < 3) {
+      toast.error('La respuesta debe tener al menos 3 caracteres');
+      return;
+    }
+    
+    if (!currentPassword) {
+      toast.error('Debes ingresar tu contraseña actual');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.post('/api/auth/update-security-answer', {
+        new_security_answer: newSecurityAnswer,
+        current_password: currentPassword
+      });
+      
+      toast.success('Respuesta de seguridad actualizada correctamente');
+      
+      // Limpiar campos
+      setEditingSecurityAnswer(false);
+      setNewSecurityAnswer('');
+      setCurrentPassword('');
+      
+      // Actualizar usuario
+      await refreshUser();
+      queryClient.invalidateQueries(['user-stats', user.id]);
+      
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Error al actualizar respuesta de seguridad');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = () => {
     if (hasChanges) {
       if (window.confirm('¿Deseas salir sin guardar los cambios?')) {
@@ -248,6 +288,16 @@ const MyDataModal = ({ isOpen, onClose }) => {
                   }`}
                 >
                   💬 Telegram
+                </button>
+                <button
+                  onClick={() => setActiveTab('security')}
+                  className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                    activeTab === 'security'
+                      ? 'bg-accent text-dark'
+                      : 'bg-glass hover:bg-glass-hover'
+                  }`}
+                >
+                  🔒 Seguridad
                 </button>
               </div>
 
@@ -445,6 +495,103 @@ const MyDataModal = ({ isOpen, onClose }) => {
                         </p>
                       </div>
                     )}
+                  </>
+                )}
+
+                {/* Security Tab */}
+                {activeTab === 'security' && (
+                  <>
+                    <div className="p-4 rounded-lg bg-violet/10 border border-violet/30 mb-4">
+                      <h3 className="font-semibold mb-2 flex items-center gap-2">
+                        🔒 Respuesta de Seguridad
+                      </h3>
+                      <p className="text-sm text-text/80 mb-4">
+                        Esta respuesta te permite recuperar tu clave si la olvidas. Manténla segura y memorable.
+                      </p>
+                      
+                      {!editingSecurityAnswer ? (
+                        <div className="space-y-3">
+                          <div className="p-3 rounded-lg bg-glass">
+                            <p className="text-xs text-text/60 mb-1">Estado actual:</p>
+                            <p className="font-medium">
+                              {user?.security_answer ? '✅ Configurada' : '❌ No configurada'}
+                            </p>
+                          </div>
+                          
+                          <button
+                            onClick={() => setEditingSecurityAnswer(true)}
+                            className="w-full px-4 py-2 bg-violet hover:bg-violet/90 text-white rounded-lg transition-colors font-medium"
+                          >
+                            {user?.security_answer ? 'Cambiar Respuesta' : 'Configurar Respuesta'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-text/80 mb-2">
+                              Nueva Respuesta de Seguridad
+                            </label>
+                            <input
+                              type="text"
+                              value={newSecurityAnswer}
+                              onChange={(e) => setNewSecurityAnswer(e.target.value)}
+                              placeholder="Ej: Nombre de tu primera mascota"
+                              className="input-glass w-full"
+                            />
+                            <p className="text-xs text-text/60 mt-1">
+                              Mínimo 3 caracteres, máximo 255
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-text/80 mb-2">
+                              Confirma con tu Clave Actual
+                            </label>
+                            <input
+                              type="password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                              placeholder="Tu contraseña actual"
+                              className="input-glass w-full"
+                            />
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingSecurityAnswer(false);
+                                setNewSecurityAnswer('');
+                                setCurrentPassword('');
+                              }}
+                              className="flex-1 px-4 py-2 bg-glass hover:bg-glass-hover rounded-lg transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={handleUpdateSecurityAnswer}
+                              disabled={loading || !newSecurityAnswer || !currentPassword}
+                              className="flex-1 px-4 py-2 bg-success hover:bg-success/90 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {loading ? 'Guardando...' : 'Guardar'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-3 rounded-lg bg-info/10 border border-info/20">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle size={16} className="text-info mt-0.5 flex-shrink-0" />
+                        <div className="text-xs text-info">
+                          <p className="font-semibold mb-1">Consejos de seguridad:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li>Usa una respuesta que solo tú conozcas</li>
+                            <li>Evita información pública (fecha de nacimiento, etc.)</li>
+                            <li>No compartas tu respuesta con nadie</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

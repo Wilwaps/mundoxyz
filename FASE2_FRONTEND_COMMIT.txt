@@ -1,0 +1,13 @@
+feat: FASE 2 integracion frontend - gestion abandono
+
+TicTacToeRoom.js:
+- Join room con userId y role via socket
+- Estado connectionStatus para tracking de desconexion
+- Handler player-disconnected: muestra alerta y timeout
+- Handler player-reconnected: oculta alerta  
+- Handler host-transferred: notifica nuevo host y cambia symbol
+- Handler room-abandoned: redirige a lobby tras devolucion
+- Alerta visual roja cuando oponente desconectado
+- Toasts informativos para todos los eventos
+
+Ahora usuarios ven en tiempo real desconexiones y transferencias

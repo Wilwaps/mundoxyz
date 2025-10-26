@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Sparkles, Zap, UserPlus } from 'lucide-react';
+import { Sparkles, Zap, UserPlus, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
@@ -133,6 +133,17 @@ const Login = () => {
                     {loading ? 'Iniciando...' : 'Iniciar Sesión (Dev)'}
                   </button>
                 </form>
+                
+                {/* Link de reset de clave */}
+                <div className="text-center mt-3">
+                  <Link
+                    to="/reset-password"
+                    className="text-violet hover:underline text-sm inline-flex items-center gap-1"
+                  >
+                    <KeyRound size={14} />
+                    ¿Olvidaste tu clave?
+                  </Link>
+                </div>
               </div>
 
               <div className="text-center">
