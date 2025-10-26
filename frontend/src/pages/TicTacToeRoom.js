@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
   X, Circle, Trophy, Clock, Users, Coins, Flame, 
@@ -16,6 +16,7 @@ const TicTacToeRoom = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket } = useSocket();
+  const queryClient = useQueryClient();
   
   const [room, setRoom] = useState(null);
   const [board, setBoard] = useState([
@@ -50,27 +51,47 @@ const TicTacToeRoom = () => {
   // Handle room data updates (replacement for onSuccess in v5)
   useEffect(() => {
     if (roomData) {
+      // Debug logs
+      console.log('Room data updated:', {
+        player_x_id: roomData.player_x_id,
+        player_o_id: roomData.player_o_id,
+        current_user_id: user?.id,
+        user_object: user,
+        is_participant: roomData.is_participant
+      });
+      
       setRoom(roomData);
       setBoard(roomData.board || [[null, null, null], [null, null, null], [null, null, null]]);
       
       // Determine player symbol
-      if (user) {
+      if (user && user.id) {
         if (roomData.player_x_id === user.id) {
           setMySymbol('X');
           setIsMyTurn(roomData.current_turn === 'X' && roomData.status === 'playing');
+          console.log('User is Player X');
         } else if (roomData.player_o_id === user.id) {
           setMySymbol('O');
           setIsMyTurn(roomData.current_turn === 'O' && roomData.status === 'playing');
+          console.log('User is Player O');
+        } else {
+          console.log('User is not a participant in this room');
         }
+      } else {
+        console.log('User object not available:', user);
       }
       
       // Check if game ended
       if (roomData.status === 'finished' && !gameOver) {
         setGameOver(true);
         setShowGameOverModal(true);
+        // Refrescar balance después de que termine el juego
+        setTimeout(() => {
+          queryClient.invalidateQueries(['balance']);
+          queryClient.invalidateQueries(['economy']);
+        }, 1000);
       }
     }
-  }, [roomData, user, gameOver]);
+  }, [roomData, user, gameOver, queryClient]);
   
   // Mark ready mutation (solo invitado)
   const markReadyMutation = useMutation({

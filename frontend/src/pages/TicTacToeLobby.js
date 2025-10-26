@@ -17,6 +17,7 @@ const TicTacToeLobby = () => {
     visibility: 'public'
   });
   const [modeFilter, setModeFilter] = useState('all');
+  const [joinCode, setJoinCode] = useState('');
   
   // Fetch active room (para reconexión)
   const { data: activeRoomData } = useQuery({
@@ -191,6 +192,39 @@ const TicTacToeLobby = () => {
           <Plus size={20} />
           Crear Sala
         </button>
+        
+        {/* Input para unirse a sala por código */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Código de sala"
+            value={joinCode}
+            onChange={(e) => {
+              // Solo permitir números
+              const value = e.target.value.replace(/[^0-9]/g, '');
+              if (value.length <= 6) {
+                setJoinCode(value);
+              }
+            }}
+            maxLength="6"
+            className="glass-input px-4 py-2 w-32 text-center"
+            style={{ letterSpacing: '0.2em' }}
+          />
+          <button
+            onClick={() => {
+              if (joinCode.length === 6) {
+                handleJoinRoom(joinCode);
+                setJoinCode('');
+              } else {
+                toast.error('El código debe tener 6 dígitos');
+              }
+            }}
+            disabled={!user || joinCode.length !== 6}
+            className="btn-secondary px-4"
+          >
+            Unirse
+          </button>
+        </div>
         
         {/* Mode Filter */}
         <div className="flex gap-2 flex-1 justify-center sm:justify-start">

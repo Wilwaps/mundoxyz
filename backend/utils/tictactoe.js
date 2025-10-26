@@ -1,10 +1,11 @@
 const logger = require('./logger');
 
 /**
- * Genera código único de 6 caracteres para sala
+ * Genera código único de 6 dígitos numéricos para sala
  */
 function generateRoomCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+  // Genera un número aleatorio entre 100000 y 999999
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 /**
@@ -90,18 +91,7 @@ async function distributePrizes(room, query) {
   // Sin comisión - 100% al ganador o 50% c/u en empate
   if (room.winner_id) {
     // Victoria: ganador recibe 100%
-    await query(
-      `UPDATE wallets 
-       SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = 
-           ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} + $1,
-           ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} = 
-           ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} + $1,
-           updated_at = NOW()
-       WHERE user_id = $2`,
-      [potTotal, room.winner_id]
-    );
-    
-    // Registrar transacción
+    // Primero obtener balance actual (antes de actualizar)
     const walletResult = await query(
       'SELECT id, ' + (currency === 'fires' ? 'fires_balance' : 'coins_balance') + ' as balance FROM wallets WHERE user_id = $1',
       [room.winner_id]
@@ -109,6 +99,21 @@ async function distributePrizes(room, query) {
     
     if (walletResult.rows.length > 0) {
       const wallet = walletResult.rows[0];
+      const balanceBefore = parseFloat(wallet.balance);
+      const balanceAfter = balanceBefore + potTotal;
+      
+      // Actualizar balance
+      await query(
+        `UPDATE wallets 
+         SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = $1,
+             ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} = 
+             ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} + $2,
+             updated_at = NOW()
+         WHERE user_id = $3`,
+        [balanceAfter, potTotal, room.winner_id]
+      );
+      
+      // Registrar transacción
       await query(
         `INSERT INTO wallet_transactions 
          (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
@@ -117,8 +122,8 @@ async function distributePrizes(room, query) {
           wallet.id,
           currency,
           potTotal,
-          parseFloat(wallet.balance) - potTotal,
-          parseFloat(wallet.balance),
+          balanceBefore,
+          balanceAfter,
           'Victoria en La Vieja',
           room.code
         ]
@@ -144,15 +149,7 @@ async function distributePrizes(room, query) {
     const refund = potTotal / 2;
     
     for (const playerId of [room.player_x_id, room.player_o_id]) {
-      await query(
-        `UPDATE wallets 
-         SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = 
-             ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} + $1,
-             updated_at = NOW()
-         WHERE user_id = $2`,
-        [refund, playerId]
-      );
-      
+      // Primero obtener balance actual (antes de actualizar)
       const walletResult = await query(
         'SELECT id, ' + (currency === 'fires' ? 'fires_balance' : 'coins_balance') + ' as balance FROM wallets WHERE user_id = $1',
         [playerId]
@@ -160,6 +157,19 @@ async function distributePrizes(room, query) {
       
       if (walletResult.rows.length > 0) {
         const wallet = walletResult.rows[0];
+        const balanceBefore = parseFloat(wallet.balance);
+        const balanceAfter = balanceBefore + refund;
+        
+        // Actualizar balance
+        await query(
+          `UPDATE wallets 
+           SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = $1,
+               updated_at = NOW()
+           WHERE user_id = $2`,
+          [balanceAfter, playerId]
+        );
+        
+        // Registrar transacción
         await query(
           `INSERT INTO wallet_transactions 
            (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
@@ -168,8 +178,8 @@ async function distributePrizes(room, query) {
             wallet.id,
             currency,
             refund,
-            parseFloat(wallet.balance) - refund,
-            parseFloat(wallet.balance),
+            balanceBefore,
+            balanceAfter,
             'Empate en La Vieja',
             room.code
           ]
