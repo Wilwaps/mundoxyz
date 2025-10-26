@@ -1,0 +1,23 @@
+feat: sistema completo recuperacion claves con pregunta seguridad
+
+BACKEND:
+- Migracion 002_security_answer.sql: columna security_answer en users
+- utils/security.js: hashSecurityAnswer, compareSecurityAnswer, validateSecurityAnswer
+- POST /reset-password-request: resetear clave con respuesta seguridad
+- POST /update-security-answer: actualizar respuesta desde perfil
+- Modificado POST /register: campo security_answer obligatorio
+
+FRONTEND:
+- ResetPassword.js: pagina completa reset con metodo telegram/email
+- Login.js: link a reset password
+- Register.js: campo security_answer obligatorio con validacion
+- App.js: ruta /reset-password
+- MyDataModal.js: tab Seguridad para ver/editar respuesta
+
+FLUJO COMPLETO:
+1. Registro: usuario ingresa respuesta seguridad (hasheada)
+2. Olvido clave: reset-password con telegram_id/email + respuesta
+3. Si coincide: clave reseteada a 123456
+4. Perfil: usuario puede cambiar respuesta con clave actual
+
+Usuario prueba1 ahora puede resetear su clave

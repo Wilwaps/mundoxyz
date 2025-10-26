@@ -142,7 +142,7 @@ const ResetPassword = () => {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={method === 'telegram' ? 'Ej: 123456789' : 'tu@email.com'}
-                className="input w-full"
+                className="input w-full text-gray-900"
                 required
               />
               <p className="text-xs text-text/60 mt-1">
@@ -163,7 +163,7 @@ const ResetPassword = () => {
                 value={securityAnswer}
                 onChange={(e) => setSecurityAnswer(e.target.value)}
                 placeholder="Ingresa tu respuesta secreta"
-                className="input w-full"
+                className="input w-full text-gray-900"
                 required
               />
               <p className="text-xs text-text/60 mt-1">

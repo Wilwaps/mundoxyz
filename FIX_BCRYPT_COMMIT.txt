@@ -1,0 +1,8 @@
+fix: cambiar bcrypt a bcryptjs en security.js
+
+ERROR: Cannot find module bcrypt
+CAUSA: Usabamos require('bcrypt') pero tenemos bcryptjs instalado
+
+SOLUCION: Cambiar a require('bcryptjs')
+
+Deploy ahora funcionara correctamente

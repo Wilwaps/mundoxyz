@@ -1,0 +1,12 @@
+fix: corregir migracion 002_security_answer
+
+ERROR: column password_hash does not exist en tabla users
+CAUSA: password_hash esta en auth_identities, no en users
+
+SOLUCION:
+- Eliminado fix temporal de prueba1 que causaba error
+- Migración ahora solo agrega columna security_answer
+- Usuarios existentes tendran security_answer = NULL
+- Pueden configurarla desde perfil despues
+
+Migracion limpia y funcional

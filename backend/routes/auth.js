@@ -833,7 +833,7 @@ router.post('/reset-password-request', async (req, res) => {
     // Buscar usuario por método
     let userQuery;
     if (method === 'telegram') {
-      userQuery = 'SELECT * FROM users WHERE telegram_id = $1';
+      userQuery = 'SELECT * FROM users WHERE tg_id = $1';
     } else {
       userQuery = 'SELECT * FROM users WHERE email = $1';
     }
