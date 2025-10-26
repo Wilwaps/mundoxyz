@@ -64,7 +64,10 @@ router.post('/login-telegram', async (req, res) => {
 
     // Get user data
     const userResult = await query(
-      'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.*, w.id as wallet_id, ' +
+      'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
+      'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
+      'array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
@@ -95,8 +98,8 @@ router.post('/login-telegram', async (req, res) => {
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         wallet_id: user.wallet_id,
-        coins_balance: user.coins_balance || 0,
-        fires_balance: user.fires_balance || 0,
+        coins_balance: parseFloat(user.coins_balance || 0),
+        fires_balance: parseFloat(user.fires_balance || 0),
         roles: user.roles?.filter(Boolean) || []
       }
     });
@@ -215,8 +218,8 @@ router.post('/login-email', async (req, res) => {
           display_name: user.display_name,
           avatar_url: user.avatar_url,
           wallet_id: user.wallet_id,
-          coins_balance: user.coins_balance || 0,
-          fires_balance: user.fires_balance || 0,
+          coins_balance: parseFloat(user.coins_balance || 0),
+          fires_balance: parseFloat(user.fires_balance || 0),
           roles: user.roles?.filter(Boolean) || []
         }
       };
@@ -228,7 +231,10 @@ router.post('/login-email', async (req, res) => {
     // Regular email/username login with stored password
     logger.info('login-email regular path');
     const result = await query(
-      'SELECT u.id, u.username, u.email, ai.password_hash, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.id, u.username, u.email, ai.password_hash, w.id as wallet_id, ' +
+      'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
+      'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
+      'array_agg(r.name) as roles ' +
       'FROM users u ' +
       "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
@@ -279,8 +285,8 @@ router.post('/login-email', async (req, res) => {
         username: row.username,
         email: row.email,
         wallet_id: row.wallet_id,
-        coins_balance: row.coins_balance || 0,
-        fires_balance: row.fires_balance || 0,
+        coins_balance: parseFloat(row.coins_balance || 0),
+        fires_balance: parseFloat(row.fires_balance || 0),
         roles: (row.roles || []).filter(Boolean)
       }
     };
@@ -482,7 +488,10 @@ router.post('/login-telegram-widget', async (req, res) => {
 
     // Get user data
     const userResult = await query(
-      'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+      'SELECT u.*, w.id as wallet_id, ' +
+      'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
+      'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
+      'array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
@@ -505,8 +514,8 @@ router.post('/login-telegram-widget', async (req, res) => {
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         wallet_id: user.wallet_id,
-        coins_balance: user.coins_balance || 0,
-        fires_balance: user.fires_balance || 0,
+        coins_balance: parseFloat(user.coins_balance || 0),
+        fires_balance: parseFloat(user.fires_balance || 0),
         roles: user.roles?.filter(Boolean) || []
       }
     });
