@@ -196,8 +196,8 @@ router.post('/join/:code', verifyToken, async (req, res) => {
         throw new Error('Ya eres el host de esta sala');
       }
       
-      // Cerrar salas anteriores del usuario antes de unirse
-      await closeUserPreviousRooms(userId, client);
+      // Cerrar salas anteriores del usuario antes de unirse (excluyendo esta sala)
+      await closeUserPreviousRooms(userId, client, room.id);
       
       // Verificar balance
       const walletResult = await client.query(

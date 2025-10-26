@@ -128,14 +128,16 @@ async function cancelRoomAndRefund(room, client = null) {
  * Cierra salas anteriores del usuario al crear una nueva
  * @param {string} userId - ID del usuario
  * @param {object} client - Cliente de transaction
+ * @param {string} excludeRoomId - ID de sala a excluir (para no cerrar sala a la que se une)
  */
-async function closeUserPreviousRooms(userId, client) {
+async function closeUserPreviousRooms(userId, client, excludeRoomId = null) {
   const activeSessions = await client.query(`
     SELECT * FROM tictactoe_rooms
     WHERE (player_x_id = $1 OR player_o_id = $1)
     AND status IN ('waiting', 'ready')
+    ${excludeRoomId ? 'AND id != $2' : ''}
     ORDER BY created_at DESC
-  `, [userId]);
+  `, excludeRoomId ? [userId, excludeRoomId] : [userId]);
   
   for (const room of activeSessions.rows) {
     await cancelRoomAndRefund(room, client);
@@ -143,6 +145,7 @@ async function closeUserPreviousRooms(userId, client) {
   
   logger.info('Closed previous rooms for user', {
     userId,
+    excludedRoom: excludeRoomId,
     roomsClosed: activeSessions.rows.length
   });
 }
