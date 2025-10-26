@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
       if (token && storedUser) {
         try {
           // Validate token with backend
-          const response = await axios.get('/roles/me');
+          const response = await axios.get('/api/roles/me');
           const userData = JSON.parse(storedUser);
           setUser({
             ...userData,
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Telegram WebApp no disponible');
       }
 
-      const response = await axios.post('/auth/login-telegram', {
+      const response = await axios.post('/api/auth/login-telegram', {
         initData: tg.initData
       });
 
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      const response = await axios.post('/auth/login-email', {
+      const response = await axios.post('/api/auth/login-email', {
         email: username,
         password
       });
@@ -153,7 +153,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      const response = await axios.post('/auth/register', {
+      const response = await axios.post('/api/auth/register', {
         username: formData.username,
         email: formData.email,
         emailConfirm: formData.emailConfirm,
@@ -176,7 +176,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/auth/logout');
+      await axios.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -194,7 +194,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const response = await axios.get(`/profile/${user.id}`);
+      const response = await axios.get(`/api/profile/${user.id}`);
       const profileData = response.data;
       
       // Construir usuario actualizado con TODOS los campos nuevos

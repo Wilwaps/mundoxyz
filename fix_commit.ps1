@@ -1,6 +1,6 @@
 git add -A
 if ($LASTEXITCODE -eq 0) { 
-    Set-Content -Path .git\COMMIT_MSG.txt -Value 'fix: configurar correctamente REACT_APP_API_URL para produccion - debe ser URL del backend' 
+    Set-Content -Path .git\COMMIT_MSG.txt -Value 'fix: agregar prefix /api a todas las rutas de auth - resolver 404 en login' 
 }
 if ($LASTEXITCODE -eq 0) { 
     git commit -F .git\COMMIT_MSG.txt 
@@ -11,4 +11,5 @@ if ($LASTEXITCODE -eq 0) {
 if ($LASTEXITCODE -eq 0) { 
     Remove-Item .git\COMMIT_MSG.txt -ErrorAction SilentlyContinue
     Write-Host "✅ Commit y push exitoso!" -ForegroundColor Green
+    Write-Host "🚀 Deploy iniciado en Railway - esperar 2-3 minutos" -ForegroundColor Yellow
 }
