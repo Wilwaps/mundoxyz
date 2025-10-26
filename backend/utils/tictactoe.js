@@ -219,10 +219,167 @@ async function awardGameXP(room, awardXpBatch) {
   return results;
 }
 
+/**
+ * Devuelve la apuesta de un jugador
+ * @param {object} client - Cliente de transacción PostgreSQL
+ * @param {string} userId - ID del usuario
+ * @param {string} mode - 'coins' o 'fires'
+ * @param {number} amount - Cantidad a devolver
+ * @param {string} roomCode - Código de la sala
+ * @param {string} reason - Razón de la devolución
+ */
+async function refundBet(client, userId, mode, amount, roomCode, reason) {
+  const column = mode === 'fires' ? 'fires_balance' : 'coins_balance';
+  const spentColumn = mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent';
+  
+  // Obtener balance actual
+  const walletResult = await client.query(
+    `SELECT ${column} FROM wallets WHERE user_id = $1`,
+    [userId]
+  );
+  
+  if (walletResult.rows.length === 0) {
+    throw new Error(`Wallet not found for user ${userId}`);
+  }
+  
+  const currentBalance = parseFloat(walletResult.rows[0][column]);
+  const newBalance = currentBalance + amount;
+  
+  // Actualizar balance
+  await client.query(
+    `UPDATE wallets 
+     SET ${column} = $1,
+         ${spentColumn} = ${spentColumn} - $2,
+         updated_at = NOW()
+     WHERE user_id = $3`,
+    [newBalance, amount, userId]
+  );
+  
+  // Registrar transacción
+  await client.query(
+    `INSERT INTO wallet_transactions 
+     (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+     VALUES (
+       (SELECT id FROM wallets WHERE user_id = $1),
+       'refund', $2, $3, $4, $5, $6, $7
+     )`,
+    [userId, mode, amount, currentBalance, newBalance, reason, roomCode]
+  );
+  
+  logger.info('Bet refunded', { userId, mode, amount, roomCode, reason });
+  
+  return newBalance;
+}
+
+/**
+ * Cancela una sala y devuelve las apuestas
+ * @param {object} client - Cliente de transacción PostgreSQL
+ * @param {object} room - Objeto de la sala
+ * @param {string} reason - Razón de cancelación
+ */
+async function cancelRoomAndRefund(client, room, reason) {
+  const betAmount = parseFloat(room.bet_amount);
+  const mode = room.mode;
+  
+  // Devolver apuesta al host (player_x)
+  if (room.player_x_id) {
+    await refundBet(
+      client,
+      room.player_x_id,
+      mode,
+      betAmount,
+      room.code,
+      `Sala cancelada: ${reason}`
+    );
+  }
+  
+  // Devolver apuesta al invitado (player_o) si existe
+  if (room.player_o_id) {
+    await refundBet(
+      client,
+      room.player_o_id,
+      mode,
+      betAmount,
+      room.code,
+      `Sala cancelada: ${reason}`
+    );
+  }
+  
+  // Marcar sala como cancelada
+  await client.query(
+    `UPDATE tictactoe_rooms 
+     SET status = 'cancelled',
+         finished_at = NOW()
+     WHERE id = $1`,
+    [room.id]
+  );
+  
+  logger.info('Room cancelled and refunded', {
+    roomId: room.id,
+    roomCode: room.code,
+    reason,
+    playersRefunded: [room.player_x_id, room.player_o_id].filter(Boolean)
+  });
+  
+  return true;
+}
+
+/**
+ * Transfiere el rol de host al invitado
+ * @param {object} client - Cliente de transacción PostgreSQL
+ * @param {object} room - Objeto de la sala
+ */
+async function transferHost(client, room) {
+  if (!room.player_o_id) {
+    throw new Error('No hay invitado para transferir host');
+  }
+  
+  // Obtener datos del invitado
+  const userResult = await client.query(
+    'SELECT username, display_name FROM users WHERE id = $1',
+    [room.player_o_id]
+  );
+  
+  if (userResult.rows.length === 0) {
+    throw new Error('Invitado no encontrado');
+  }
+  
+  const newHost = userResult.rows[0];
+  
+  // Transferir host: player_o se convierte en player_x
+  await client.query(
+    `UPDATE tictactoe_rooms 
+     SET host_id = $1,
+         player_x_id = $2,
+         player_x_ready = $3,
+         player_o_id = NULL,
+         player_o_ready = FALSE,
+         status = 'waiting'
+     WHERE id = $4`,
+    [room.player_o_id, room.player_o_id, room.player_o_ready, room.id]
+  );
+  
+  logger.info('Host transferred', {
+    roomId: room.id,
+    roomCode: room.code,
+    oldHost: room.player_x_id,
+    newHost: room.player_o_id,
+    newHostUsername: newHost.username
+  });
+  
+  return {
+    newHostId: room.player_o_id,
+    newHostUsername: newHost.username
+  };
+}
+
 module.exports = {
   generateRoomCode,
   isValidMove,
   checkWinner,
   distributePrizes,
-  awardGameXP
+  awardGameXP,
+  refundBet,
+  cancelRoomAndRefund,
+  transferHost
 };
