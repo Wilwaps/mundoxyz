@@ -312,38 +312,9 @@ router.post('/room/:code/ready', verifyToken, async (req, res) => {
         );
       }
       
-      // Verificar si ambos están listos
-      const updatedResult = await client.query(
-        'SELECT * FROM tictactoe_rooms WHERE id = $1',
-        [room.id]
-      );
-      
-      const updatedRoom = updatedResult.rows[0];
-      
-      if (updatedRoom.player_x_ready && updatedRoom.player_o_ready) {
-        // Iniciar juego
-        await client.query(
-          `UPDATE tictactoe_rooms 
-           SET status = 'playing', 
-               started_at = NOW(),
-               last_move_at = NOW()
-           WHERE id = $1`,
-          [room.id]
-        );
-        
-        logger.info('Tictactoe game started', { roomId: room.id, code });
-        
-        // Emit socket event for game start
-        if (req.io) {
-          req.io.to(`tictactoe:${code}`).emit('room:game-started', {
-            roomCode: code
-          });
-        }
-        
-        return { success: true, gameStarted: true };
-      }
-      
-      return { success: true, gameStarted: false };
+      // Solo marcar como listo, no auto-iniciar
+      // El host iniciará manualmente con el endpoint /start
+      return { success: true };
     });
     
     res.json(result);
@@ -351,6 +322,78 @@ router.post('/room/:code/ready', verifyToken, async (req, res) => {
   } catch (error) {
     logger.error('Error marking ready:', error);
     res.status(400).json({ error: error.message || 'Failed to mark ready' });
+  }
+});
+
+// POST /api/tictactoe/room/:code/start - Iniciar partida (solo host)
+router.post('/room/:code/start', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const userId = req.user.id;
+    
+    const result = await transaction(async (client) => {
+      const roomResult = await client.query(
+        'SELECT * FROM tictactoe_rooms WHERE code = $1 FOR UPDATE',
+        [code]
+      );
+      
+      if (roomResult.rows.length === 0) {
+        throw new Error('Sala no encontrada');
+      }
+      
+      const room = roomResult.rows[0];
+      
+      // Verificar que el usuario es el host
+      if (room.player_x_id !== userId) {
+        throw new Error('Solo el host puede iniciar la partida');
+      }
+      
+      // Verificar estado de la sala
+      if (room.status !== 'ready') {
+        throw new Error('La sala no está lista para comenzar');
+      }
+      
+      // Verificar que ambos jugadores estén presentes
+      if (!room.player_o_id) {
+        throw new Error('Esperando al segundo jugador');
+      }
+      
+      // Verificar que el invitado esté listo
+      if (!room.player_o_ready) {
+        throw new Error('El invitado aún no está listo');
+      }
+      
+      // Iniciar juego
+      await client.query(
+        `UPDATE tictactoe_rooms 
+         SET status = 'playing', 
+             started_at = NOW(),
+             last_move_at = NOW()
+         WHERE id = $1`,
+        [room.id]
+      );
+      
+      logger.info('Tictactoe game started by host', { 
+        roomId: room.id, 
+        code,
+        host: req.user.username
+      });
+      
+      // Emit socket event for game start
+      if (req.io) {
+        req.io.to(`tictactoe:${code}`).emit('room:game-started', {
+          roomCode: code
+        });
+      }
+      
+      return { success: true };
+    });
+    
+    res.json(result);
+    
+  } catch (error) {
+    logger.error('Error starting game:', error);
+    res.status(400).json({ error: error.message || 'Failed to start game' });
   }
 });
 

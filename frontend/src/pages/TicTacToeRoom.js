@@ -68,22 +68,33 @@ const TicTacToeRoom = () => {
     }
   });
   
-  // Mark ready mutation
+  // Mark ready mutation (solo invitado)
   const markReadyMutation = useMutation({
     mutationFn: async () => {
       const response = await axios.post(`/api/tictactoe/room/${code}/ready`);
       return response.data;
     },
-    onSuccess: (data) => {
-      if (data.gameStarted) {
-        toast.success('¡El juego ha comenzado!');
-      } else {
-        toast.success('Estás listo');
-      }
+    onSuccess: () => {
+      toast.success('¡Estás listo!');
       refetchRoom();
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al marcar listo');
+    }
+  });
+  
+  // Start game mutation (solo host)
+  const startGameMutation = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(`/api/tictactoe/room/${code}/start`);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('¡El juego ha comenzado!');
+      refetchRoom();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al iniciar juego');
     }
   });
   
@@ -375,20 +386,59 @@ const TicTacToeRoom = () => {
         
         <div className="card-glass p-4">
           <div className="flex justify-between items-center">
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-bold text-text">Sala {code}</h1>
-              <div className="flex items-center gap-4 mt-1">
+              <div className="flex items-center gap-4 mt-2">
                 <span className="text-sm text-text/60">
                   Modo: {room?.mode === 'coins' ? '🪙 Coins' : '🔥 Fires'}
                 </span>
                 <span className="text-sm text-text/60">
                   Apuesta: {room?.bet_amount}
                 </span>
-                <span className="text-sm text-text/60">
-                  Premio: {room?.mode === 'coins' 
-                    ? `${room?.pot_coins || 0} 🪙` 
-                    : `${room?.pot_fires || 0} 🔥`}
-                </span>
+              </div>
+              
+              {/* Premio con desglose */}
+              <div className="mt-3">
+                {room?.status === 'waiting' && (
+                  <div className="inline-block p-2 rounded-lg bg-violet/10 border border-violet/30">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold">
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                      </span>
+                      <span className="text-xs text-text/60">(Esperando oponente)</span>
+                    </div>
+                  </div>
+                )}
+                
+                {room?.status === 'ready' && (
+                  <div className="inline-block p-3 rounded-lg bg-success/10 border border-success/30">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-success mb-1">
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                      </div>
+                      <div className="text-xs text-text/60 flex items-center gap-1 justify-center">
+                        <span>Host: {room?.bet_amount}</span>
+                        <span>+</span>
+                        <span>Invitado: {room?.bet_amount}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {room?.status === 'playing' && (
+                  <motion.div 
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="inline-block p-3 rounded-lg bg-gradient-to-r from-violet/20 to-accent/20 border-2 border-violet/50"
+                  >
+                    <div className="text-center">
+                      <div className="text-xs font-semibold text-violet mb-1">PREMIO TOTAL</div>
+                      <div className="text-3xl font-bold">
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
             
@@ -456,11 +506,30 @@ const TicTacToeRoom = () => {
         </div>
         
         {/* Player O */}
-        <div className={`card-glass p-4 ${room?.current_turn === 'O' && room?.status === 'playing' ? 'ring-2 ring-accent' : ''}`}>
+        <motion.div 
+          animate={room?.status === 'ready' && room?.player_o_ready ? {
+            boxShadow: [
+              '0 0 20px rgba(134, 239, 172, 0.3)',
+              '0 0 40px rgba(134, 239, 172, 0.6)',
+              '0 0 20px rgba(134, 239, 172, 0.3)'
+            ]
+          } : {}}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className={`card-glass p-4 ${
+            room?.current_turn === 'O' && room?.status === 'playing' 
+              ? 'ring-2 ring-accent' 
+              : room?.status === 'ready' && room?.player_o_ready
+                ? 'ring-2 ring-success'
+                : ''
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <Circle size={20} className="text-accent" />
             {room?.current_turn === 'O' && room?.status === 'playing' && (
               <Zap size={16} className="text-accent animate-pulse" />
+            )}
+            {room?.status === 'ready' && room?.player_o_ready && (
+              <span className="text-success text-2xl">✓</span>
             )}
           </div>
           <p className="font-semibold text-text">
@@ -470,11 +539,11 @@ const TicTacToeRoom = () => {
             {room?.player_o_id === user?.id ? '(Tú)' : ''}
           </p>
           {room?.status === 'ready' && (
-            <p className="text-xs text-success mt-1">
-              {room?.player_o_ready ? '✓ Listo' : 'No listo'}
+            <p className={`text-xs mt-1 font-semibold ${room?.player_o_ready ? 'text-success animate-pulse' : 'text-text/40'}`}>
+              {room?.player_o_ready ? '✓ Listo para jugar' : 'No listo'}
             </p>
           )}
-        </div>
+        </motion.div>
       </div>
       
       {/* Game Status Message */}
@@ -489,29 +558,81 @@ const TicTacToeRoom = () => {
         </div>
       )}
       
-      {room?.status === 'ready' && !room?.player_x_ready && !room?.player_o_ready && (
-        <div className="mb-6 p-4 rounded-lg bg-success/10 border border-success/30">
-          <div className="flex gap-2">
-            <AlertCircle size={16} className="text-success mt-0.5" />
-            <p className="text-sm text-text/80">
-              Ambos jugadores deben marcar "Listo" para comenzar
-            </p>
-          </div>
-        </div>
-      )}
-      
-      {/* Ready Button */}
+      {/* Ready Section */}
       {room?.status === 'ready' && mySymbol && (
-        <div className="mb-6 text-center">
-          {((mySymbol === 'X' && !room?.player_x_ready) || 
-            (mySymbol === 'O' && !room?.player_o_ready)) && (
-            <button
-              onClick={() => markReadyMutation.mutate()}
-              disabled={markReadyMutation.isPending}
-              className="btn-primary"
-            >
-              {markReadyMutation.isPending ? 'Marcando...' : '¡Estoy Listo!'}
-            </button>
+        <div className="mb-6">
+          {/* Invitado (Player O): Botón Listo */}
+          {mySymbol === 'O' && !room?.player_o_ready && (
+            <div className="text-center">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => markReadyMutation.mutate()}
+                disabled={markReadyMutation.isPending}
+                className="btn-primary px-8 py-3 text-lg animate-pulse"
+              >
+                {markReadyMutation.isPending ? 'Marcando...' : '¡Estoy Listo!'}
+              </motion.button>
+              <p className="text-sm text-text/60 mt-2">
+                Marca listo cuando estés preparado para jugar
+              </p>
+            </div>
+          )}
+          
+          {/* Invitado ya listo */}
+          {mySymbol === 'O' && room?.player_o_ready && (
+            <div className="p-4 rounded-lg bg-success/20 border border-success/50 text-center">
+              <p className="text-success font-semibold">✓ Estás listo</p>
+              <p className="text-sm text-text/60 mt-1">
+                Esperando que el host inicie la partida...
+              </p>
+            </div>
+          )}
+          
+          {/* Host (Player X): Ver estado del invitado */}
+          {mySymbol === 'X' && (
+            <div className="space-y-4">
+              {/* Estado del invitado */}
+              <div className={`p-4 rounded-lg border ${
+                room?.player_o_ready 
+                  ? 'bg-success/20 border-success/50' 
+                  : 'bg-violet/10 border-violet/30'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Users size={20} className={room?.player_o_ready ? 'text-success' : 'text-violet'} />
+                    <div>
+                      <p className="font-semibold">
+                        {room?.player_o_ready ? '✓ Invitado está listo' : 'Esperando invitado...'}
+                      </p>
+                      <p className="text-xs text-text/60">
+                        {room?.player_o_ready 
+                          ? 'Puedes iniciar la partida cuando quieras' 
+                          : 'El invitado debe marcar listo primero'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Botón Iniciar (solo si invitado listo) */}
+              {room?.player_o_ready && (
+                <div className="text-center">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => startGameMutation.mutate()}
+                    disabled={startGameMutation.isPending}
+                    className="btn-primary px-8 py-3 text-lg"
+                  >
+                    {startGameMutation.isPending ? 'Iniciando...' : '🎮 Iniciar Partida'}
+                  </motion.button>
+                  <p className="text-sm text-text/60 mt-2">
+                    Comienza el juego cuando estés listo
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
