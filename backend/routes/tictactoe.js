@@ -223,14 +223,14 @@ router.post('/join/:code', verifyToken, async (req, res) => {
       // Registrar transacción
       await client.query(
         `INSERT INTO wallet_transactions 
-         (wallet_id, type, currency, amount, balance_before, balance_after, description, related_id)
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
          VALUES (
            (SELECT id FROM wallets WHERE user_id = $1),
            'game_bet', $2, $3, $4, $5,
-           'Apuesta La Vieja - Sala ' || $6,
-           $7
+           'Apuesta La Vieja - Unirse',
+           $6
          )`,
-        [userId, room.mode, betAmount, balance, balance - betAmount, code, room.id]
+        [userId, room.mode, betAmount, balance, balance - betAmount, code]
       );
       
       // Actualizar sala: agregar jugador O y pot
