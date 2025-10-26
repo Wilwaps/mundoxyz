@@ -45,28 +45,32 @@ const TicTacToeRoom = () => {
       return response.data.room;
     },
     refetchInterval: 2000, // Poll every 2 seconds
-    onSuccess: (data) => {
-      setRoom(data);
-      setBoard(data.board || [[null, null, null], [null, null, null], [null, null, null]]);
+  });
+  
+  // Handle room data updates (replacement for onSuccess in v5)
+  useEffect(() => {
+    if (roomData) {
+      setRoom(roomData);
+      setBoard(roomData.board || [[null, null, null], [null, null, null], [null, null, null]]);
       
       // Determine player symbol
       if (user) {
-        if (data.player_x_id === user.id) {
+        if (roomData.player_x_id === user.id) {
           setMySymbol('X');
-          setIsMyTurn(data.current_turn === 'X' && data.status === 'playing');
-        } else if (data.player_o_id === user.id) {
+          setIsMyTurn(roomData.current_turn === 'X' && roomData.status === 'playing');
+        } else if (roomData.player_o_id === user.id) {
           setMySymbol('O');
-          setIsMyTurn(data.current_turn === 'O' && data.status === 'playing');
+          setIsMyTurn(roomData.current_turn === 'O' && roomData.status === 'playing');
         }
       }
       
       // Check if game ended
-      if (data.status === 'finished' && !gameOver) {
+      if (roomData.status === 'finished' && !gameOver) {
         setGameOver(true);
         setShowGameOverModal(true);
       }
     }
-  });
+  }, [roomData, user, gameOver]);
   
   // Mark ready mutation (solo invitado)
   const markReadyMutation = useMutation({
