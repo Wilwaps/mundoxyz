@@ -60,6 +60,15 @@ axios.interceptors.response.use(
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Helper para normalizar roles siempre como array
+  const normalizeUserData = (userData) => {
+    return {
+      ...userData,
+      roles: Array.isArray(userData?.roles) ? userData.roles : 
+             (userData?.roles ? [userData.roles] : ['user'])
+    };
+  };
 
   useEffect(() => {
     // Check for existing session
@@ -72,9 +81,12 @@ export const AuthProvider = ({ children }) => {
           // Validate token with backend
           const response = await axios.get('/api/roles/me');
           const userData = JSON.parse(storedUser);
+          // Asegurar que roles sea un array y manejar ambos formatos
+          const rolesArray = response.data.roles || [];
+          const normalizedRoles = rolesArray.map(r => typeof r === 'string' ? r : r.name).filter(Boolean);
           setUser({
             ...userData,
-            roles: response.data.roles.map(r => r.name)
+            roles: normalizedRoles
           });
         } catch (error) {
           console.error('Session validation failed:', error);
@@ -105,11 +117,14 @@ export const AuthProvider = ({ children }) => {
 
       const { token, user: userData } = response.data;
       
+      // Normalizar datos del usuario
+      const normalizedUser = normalizeUserData(userData);
+      
       // Store token and user
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
       
-      setUser(userData);
+      setUser(normalizedUser);
       toast.success('¡Bienvenido a MUNDOXYZ!');
       
       return { success: true };
@@ -133,10 +148,13 @@ export const AuthProvider = ({ children }) => {
 
       const { token, user: userData } = response.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Normalizar datos del usuario
+      const normalizedUser = normalizeUserData(userData);
       
-      setUser(userData);
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      
+      setUser(normalizedUser);
       toast.success('¡Bienvenido a MUNDOXYZ!');
       
       return { success: true };
@@ -188,8 +206,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    const normalizedUser = normalizeUserData(userData);
+    setUser(normalizedUser);
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
   };
 
   const refreshUser = async () => {
@@ -211,7 +230,8 @@ export const AuthProvider = ({ children }) => {
         is_verified: profileData.is_verified,
         created_at: profileData.created_at,
         last_seen_at: profileData.last_seen_at,
-        roles: profileData.roles || user.roles || [],
+        roles: Array.isArray(profileData.roles) ? profileData.roles : 
+               Array.isArray(user.roles) ? user.roles : [],
         wallet_id: profileData.wallet_id,
         // Balances del stats
         coins_balance: profileData.stats?.coins_balance || 0,
