@@ -88,7 +88,9 @@ const Games = () => {
   };
 
   const handleGameClick = (gameId) => {
-    if (gameId === 'bingo' || gameId === 'raffles') {
+    if (gameId === 'bingo') {
+      navigate('/bingo/lobby');
+    } else if (gameId === 'raffles') {
       navigate(`/${gameId}`);
     } else if (gameId === 'tictactoe') {
       navigate('/tictactoe/lobby');
@@ -199,7 +201,7 @@ const Games = () => {
                     key={room.id}
                     whileHover={{ x: 5 }}
                     className="glass-panel p-4 cursor-pointer"
-                    onClick={() => navigate(`/bingo/${room.code}`)}
+                    onClick={() => navigate(`/bingo/room/${room.code}`)}
                   >
                     <div className="flex justify-between items-center">
                       <div>

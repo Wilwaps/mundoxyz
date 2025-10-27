@@ -15,6 +15,7 @@ import Raffles from './pages/Raffles';
 import Market from './pages/Market';
 import Roles from './pages/Roles';
 import Upcoming from './pages/Upcoming';
+import BingoLobby from './pages/BingoLobby';
 import BingoRoom from './pages/BingoRoom';
 import RaffleDetails from './pages/RaffleDetails';
 import Admin from './pages/Admin';
@@ -116,7 +117,8 @@ function App() {
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />
                 <Route path="upcoming" element={<Upcoming />} />
-                <Route path="bingo/:code" element={<BingoRoom />} />
+                <Route path="bingo/lobby" element={<BingoLobby />} />
+                <Route path="bingo/room/:code" element={<BingoRoom />} />
                 <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
                 <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
                 <Route path="admin/*" element={<Admin />} />
