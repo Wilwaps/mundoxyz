@@ -16,6 +16,18 @@ DROP TABLE IF EXISTS bingo_rooms CASCADE;
 
 -- 2. ELIMINAR ÍNDICES ANTIGUOS (si existen)
 -- ============================================
+-- Eliminar cualquier índice que empiece con idx_bingo_
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT indexname FROM pg_indexes WHERE indexname LIKE 'idx_bingo_%')
+    LOOP
+        EXECUTE 'DROP INDEX IF EXISTS ' || r.indexname;
+    END LOOP;
+END $$;
+
+-- También eliminar índices específicos conocidos
 DROP INDEX IF EXISTS idx_bingo_rooms_code;
 DROP INDEX IF EXISTS idx_bingo_rooms_host;
 DROP INDEX IF EXISTS idx_bingo_rooms_status;
@@ -38,6 +50,8 @@ DROP INDEX IF EXISTS idx_bingo_claims_player;
 DROP INDEX IF EXISTS idx_bingo_claims_status;
 DROP INDEX IF EXISTS idx_bingo_transactions_room;
 DROP INDEX IF EXISTS idx_bingo_transactions_player;
+DROP INDEX IF EXISTS idx_bingo_trans_room;
+DROP INDEX IF EXISTS idx_bingo_trans_player;
 DROP INDEX IF EXISTS idx_bingo_winners_room;
 DROP INDEX IF EXISTS idx_bingo_audit_logs_room;
 DROP INDEX IF EXISTS idx_bingo_game_stats_room;
