@@ -1,4 +1,4 @@
--- Games tables: raffles, bingo
+-- Raffles tables only (Bingo tables are handled by 004_cleanup_and_recreate_bingo.sql)
 
 -- Raffles table
 CREATE TABLE IF NOT EXISTS raffles (
@@ -91,112 +91,6 @@ CREATE TABLE IF NOT EXISTS raffle_pending_requests (
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_raffle ON raffle_pending_requests(raffle_id);
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_status ON raffle_pending_requests(status);
 
--- Bingo rooms table
-CREATE TABLE IF NOT EXISTS bingo_rooms (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(10) UNIQUE NOT NULL,
-  host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(128) NOT NULL,
-  description TEXT,
-  mode VARCHAR(20) NOT NULL CHECK (mode IN ('friendly', 'fires', 'coins')),
-  victory_mode VARCHAR(20) NOT NULL DEFAULT 'line' CHECK (victory_mode IN ('line', 'corners', 'full')),
-  ball_count INTEGER NOT NULL DEFAULT 75 CHECK (ball_count IN (75, 90)),
-  entry_price_fire DECIMAL(18,2) DEFAULT 0 CHECK (entry_price_fire >= 0),
-  entry_price_coin DECIMAL(18,2) DEFAULT 0 CHECK (entry_price_coin >= 0),
-  pot_fires DECIMAL(18,2) DEFAULT 0,
-  pot_coins DECIMAL(18,2) DEFAULT 0,
-  max_players INTEGER DEFAULT 20,
-  max_cards_per_player INTEGER DEFAULT 10 CHECK (max_cards_per_player BETWEEN 1 AND 10),
-  status VARCHAR(20) NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready', 'playing', 'finished', 'cancelled')),
-  visibility VARCHAR(20) NOT NULL DEFAULT 'public' CHECK (visibility IN ('public', 'private')),
-  numbers_drawn INTEGER[] DEFAULT '{}',
-  current_number INTEGER,
-  winner_id UUID REFERENCES users(id),
-  winning_card_id UUID,
-  rules_meta JSONB DEFAULT '{}',
-  starts_at TIMESTAMPTZ,
-  ends_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_bingo_rooms_code ON bingo_rooms(code);
-CREATE INDEX IF NOT EXISTS idx_bingo_rooms_host ON bingo_rooms(host_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_rooms_status ON bingo_rooms(status);
-CREATE INDEX IF NOT EXISTS idx_bingo_rooms_visibility ON bingo_rooms(visibility);
-
--- Bingo players table
-CREATE TABLE IF NOT EXISTS bingo_players (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id UUID NOT NULL REFERENCES bingo_rooms(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  user_ext VARCHAR(128) NOT NULL,
-  cards_count INTEGER NOT NULL DEFAULT 1 CHECK (cards_count BETWEEN 1 AND 10),
-  fires_spent DECIMAL(18,2) DEFAULT 0,
-  coins_spent DECIMAL(18,2) DEFAULT 0,
-  is_ready BOOLEAN DEFAULT false,
-  is_winner BOOLEAN DEFAULT false,
-  status VARCHAR(20) NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready', 'playing', 'winner', 'loser', 'left')),
-  joined_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(room_id, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_bingo_players_room ON bingo_players(room_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_players_user ON bingo_players(user_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_players_status ON bingo_players(status);
-
--- Bingo cards table
-CREATE TABLE IF NOT EXISTS bingo_cards (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id UUID NOT NULL REFERENCES bingo_rooms(id) ON DELETE CASCADE,
-  player_id UUID NOT NULL REFERENCES bingo_players(id) ON DELETE CASCADE,
-  card_number INTEGER NOT NULL,
-  card_data JSONB NOT NULL, -- 5x5 array for 75-ball or appropriate for 90-ball
-  marked_numbers INTEGER[] DEFAULT '{}',
-  is_winner BOOLEAN DEFAULT false,
-  winning_pattern VARCHAR(20),
-  claimed_at TIMESTAMPTZ,
-  claim_ref VARCHAR(255)
-);
-
-CREATE INDEX IF NOT EXISTS idx_bingo_cards_room ON bingo_cards(room_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_cards_player ON bingo_cards(player_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_cards_winner ON bingo_cards(is_winner) WHERE is_winner = true;
-
--- Bingo draws history
-CREATE TABLE IF NOT EXISTS bingo_draws (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id UUID NOT NULL REFERENCES bingo_rooms(id) ON DELETE CASCADE,
-  number INTEGER NOT NULL,
-  draw_order INTEGER NOT NULL,
-  drawn_by UUID REFERENCES users(id),
-  drawn_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_bingo_draws_room ON bingo_draws(room_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_draws_order ON bingo_draws(room_id, draw_order);
-
--- Bingo claims (when players claim victory)
-CREATE TABLE IF NOT EXISTS bingo_claims (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id UUID NOT NULL REFERENCES bingo_rooms(id) ON DELETE CASCADE,
-  card_id UUID NOT NULL REFERENCES bingo_cards(id) ON DELETE CASCADE,
-  player_id UUID NOT NULL REFERENCES bingo_players(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  user_ext VARCHAR(128) NOT NULL,
-  claim_type VARCHAR(20) NOT NULL, -- 'line', 'corners', 'full'
-  is_valid BOOLEAN,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'validating', 'approved', 'rejected')),
-  validator_id UUID REFERENCES users(id),
-  validated_at TIMESTAMPTZ,
-  review_notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_bingo_claims_room ON bingo_claims(room_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_claims_player ON bingo_claims(player_id);
-CREATE INDEX IF NOT EXISTS idx_bingo_claims_status ON bingo_claims(status);
-
 -- Game history/stats table
 CREATE TABLE IF NOT EXISTS game_stats (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -223,14 +117,6 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_raffles_updated_at') THEN
     CREATE TRIGGER update_raffles_updated_at BEFORE UPDATE ON raffles
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-END$$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_bingo_rooms_updated_at') THEN
-    CREATE TRIGGER update_bingo_rooms_updated_at BEFORE UPDATE ON bingo_rooms
         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
   END IF;
 END$$;
