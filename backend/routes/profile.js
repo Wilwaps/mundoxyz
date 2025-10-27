@@ -560,7 +560,7 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const result = await query(
       `SELECT 
          u.id,
-         ai.password_hash
+         ai.password_hash AS password_hash
        FROM users u
        LEFT JOIN auth_identities ai 
          ON ai.user_id = u.id AND ai.provider = 'email'
