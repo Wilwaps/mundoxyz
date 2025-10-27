@@ -556,12 +556,11 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
       paramsUserId: userId
     });
 
-    // Get user and potential hashes from both sources (compatibilidad)
+    // Get user password hash from auth_identities
     const result = await query(
       `SELECT 
          u.id,
-         u.password_hash AS u_hash,
-         ai.password_hash AS ai_hash
+         ai.password_hash
        FROM users u
        LEFT JOIN auth_identities ai 
          ON ai.user_id = u.id AND ai.provider = 'email'
@@ -575,7 +574,7 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     }
 
     const row = result.rows[0];
-    const storedHash = row.ai_hash || row.u_hash || null;
+    const storedHash = row.password_hash;
 
     // If no password set anywhere
     if (!storedHash) {
