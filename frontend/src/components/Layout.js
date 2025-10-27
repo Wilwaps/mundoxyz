@@ -41,8 +41,8 @@ const Layout = () => {
     staleTime: 0
   });
 
-  const displayCoins = balanceData?.coins_balance ?? user?.coins_balance ?? 0;
-  const displayFires = balanceData?.fires_balance ?? user?.fires_balance ?? 0;
+  const displayCoins = parseFloat(balanceData?.coins_balance ?? user?.coins_balance ?? 0);
+  const displayFires = parseFloat(balanceData?.fires_balance ?? user?.fires_balance ?? 0);
 
   const navItems = [
     { path: '/profile', icon: User, label: 'Perfil' },
