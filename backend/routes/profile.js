@@ -551,22 +551,32 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     // No comparar con userId del params, usar directamente req.user.id
     const actualUserId = req.user.id;
 
-    logger.info('Check password request', { 
+    logger.info('=== CHECK PASSWORD START ===', { 
       userId: actualUserId,
-      paramsUserId: userId
+      paramsUserId: userId,
+      userType: typeof actualUserId
     });
 
     // Get user password hash from auth_identities
     const result = await query(
       `SELECT 
          u.id,
-         ai.password_hash AS password_hash
+         u.username,
+         ai.id AS auth_id,
+         ai.provider,
+         ai.password_hash,
+         LENGTH(ai.password_hash) AS hash_length
        FROM users u
        LEFT JOIN auth_identities ai 
          ON ai.user_id = u.id AND ai.provider = 'email'
-       WHERE u.id = $1`,
-      [actualUserId]  // Usar siempre el ID del token
+       WHERE u.id = $1::uuid`,
+      [actualUserId]  // Usar siempre el ID del token con cast explícito
     );
+
+    logger.info('Query result', { 
+      rowCount: result.rows.length,
+      data: result.rows[0] 
+    });
 
     if (result.rows.length === 0) {
       logger.warn('User not found for password check', { userId: actualUserId });
@@ -575,6 +585,13 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
 
     const row = result.rows[0];
     const storedHash = row.password_hash;
+
+    logger.info('Password hash check', {
+      hasHash: !!storedHash,
+      hashLength: storedHash ? storedHash.length : 0,
+      provider: row.provider,
+      authId: row.auth_id
+    });
 
     // If no password set anywhere
     if (!storedHash) {
