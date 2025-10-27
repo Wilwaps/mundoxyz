@@ -8,9 +8,10 @@ import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
 import BingoCard from '../components/bingo/BingoCard';
 import NumberBoard from '../components/bingo/NumberBoard';
+import BuyCardsModal from '../components/bingo/BuyCardsModal';
 import { 
   FaArrowLeft, FaUsers, FaPlay, FaCheck, FaTrophy, 
-  FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot
+  FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart
 } from 'react-icons/fa';
 
 const BingoRoom = () => {
@@ -27,6 +28,7 @@ const BingoRoom = () => {
   const [gameStatus, setGameStatus] = useState('waiting');
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [winnerInfo, setWinnerInfo] = useState(null);
+  const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
 
   // Obtener detalles de la sala
   const { data: room, isLoading } = useQuery({
@@ -36,6 +38,15 @@ const BingoRoom = () => {
       return response.data;
     },
     refetchInterval: 3000
+  });
+
+  // Obtener balance del usuario
+  const { data: balance } = useQuery({
+    queryKey: ['economy-balance'],
+    queryFn: async () => {
+      const response = await axios.get('/api/economy/balance');
+      return response.data;
+    }
   });
 
   // WebSocket effects
@@ -303,29 +314,42 @@ const BingoRoom = () => {
             {myCards.length > 0 ? (
               <>
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-white">Mis Cartones</h2>
-                  {room.status === 'waiting' && !currentPlayer?.is_ready && (
-                    <button
-                      onClick={() => markReady.mutate()}
-                      disabled={markReady.isPending}
-                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 
-                               text-white rounded-lg font-semibold hover:shadow-lg 
-                               hover:shadow-green-500/25 transition-all flex items-center gap-2"
-                    >
-                      <FaCheck /> Estoy Listo
-                    </button>
-                  )}
-                  {isHost && room.status === 'ready' && (
-                    <button
-                      onClick={() => startGame.mutate()}
-                      disabled={startGame.isPending}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 
-                               text-white rounded-lg font-semibold hover:shadow-lg 
-                               hover:shadow-purple-500/25 transition-all flex items-center gap-2"
-                    >
-                      <FaPlay /> Iniciar Juego
-                    </button>
-                  )}
+                  <h2 className="text-xl font-bold text-white">Mis Cartones ({myCards.length})</h2>
+                  <div className="flex gap-2">
+                    {/* Botón comprar más cartones (solo en espera) */}
+                    {(room.status === 'waiting' || room.status === 'ready') && myCards.length < room.max_cards_per_player && (
+                      <button
+                        onClick={() => setShowBuyCardsModal(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 
+                                 text-white rounded-lg font-semibold hover:shadow-lg 
+                                 hover:shadow-blue-500/25 transition-all flex items-center gap-2"
+                      >
+                        <FaShoppingCart /> Comprar Más
+                      </button>
+                    )}
+                    {room.status === 'waiting' && !currentPlayer?.is_ready && (
+                      <button
+                        onClick={() => markReady.mutate()}
+                        disabled={markReady.isPending}
+                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 
+                                 text-white rounded-lg font-semibold hover:shadow-lg 
+                                 hover:shadow-green-500/25 transition-all flex items-center gap-2"
+                      >
+                        <FaCheck /> Estoy Listo
+                      </button>
+                    )}
+                    {isHost && room.status === 'ready' && (
+                      <button
+                        onClick={() => startGame.mutate()}
+                        disabled={startGame.isPending}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 
+                                 text-white rounded-lg font-semibold hover:shadow-lg 
+                                 hover:shadow-purple-500/25 transition-all flex items-center gap-2"
+                      >
+                        <FaPlay /> Iniciar Juego
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {myCards.map((card) => (
@@ -355,7 +379,22 @@ const BingoRoom = () => {
               <div className="glass-effect p-8 rounded-xl text-center">
                 <FaTicketAlt className="text-6xl text-white/40 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-white mb-2">No tienes cartones</h3>
-                <p className="text-white/60">Eres un espectador en esta sala</p>
+                <p className="text-white/60 mb-4">
+                  {isHost ? 'Como anfitrión, puedes comprar cartones para participar' : 'Compra cartones para participar en esta sala'}
+                </p>
+                {(room.status === 'waiting' || room.status === 'ready') && (
+                  <button
+                    onClick={() => setShowBuyCardsModal(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 
+                             text-white rounded-xl font-semibold hover:shadow-lg 
+                             hover:shadow-purple-500/25 transition-all flex items-center gap-2 mx-auto"
+                  >
+                    <FaShoppingCart /> Comprar Cartones
+                  </button>
+                )}
+                {room.status === 'playing' && (
+                  <p className="text-yellow-400 text-sm">⚠️ El juego ya comenzó, solo puedes observar</p>
+                )}
               </div>
             )}
           </div>
@@ -393,6 +432,15 @@ const BingoRoom = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de compra de cartones */}
+      <BuyCardsModal 
+        isOpen={showBuyCardsModal}
+        onClose={() => setShowBuyCardsModal(false)}
+        roomCode={code}
+        room={room}
+        userBalance={room.currency === 'coins' ? balance?.coins_balance : balance?.fires_balance}
+      />
 
       {/* Modal de ganador */}
       <AnimatePresence>

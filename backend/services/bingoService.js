@@ -187,15 +187,15 @@ class BingoService {
     try {
       await client.query('BEGIN');
 
-      // Obtener sala
+      // Obtener sala (permitir compra solo en waiting o ready)
       const roomResult = await client.query(
         `SELECT * FROM bingo_rooms 
-         WHERE code = $1 AND status = 'lobby'`,
+         WHERE code = $1 AND status IN ('waiting', 'ready')`,
         [roomCode]
       );
 
       if (!roomResult.rows.length) {
-        throw new Error('Sala no encontrada o no disponible');
+        throw new Error('Sala no encontrada o ya comenzó el juego');
       }
 
       const room = roomResult.rows[0];
@@ -212,22 +212,31 @@ class BingoService {
         [room.id, userId]
       );
 
-      if (existingPlayer.rows.length) {
-        throw new Error('Ya estás en esta sala');
+      const isAlreadyInRoom = existingPlayer.rows.length > 0;
+      let currentCards = 0;
+
+      if (isAlreadyInRoom) {
+        // Si ya está en la sala, verificar cuántos cartones tiene
+        currentCards = parseInt(existingPlayer.rows[0].cards_owned);
+        
+        // Verificar que no exceda el máximo total de cartones
+        if (currentCards + numberOfCards > room.max_cards_per_player) {
+          throw new Error(`No puedes tener más de ${room.max_cards_per_player} cartones. Actualmente tienes ${currentCards}`);
+        }
+      } else {
+        // Si es nuevo jugador, verificar capacidad de la sala
+        const playerCount = await client.query(
+          `SELECT COUNT(*) as count FROM bingo_room_players 
+           WHERE room_id = $1`,
+          [room.id]
+        );
+
+        if (parseInt(playerCount.rows[0].count) >= room.max_players) {
+          throw new Error('Sala llena');
+        }
       }
 
-      // Verificar capacidad
-      const playerCount = await client.query(
-        `SELECT COUNT(*) as count FROM bingo_room_players 
-         WHERE room_id = $1`,
-        [room.id]
-      );
-
-      if (parseInt(playerCount.rows[0].count) >= room.max_players) {
-        throw new Error('Sala llena');
-      }
-
-      // Validar número de cartones
+      // Validar número de cartones a comprar
       if (numberOfCards < 1 || numberOfCards > room.max_cards_per_player) {
         throw new Error(`Debes comprar entre 1 y ${room.max_cards_per_player} cartones`);
       }
@@ -248,23 +257,43 @@ class BingoService {
         throw new Error(`Saldo insuficiente. Necesitas ${totalCost} ${room.currency}`);
       }
 
-      // Registrar jugador
-      await client.query(
-        `INSERT INTO bingo_room_players (
-          room_id, user_id, cards_owned
-        ) VALUES ($1, $2, $3)`,
-        [room.id, userId, numberOfCards]
-      );
+      // Registrar jugador o actualizar cartones
+      if (isAlreadyInRoom) {
+        // Actualizar cantidad de cartones del jugador existente
+        await client.query(
+          `UPDATE bingo_room_players 
+           SET cards_owned = cards_owned + $1 
+           WHERE room_id = $2 AND user_id = $3`,
+          [numberOfCards, room.id, userId]
+        );
+      } else {
+        // Registrar nuevo jugador
+        await client.query(
+          `INSERT INTO bingo_room_players (
+            room_id, user_id, cards_owned
+          ) VALUES ($1, $2, $3)`,
+          [room.id, userId, numberOfCards]
+        );
+      }
 
       // Generar cartones
       const cards = BingoCardGenerator.generateMultipleCards(room.numbers_mode, numberOfCards);
+      
+      // Obtener el número de cartones existentes del jugador para numeración correcta
+      const existingCardsCount = await client.query(
+        `SELECT COUNT(*) as count FROM bingo_cards 
+         WHERE room_id = $1 AND owner_id = $2`,
+        [room.id, userId]
+      );
+      
+      const startCardNumber = parseInt(existingCardsCount.rows[0].count) + 1;
       
       for (let i = 0; i < cards.length; i++) {
         await client.query(
           `INSERT INTO bingo_cards (
             room_id, owner_id, card_number, numbers
           ) VALUES ($1, $2, $3, $4)`,
-          [room.id, userId, i + 1, JSON.stringify(cards[i])]
+          [room.id, userId, startCardNumber + i, JSON.stringify(cards[i])]
         );
       }
 
@@ -323,19 +352,24 @@ class BingoService {
 
       await client.query('COMMIT');
 
-      logger.info('Jugador unido a sala de bingo', {
+      const totalCardsOwned = currentCards + numberOfCards;
+
+      logger.info(isAlreadyInRoom ? 'Jugador compró cartones adicionales' : 'Jugador unido a sala de bingo', {
         roomId: room.id,
         userId,
-        cardsOwned: numberOfCards,
+        cardsPurchased: numberOfCards,
+        totalCardsOwned,
         totalCost,
         newPot
       });
 
       return {
         success: true,
-        cardsOwned: numberOfCards,
+        cardsPurchased: numberOfCards,
+        totalCardsOwned,
         totalCost,
-        cards
+        cards,
+        isAdditionalPurchase: isAlreadyInRoom
       };
 
     } catch (error) {
