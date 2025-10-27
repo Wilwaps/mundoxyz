@@ -1,5 +1,7 @@
-import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
   User,
@@ -13,8 +15,34 @@ import {
 } from 'lucide-react';
 
 const Layout = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, updateUser } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [showBalanceTooltip, setShowBalanceTooltip] = useState(false);
+
+  // Fetch balance en tiempo real
+  const { data: balanceData } = useQuery({
+    queryKey: ['header-balance', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const response = await axios.get('/api/economy/balance');
+      // Actualizar user en contexto con nuevo balance
+      if (response.data) {
+        updateUser({
+          ...user,
+          coins_balance: response.data.coins_balance,
+          fires_balance: response.data.fires_balance
+        });
+      }
+      return response.data;
+    },
+    enabled: !!user,
+    refetchInterval: 3000, // Refetch cada 3 segundos
+    staleTime: 0
+  });
+
+  const displayCoins = balanceData?.coins_balance ?? user?.coins_balance ?? 0;
+  const displayFires = balanceData?.fires_balance ?? user?.fires_balance ?? 0;
 
   const navItems = [
     { path: '/profile', icon: User, label: 'Perfil' },
@@ -37,13 +65,21 @@ const Layout = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gradient-accent">MUNDOXYZ</h1>
           <div className="flex items-center gap-4">
-            {/* Balance Display */}
+            {/* Balance Display - Clickeable */}
             <div className="flex items-center gap-3">
-              <div className="badge-coins">
-                <span className="text-sm">🪙 {user?.coins_balance || 0}</span>
+              <div 
+                className="badge-coins cursor-pointer hover:scale-110 transition-transform"
+                onClick={() => navigate('/profile?tab=coins')}
+                title="Ver historial de coins"
+              >
+                <span className="text-sm">🪙 {displayCoins.toFixed(2)}</span>
               </div>
-              <div className="badge-fire">
-                <span className="text-sm">🔥 {user?.fires_balance || 0}</span>
+              <div 
+                className="badge-fire cursor-pointer hover:scale-110 transition-transform"
+                onClick={() => navigate('/profile?tab=fires')}
+                title="Ver historial de fuegos"
+              >
+                <span className="text-sm">🔥 {displayFires.toFixed(2)}</span>
               </div>
             </div>
           </div>

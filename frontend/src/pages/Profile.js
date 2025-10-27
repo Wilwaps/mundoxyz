@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -25,6 +26,7 @@ import MyDataModal from '../components/MyDataModal';
 
 const Profile = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { user, logout, refreshUser } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showMyData, setShowMyData] = useState(false);
@@ -33,6 +35,15 @@ const Profile = () => {
   const [showBuyFires, setShowBuyFires] = useState(false);
   const [showReceiveFires, setShowReceiveFires] = useState(false);
   const [walletId, setWalletId] = useState(user?.wallet_id || null);
+
+  // Detectar query param para abrir modal de historial
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'fires' || tab === 'coins') {
+      setShowFiresHistory(true);
+    }
+  }, [location.search]);
 
   // Sync walletId when user changes
   React.useEffect(() => {
