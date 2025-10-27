@@ -982,7 +982,7 @@ class BingoService {
           r.pot_total,
           r.status,
           r.created_at,
-          r.updated_at,
+          r.last_activity,
           u.username as host_name
         FROM bingo_rooms r
         JOIN users u ON u.id = r.host_id

@@ -34,7 +34,7 @@ router.get('/rooms/public', async (req, res) => {
         r.pot_total,
         r.status,
         r.created_at,
-        r.updated_at,
+        r.last_activity,
         u.username as host_name,
         COUNT(DISTINCT p.user_id) as player_count,
         SUM(p.cards_owned) as total_cards
@@ -429,7 +429,7 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
         r.pot_total,
         r.status,
         r.created_at,
-        r.updated_at,
+        r.last_activity,
         u.username as host_name
       FROM bingo_rooms r
       JOIN users u ON u.id = r.host_id
@@ -635,7 +635,7 @@ router.get('/my-active-room', verifyToken, async (req, res) => {
         r.password,
         r.pot_total,
         r.created_at,
-        r.updated_at
+        r.last_activity
       FROM bingo_rooms r
       JOIN bingo_room_players p ON p.room_id = r.id
       WHERE p.user_id = $1 
