@@ -1,4 +1,4 @@
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 const logger = require('../utils/logger');
 const BingoCardGenerator = require('../utils/bingoCardGenerator');
 
@@ -8,7 +8,7 @@ class BingoService {
    */
   static async createRoom(hostId, roomData, client = null) {
     const shouldCommit = !client;
-    client = client || await query.getClient();
+    client = client || await getClient();
 
     try {
       await client.query('BEGIN');
@@ -178,7 +178,7 @@ class BingoService {
    * Unirse a una sala y comprar cartones
    */
   static async joinRoom(roomCode, userId, numberOfCards, password = null) {
-    const client = await query.getClient();
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
@@ -390,7 +390,7 @@ class BingoService {
    * Iniciar partida (solo host)
    */
   static async startGame(roomId, hostId) {
-    const client = await query.getClient();
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
@@ -454,7 +454,7 @@ class BingoService {
    * Cantar un número (solo host)
    */
   static async drawNumber(roomId, hostId) {
-    const client = await query.getClient();
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
@@ -547,7 +547,7 @@ class BingoService {
    * Marcar número en cartón (jugador)
    */
   static async markNumber(cardId, number, userId) {
-    const client = await query.getClient();
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
@@ -623,7 +623,7 @@ class BingoService {
    * Cantar bingo (reclamar victoria)
    */
   static async callBingo(cardId, userId) {
-    const client = await query.getClient();
+    const client = await getClient();
 
     try {
       await client.query('BEGIN');
