@@ -49,7 +49,7 @@ class BingoService {
           id, code, host_id, room_name, room_type, currency, 
           numbers_mode, victory_mode, card_cost, max_players, 
           max_cards_per_player, password, pot_total, status, 
-          created_at, updated_at`,
+          created_at, last_activity`,
         [
           roomCode,
           hostId,
