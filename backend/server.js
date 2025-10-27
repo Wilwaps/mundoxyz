@@ -70,6 +70,10 @@ io.on('connection', (socket) => {
   const { initTicTacToeSocket } = require('./socket/tictactoe');
   initTicTacToeSocket(io, socket);
   
+  // Initialize Bingo socket handlers
+  const handleBingoSocket = require('./socket/bingo');
+  handleBingoSocket(io, socket);
+  
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
   });
