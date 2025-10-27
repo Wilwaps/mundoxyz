@@ -28,6 +28,7 @@ DROP INDEX IF EXISTS idx_bingo_draws_order;
 DROP INDEX IF EXISTS idx_bingo_players_room;
 DROP INDEX IF EXISTS idx_bingo_players_user;
 DROP INDEX IF EXISTS idx_bingo_players_status;
+DROP INDEX IF EXISTS idx_bingo_players_connected;
 DROP INDEX IF EXISTS idx_bingo_claims_room;
 DROP INDEX IF EXISTS idx_bingo_claims_player;
 DROP INDEX IF EXISTS idx_bingo_claims_status;

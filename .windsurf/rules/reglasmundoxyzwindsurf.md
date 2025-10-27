@@ -29,8 +29,3 @@ if ($LASTEXITCODE -eq 0) { git commit -F .git\COMMIT_MSG.txt }
 if ($LASTEXITCODE -eq 0) { git push -u origin HEAD }
 Recuerda: en PowerShell, si ejecutas un script o binario local, usa el prefijo .\, pero para comandos en el PATH (como git) no hace falta.
 
-Si aun así quisieras usar Invoke-Expression, tendrías que escapar las comillas internas con la comilla invertida:
-
-powershell
-Invoke-Expression "git commit -m `"feat: FASE 1 reconexión salas TicTacToe - backend y frontend`""
-Pero la forma recomendada es la primera: ejecuta git directamente desde PowerShell. Asegúrate también de estar ubicado en la raíz del repositorio antes de lanzar el commit.
