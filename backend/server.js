@@ -204,11 +204,14 @@ app.use('/api/welcome', welcomeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/games', gameRoutes);
-app.use('/api/games/bingo', bingoRoutes);
 app.use('/api/tictactoe', (req, res, next) => {
   req.io = io;
   next();
 }, tictactoeRoutes);
+app.use('/api/bingo', (req, res, next) => {
+  req.io = io;
+  next();
+}, bingoRoutes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
