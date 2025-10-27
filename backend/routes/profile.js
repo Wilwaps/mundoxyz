@@ -543,11 +543,18 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const { userId } = req.params;
     const { password } = req.body;
 
+    logger.info('Check password request', { 
+      requestUserId: req.user?.id, 
+      targetUserId: userId,
+      hasPassword: !!password 
+    });
+
     // Verify permissions - convertir todo a string para comparación
     const requestUserId = String(req.user.id);
     const targetUserId = String(userId);
     
     if (requestUserId !== targetUserId) {
+      logger.warn('Check password unauthorized', { requestUserId, targetUserId });
       return res.status(403).json({ error: 'No autorizado' });
     }
 

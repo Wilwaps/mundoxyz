@@ -20,8 +20,15 @@ const PasswordRequiredModal = ({ isOpen, onClose, onSuccess, action = 'esta acci
       return;
     }
 
+    if (!user || !user.id) {
+      setError('Error: Usuario no identificado');
+      console.error('User data missing:', user);
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log('Checking password for user:', user.id);
       const response = await axios.post(`/api/profile/${user.id}/check-password`, { password });
       
       if (response.data.valid) {
@@ -30,11 +37,17 @@ const PasswordRequiredModal = ({ isOpen, onClose, onSuccess, action = 'esta acci
         handleClose();
       }
     } catch (err) {
+      console.error('Password check error:', err.response?.data || err.message);
       if (err.response?.data?.requiresPasswordCreation) {
         setError('Debes establecer una contraseña primero');
         toast.error('Por seguridad, establece una contraseña desde "Cambiar Contraseña"');
+      } else if (err.response?.status === 403) {
+        setError('No autorizado para verificar esta contraseña');
+        console.error('Authorization failed. User:', user.id, 'Response:', err.response.data);
       } else {
-        setError(err.response?.data?.error || 'Contraseña incorrecta');
+        const errorMsg = err.response?.data?.error || 'Contraseña incorrecta';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
