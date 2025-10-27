@@ -543,34 +543,18 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const { userId } = req.params;
     const { password } = req.body;
 
-    logger.info('Check password request', { 
-      requestUserId: req.user?.id, 
-      requestUserIdType: typeof req.user?.id,
-      targetUserId: userId,
-      targetUserIdType: typeof userId,
-      hasPassword: !!password 
-    });
-
-    // Verify permissions - normalizar ambos IDs
-    const requestUserId = String(req.user.id).toLowerCase().trim();
-    const targetUserId = String(userId).toLowerCase().trim();
-    
-    logger.info('Comparing IDs after normalization', { requestUserId, targetUserId, match: requestUserId === targetUserId });
-    
-    if (requestUserId !== targetUserId) {
-      logger.warn('Check password unauthorized', { 
-        requestUserId, 
-        targetUserId,
-        requestUser: req.user
-      });
-      return res.status(403).json({ 
-        error: 'No autorizado',
-        debug: {
-          requestUserId,
-          targetUserId
-        }
-      });
+    if (!password) {
+      return res.status(400).json({ error: 'Contraseña requerida' });
     }
+
+    // Usar req.user.id del token (ya verificado por verifyToken)
+    // No comparar con userId del params, usar directamente req.user.id
+    const actualUserId = req.user.id;
+
+    logger.info('Check password request', { 
+      userId: actualUserId,
+      paramsUserId: userId
+    });
 
     // Get user and potential hashes from both sources (compatibilidad)
     const result = await query(
@@ -582,10 +566,11 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
        LEFT JOIN auth_identities ai 
          ON ai.user_id = u.id AND ai.provider = 'email'
        WHERE u.id = $1`,
-      [userId]
+      [actualUserId]  // Usar siempre el ID del token
     );
 
     if (result.rows.length === 0) {
+      logger.warn('User not found for password check', { userId: actualUserId });
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
@@ -594,6 +579,7 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
 
     // If no password set anywhere
     if (!storedHash) {
+      logger.info('No password set for user', { userId: actualUserId });
       return res.status(400).json({ 
         error: 'No tienes contraseña establecida',
         requiresPasswordCreation: true
@@ -605,9 +591,11 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const isValid = await bcrypt.compare(password, storedHash);
 
     if (!isValid) {
+      logger.info('Invalid password attempt', { userId: actualUserId });
       return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
 
+    logger.info('Password verified successfully', { userId: actualUserId });
     res.json({ success: true, valid: true });
 
   } catch (error) {
