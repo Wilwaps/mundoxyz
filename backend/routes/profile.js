@@ -545,17 +545,31 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
 
     logger.info('Check password request', { 
       requestUserId: req.user?.id, 
+      requestUserIdType: typeof req.user?.id,
       targetUserId: userId,
+      targetUserIdType: typeof userId,
       hasPassword: !!password 
     });
 
-    // Verify permissions - convertir todo a string para comparación
-    const requestUserId = String(req.user.id);
-    const targetUserId = String(userId);
+    // Verify permissions - normalizar ambos IDs
+    const requestUserId = String(req.user.id).toLowerCase().trim();
+    const targetUserId = String(userId).toLowerCase().trim();
+    
+    logger.info('Comparing IDs after normalization', { requestUserId, targetUserId, match: requestUserId === targetUserId });
     
     if (requestUserId !== targetUserId) {
-      logger.warn('Check password unauthorized', { requestUserId, targetUserId });
-      return res.status(403).json({ error: 'No autorizado' });
+      logger.warn('Check password unauthorized', { 
+        requestUserId, 
+        targetUserId,
+        requestUser: req.user
+      });
+      return res.status(403).json({ 
+        error: 'No autorizado',
+        debug: {
+          requestUserId,
+          targetUserId
+        }
+      });
     }
 
     // Get user and potential hashes from both sources (compatibilidad)
