@@ -45,7 +45,11 @@ class BingoService {
           numbers_mode, victory_mode, card_cost, max_players, 
           max_cards_per_player, password, pot_total
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING *`,
+        RETURNING 
+          id, code, host_id, room_name, room_type, currency, 
+          numbers_mode, victory_mode, card_cost, max_players, 
+          max_cards_per_player, password, pot_total, status, 
+          created_at, updated_at`,
         [
           roomCode,
           hostId,
