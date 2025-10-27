@@ -543,8 +543,11 @@ router.post('/:userId/check-password', verifyToken, async (req, res) => {
     const { userId } = req.params;
     const { password } = req.body;
 
-    // Verify permissions
-    if (req.user.id !== userId && req.user.id.toString() !== userId && req.user.username !== userId) {
+    // Verify permissions - convertir todo a string para comparación
+    const requestUserId = String(req.user.id);
+    const targetUserId = String(userId);
+    
+    if (requestUserId !== targetUserId) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 

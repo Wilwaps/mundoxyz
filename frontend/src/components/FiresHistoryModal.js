@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Send, Download, ShoppingBag, Gift, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Clock, Send, Download, ShoppingBag, Gift, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
     queryKey: ['wallet-transactions', user?.id, page],
     queryFn: async () => {
       if (!user?.id) return { transactions: [], total: 0 };
-      const response = await axios.get(`/profile/${user.id}/transactions`, {
+      const response = await axios.get(`/api/profile/${user.id}/transactions`, {
         params: {
           currency: 'fires',
           limit: pageSize,
@@ -36,15 +36,23 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'transfer_in':
+        return <ArrowDown size={16} className="text-green-400" />;
       case 'transfer_out':
-        return <Send size={16} />;
+        return <ArrowUp size={16} className="text-red-400" />;
       case 'fire_purchase':
         return <ShoppingBag size={16} />;
       case 'welcome_bonus':
       case 'game_reward':
+      case 'tictactoe_win':
+      case 'tictactoe_draw':
         return <Gift size={16} />;
       case 'commission':
-        return <ArrowDown size={16} />;
+        return <ArrowDown size={16} className="text-yellow-400" />;
+      case 'game_bet':
+      case 'tictactoe_bet':
+        return <Clock size={16} className="text-orange-400" />;
+      case 'tictactoe_refund':
+        return <RefreshCw size={16} className="text-blue-400" />;
       default:
         return <Clock size={16} />;
     }
@@ -52,15 +60,20 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
 
   const getTransactionLabel = (type) => {
     const labels = {
-      transfer_in: 'Recibido',
-      transfer_out: 'Enviado',
-      fire_purchase: 'Compra',
-      welcome_bonus: 'Bono',
-      game_reward: 'Premio',
+      transfer_in: 'Fuegos Recibidos',
+      transfer_out: 'Fuegos Enviados',
+      fire_purchase: 'Compra de Fuegos',
+      welcome_bonus: 'Bono de Bienvenida',
+      game_reward: 'Premio de Juego',
       commission: 'Comisión',
-      admin_grant: 'Regalo Admin'
+      admin_grant: 'Regalo Admin',
+      game_bet: 'Apuesta de Juego',
+      tictactoe_bet: 'Apuesta TicTacToe',
+      tictactoe_win: 'Victoria TicTacToe',
+      tictactoe_draw: 'Empate TicTacToe',
+      tictactoe_refund: 'Devolución TicTacToe'
     };
-    return labels[type] || type;
+    return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const getTransactionColor = (amount) => {
