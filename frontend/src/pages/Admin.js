@@ -354,12 +354,12 @@ const AdminFireRequests = () => {
   const handleConfirmReview = async () => {
     try {
       if (reviewAction === 'approve') {
-        await axios.put(`/economy/fire-requests/${selectedRequest.id}/approve`, {
+        await axios.put(`/api/economy/fire-requests/${selectedRequest.id}/approve`, {
           review_notes: reviewNotes
         });
         toast.success('Solicitud aprobada exitosamente');
       } else {
-        await axios.put(`/economy/fire-requests/${selectedRequest.id}/reject`, {
+        await axios.put(`/api/economy/fire-requests/${selectedRequest.id}/reject`, {
           review_notes: reviewNotes
         });
         toast.success('Solicitud rechazada');
