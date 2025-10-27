@@ -956,6 +956,83 @@ class BingoService {
     // Esto es crítico para evitar trampas
     return true; // Por ahora
   }
+
+  /**
+   * Obtener detalles completos de una sala
+   */
+  static async getRoomDetails(roomCode) {
+    const { query } = require('../db');
+    
+    try {
+      // Información de la sala
+      const roomResult = await query(`
+        SELECT 
+          r.id,
+          r.code,
+          r.host_id,
+          r.room_name,
+          r.room_type,
+          r.currency,
+          r.numbers_mode,
+          r.victory_mode,
+          r.card_cost,
+          r.max_players,
+          r.max_cards_per_player,
+          r.password,
+          r.pot_total,
+          r.status,
+          r.created_at,
+          r.updated_at,
+          u.username as host_name
+        FROM bingo_rooms r
+        JOIN users u ON u.id = r.host_id
+        WHERE r.code = $1
+      `, [roomCode]);
+      
+      if (!roomResult.rows.length) {
+        throw new Error('Sala no encontrada');
+      }
+      
+      const room = roomResult.rows[0];
+      
+      // Jugadores
+      const playersResult = await query(`
+        SELECT 
+          p.*,
+          u.username,
+          u.avatar_url
+        FROM bingo_room_players p
+        JOIN users u ON u.id = p.user_id
+        WHERE p.room_id = $1
+        ORDER BY p.joined_at
+      `, [room.id]);
+      
+      // Cartones de cada jugador
+      const cardsResult = await query(`
+        SELECT * FROM bingo_cards 
+        WHERE room_id = $1
+        ORDER BY owner_id, card_number
+      `, [room.id]);
+      
+      // Números cantados
+      const drawnNumbersResult = await query(`
+        SELECT * FROM bingo_drawn_numbers 
+        WHERE room_id = $1
+        ORDER BY sequence_number
+      `, [room.id]);
+      
+      return {
+        ...room,
+        players: playersResult.rows,
+        cards: cardsResult.rows,
+        drawnNumbers: drawnNumbersResult.rows
+      };
+      
+    } catch (error) {
+      logger.error('Error obteniendo detalles de sala:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = BingoService;
