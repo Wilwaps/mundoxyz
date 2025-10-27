@@ -620,7 +620,22 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
 router.get('/my-active-room', verifyToken, async (req, res) => {
   try {
     const result = await query(`
-      SELECT r.code, r.status
+      SELECT 
+        r.id,
+        r.code,
+        r.status,
+        r.room_name,
+        r.room_type,
+        r.currency,
+        r.numbers_mode,
+        r.victory_mode,
+        r.card_cost,
+        r.max_players,
+        r.max_cards_per_player,
+        r.password,
+        r.pot_total,
+        r.created_at,
+        r.updated_at
       FROM bingo_rooms r
       JOIN bingo_room_players p ON p.room_id = r.id
       WHERE p.user_id = $1 
