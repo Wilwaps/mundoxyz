@@ -22,7 +22,7 @@ const PasswordRequiredModal = ({ isOpen, onClose, onSuccess, action = 'esta acci
 
     setLoading(true);
     try {
-      const response = await axios.post(`/profile/${user.id}/check-password`, { password });
+      const response = await axios.post(`/api/profile/${user.id}/check-password`, { password });
       
       if (response.data.valid) {
         toast.success('Contraseña verificada');
