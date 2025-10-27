@@ -27,6 +27,7 @@ DROP INDEX IF EXISTS idx_bingo_draws_room;
 DROP INDEX IF EXISTS idx_bingo_draws_order;
 DROP INDEX IF EXISTS idx_bingo_drawn_room;
 DROP INDEX IF EXISTS idx_bingo_drawn_numbers;
+DROP INDEX IF EXISTS idx_bingo_drawn_sequence;
 DROP INDEX IF EXISTS idx_bingo_players_room;
 DROP INDEX IF EXISTS idx_bingo_players_user;
 DROP INDEX IF EXISTS idx_bingo_players_status;
@@ -38,6 +39,10 @@ DROP INDEX IF EXISTS idx_bingo_transactions_room;
 DROP INDEX IF EXISTS idx_bingo_transactions_player;
 DROP INDEX IF EXISTS idx_bingo_winners_room;
 DROP INDEX IF EXISTS idx_bingo_audit_logs_room;
+DROP INDEX IF EXISTS idx_bingo_game_stats_room;
+DROP INDEX IF EXISTS idx_bingo_game_stats_player;
+DROP INDEX IF EXISTS idx_bingo_prize_distribution_room;
+DROP INDEX IF EXISTS idx_bingo_prize_distribution_winner;
 
 -- 3. CREAR NUEVAS TABLAS CON ESTRUCTURA CORRECTA
 -- ============================================
