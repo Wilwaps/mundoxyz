@@ -19,7 +19,22 @@ router.get('/rooms/public', async (req, res) => {
     
     let queryStr = `
       SELECT 
-        r.*,
+        r.id,
+        r.code,
+        r.host_id,
+        r.room_name,
+        r.room_type,
+        r.currency,
+        r.numbers_mode,
+        r.victory_mode,
+        r.card_cost,
+        r.max_players,
+        r.max_cards_per_player,
+        r.password,
+        r.pot_total,
+        r.status,
+        r.created_at,
+        r.updated_at,
         u.username as host_name,
         COUNT(DISTINCT p.user_id) as player_count,
         SUM(p.cards_owned) as total_cards
