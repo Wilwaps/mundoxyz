@@ -414,7 +414,22 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
     // Información de la sala
     const roomResult = await query(`
       SELECT 
-        r.*,
+        r.id,
+        r.code,
+        r.host_id,
+        r.room_name,
+        r.room_type,
+        r.currency,
+        r.numbers_mode,
+        r.victory_mode,
+        r.card_cost,
+        r.max_players,
+        r.max_cards_per_player,
+        r.password,
+        r.pot_total,
+        r.status,
+        r.created_at,
+        r.updated_at,
         u.username as host_name
       FROM bingo_rooms r
       JOIN users u ON u.id = r.host_id
