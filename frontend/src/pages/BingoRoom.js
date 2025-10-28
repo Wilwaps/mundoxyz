@@ -212,8 +212,8 @@ const BingoRoom = () => {
     );
   }
 
-  // Si está en estado de espera o listo, mostrar sala de espera
-  if (room.status === 'waiting' || room.status === 'ready') {
+  // Si está en estado de espera, listo o lobby, mostrar sala de espera
+  if (room.status === 'waiting' || room.status === 'ready' || room.status === 'lobby') {
     return (
       <BingoWaitingRoom
         room={room}
