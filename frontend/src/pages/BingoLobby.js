@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import { FaPlus, FaFilter, FaSearch } from 'react-icons/fa';
 import CreateRoomModal from '../components/bingo/CreateRoomModal';
 import JoinRoomModal from '../components/bingo/JoinRoomModal';
