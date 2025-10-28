@@ -53,6 +53,15 @@ const BingoRoom = () => {
     }
   });
 
+  // Efecto para procesar datos de la sala (React Query V5 fix)
+  useEffect(() => {
+    if (room) {
+      setDrawnNumbers(room.drawnNumbers || []);
+      setLastNumber(room.lastNumber || null);
+      setGameStatus(room.status || 'waiting');
+    }
+  }, [room]);
+
   // WebSocket effects
   useEffect(() => {
     if (!socket || !code) return;
