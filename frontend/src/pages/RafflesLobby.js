@@ -13,7 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import CreateRaffleModal from '../components/raffles/CreateRaffleModal';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 
 const RafflesLobby = () => {
