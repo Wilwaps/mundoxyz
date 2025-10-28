@@ -756,7 +756,6 @@ class RaffleService {
             client.release();
         }
     }
-}
 
     /**
      * Obtener rifa por código
@@ -1029,5 +1028,6 @@ class RaffleService {
         
         return pdfUrl;
     }
+}
 
 module.exports = RaffleService;
