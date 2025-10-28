@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 
+// Force rebuild v3 - BuyCardsModal integration
+
 // Initialize Telegram WebApp
 if (window.Telegram?.WebApp) {
   const tg = window.Telegram.WebApp;
