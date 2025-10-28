@@ -10,9 +10,11 @@ import BingoCard from '../components/bingo/BingoCard';
 import NumberBoard from '../components/bingo/NumberBoard';
 import BuyCardsModal from '../components/bingo/BuyCardsModal';
 import BingoWaitingRoom from '../components/bingo/BingoWaitingRoom';
+import NumberBoardModal from '../components/bingo/NumberBoardModal';
 import { 
   FaArrowLeft, FaUsers, FaPlay, FaCheck, FaTrophy, 
-  FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart
+  FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart,
+  FaThLarge
 } from 'react-icons/fa';
 
 const BingoRoom = () => {
@@ -30,6 +32,7 @@ const BingoRoom = () => {
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
+  const [showNumberBoardModal, setShowNumberBoardModal] = useState(false);
 
   // Obtener detalles de la sala
   const { data: room, isLoading } = useQuery({
@@ -502,6 +505,38 @@ const BingoRoom = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Botón flotante para ver tabla de números */}
+      {(gameStatus === 'playing' || drawnNumbers.length > 0) && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowNumberBoardModal(true)}
+          className="fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 
+                   text-white rounded-full shadow-2xl shadow-purple-500/50 
+                   flex items-center justify-center hover:shadow-purple-500/75 transition-all"
+        >
+          <FaThLarge className="text-2xl" />
+          {drawnNumbers.length > 0 && (
+            <span className="absolute -top-2 -right-2 bg-yellow-500 text-black 
+                           text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center
+                           border-2 border-white">
+              {drawnNumbers.length}
+            </span>
+          )}
+        </motion.button>
+      )}
+
+      {/* Modal de tabla de números */}
+      <NumberBoardModal
+        isOpen={showNumberBoardModal}
+        onClose={() => setShowNumberBoardModal(false)}
+        drawnNumbers={drawnNumbers}
+        totalNumbers={room?.numbers_mode || 75}
+        mode={room?.numbers_mode || 75}
+      />
     </div>
   );
 };
