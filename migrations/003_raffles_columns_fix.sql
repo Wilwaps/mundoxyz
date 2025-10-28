@@ -169,5 +169,3 @@ CREATE TRIGGER update_raffles_updated_at_trigger
     BEFORE UPDATE ON raffles
     FOR EACH ROW
     EXECUTE FUNCTION update_raffles_updated_at();
-
-RAISE NOTICE 'Migración 003_raffles_columns_fix completada exitosamente';
