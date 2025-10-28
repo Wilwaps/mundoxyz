@@ -52,15 +52,15 @@ const BingoLobby = () => {
     if (activeRoom?.hasActiveRoom) {
       toast(
         <div className="flex items-center justify-between">
-          <span>Tienes una sala activa</span>
+          <span>🎰 Tienes una sala activa: {activeRoom.room.code}</span>
           <button
             onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
             className="ml-3 px-3 py-1 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
           >
-            Volver
+            Volver a Sala
           </button>
         </div>,
-        { duration: 5000, icon: '🎰' }
+        { duration: 8000, icon: '🎰' }
       );
     }
   }, [activeRoom, navigate]);
@@ -211,6 +211,28 @@ const BingoLobby = () => {
           </div>
         )}
       </div>
+
+      {/* Botón flotante para sala activa */}
+      {activeRoom?.hasActiveRoom && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="fixed bottom-6 right-6 z-50"
+        >
+          <button
+            onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
+            className="px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 
+                     text-white rounded-full font-bold hover:shadow-xl 
+                     hover:shadow-purple-500/50 transition-all flex items-center gap-3
+                     animate-pulse border-2 border-white/30"
+          >
+            🎰 Volver a Sala
+            <span className="bg-white/20 px-2 py-1 rounded-full text-sm">
+              {activeRoom.room.code}
+            </span>
+          </button>
+        </motion.div>
+      )}
 
       {/* Modales */}
       <CreateRoomModal

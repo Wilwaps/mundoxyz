@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import BingoCard from '../components/bingo/BingoCard';
 import NumberBoard from '../components/bingo/NumberBoard';
 import BuyCardsModal from '../components/bingo/BuyCardsModal';
+import BingoWaitingRoom from '../components/bingo/BingoWaitingRoom';
 import { 
   FaArrowLeft, FaUsers, FaPlay, FaCheck, FaTrophy, 
   FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart
@@ -208,6 +209,20 @@ const BingoRoom = () => {
     );
   }
 
+  // Si está en estado de espera o listo, mostrar sala de espera
+  if (room.status === 'waiting' || room.status === 'ready') {
+    return (
+      <BingoWaitingRoom
+        room={room}
+        user={user}
+        isHost={isHost}
+        onLeave={() => navigate('/bingo/lobby')}
+        onStartGame={() => startGame.mutate()}
+      />
+    );
+  }
+
+  // Si está en juego o finalizado, mostrar tablero de juego
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900">
       {/* Header */}
