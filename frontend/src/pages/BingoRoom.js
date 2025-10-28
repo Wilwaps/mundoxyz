@@ -35,14 +35,17 @@ const BingoRoom = () => {
   const [showNumberBoardModal, setShowNumberBoardModal] = useState(false);
 
   // Obtener detalles de la sala
-  const { data: room, isLoading } = useQuery({
+  const { data: roomData, isLoading } = useQuery({
     queryKey: ['bingo-room', code],
     queryFn: async () => {
       const response = await axios.get(`/api/bingo/rooms/${code}`);
-      return response.data;
+      return response.data.room; // Devolver room directamente
     },
     refetchInterval: 3000
   });
+  
+  // Procesar room data
+  const room = roomData || null;
 
   // Obtener balance del usuario
   const { data: balance } = useQuery({
@@ -55,12 +58,12 @@ const BingoRoom = () => {
 
   // Efecto para procesar datos de la sala (React Query V5 fix)
   useEffect(() => {
-    if (room) {
-      setDrawnNumbers(room.drawnNumbers || []);
-      setLastNumber(room.lastNumber || null);
-      setGameStatus(room.status || 'waiting');
+    if (roomData) {
+      setDrawnNumbers(roomData.drawnNumbers || []);
+      setLastNumber(roomData.lastNumber || null);
+      setGameStatus(roomData.status || 'waiting');
     }
-  }, [room]);
+  }, [roomData]);
 
   // WebSocket effects
   useEffect(() => {
