@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Ticket, Users, Clock, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Ticket, Users, Clock, TrendingUp, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const RaffleDetails = () => {
@@ -17,7 +17,7 @@ const RaffleDetails = () => {
   const { data: raffle, isLoading, refetch } = useQuery({
     queryKey: ['raffle', code],
     queryFn: async () => {
-      const response = await axios.get(`/raffles/${code}`);
+      const response = await axios.get(`/api/raffles/${code}`);
       return response.data;
     },
     refetchInterval: 30000
@@ -25,7 +25,10 @@ const RaffleDetails = () => {
 
   const buyNumbersMutation = useMutation({
     mutationFn: async (numbers) => {
-      return axios.post(`/raffles/${code}/buy`, { numbers: Array.from(numbers) });
+      return axios.post(`/api/raffles/purchase`, { 
+        raffle_id: raffle.raffle.id,
+        numbers: Array.from(numbers) 
+      });
     },
     onSuccess: () => {
       toast.success('¡Números comprados exitosamente!');
@@ -56,11 +59,9 @@ const RaffleDetails = () => {
       return;
     }
     
-    const totalCost = selectedNumbers.size * (
-      raffle.raffle.entry_price_fire || raffle.raffle.entry_price_coin || 0
-    );
+    const totalCost = selectedNumbers.size * (raffle.raffle.cost_per_number || 10);
     
-    const currency = raffle.raffle.entry_price_fire > 0 ? 'fires' : 'coins';
+    const currency = raffle.raffle.mode === 'fire' ? 'fires' : 'coins';
     const balance = currency === 'fires' ? user?.fires_balance : user?.coins_balance;
     
     if (totalCost > balance) {
@@ -93,7 +94,7 @@ const RaffleDetails = () => {
   }
 
   const myNumbers = raffle.numbers?.filter(n => n.owner_id === user?.id).map(n => n.number_idx) || [];
-  const isFree = !raffle.raffle.entry_price_fire && !raffle.raffle.entry_price_coin;
+  const isFree = false; // Todas las rifas tienen costo mínimo
 
   return (
     <div className="p-4 pb-24">
@@ -184,17 +185,16 @@ const RaffleDetails = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-text/60">Precio por número:</span>
                 <span className="font-bold">
-                  {raffle.raffle.entry_price_fire > 0 ? `🔥 ${raffle.raffle.entry_price_fire}` :
-                   raffle.raffle.entry_price_coin > 0 ? `🪙 ${raffle.raffle.entry_price_coin}` : 'Gratis'}
+                  {raffle.raffle.mode === 'fire' ? `🔥 ${raffle.raffle.cost_per_number || 10}` : `🪙 ${raffle.raffle.cost_per_number || 10}`}
                 </span>
               </div>
               {selectedNumbers.size > 0 && (
                 <div className="flex justify-between items-center mt-2 pt-2 border-t border-glass">
                   <span className="text-sm text-text/60">Total a pagar:</span>
                   <span className="font-bold text-fire-orange">
-                    {raffle.raffle.entry_price_fire > 0 
-                      ? `🔥 ${raffle.raffle.entry_price_fire * selectedNumbers.size}`
-                      : `🪙 ${raffle.raffle.entry_price_coin * selectedNumbers.size}`}
+                    {raffle.raffle.mode === 'fire' 
+                      ? `🔥 ${(raffle.raffle.cost_per_number || 10) * selectedNumbers.size}`
+                      : `🪙 ${(raffle.raffle.cost_per_number || 10) * selectedNumbers.size}`}
                   </span>
                 </div>
               )}

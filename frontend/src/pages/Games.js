@@ -91,7 +91,7 @@ const Games = () => {
     if (gameId === 'bingo') {
       navigate('/bingo/lobby');
     } else if (gameId === 'raffles') {
-      navigate(`/${gameId}`);
+      navigate('/raffles/lobby');
     } else if (gameId === 'tictactoe') {
       navigate('/tictactoe/lobby');
     }

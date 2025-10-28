@@ -1,582 +1,853 @@
+/**
+ * Routes API - Sistema de Rifas Completo
+ * Implementa todos los endpoints para rifas con modo empresas, premio, CAPTCHA, etc.
+ */
 const express = require('express');
 const router = express.Router();
-const { query, transaction } = require('../db');
-const { verifyToken } = require('../middleware/auth');
-const logger = require('../utils/logger');
-const { v4: uuidv4 } = require('uuid');
+const authMiddleware = require('../middleware/auth');
+const RaffleService = require('../services/RaffleService');
+const multer = require('multer');
+const AWS = require('aws-sdk');
 
-// Generate raffle code
-function generateRaffleCode() {
-  return 'R' + Math.random().toString(36).substring(2, 7).toUpperCase();
-}
+const raffleService = new RaffleService();
 
-// Create raffle
-router.post('/create', verifyToken, async (req, res) => {
-  try {
-    const {
-      name,
-      description,
-      mode = 'free',
-      entry_price = 0,
-      numbers_range = 100,
-      visibility = 'public',
-      max_participants,
-      prize_description,
-      ends_in_hours = 24
-    } = req.body;
-    
-    const hostId = req.user.id;
-    
-    // Validate inputs
-    if (!name) {
-      return res.status(400).json({ error: 'Raffle name is required' });
-    }
-    
-    if (!['free', 'fires', 'coins'].includes(mode)) {
-      return res.status(400).json({ error: 'Invalid mode' });
-    }
-    
-    if (mode !== 'free' && entry_price <= 0) {
-      return res.status(400).json({ error: 'Entry price must be positive for paid raffles' });
-    }
-    
-    // Generate unique code
-    let code;
-    let attempts = 0;
-    do {
-      code = generateRaffleCode();
-      const existing = await query('SELECT 1 FROM raffles WHERE code = $1', [code]);
-      if (existing.rows.length === 0) break;
-      attempts++;
-    } while (attempts < 10);
-    
-    // Create raffle
-    const result = await query(
-      `INSERT INTO raffles 
-       (id, code, host_id, name, description, mode, 
-        entry_price_fire, entry_price_coin, numbers_range, 
-        visibility, max_participants, prize_meta, status, 
-        starts_at, ends_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', NOW(), $13)
-       RETURNING *`,
-      [
-        uuidv4(),
-        code,
-        hostId,
-        name,
-        description,
-        mode,
-        mode === 'fires' ? entry_price : 0,
-        mode === 'coins' ? entry_price : 0,
-        numbers_range,
-        visibility,
-        max_participants || null,
-        JSON.stringify({ description: prize_description }),
-        new Date(Date.now() + ends_in_hours * 60 * 60 * 1000)
-      ]
-    );
-    
-    const raffle = result.rows[0];
-    
-    // Initialize numbers
-    const numberInserts = [];
-    for (let i = 1; i <= numbers_range; i++) {
-      numberInserts.push(
-        query(
-          'INSERT INTO raffle_numbers (raffle_id, number_idx, state) VALUES ($1, $2, \'available\')',
-          [raffle.id, i]
-        )
-      );
-    }
-    await Promise.all(numberInserts);
-    
-    logger.info('Raffle created', { 
-      raffleId: raffle.id, 
-      code: raffle.code,
-      host: req.user.username 
-    });
-    
-    res.json({
-      success: true,
-      raffle: {
-        id: raffle.id,
-        code: raffle.code,
-        name: raffle.name,
-        mode: raffle.mode,
-        numbers_range: raffle.numbers_range,
-        ends_at: raffle.ends_at
-      }
-    });
-    
-  } catch (error) {
-    logger.error('Error creating raffle:', error);
-    res.status(500).json({ error: 'Failed to create raffle' });
-  }
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION
 });
 
-// Buy raffle numbers
-router.post('/:code/buy', verifyToken, async (req, res) => {
-  try {
-    const { code } = req.params;
-    const { numbers } = req.body; // Array of number indices to buy
-    const userId = req.user.id;
-    
-    if (!Array.isArray(numbers) || numbers.length === 0) {
-      return res.status(400).json({ error: 'Numbers array is required' });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten archivos de imagen'));
+        }
     }
-    
-    const result = await transaction(async (client) => {
-      // Get raffle
-      const raffleResult = await client.query(
-        'SELECT * FROM raffles WHERE code = $1 FOR UPDATE',
-        [code]
-      );
-      
-      if (raffleResult.rows.length === 0) {
-        throw new Error('Raffle not found');
-      }
-      
-      const raffle = raffleResult.rows[0];
-      
-      if (raffle.status !== 'active') {
-        throw new Error('Raffle is not active');
-      }
-      
-      if (new Date(raffle.ends_at) < new Date()) {
-        throw new Error('Raffle has ended');
-      }
-      
-      // Check numbers availability
-      const numberCheck = await client.query(
-        'SELECT * FROM raffle_numbers WHERE raffle_id = $1 AND number_idx = ANY($2) FOR UPDATE',
-        [raffle.id, numbers]
-      );
-      
-      const unavailable = numberCheck.rows.filter(n => n.state !== 'available');
-      if (unavailable.length > 0) {
-        throw new Error(`Numbers not available: ${unavailable.map(n => n.number_idx).join(', ')}`);
-      }
-      
-      // Calculate cost
-      const totalCost = numbers.length * (
-        raffle.mode === 'fires' ? parseFloat(raffle.entry_price_fire) :
-        raffle.mode === 'coins' ? parseFloat(raffle.entry_price_coin) : 0
-      );
-      
-      let firesCost = 0, coinsCost = 0;
-      
-      if (raffle.mode === 'fires') {
-        firesCost = totalCost;
-      } else if (raffle.mode === 'coins') {
-        coinsCost = totalCost;
-      }
-      
-      // Check and deduct balance if not free
-      if (firesCost > 0 || coinsCost > 0) {
-        const walletResult = await client.query(
-          'SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE',
-          [userId]
-        );
-        
-        if (walletResult.rows.length === 0) {
-          throw new Error('Wallet not found');
-        }
-        
-        const wallet = walletResult.rows[0];
-        
-        if (firesCost > 0 && parseFloat(wallet.fires_balance) < firesCost) {
-          throw new Error('Insufficient fires balance');
-        }
-        
-        if (coinsCost > 0 && parseFloat(wallet.coins_balance) < coinsCost) {
-          throw new Error('Insufficient coins balance');
-        }
-        
-        // Deduct balance
-        await client.query(
-          `UPDATE wallets 
-           SET fires_balance = fires_balance - $1,
-               coins_balance = coins_balance - $2,
-               total_fires_spent = total_fires_spent + $1,
-               total_coins_spent = total_coins_spent + $2
-           WHERE user_id = $3`,
-          [firesCost, coinsCost, userId]
-        );
-        
-        // Add to pot
-        await client.query(
-          `UPDATE raffles 
-           SET pot_fires = pot_fires + $1,
-               pot_coins = pot_coins + $2
-           WHERE id = $3`,
-          [firesCost, coinsCost, raffle.id]
-        );
-        
-        // Record transaction
-        if (firesCost > 0) {
-          await client.query(
-            `INSERT INTO wallet_transactions 
-             (wallet_id, type, currency, amount, balance_before, balance_after, description)
-             VALUES (
-               (SELECT id FROM wallets WHERE user_id = $1),
-               'raffle_entry', 'fires', $2, 
-               $3, $4, $5
-             )`,
-            [userId, firesCost, wallet.fires_balance, 
-             wallet.fires_balance - firesCost, `Raffle: ${raffle.name}`]
-          );
-        }
-        
-        if (coinsCost > 0) {
-          await client.query(
-            `INSERT INTO wallet_transactions 
-             (wallet_id, type, currency, amount, balance_before, balance_after, description)
-             VALUES (
-               (SELECT id FROM wallets WHERE user_id = $1),
-               'raffle_entry', 'coins', $2, 
-               $3, $4, $5
-             )`,
-            [userId, coinsCost, wallet.coins_balance, 
-             wallet.coins_balance - coinsCost, `Raffle: ${raffle.name}`]
-          );
-        }
-      }
-      
-      // Mark numbers as sold
-      await client.query(
-        `UPDATE raffle_numbers 
-         SET state = 'sold', 
-             owner_id = $1, 
-             owner_ext = $2, 
-             sold_at = NOW()
-         WHERE raffle_id = $3 AND number_idx = ANY($4)`,
-        [userId, `db:${userId}`, raffle.id, numbers]
-      );
-      
-      // Create/update participant record
-      const participantResult = await client.query(
-        `INSERT INTO raffle_participants 
-         (raffle_id, user_id, user_ext, numbers, fires_spent, coins_spent)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (raffle_id, user_id) 
-         DO UPDATE SET 
-           numbers = array_cat(raffle_participants.numbers, $4),
-           fires_spent = raffle_participants.fires_spent + $5,
-           coins_spent = raffle_participants.coins_spent + $6
-         RETURNING *`,
-        [raffle.id, userId, `db:${userId}`, numbers, firesCost, coinsCost]
-      );
-      
-      return {
-        success: true,
-        numbers_purchased: numbers,
-        total_numbers: participantResult.rows[0].numbers,
-        fires_spent: firesCost,
-        coins_spent: coinsCost
-      };
-    });
-    
-    res.json(result);
-    
-  } catch (error) {
-    logger.error('Error buying raffle numbers:', error);
-    res.status(400).json({ error: error.message || 'Failed to buy numbers' });
-  }
 });
 
-// Get raffle details
+/**
+ * GET /api/raffles/public
+ * Listar rifas públicas para el lobby con paginación
+ */
+router.get('/public', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const filters = {
+            mode: req.query.mode,
+            type: req.query.type,
+            company_mode: req.query.company_mode === 'true' ? true : 
+                         req.query.company_mode === 'false' ? false : undefined,
+            search: req.query.search
+        };
+
+        const result = await raffleService.listPublicRaffles(page, limit, filters);
+        
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        console.error('Error listing public raffles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/active
+ * Obtener rifas activas del usuario actual
+ */
+router.get('/active', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffles = await raffleService.getUserActiveRaffles(userId);
+        
+        res.json({
+            success: true,
+            data: raffles
+        });
+    } catch (error) {
+        console.error('Error getting active raffles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/participated
+ * Obtener rifas en las que participó el usuario
+ */
+router.get('/participated', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffles = await raffleService.getUserParticipatedRaffles(userId);
+        
+        res.json({
+            success: true,
+            data: raffles
+        });
+    } catch (error) {
+        console.error('Error getting participated raffles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/create
+ * Crear nueva rifa con todas las configuraciones
+ */
+router.post('/create', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffleData = req.body;
+
+        // Validar datos requeridos
+        if (!raffleData.name) {
+            return res.status(400).json({
+                success: false,
+                error: 'El nombre de la rifa es requerido'
+            });
+        }
+
+        if (!raffleData.mode || !['fire', 'prize'].includes(raffleData.mode)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Modo de rifa inválido (fire/prize)'
+            });
+        }
+
+        if (raffleData.is_company_mode && !raffleData.company_config) {
+            return res.status(400).json({
+                success: false,
+                error: 'Configuración de empresa requerida para modo empresas'
+            });
+        }
+
+        const raffle = await raffleService.createRaffle(userId, raffleData);
+        
+        res.json({
+            success: true,
+            data: raffle,
+            message: 'Rifa creada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error creating raffle:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/active
+ * Obtener rifas activas del usuario actual
+ */
+router.get('/active', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffles = await raffleService.getUserActiveRaffles(userId);
+        
+        res.json({
+            success: true,
+            data: raffles
+        });
+    } catch (error) {
+        console.error('Error getting active raffles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/participated
+ * Obtener rifas en las que participó el usuario
+ */
+router.get('/participated', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffles = await raffleService.getUserParticipatedRaffles(userId);
+        
+        res.json({
+            success: true,
+            data: raffles
+        });
+    } catch (error) {
+        console.error('Error getting participated raffles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/create
+ * Crear nueva rifa con todas las configuraciones
+ */
+router.post('/create', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffleData = req.body;
+
+        // Validar datos requeridos
+        if (!raffleData.name) {
+            return res.status(400).json({
+                success: false,
+                error: 'El nombre de la rifa es requerido'
+            });
+        }
+
+        if (!raffleData.mode || !['fire', 'prize'].includes(raffleData.mode)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Modo de rifa inválido (fire/prize)'
+            });
+        }
+
+        if (raffleData.is_company_mode && !raffleData.company_config) {
+            return res.status(400).json({
+                success: false,
+                error: 'Configuración de empresa requerida para modo empresas'
+            });
+        }
+
+        const raffle = await raffleService.createRaffle(userId, raffleData);
+        
+        res.json({
+            success: true,
+            data: raffle,
+            message: 'Rifa creada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error creating raffle:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:code
+ * Obtener detalles completos de una rifa por código
+ */
 router.get('/:code', async (req, res) => {
-  try {
-    const { code } = req.params;
-    
-    // Get raffle
-    const raffleResult = await query(
-      `SELECT 
-        r.*,
-        u.username as host_username,
-        COUNT(DISTINCT rp.user_id) as participant_count,
-        COUNT(DISTINCT rn.number_idx) FILTER (WHERE rn.state = 'sold') as numbers_sold
-       FROM raffles r
-       JOIN users u ON u.id = r.host_id
-       LEFT JOIN raffle_participants rp ON rp.raffle_id = r.id
-       LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
-       WHERE r.code = $1
-       GROUP BY r.id, u.username`,
-      [code]
-    );
-    
-    if (raffleResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Raffle not found' });
+    try {
+        const code = req.params.code;
+        
+        const raffle = await raffleService.getRaffleByCode(code);
+        
+        if (!raffle) {
+            return res.status(404).json({
+                success: false,
+                error: 'Rifa no encontrada'
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: raffle
+        });
+    } catch (error) {
+        console.error('Error getting raffle details:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-    
-    const raffle = raffleResult.rows[0];
-    
-    // Get numbers status
-    const numbersResult = await query(
-      `SELECT 
-        number_idx,
-        state,
-        owner_id,
-        u.username as owner_username
-       FROM raffle_numbers rn
-       LEFT JOIN users u ON u.id = rn.owner_id
-       WHERE rn.raffle_id = $1
-       ORDER BY rn.number_idx`,
-      [raffle.id]
-    );
-    
-    // Get participants
-    const participantsResult = await query(
-      `SELECT 
-        rp.user_id,
-        u.username,
-        u.display_name,
-        array_length(rp.numbers, 1) as numbers_count,
-        rp.fires_spent,
-        rp.coins_spent
-       FROM raffle_participants rp
-       JOIN users u ON u.id = rp.user_id
-       WHERE rp.raffle_id = $1
-       ORDER BY array_length(rp.numbers, 1) DESC`,
-      [raffle.id]
-    );
-    
-    res.json({
-      raffle: {
-        id: raffle.id,
-        code: raffle.code,
-        name: raffle.name,
-        description: raffle.description,
-        mode: raffle.mode,
-        status: raffle.status,
-        entry_price_fire: parseFloat(raffle.entry_price_fire),
-        entry_price_coin: parseFloat(raffle.entry_price_coin),
-        pot_fires: parseFloat(raffle.pot_fires),
-        pot_coins: parseFloat(raffle.pot_coins),
-        numbers_range: raffle.numbers_range,
-        numbers_sold: parseInt(raffle.numbers_sold),
-        participant_count: parseInt(raffle.participant_count),
-        host_username: raffle.host_username,
-        starts_at: raffle.starts_at,
-        ends_at: raffle.ends_at,
-        winner_id: raffle.winner_id,
-        winning_number: raffle.winning_number
-      },
-      numbers: numbersResult.rows,
-      participants: participantsResult.rows
-    });
-    
-  } catch (error) {
-    logger.error('Error fetching raffle:', error);
-    res.status(500).json({ error: 'Failed to fetch raffle' });
-  }
 });
 
-// Draw winner (host only or automatic)
-router.post('/:code/draw', verifyToken, async (req, res) => {
-  try {
-    const { code } = req.params;
-    const userId = req.user.id;
-    
-    const result = await transaction(async (client) => {
-      // Get raffle
-      const raffleResult = await client.query(
-        'SELECT * FROM raffles WHERE code = $1 FOR UPDATE',
-        [code]
-      );
-      
-      if (raffleResult.rows.length === 0) {
-        throw new Error('Raffle not found');
-      }
-      
-      const raffle = raffleResult.rows[0];
-      
-      // Check if user is host or admin
-      if (raffle.host_id !== userId && !req.user.roles?.includes('admin')) {
-        throw new Error('Only host or admin can draw winner');
-      }
-      
-      if (raffle.status !== 'active') {
-        throw new Error('Raffle is not active');
-      }
-      
-      // Get sold numbers
-      const soldNumbers = await client.query(
-        'SELECT * FROM raffle_numbers WHERE raffle_id = $1 AND state = \'sold\'',
-        [raffle.id]
-      );
-      
-      if (soldNumbers.rows.length === 0) {
-        throw new Error('No numbers have been sold');
-      }
-      
-      // Select random winner
-      const winnerIndex = Math.floor(Math.random() * soldNumbers.rows.length);
-      const winningNumber = soldNumbers.rows[winnerIndex];
-      
-      // Update raffle
-      await client.query(
-        `UPDATE raffles 
-         SET status = 'finished',
-             winner_id = $1,
-             winning_number = $2,
-             drawn_at = NOW()
-         WHERE id = $3`,
-        [winningNumber.owner_id, winningNumber.number_idx, raffle.id]
-      );
-      
-      // Update participant status
-      await client.query(
-        `UPDATE raffle_participants 
-         SET status = CASE 
-           WHEN user_id = $1 THEN 'winner'
-           ELSE 'loser'
-         END
-         WHERE raffle_id = $2`,
-        [winningNumber.owner_id, raffle.id]
-      );
-      
-      // Distribute prizes (70% winner, 20% host, 10% tote)
-      const potFires = parseFloat(raffle.pot_fires);
-      const potCoins = parseFloat(raffle.pot_coins);
-      
-      if (potFires > 0) {
-        const winnerAmount = potFires * 0.7;
-        const hostAmount = potFires * 0.2;
-        const toteAmount = potFires * 0.1;
-        
-        // Winner
-        await client.query(
-          `UPDATE wallets 
-           SET fires_balance = fires_balance + $1,
-               total_fires_earned = total_fires_earned + $1
-           WHERE user_id = $2`,
-          [winnerAmount, winningNumber.owner_id]
-        );
-        
-        // Host (if not winner)
-        if (raffle.host_id !== winningNumber.owner_id) {
-          await client.query(
-            `UPDATE wallets 
-             SET fires_balance = fires_balance + $1,
-                 total_fires_earned = total_fires_earned + $1
-             WHERE user_id = $2`,
-            [hostAmount, raffle.host_id]
-          );
+/**
+ * POST /api/raffles/purchase
+ * Comprar número de rifa con CAPTCHA matemático
+ */
+router.post('/purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { raffle_id, number, captcha_data } = req.body;
+
+        if (!raffle_id || !number || !captcha_data) {
+            return res.status(400).json({
+                success: false,
+                error: 'Datos incompletos para la compra'
+            });
         }
+
+        const result = await raffleService.purchaseNumber(userId, raffle_id, number, captcha_data);
         
-        // Tote
-        const toteUser = await client.query(
-          'SELECT id FROM users WHERE tg_id = $1',
-          [config.telegram.toteId]
-        );
-        
-        if (toteUser.rows.length > 0) {
-          await client.query(
-            `UPDATE wallets 
-             SET fires_balance = fires_balance + $1,
-                 total_fires_earned = total_fires_earned + $1
-             WHERE user_id = $2`,
-            [toteAmount, toteUser.rows[0].id]
-          );
-        }
-      }
-      
-      // Similar distribution for coins
-      if (potCoins > 0) {
-        const winnerAmount = potCoins * 0.7;
-        const hostAmount = potCoins * 0.2;
-        const toteAmount = potCoins * 0.1;
-        
-        await client.query(
-          `UPDATE wallets 
-           SET coins_balance = coins_balance + $1,
-               total_coins_earned = total_coins_earned + $1
-           WHERE user_id = $2`,
-          [winnerAmount, winningNumber.owner_id]
-        );
-        
-        if (raffle.host_id !== winningNumber.owner_id) {
-          await client.query(
-            `UPDATE wallets 
-             SET coins_balance = coins_balance + $1,
-                 total_coins_earned = total_coins_earned + $1
-             WHERE user_id = $2`,
-            [hostAmount, raffle.host_id]
-          );
-        }
-      }
-      
-      // Get winner info
-      const winnerInfo = await client.query(
-        'SELECT username, display_name FROM users WHERE id = $1',
-        [winningNumber.owner_id]
-      );
-      
-      return {
-        success: true,
-        winning_number: winningNumber.number_idx,
-        winner: winnerInfo.rows[0],
-        prizes: {
-          fires: potFires * 0.7,
-          coins: potCoins * 0.7
-        }
-      };
-    });
-    
-    logger.info('Raffle winner drawn', { 
-      code, 
-      winner: result.winner.username,
-      number: result.winning_number 
-    });
-    
-    res.json(result);
-    
-  } catch (error) {
-    logger.error('Error drawing raffle winner:', error);
-    res.status(400).json({ error: error.message || 'Failed to draw winner' });
-  }
+        res.json({
+            success: true,
+            data: result,
+            message: 'Número comprado exitosamente'
+        });
+    } catch (error) {
+        console.error('Error purchasing number:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
-// List active raffles
-router.get('/', async (req, res) => {
-  try {
-    const { status = 'active', visibility = 'public' } = req.query;
-    
-    const result = await query(
-      `SELECT 
-        r.id,
-        r.code,
-        r.name,
-        r.description,
-        r.mode,
-        r.status,
-        r.entry_price_fire,
-        r.entry_price_coin,
-        r.pot_fires,
-        r.pot_coins,
-        r.numbers_range,
-        r.ends_at,
-        u.username as host_username,
-        COUNT(DISTINCT rp.user_id) as participant_count,
-        COUNT(DISTINCT rn.number_idx) FILTER (WHERE rn.state = 'sold') as numbers_sold
-       FROM raffles r
-       JOIN users u ON u.id = r.host_id
-       LEFT JOIN raffle_participants rp ON rp.raffle_id = r.id
-       LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
-       WHERE r.status = $1 AND r.visibility = $2
-       GROUP BY r.id, u.username
-       ORDER BY r.created_at DESC
-       LIMIT 50`,
-      [status, visibility]
-    );
-    
-    res.json(result.rows);
-    
-  } catch (error) {
-    logger.error('Error listing raffles:', error);
-    res.status(500).json({ error: 'Failed to list raffles' });
-  }
+/**
+ * POST /api/raffles/captcha
+ * Generar nuevo CAPTCHA matemático
+ */
+router.post('/captcha', (req, res) => {
+    try {
+        const captcha = raffleService.generateMathCaptcha();
+        
+        res.json({
+            success: true,
+            data: captcha
+        });
+    } catch (error) {
+        console.error('Error generating captcha:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/approve-purchase
+ * Aprobar solicitud de compra (modo premio) - Solo host
+ */
+router.post('/approve-purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { request_id } = req.body;
+
+        if (!request_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de solicitud requerido'
+            });
+        }
+
+        const result = await raffleService.approvePurchase(userId, request_id);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Compra aprobada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error approving purchase:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/reject-purchase
+ * Rechazar solicitud de compra - Solo host
+ */
+router.post('/reject-purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { request_id, reason } = req.body;
+
+        if (!request_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de solicitud requerido'
+            });
+        }
+
+        const result = await raffleService.rejectPurchase(userId, request_id, reason);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Compra rechazada'
+        });
+    } catch (error) {
+        console.error('Error rejecting purchase:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/upload-logo
+ * Subir logo para modo empresa (AWS S3)
+ */
+router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo de imagen'
+            });
+        }
+
+        const fileName = `raffle-logos/${Date.now()}-${req.file.originalname}`;
+        
+        const params = {
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+        
+        res.json({
+            success: true,
+            data: {
+                logo_url: uploadResult.Location
+            },
+            message: 'Logo subido exitosamente'
+        });
+    } catch (error) {
+        console.error('Error uploading logo:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:code/numbers
+ * Obtener grid completo de números de una rifa
+ */
+router.get('/:code/numbers', async (req, res) => {
+    try {
+        const code = req.params.code;
+        
+        const numbers = await raffleService.getRaffleNumbers(code);
+        
+        res.json({
+            success: true,
+            data: numbers
+        });
+    } catch (error) {
+        console.error('Error getting raffle numbers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/:code/close
+ * Cerrar rifa manualmente - Solo host
+ */
+router.post('/:code/close', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const code = req.params.code;
+
+        const result = await raffleService.closeRaffleManually(userId, code);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Rifa cerrada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error closing raffle:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:code/ticket/:ticketNumber
+ * Validar ticket digital con QR
+ */
+router.get('/:code/ticket/:ticketNumber', async (req, res) => {
+    try {
+        const code = req.params.code;
+        const ticketNumber = req.params.ticketNumber;
+        
+        const ticket = await raffleService.validateTicket(code, ticketNumber);
+        
+        if (!ticket) {
+            return res.status(404).json({
+                success: false,
+                error: 'Ticket no encontrado o inválido'
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: ticket
+        });
+    } catch (error) {
+        console.error('Error validating ticket:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/stats/overview
+ * Estadísticas generales del sistema de rifas
+ */
+router.get('/stats/overview', async (req, res) => {
+    try {
+        const stats = await raffleService.getSystemStats();
+        
+        res.json({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error('Error getting system stats:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/generate-pdf
+ * Generar PDF de certificado para ganador con QR
+ */
+router.post('/generate-pdf', authMiddleware, async (req, res) => {
+    try {
+        const { raffle_id } = req.body;
+        
+        if (!raffle_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de rifa requerido'
+            });
+        }
+
+        const pdfUrl = await raffleService.generateWinnerPDF(raffle_id);
+        
+        res.json({
+            success: true,
+            data: { pdf_url: pdfUrl },
+            message: 'PDF generado exitosamente'
+        });
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/purchase
+ * Comprar número de rifa con CAPTCHA matemático
+ */
+router.post('/purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { raffle_id, number, captcha_data } = req.body;
+
+        if (!raffle_id || !number || !captcha_data) {
+            return res.status(400).json({
+                success: false,
+                error: 'Datos incompletos para la compra'
+            });
+        }
+
+        const result = await raffleService.purchaseNumber(userId, raffle_id, number, captcha_data);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Número comprado exitosamente'
+        });
+    } catch (error) {
+        console.error('Error purchasing number:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/captcha
+ * Generar nuevo CAPTCHA matemático
+ */
+router.post('/captcha', (req, res) => {
+    try {
+        const captcha = raffleService.generateMathCaptcha();
+        
+        res.json({
+            success: true,
+            data: captcha
+        });
+    } catch (error) {
+        console.error('Error generating captcha:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/approve-purchase
+ * Aprobar solicitud de compra (modo premio) - Solo host
+ */
+router.post('/approve-purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { request_id } = req.body;
+
+        if (!request_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de solicitud requerido'
+            });
+        }
+
+        const result = await raffleService.approvePurchase(userId, request_id);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Compra aprobada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error approving purchase:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/reject-purchase
+ * Rechazar solicitud de compra - Solo host
+ */
+router.post('/reject-purchase', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { request_id, reason } = req.body;
+
+        if (!request_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de solicitud requerido'
+            });
+        }
+
+        const result = await raffleService.rejectPurchase(userId, request_id, reason);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Compra rechazada'
+        });
+    } catch (error) {
+        console.error('Error rejecting purchase:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/upload-logo
+ * Subir logo para modo empresa (AWS S3)
+ */
+router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo de imagen'
+            });
+        }
+
+        const fileName = `raffle-logos/${Date.now()}-${req.file.originalname}`;
+        
+        const params = {
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+        
+        res.json({
+            success: true,
+            data: {
+                logo_url: uploadResult.Location
+            },
+            message: 'Logo subido exitosamente'
+        });
+    } catch (error) {
+        console.error('Error uploading logo:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:code/numbers
+ * Obtener grid completo de números de una rifa
+ */
+router.get('/:code/numbers', async (req, res) => {
+    try {
+        const code = req.params.code;
+        
+        const numbers = await raffleService.getRaffleNumbers(code);
+        
+        res.json({
+            success: true,
+            data: numbers
+        });
+    } catch (error) {
+        console.error('Error getting raffle numbers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/:code/close
+ * Cerrar rifa manualmente - Solo host
+ */
+router.post('/:code/close', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const code = req.params.code;
+
+        const result = await raffleService.closeRaffleManually(userId, code);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Rifa cerrada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error closing raffle:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:code/ticket/:ticketNumber
+ * Validar ticket digital con QR
+ */
+router.get('/:code/ticket/:ticketNumber', async (req, res) => {
+    try {
+        const code = req.params.code;
+        const ticketNumber = req.params.ticketNumber;
+        
+        const ticket = await raffleService.validateTicket(code, ticketNumber);
+        
+        if (!ticket) {
+            return res.status(404).json({
+                success: false,
+                error: 'Ticket no encontrado o inválido'
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: ticket
+        });
+    } catch (error) {
+        console.error('Error validating ticket:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/stats/overview
+ * Estadísticas generales del sistema de rifas
+ */
+router.get('/stats/overview', async (req, res) => {
+    try {
+        const stats = await raffleService.getSystemStats();
+        
+        res.json({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error('Error getting system stats:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/generate-pdf
+ * Generar PDF de certificado para ganador con QR
+ */
+router.post('/generate-pdf', authMiddleware, async (req, res) => {
+    try {
+        const { raffle_id } = req.body;
+        
+        if (!raffle_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'ID de rifa requerido'
+            });
+        }
+
+        const pdfUrl = await raffleService.generateWinnerPDF(raffle_id);
+        
+        res.json({
+            success: true,
+            data: { pdf_url: pdfUrl },
+            message: 'PDF generado exitosamente'
+        });
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 module.exports = router;

@@ -12,6 +12,8 @@ import Games from './pages/Games';
 import Profile from './pages/Profile';
 import Lobby from './pages/Lobby';
 import Raffles from './pages/Raffles';
+import RafflesLobby from './pages/RafflesLobby';
+import RaffleRoom from './pages/RaffleRoom';
 import Market from './pages/Market';
 import Roles from './pages/Roles';
 import Upcoming from './pages/Upcoming';
@@ -113,7 +115,9 @@ function App() {
                 <Route path="profile" element={<Profile />} />
                 <Route path="lobby" element={<Lobby />} />
                 <Route path="raffles" element={<Raffles />} />
+                <Route path="raffles/lobby" element={<RafflesLobby />} />
                 <Route path="raffles/:code" element={<RaffleDetails />} />
+                <Route path="raffles/room/:code" element={<RaffleRoom />} />
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />
                 <Route path="upcoming" element={<Upcoming />} />
