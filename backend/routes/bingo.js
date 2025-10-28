@@ -174,7 +174,7 @@ router.post('/rooms/:code/join', verifyToken, async (req, res) => {
     
     // Obtener info de la sala para WebSocket
     const roomInfo = await query(
-      `SELECT id, host_id FROM bingo_rooms WHERE code = $1`,
+      `SELECT id, host_id FROM bingo_rooms WHERE bingo_rooms.code = $1`,
       [code]
     );
     
@@ -204,7 +204,7 @@ router.post('/rooms/:code/ready', verifyToken, async (req, res) => {
     
     // Obtener ID de la sala
     const roomResult = await query(
-      `SELECT id FROM bingo_rooms WHERE code = $1`,
+      `SELECT id FROM bingo_rooms WHERE bingo_rooms.code = $1`,
       [code]
     );
     
@@ -244,7 +244,7 @@ router.post('/rooms/:code/start', verifyToken, async (req, res) => {
     
     // Obtener info de la sala
     const roomResult = await query(
-      `SELECT id, host_id FROM bingo_rooms WHERE code = $1`,
+      `SELECT id, host_id FROM bingo_rooms WHERE bingo_rooms.code = $1`,
       [code]
     );
     
@@ -285,7 +285,7 @@ router.post('/rooms/:code/draw', verifyToken, async (req, res) => {
     
     // Obtener info de la sala
     const roomResult = await query(
-      `SELECT id, host_id FROM bingo_rooms WHERE code = $1`,
+      `SELECT id, host_id FROM bingo_rooms WHERE bingo_rooms.code = $1`,
       [code]
     );
     
@@ -371,7 +371,7 @@ router.post('/rooms/:code/card/:cardId/call-bingo', verifyToken, async (req, res
       
       // Si la partida terminó, emitir evento de finalización
       const roomStatus = await query(
-        `SELECT status FROM bingo_rooms WHERE code = $1`,
+        `SELECT status FROM bingo_rooms WHERE bingo_rooms.code = $1`,
         [code]
       );
       
@@ -511,7 +511,7 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
     const roomResult = await query(`
       SELECT id, status, currency, card_cost
       FROM bingo_rooms 
-      WHERE code = $1 AND status = 'lobby'
+      WHERE bingo_rooms.code = $1 AND status = 'lobby'
     `, [code]);
     
     if (!roomResult.rows.length) {
