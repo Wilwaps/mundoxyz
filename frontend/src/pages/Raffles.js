@@ -9,14 +9,16 @@ import toast from 'react-hot-toast';
 const Raffles = () => {
   const navigate = useNavigate();
 
-  const { data: raffles, isLoading } = useQuery({
-    queryKey: ['raffles'],
+  const { data: rafflesResponse, isLoading } = useQuery({
+    queryKey: ['raffles-public'],
     queryFn: async () => {
-      const response = await axios.get('/api/raffles');
+      const response = await axios.get('/api/raffles/public');
       return response.data;
     },
     refetchInterval: 30000
   });
+
+  const raffles = rafflesResponse?.data?.raffles || [];
 
   const handleCreateRaffle = () => {
     toast.info('Creación de rifas próximamente');
