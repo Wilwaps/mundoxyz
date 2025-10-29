@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 const RaffleService = require('../services/RaffleService');
 const multer = require('multer');
 const AWS = require('aws-sdk');
@@ -64,7 +64,7 @@ router.get('/public', async (req, res) => {
  * GET /api/raffles/active
  * Obtener rifas activas del usuario actual
  */
-router.get('/active', authMiddleware, async (req, res) => {
+router.get('/active', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffles = await raffleService.getUserActiveRaffles(userId);
@@ -86,7 +86,7 @@ router.get('/active', authMiddleware, async (req, res) => {
  * GET /api/raffles/participated
  * Obtener rifas en las que participó el usuario
  */
-router.get('/participated', authMiddleware, async (req, res) => {
+router.get('/participated', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffles = await raffleService.getUserParticipatedRaffles(userId);
@@ -108,7 +108,7 @@ router.get('/participated', authMiddleware, async (req, res) => {
  * POST /api/raffles/create
  * Crear nueva rifa con todas las configuraciones
  */
-router.post('/create', authMiddleware, async (req, res) => {
+router.post('/create', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffleData = req.body;
@@ -155,7 +155,7 @@ router.post('/create', authMiddleware, async (req, res) => {
  * GET /api/raffles/active
  * Obtener rifas activas del usuario actual
  */
-router.get('/active', authMiddleware, async (req, res) => {
+router.get('/active', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffles = await raffleService.getUserActiveRaffles(userId);
@@ -177,7 +177,7 @@ router.get('/active', authMiddleware, async (req, res) => {
  * GET /api/raffles/participated
  * Obtener rifas en las que participó el usuario
  */
-router.get('/participated', authMiddleware, async (req, res) => {
+router.get('/participated', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffles = await raffleService.getUserParticipatedRaffles(userId);
@@ -199,7 +199,7 @@ router.get('/participated', authMiddleware, async (req, res) => {
  * POST /api/raffles/create
  * Crear nueva rifa con todas las configuraciones
  */
-router.post('/create', authMiddleware, async (req, res) => {
+router.post('/create', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const raffleData = req.body;
@@ -276,7 +276,7 @@ router.get('/:code', async (req, res) => {
  * POST /api/raffles/purchase
  * Comprar número de rifa con CAPTCHA matemático
  */
-router.post('/purchase', authMiddleware, async (req, res) => {
+router.post('/purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { raffle_id, number, captcha_data } = req.body;
@@ -329,7 +329,7 @@ router.post('/captcha', (req, res) => {
  * POST /api/raffles/approve-purchase
  * Aprobar solicitud de compra (modo premio) - Solo host
  */
-router.post('/approve-purchase', authMiddleware, async (req, res) => {
+router.post('/approve-purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { request_id } = req.body;
@@ -361,7 +361,7 @@ router.post('/approve-purchase', authMiddleware, async (req, res) => {
  * POST /api/raffles/reject-purchase
  * Rechazar solicitud de compra - Solo host
  */
-router.post('/reject-purchase', authMiddleware, async (req, res) => {
+router.post('/reject-purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { request_id, reason } = req.body;
@@ -393,7 +393,7 @@ router.post('/reject-purchase', authMiddleware, async (req, res) => {
  * POST /api/raffles/upload-logo
  * Subir logo para modo empresa (AWS S3)
  */
-router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req, res) => {
+router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -457,7 +457,7 @@ router.get('/:code/numbers', async (req, res) => {
  * POST /api/raffles/:code/close
  * Cerrar rifa manualmente - Solo host
  */
-router.post('/:code/close', authMiddleware, async (req, res) => {
+router.post('/:code/close', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const code = req.params.code;
@@ -534,7 +534,7 @@ router.get('/stats/overview', async (req, res) => {
  * POST /api/raffles/generate-pdf
  * Generar PDF de certificado para ganador con QR
  */
-router.post('/generate-pdf', authMiddleware, async (req, res) => {
+router.post('/generate-pdf', verifyToken, async (req, res) => {
     try {
         const { raffle_id } = req.body;
         
@@ -565,7 +565,7 @@ router.post('/generate-pdf', authMiddleware, async (req, res) => {
  * POST /api/raffles/purchase
  * Comprar número de rifa con CAPTCHA matemático
  */
-router.post('/purchase', authMiddleware, async (req, res) => {
+router.post('/purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { raffle_id, number, captcha_data } = req.body;
@@ -618,7 +618,7 @@ router.post('/captcha', (req, res) => {
  * POST /api/raffles/approve-purchase
  * Aprobar solicitud de compra (modo premio) - Solo host
  */
-router.post('/approve-purchase', authMiddleware, async (req, res) => {
+router.post('/approve-purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { request_id } = req.body;
@@ -650,7 +650,7 @@ router.post('/approve-purchase', authMiddleware, async (req, res) => {
  * POST /api/raffles/reject-purchase
  * Rechazar solicitud de compra - Solo host
  */
-router.post('/reject-purchase', authMiddleware, async (req, res) => {
+router.post('/reject-purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { request_id, reason } = req.body;
@@ -682,7 +682,7 @@ router.post('/reject-purchase', authMiddleware, async (req, res) => {
  * POST /api/raffles/upload-logo
  * Subir logo para modo empresa (AWS S3)
  */
-router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req, res) => {
+router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -746,7 +746,7 @@ router.get('/:code/numbers', async (req, res) => {
  * POST /api/raffles/:code/close
  * Cerrar rifa manualmente - Solo host
  */
-router.post('/:code/close', authMiddleware, async (req, res) => {
+router.post('/:code/close', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const code = req.params.code;
@@ -823,7 +823,7 @@ router.get('/stats/overview', async (req, res) => {
  * POST /api/raffles/generate-pdf
  * Generar PDF de certificado para ganador con QR
  */
-router.post('/generate-pdf', authMiddleware, async (req, res) => {
+router.post('/generate-pdf', verifyToken, async (req, res) => {
     try {
         const { raffle_id } = req.body;
         
