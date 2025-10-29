@@ -31,7 +31,7 @@ const PasswordChangeModal = ({ isOpen, onClose }) => {
   const checkIfHasPassword = async () => {
     try {
       // Intentar verificar con password vacío para detectar si tiene password
-      await axios.post(`/profile/${user.id}/check-password`, { password: 'dummy-check' });
+      await axios.post(`/api/profile/${user.id}/check-password`, { password: 'dummy-check' });
       // Si llega aquí sin error, tiene password (aunque falló la verificación)
       setHasPassword(true);
     } catch (err) {
@@ -98,7 +98,7 @@ const PasswordChangeModal = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      await axios.put('/auth/change-password', formData);
+      await axios.put('/api/auth/change-password', formData);
       const message = hasPassword ? 'Contraseña actualizada correctamente' : '¡Contraseña establecida correctamente!';
       toast.success(message);
       setFormData({ current_password: '', new_password: '', new_password_confirm: '' });
