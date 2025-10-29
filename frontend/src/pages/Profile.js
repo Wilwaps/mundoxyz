@@ -56,7 +56,7 @@ const Profile = () => {
   const { data: stats } = useQuery({
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
-      const response = await axios.get(`/profile/${user.id}/stats`);
+      const response = await axios.get(`/api/profile/${user.id}/stats`);
       return response.data;
     },
     enabled: !!user?.id,
@@ -68,7 +68,7 @@ const Profile = () => {
   const { data: walletData } = useQuery({
     queryKey: ['user-wallet', user?.id],
     queryFn: async () => {
-      const response = await axios.get(`/profile/${user.id}`);
+      const response = await axios.get(`/api/profile/${user.id}`);
       setWalletId(response.data.wallet_id);
       return response.data;
     },
@@ -81,7 +81,7 @@ const Profile = () => {
   const { data: games } = useQuery({
     queryKey: ['user-games', user?.id],
     queryFn: async () => {
-      const response = await axios.get(`/profile/${user.id}/games`);
+      const response = await axios.get(`/api/profile/${user.id}/games`);
       return response.data;
     },
     enabled: !!user?.id

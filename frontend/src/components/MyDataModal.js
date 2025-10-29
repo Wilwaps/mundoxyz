@@ -32,7 +32,7 @@ const MyDataModal = ({ isOpen, onClose }) => {
   // Helper: Check if user has password
   const checkHasPassword = async () => {
     try {
-      await axios.post(`/profile/${user.id}/check-password`, { password: 'dummy-check' });
+      await axios.post(`/api/profile/${user.id}/check-password`, { password: 'dummy-check' });
       return true; // Tiene contraseña (aunque falló la verificación)
     } catch (err) {
       // Si devuelve requiresPasswordCreation (400), NO tiene contraseña
@@ -80,7 +80,7 @@ const MyDataModal = ({ isOpen, onClose }) => {
 
     setCheckingNickname(true);
     try {
-      const response = await axios.get(`/profile/check-nickname/${nickname}`);
+      const response = await axios.get(`/api/profile/check-nickname/${nickname}`);
       setNicknameStatus(response.data);
     } catch (error) {
       console.error('Error checking nickname:', error);
@@ -123,7 +123,7 @@ const MyDataModal = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      await axios.put(`/profile/${user.id}/update-profile`, formData);
+      await axios.put(`/api/profile/${user.id}/update-profile`, formData);
       toast.success('Perfil actualizado exitosamente');
       
       // Actualizar usuario y refrescar todas las queries
@@ -165,7 +165,7 @@ const MyDataModal = ({ isOpen, onClose }) => {
 
   const unlinkTelegram = async () => {
     try {
-      await axios.post(`/profile/${user.id}/unlink-telegram`);
+      await axios.post(`/api/profile/${user.id}/unlink-telegram`);
       toast.success('Telegram desvinculado');
       
       // Actualizar usuario y refrescar queries

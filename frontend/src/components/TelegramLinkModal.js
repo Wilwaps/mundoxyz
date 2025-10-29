@@ -21,7 +21,7 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
   const generateBotLink = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(`/profile/${user.id}/link-telegram`);
+      const response = await axios.post(`/api/profile/${user.id}/link-telegram`);
       setBotToken(response.data.linkToken);
       setBotUrl(response.data.telegramUrl);
       
@@ -41,7 +41,7 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
       try {
         await refreshUser();
         // Check if tg_id was set
-        const response = await axios.get(`/profile/${user.id}`);
+        const response = await axios.get(`/api/profile/${user.id}`);
         if (response.data.tg_id) {
           clearInterval(interval);
           setChecking(false);
@@ -71,7 +71,7 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      await axios.post(`/profile/${user.id}/link-telegram-manual`, { tg_id: manualId });
+      await axios.post(`/api/profile/${user.id}/link-telegram-manual`, { tg_id: manualId });
       toast.success('Telegram vinculado exitosamente');
       await refreshUser();
       queryClient.invalidateQueries(['user-stats', user.id]);
