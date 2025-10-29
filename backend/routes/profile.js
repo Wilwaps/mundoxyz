@@ -26,6 +26,7 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         u.last_seen_at,
         u.nickname,
         u.bio,
+        u.security_answer,
         w.id as wallet_id,
         w.coins_balance,
         w.fires_balance,
@@ -89,6 +90,8 @@ router.get('/:userId', optionalAuth, async (req, res) => {
       profile.locale = user.locale;
       profile.total_coins_spent = user.total_coins_spent || 0;
       profile.total_fires_spent = user.total_fires_spent || 0;
+      // Indicar si tiene respuesta de seguridad (sin revelar el valor)
+      profile.security_answer = user.security_answer ? true : false;
     }
 
     // Get recent transactions if own profile
