@@ -114,12 +114,12 @@ router.post('/create', verifyToken, async (req, res) => {
         throw new Error('No se pudo generar código único');
       }
       
-      // Crear sala
+      // Crear sala - host automáticamente marcado como ready
       const roomResult = await client.query(
         `INSERT INTO tictactoe_rooms 
          (id, code, host_id, mode, bet_amount, visibility, player_x_id, 
-          pot_coins, pot_fires, status, current_turn)
-         VALUES ($1, $2, $3, $4, $5, $6, $3, $7, $8, 'waiting', 'X')
+          pot_coins, pot_fires, status, current_turn, player_x_ready)
+         VALUES ($1, $2, $3, $4, $5, $6, $3, $7, $8, 'waiting', 'X', TRUE)
          RETURNING *`,
         [
           uuidv4(),
@@ -244,12 +244,13 @@ router.post('/join/:code', verifyToken, async (req, res) => {
         [userId, room.mode, betAmount, balance, balance - betAmount, code]
       );
       
-      // Actualizar sala: agregar jugador O y pot
+      // Actualizar sala: agregar jugador O y pot, marcar como ready
       await client.query(
         `UPDATE tictactoe_rooms 
          SET player_o_id = $1,
              ${room.mode === 'fires' ? 'pot_fires' : 'pot_coins'} = 
              ${room.mode === 'fires' ? 'pot_fires' : 'pot_coins'} + $2,
+             player_o_ready = TRUE,
              status = 'ready'
          WHERE id = $3`,
         [userId, betAmount, room.id]
@@ -369,15 +370,21 @@ router.post('/room/:code/start', verifyToken, async (req, res) => {
         throw new Error('Esperando al segundo jugador');
       }
       
-      // Verificar que el invitado esté listo
+      // Verificar que AMBOS jugadores estén listos
+      if (!room.player_x_ready) {
+        throw new Error('El host aún no está listo');
+      }
+      
       if (!room.player_o_ready) {
         throw new Error('El invitado aún no está listo');
       }
       
-      // Iniciar juego
+      // Iniciar juego - garantizar que ambos estén marcados como ready
       await client.query(
         `UPDATE tictactoe_rooms 
          SET status = 'playing', 
+             player_x_ready = TRUE,
+             player_o_ready = TRUE,
              started_at = NOW(),
              last_move_at = NOW()
          WHERE id = $1`,
