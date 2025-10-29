@@ -74,7 +74,11 @@ export const AuthProvider = ({ children }) => {
     return {
       ...userData,
       roles: Array.isArray(userData?.roles) ? userData.roles : 
-             (userData?.roles ? [userData.roles] : ['user'])
+             (userData?.roles ? [userData.roles] : ['user']),
+      // Normalizar security_answer: backend puede enviar has_security_answer o security_answer
+      security_answer: userData?.security_answer !== undefined 
+        ? userData.security_answer 
+        : (userData?.has_security_answer || false)
     };
   };
 
@@ -241,6 +245,8 @@ export const AuthProvider = ({ children }) => {
         roles: Array.isArray(profileData.roles) ? profileData.roles : 
                Array.isArray(user.roles) ? user.roles : [],
         wallet_id: profileData.wallet_id,
+        // Seguridad
+        security_answer: profileData.security_answer || false,
         // Balances del stats
         coins_balance: profileData.stats?.coins_balance || 0,
         fires_balance: profileData.stats?.fires_balance || 0,
