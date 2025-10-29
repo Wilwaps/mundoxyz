@@ -684,8 +684,10 @@ class RaffleService {
 
             const result = await client.query(query, params);
 
-            // Obtener total para paginación
-            const countQuery = query.split('ORDER BY')[0].replace(/SELECT.*?FROM/, 'SELECT COUNT(*) FROM');
+            // Obtener total para paginación (contar distintos raffles)
+            let countQuery = query.split('ORDER BY')[0].replace(/SELECT.*?FROM/, 'SELECT COUNT(DISTINCT r.id) as count FROM');
+            // Remover el GROUP BY para el count
+            countQuery = countQuery.replace(/GROUP BY.*$/, '');
             const countResult = await client.query(countQuery, params.slice(0, -2));
             
             return {
@@ -693,8 +695,8 @@ class RaffleService {
                 pagination: {
                     page: page,
                     limit: limit,
-                    total: parseInt(countResult.rows[0].count),
-                    totalPages: Math.ceil(countResult.rows[0].count / limit)
+                    total: parseInt(countResult.rows[0]?.count || 0),
+                    totalPages: Math.ceil((countResult.rows[0]?.count || 0) / limit)
                 }
             };
 
