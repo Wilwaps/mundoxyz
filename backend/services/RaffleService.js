@@ -636,22 +636,21 @@ class RaffleService {
                     r.name,
                     u.username as host_username,
                     r.mode,
-                    r.type,
+                    COALESCE(r.type, 'public') as type,
                     r.status,
-                    r.cost_per_number,
-                    (r.pot_fires + r.pot_coins) as current_pot,
+                    COALESCE(r.cost_per_number, 10) as cost_per_number,
+                    (COALESCE(r.pot_fires, 0) + COALESCE(r.pot_coins, 0)) as current_pot,
                     r.numbers_range,
-                    r.is_company_mode,
+                    COALESCE(r.is_company_mode, false) as is_company_mode,
                     r.created_at,
-                    rc.company_name,
-                    rc.logo_url,
-                    COUNT(DISTINCT rn.id) FILTER (WHERE rn.state IN ('reserved', 'sold')) as purchased_count
+                    NULL as company_name,
+                    NULL as logo_url,
+                    COUNT(DISTINCT CASE WHEN rn.state IN ('reserved', 'sold') THEN rn.id END) as purchased_count
                 FROM raffles r
                 LEFT JOIN users u ON u.id = r.host_id
-                LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
                 LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
                 WHERE r.status IN ('pending', 'active', 'finished')
-                GROUP BY r.id, u.username, rc.company_name, rc.logo_url
+                GROUP BY r.id, u.username
             `;
             
             const params = [];
