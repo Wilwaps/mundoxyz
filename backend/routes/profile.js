@@ -214,7 +214,7 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
       FROM users u
       LEFT JOIN raffle_participants rp ON rp.user_id = u.id
       LEFT JOIN raffles r ON r.id = rp.raffle_id
-      LEFT JOIN bingo_players bp ON bp.user_id = u.id
+      LEFT JOIN bingo_room_players bp ON bp.user_id = u.id
       LEFT JOIN bingo_rooms b ON b.id = bp.room_id
       WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
       GROUP BY u.id`,
@@ -335,7 +335,7 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
         bp.is_ready,
         bp.fires_spent,
         bp.coins_spent
-      FROM bingo_players bp
+      FROM bingo_room_players bp
       JOIN bingo_rooms br ON br.id = bp.room_id
       WHERE bp.user_id = $1 AND br.status IN ('waiting', 'ready', 'playing')
       ORDER BY br.created_at DESC`,

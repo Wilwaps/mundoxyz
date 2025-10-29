@@ -105,7 +105,7 @@ router.get('/history', verifyToken, async (req, res) => {
           bp.coins_spent,
           bp.is_winner,
           CASE WHEN br.winner_id = $1 THEN true ELSE false END as won
-        FROM bingo_players bp
+        FROM bingo_room_players bp
         JOIN bingo_rooms br ON br.id = bp.room_id
         WHERE bp.user_id = $1 AND br.status = 'finished'
         ORDER BY br.ends_at DESC
@@ -268,7 +268,7 @@ router.get('/active', async (req, res) => {
           COUNT(bp.id) as current_players,
           u.username as host_username
         FROM bingo_rooms br
-        LEFT JOIN bingo_players bp ON bp.room_id = br.id AND bp.status != 'left'
+        LEFT JOIN bingo_room_players bp ON bp.room_id = br.id AND bp.status != 'left'
         JOIN users u ON u.id = br.host_id
         WHERE br.status IN ('waiting', 'ready') 
           AND br.visibility = 'public'
