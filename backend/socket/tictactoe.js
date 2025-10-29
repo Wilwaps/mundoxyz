@@ -18,6 +18,9 @@ function initTicTacToeSocket(io, socket) {
     if (roomCode && userId) {
       socket.join(`tictactoe:${roomCode}`);
       
+      // Verificar si es reconexión o primera conexión
+      const isReconnection = await isPlayerReconnecting(roomCode, userId, role);
+      
       // Registrar conexión
       await registerConnection(roomCode, userId, role);
       
@@ -25,15 +28,18 @@ function initTicTacToeSocket(io, socket) {
         socketId: socket.id, 
         roomCode,
         userId,
-        role
+        role,
+        isReconnection
       });
       
-      // Notificar reconexión si es necesario
-      io.to(`tictactoe:${roomCode}`).emit('room:player-reconnected', {
-        roomCode,
-        userId,
-        role
-      });
+      // Notificar reconexión SOLO si realmente es una reconexión
+      if (isReconnection) {
+        io.to(`tictactoe:${roomCode}`).emit('room:player-reconnected', {
+          roomCode,
+          userId,
+          role
+        });
+      }
     }
   });
   
@@ -148,6 +154,21 @@ function initTicTacToeSocket(io, socket) {
  */
 function emitToRoom(io, roomCode, event, data) {
   io.to(`tictactoe:${roomCode}`).emit(event, data);
+}
+
+/**
+ * Verificar si un jugador está reconectándose
+ */
+async function isPlayerReconnecting(roomCode, userId, role) {
+  if (!roomConnections.has(roomCode)) {
+    return false;
+  }
+  
+  const connections = roomConnections.get(roomCode);
+  const key = role === 'X' ? 'playerX' : 'playerO';
+  
+  // Es reconexión si ya existía una entrada para este jugador
+  return connections[key]?.userId === userId && connections[key]?.connected === false;
 }
 
 /**
@@ -363,5 +384,6 @@ module.exports = {
   emitToRoom,
   handleDisconnect,
   registerConnection,
-  markDisconnected
+  markDisconnected,
+  isPlayerReconnecting
 };

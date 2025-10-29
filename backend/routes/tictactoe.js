@@ -679,8 +679,9 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           `INSERT INTO tictactoe_rooms 
            (id, code, host_id, mode, bet_amount, visibility, 
             player_x_id, player_o_id, status, current_turn,
-            pot_coins, pot_fires, rematch_count, is_rematch, original_room_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'playing', $13, $9, $10, $11, TRUE, $12)
+            pot_coins, pot_fires, rematch_count, is_rematch, original_room_id,
+            player_x_ready, player_o_ready, last_move_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'playing', $13, $9, $10, $11, TRUE, $12, TRUE, TRUE, NOW())
            RETURNING *`,
           [
             uuidv4(),
