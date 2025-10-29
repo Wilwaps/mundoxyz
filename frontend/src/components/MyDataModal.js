@@ -48,9 +48,9 @@ const MyDataModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // Initialize form data with user data
+  // Initialize form data with user data - SOLO cuando el modal se abre
   useEffect(() => {
-    if (user && isOpen) {
+    if (isOpen && user) {
       setFormData({
         display_name: user.display_name || '',
         nickname: user.nickname || '',
@@ -59,7 +59,7 @@ const MyDataModal = ({ isOpen, onClose }) => {
       });
       setHasChanges(false);
     }
-  }, [user, isOpen]);
+  }, [isOpen]); // ✅ Solo cuando isOpen cambia, NO cuando user cambia
 
   const handleChange = (e) => {
     const { name, value } = e.target;
