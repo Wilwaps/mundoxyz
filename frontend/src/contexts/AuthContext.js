@@ -48,10 +48,18 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Excluir endpoints de contraseña del logout automático
+      const url = error.config?.url || '';
+      const isPasswordEndpoint = url.includes('/check-password') || 
+                                  url.includes('/change-password');
+      
+      // Solo hacer logout si NO es un endpoint de contraseña
+      if (!isPasswordEndpoint) {
+        // Token expired or invalid
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
