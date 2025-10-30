@@ -812,9 +812,43 @@ router.post('/clear-my-room', verifyToken, async (req, res) => {
       });
     }
     
-    // Si no es host o la sala no está en lobby, solo remover al usuario
-    await BingoRefundService.refundPlayer(room.id, req.user.id);
+    // Si no es host o la sala no está en lobby, reembolsar manualmente y remover
+    // Obtener cuánto gastó el usuario
+    const spentResult = await query(`
+      SELECT SUM(amount) as total_spent
+      FROM bingo_transactions
+      WHERE room_id = $1 AND user_id = $2
+      AND type IN ('room_creation', 'card_purchase')
+    `, [room.id, req.user.id]);
     
+    const totalSpent = parseFloat(spentResult.rows[0]?.total_spent || 0);
+    
+    if (totalSpent > 0) {
+      // Obtener moneda de la sala
+      const roomInfoResult = await query(`
+        SELECT currency FROM bingo_rooms WHERE id = $1
+      `, [room.id]);
+      
+      const currency = roomInfoResult.rows[0].currency;
+      
+      // Devolver dinero
+      await query(`
+        UPDATE wallets
+        SET ${currency}_balance = ${currency}_balance + $1
+        WHERE user_id = $2
+      `, [totalSpent, req.user.id]);
+      
+      // Registrar transacción
+      await query(`
+        INSERT INTO bingo_transactions (
+          room_id, user_id, type, amount, currency, description
+        ) VALUES ($1, $2, 'refund', $3, $4, $5)
+      `, [room.id, req.user.id, totalSpent, currency, 'Reembolso por limpiar sala']);
+      
+      logger.info(`Reembolsado ${totalSpent} ${currency} a usuario ${req.user.username}`);
+    }
+    
+    // Remover de la sala
     await query(`
       DELETE FROM bingo_room_players 
       WHERE room_id = $1 AND user_id = $2
