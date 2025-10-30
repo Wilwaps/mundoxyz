@@ -482,14 +482,19 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
     `, [room.id, req.user.id]);
     
     // Formatear cartones
-    const userCards = myCardsResult.rows.map(card => ({
-      id: card.id,
-      card_number: card.card_number,
-      numbers: typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers,
-      marked_numbers: card.marked_numbers ? 
-        (typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers) : 
-        []
-    }));
+    const userCards = myCardsResult.rows.map(card => {
+      const numbersObj = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+      
+      return {
+        id: card.id,
+        card_number: card.card_number,
+        numbers: numbersObj.allNumbers || numbersObj, // Usar allNumbers si existe, sino el objeto completo
+        numbersGrid: numbersObj.grid || null, // Grid completo disponible si se necesita
+        marked_numbers: card.marked_numbers ? 
+          (typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers) : 
+          []
+      };
+    });
     
     // Números cantados
     const drawnNumbersResult = await query(`
