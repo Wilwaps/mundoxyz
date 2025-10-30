@@ -305,6 +305,15 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
                 </button>
               )}
 
+              {/* Mensaje para host esperando jugadores */}
+              {isHost && !allPlayersReady && room?.players?.length > 0 && (
+                <div className="text-center py-3 px-4 bg-yellow-600/20 rounded-lg">
+                  <span className="text-yellow-400 font-semibold text-sm">
+                    ⏳ Esperando que todos estén listos ({room.players.filter(p => p.is_ready).length}/{room.players.length})
+                  </span>
+                </div>
+              )}
+
               {/* Estado de listo */}
               {amIReady && (
                 <div className="text-center py-2 px-4 bg-green-600/20 rounded-lg">

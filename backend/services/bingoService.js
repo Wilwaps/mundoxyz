@@ -68,11 +68,11 @@ class BingoService {
 
       const room = roomResult.rows[0];
 
-      // Registrar al host como jugador
+      // Registrar al host como jugador (marcado como listo automáticamente)
       await client.query(
         `INSERT INTO bingo_room_players (
-          room_id, user_id, is_host, cards_owned
-        ) VALUES ($1, $2, true, 1)`,
+          room_id, user_id, is_host, cards_owned, ready_at
+        ) VALUES ($1, $2, true, 1, CURRENT_TIMESTAMP)`,
         [room.id, hostId]
       );
 
