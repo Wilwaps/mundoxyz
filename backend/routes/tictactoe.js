@@ -82,7 +82,7 @@ router.post('/create', verifyToken, async (req, res) => {
         [betAmount, userId]
       );
       
-      // Registrar transacción
+      // Registrar transacción (amount negativo para apuestas)
       await client.query(
         `INSERT INTO wallet_transactions 
          (wallet_id, type, currency, amount, balance_before, balance_after, description)
@@ -91,7 +91,7 @@ router.post('/create', verifyToken, async (req, res) => {
            'game_bet', $2, $3, $4, $5,
            'Apuesta La Vieja'
          )`,
-        [userId, mode, betAmount, balance, balance - betAmount]
+        [userId, mode, -betAmount, balance, balance - betAmount]
       );
       
       // Cerrar salas anteriores del usuario
@@ -230,8 +230,8 @@ router.post('/join/:code', verifyToken, async (req, res) => {
          WHERE user_id = $2`,
         [betAmount, userId]
       );
-      
-      // Registrar transacción
+
+      // Registrar transacción (amount negativo para apuestas)
       await client.query(
         `INSERT INTO wallet_transactions 
          (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
@@ -241,9 +241,9 @@ router.post('/join/:code', verifyToken, async (req, res) => {
            'Apuesta La Vieja - Unirse',
            $6
          )`,
-        [userId, room.mode, betAmount, balance, balance - betAmount, code]
+        [userId, room.mode, -betAmount, balance, balance - betAmount, code]
       );
-      
+
       // Actualizar sala: agregar jugador O y pot, marcar como ready
       await client.query(
         `UPDATE tictactoe_rooms 
@@ -725,7 +725,7 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
                'Revancha La Vieja #' || $6,
                $7
              )`,
-            [playerId, currency, betAmount, balance, balance - betAmount, newRematchCount, code]
+            [playerId, currency, -betAmount, balance, balance - betAmount, newRematchCount, code]
           );
         }
         
