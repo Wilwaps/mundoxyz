@@ -170,8 +170,24 @@ const TicTacToeRoom = () => {
     },
     onSuccess: (data) => {
       if (data.rematchAccepted) {
-        toast.success(`¡Revancha aceptada! Sala: ${data.newRoomCode}`);
-        navigate(`/tictactoe/room/${data.newRoomCode}`);
+        // Nueva lógica: misma sala, solo refrescar estado
+        if (data.sameRoom) {
+          toast.success(`¡Revancha aceptada! Reiniciando partida...`);
+          // Actualizar balance
+          refreshUser();
+          // Resetear estados locales (el useEffect con [code] no se ejecutará porque code no cambia)
+          setRematchRequested({ byMe: false, byOpponent: false });
+          setGameOver(false);
+          setShowGameOverModal(false);
+          setBoard([[null, null, null], [null, null, null], [null, null, null]]);
+          setTimeLeft(15);
+          // Refrescar datos de la sala desde el servidor
+          refetchRoom();
+        } else {
+          // Fallback por si acaso (no debería pasar con nueva lógica)
+          toast.success(`¡Revancha aceptada! Sala: ${data.roomCode}`);
+          navigate(`/tictactoe/room/${data.roomCode}`);
+        }
       } else {
         setRematchRequested(prev => ({ ...prev, byMe: true }));
         toast.success('Revancha solicitada. Esperando al oponente...');
@@ -304,12 +320,29 @@ const TicTacToeRoom = () => {
     
     const handleRematchAccepted = (data) => {
       if (data.roomCode === code) {
-        toast.success(`¡Revancha aceptada! Redirigiendo a nueva sala...`);
-        // Actualizar balance antes de navegar
-        refreshUser();
-        setTimeout(() => {
-          navigate(`/tictactoe/room/${data.newRoomCode}`);
-        }, 1000);
+        // Nueva lógica: misma sala, solo refrescar
+        if (data.sameRoom) {
+          toast.success(`¡Revancha aceptada! Nueva partida iniciando...`);
+          // Actualizar balance
+          refreshUser();
+          // Resetear estados locales
+          setRematchRequested({ byMe: false, byOpponent: false });
+          setGameOver(false);
+          setShowGameOverModal(false);
+          setBoard([[null, null, null], [null, null, null], [null, null, null]]);
+          setTimeLeft(15);
+          // Refrescar sala
+          setTimeout(() => {
+            refetchRoom();
+          }, 500);
+        } else {
+          // Fallback (código viejo, no debería ejecutarse)
+          toast.success(`¡Revancha aceptada! Redirigiendo a nueva sala...`);
+          refreshUser();
+          setTimeout(() => {
+            navigate(`/tictactoe/room/${data.newRoomCode}`);
+          }, 1000);
+        }
       }
     };
     

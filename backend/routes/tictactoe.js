@@ -681,45 +681,16 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
       const updatedRoom = updatedResult.rows[0];
       
       if (updatedRoom.rematch_requested_by_x && updatedRoom.rematch_requested_by_o) {
-        // Crear nueva sala de revancha
-        const newCode = generateRoomCode();
+        // Reutilizar la misma sala para revancha
         const newRematchCount = updatedRoom.rematch_count + 1;
-        const originalRoomId = updatedRoom.is_rematch ? updatedRoom.original_room_id : updatedRoom.id;
         
         // Alternar turno inicial: en revanchas impares empieza O, en pares empieza X
         const initialTurn = newRematchCount % 2 === 0 ? 'X' : 'O';
         
-        const newRoomResult = await client.query(
-          `INSERT INTO tictactoe_rooms 
-           (id, code, host_id, mode, bet_amount, visibility, 
-            player_x_id, player_o_id, status, current_turn,
-            pot_coins, pot_fires, rematch_count, is_rematch, original_room_id,
-            player_x_ready, player_o_ready, last_move_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'playing', $13, $9, $10, $11, TRUE, $12, TRUE, TRUE, NOW())
-           RETURNING *`,
-          [
-            uuidv4(),
-            newCode,
-            updatedRoom.host_id,
-            updatedRoom.mode,
-            updatedRoom.bet_amount,
-            updatedRoom.visibility,
-            updatedRoom.player_x_id,
-            updatedRoom.player_o_id,
-            updatedRoom.mode === 'coins' ? updatedRoom.bet_amount * 2 : 0,
-            updatedRoom.mode === 'fires' ? updatedRoom.bet_amount * 2 : 0,
-            newRematchCount,
-            originalRoomId,
-            initialTurn
-          ]
-        );
-        
-        const newRoom = newRoomResult.rows[0];
-        
         // Deducir apuestas de ambos jugadores
-        for (const playerId of [newRoom.player_x_id, newRoom.player_o_id]) {
-          const betAmount = parseFloat(newRoom.bet_amount);
-          const currency = newRoom.mode;
+        for (const playerId of [updatedRoom.player_x_id, updatedRoom.player_o_id]) {
+          const betAmount = parseFloat(updatedRoom.bet_amount);
+          const currency = updatedRoom.mode;
           
           const walletResult = await client.query(
             'SELECT fires_balance, coins_balance FROM wallets WHERE user_id = $1',
@@ -754,38 +725,61 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
                'Revancha La Vieja #' || $6,
                $7
              )`,
-            [playerId, currency, betAmount, balance, balance - betAmount, newRematchCount, newCode]
+            [playerId, currency, betAmount, balance, balance - betAmount, newRematchCount, code]
           );
         }
         
-        logger.info('Tictactoe rematch created', { 
-          oldRoomId: room.id,
-          newRoomId: newRoom.id,
-          newCode,
+        // Actualizar pot con las nuevas apuestas
+        const newPotCoins = updatedRoom.mode === 'coins' 
+          ? parseFloat(updatedRoom.pot_coins) + (parseFloat(updatedRoom.bet_amount) * 2)
+          : parseFloat(updatedRoom.pot_coins);
+        const newPotFires = updatedRoom.mode === 'fires'
+          ? parseFloat(updatedRoom.pot_fires) + (parseFloat(updatedRoom.bet_amount) * 2)
+          : parseFloat(updatedRoom.pot_fires);
+        
+        // Resetear sala para nueva partida (misma sala, nuevo juego)
+        await client.query(
+          `UPDATE tictactoe_rooms 
+           SET status = 'playing',
+               current_turn = $1,
+               board = '[[null,null,null],[null,null,null],[null,null,null]]',
+               winner_id = NULL,
+               ended_at = NULL,
+               rematch_requested_by_x = FALSE,
+               rematch_requested_by_o = FALSE,
+               rematch_count = $2,
+               pot_coins = $3,
+               pot_fires = $4,
+               last_move_at = NOW(),
+               updated_at = NOW()
+           WHERE id = $5`,
+          [initialTurn, newRematchCount, newPotCoins, newPotFires, updatedRoom.id]
+        );
+        
+        logger.info('Tictactoe rematch started (same room)', { 
+          roomId: room.id,
+          roomCode: code,
+          rematchCount: newRematchCount,
+          initialTurn,
+          newPotCoins,
+          newPotFires
+        });
+        
+        // Emitir evento de revancha aceptada (sin cambio de sala)
+        const io = req.app.get('io');
+        io.to(`tictactoe:${code}`).emit('room:rematch-accepted', {
+          roomCode: code,
+          sameRoom: true, // Flag para indicar que es la misma sala
           rematchCount: newRematchCount,
           initialTurn
         });
         
-        // Emitir evento de socket para que ambos jugadores vayan a la nueva sala
-        const io = req.app.get('io');
-        io.to(`tictactoe:${code}`).emit('room:rematch-accepted', {
-          roomCode: code,
-          newRoomCode: newCode,
-          rematchCount: newRematchCount
-        });
-        
-        // Emitir evento de game-started para la nueva sala (después que lleguen)
-        setTimeout(() => {
-          io.to(`tictactoe:${newCode}`).emit('room:game-started', {
-            roomCode: newCode,
-            initialTurn
-          });
-        }, 2000);
-        
         return {
           rematchAccepted: true,
-          newRoomCode: newCode,
-          rematchCount: newRematchCount
+          sameRoom: true,
+          roomCode: code,
+          rematchCount: newRematchCount,
+          initialTurn
         };
       }
       
