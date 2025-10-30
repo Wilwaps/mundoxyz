@@ -215,23 +215,29 @@ CREATE INDEX idx_bingo_audit_created ON bingo_audit_logs(created_at DESC);
 
 -- 5. FUNCIÓN PARA GENERAR CÓDIGO ÚNICO
 -- ============================================
+-- CORREGIDO: Usar new_code para evitar ambigüedad con columna bingo_rooms.code
 CREATE OR REPLACE FUNCTION generate_unique_bingo_room_code()
 RETURNS VARCHAR(6) AS $$
 DECLARE
     chars VARCHAR := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    code VARCHAR(6) := '';
+    new_code VARCHAR(6) := '';
     i INTEGER;
     max_attempts INTEGER := 100;
     attempt_count INTEGER := 0;
+    room_exists BOOLEAN;
 BEGIN
     LOOP
-        code := '';
+        new_code := '';
         FOR i IN 1..6 LOOP
-            code := code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
+            new_code := new_code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
         END LOOP;
         
-        IF NOT EXISTS (SELECT 1 FROM bingo_rooms WHERE bingo_rooms.code = code) THEN
-            RETURN code;
+        SELECT EXISTS(
+            SELECT 1 FROM bingo_rooms WHERE code = new_code
+        ) INTO room_exists;
+        
+        IF NOT room_exists THEN
+            RETURN new_code;
         END IF;
         
         attempt_count := attempt_count + 1;
