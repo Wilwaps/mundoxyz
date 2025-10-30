@@ -1103,9 +1103,140 @@ class BingoService {
    * Validar patrón ganador en el servidor
    */
   static async validateWinningPattern(card, markedNumbers, victoryMode, client) {
-    // Implementación completa de validación server-side
-    // Esto es crítico para evitar trampas
-    return true; // Por ahora
+    try {
+      // Parsear números del cartón
+      const numbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+      const marked = typeof markedNumbers === 'string' ? JSON.parse(markedNumbers) : (markedNumbers || []);
+      
+      // Obtener grid del cartón
+      let grid;
+      if (numbers.grid) {
+        grid = numbers.grid;
+      } else if (Array.isArray(numbers)) {
+        // Si es array plano, construir grid 5x5 (modo 75)
+        grid = [];
+        for (let col = 0; col < 5; col++) {
+          grid[col] = [];
+          for (let row = 0; row < 5; row++) {
+            const index = col * 5 + row;
+            grid[col][row] = numbers[index];
+          }
+        }
+      } else {
+        logger.error('Formato de números del cartón inválido', numbers);
+        return false;
+      }
+      
+      // Función helper para verificar si un número está marcado
+      const isMarked = (num) => {
+        if (num === 'FREE' || num === null) return true; // FREE siempre cuenta como marcado
+        if (typeof num === 'object' && num !== null) {
+          num = num.value;
+        }
+        return marked.includes(num) || marked.includes('FREE');
+      };
+      
+      // Validar según modo de victoria
+      switch (victoryMode.toLowerCase()) {
+        case 'linea':
+        case 'línea':
+        case 'line':
+          // Verificar filas (horizontal)
+          for (let row = 0; row < 5; row++) {
+            let rowComplete = true;
+            for (let col = 0; col < 5; col++) {
+              const cell = grid[col][row];
+              const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+              if (!isMarked(num)) {
+                rowComplete = false;
+                break;
+              }
+            }
+            if (rowComplete) return true;
+          }
+          
+          // Verificar columnas (vertical)
+          for (let col = 0; col < 5; col++) {
+            let colComplete = true;
+            for (let row = 0; row < 5; row++) {
+              const cell = grid[col][row];
+              const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+              if (!isMarked(num)) {
+                colComplete = false;
+                break;
+              }
+            }
+            if (colComplete) return true;
+          }
+          
+          // Verificar diagonal principal (top-left a bottom-right)
+          let diag1Complete = true;
+          for (let i = 0; i < 5; i++) {
+            const cell = grid[i][i];
+            const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+            if (!isMarked(num)) {
+              diag1Complete = false;
+              break;
+            }
+          }
+          if (diag1Complete) return true;
+          
+          // Verificar diagonal secundaria (top-right a bottom-left)
+          let diag2Complete = true;
+          for (let i = 0; i < 5; i++) {
+            const cell = grid[i][4 - i];
+            const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+            if (!isMarked(num)) {
+              diag2Complete = false;
+              break;
+            }
+          }
+          if (diag2Complete) return true;
+          
+          return false;
+          
+        case 'esquinas':
+        case 'corners':
+          // Verificar las 4 esquinas
+          const corners = [
+            grid[0][0],  // Top-left
+            grid[4][0],  // Top-right
+            grid[0][4],  // Bottom-left
+            grid[4][4]   // Bottom-right
+          ];
+          
+          for (const cell of corners) {
+            const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+            if (!isMarked(num)) {
+              return false;
+            }
+          }
+          return true;
+          
+        case 'completo':
+        case 'full':
+        case 'blackout':
+          // Verificar que todo el cartón esté marcado
+          for (let col = 0; col < 5; col++) {
+            for (let row = 0; row < 5; row++) {
+              const cell = grid[col][row];
+              const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+              if (!isMarked(num)) {
+                return false;
+              }
+            }
+          }
+          return true;
+          
+        default:
+          logger.error('Modo de victoria desconocido:', victoryMode);
+          return false;
+      }
+      
+    } catch (error) {
+      logger.error('Error validando patrón ganador:', error);
+      return false;
+    }
   }
 
   /**

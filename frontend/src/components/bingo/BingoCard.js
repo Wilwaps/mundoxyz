@@ -82,7 +82,13 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                   className={`aspect-square ${getCellClass(isFreeSpace ? 'FREE' : number)}`}
-                  onClick={() => !isFreeSpace && number && onNumberClick(number)}
+                  onClick={() => {
+                    if (isFreeSpace) {
+                      onNumberClick('FREE');
+                    } else if (number) {
+                      onNumberClick(number);
+                    }
+                  }}
                 >
                   {isFreeSpace ? (
                     <span className="text-xs">FREE</span>
