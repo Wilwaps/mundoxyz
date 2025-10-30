@@ -181,8 +181,8 @@ await client.query(
 3. Termina en empate
 4. **Verificar historial ambos usuarios**:
    - Transacción 1: game_bet → -1.0 Fire ✅
-   - Transacción 2: game_refund → +0.5 Fire ✅
-   - Balance final: -0.5 Fire neto (perdieron 50% cada uno) ✅
+   - Transacción 2: game_refund → +1.0 Fire ✅
+   - Balance final: 0.0 Fire neto (recuperaron su apuesta completa, sin comisión) ✅
 
 ### **Test 4: Múltiples Revanchas**
 1. Jugar 5 revanchas consecutivas
