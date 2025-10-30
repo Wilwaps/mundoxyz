@@ -3,6 +3,61 @@ const logger = require('../utils/logger');
 const BingoCardGenerator = require('../utils/bingoCardGenerator');
 
 class BingoService {
+  static async updateRoomActivity(roomId, dbClient = null) {
+    try {
+      const runQuery = dbClient
+        ? (text, params) => dbClient.query(text, params)
+        : query;
+
+      await runQuery(
+        `UPDATE bingo_rooms 
+         SET last_activity = NOW() 
+         WHERE id = $1`,
+        [roomId]
+      );
+    } catch (error) {
+      logger.error('Error actualizando last_activity de sala:', { roomId, error });
+    }
+  }
+
+  static async detectAndRefundInactiveRooms(roomId, dbClient = null) {
+    try {
+      const runQuery = dbClient
+        ? (text, params) => dbClient.query(text, params)
+        : query;
+
+      const result = await runQuery(
+        `SELECT status, host_id FROM bingo_rooms WHERE id = $1`,
+        [roomId]
+      );
+
+      if (!result.rows.length) {
+        return;
+      }
+
+      const room = result.rows[0];
+
+      if (room.status === 'lobby') {
+        const readyStats = await runQuery(
+          `SELECT 
+             COUNT(*)::int AS total_players,
+             COUNT(ready_at)::int AS ready_players
+           FROM bingo_room_players
+           WHERE room_id = $1`,
+          [roomId]
+        );
+
+        const { total_players, ready_players } = readyStats.rows[0];
+
+        if (total_players === 1 && ready_players === 0) {
+          await BingoRefundService.refundRoom(roomId, 'force_refund_single_player');
+        }
+      }
+    } catch (error) {
+      logger.error('Error evaluando refund automático:', { roomId, error });
+    }
+  }
+
   /**
    * Crea una nueva sala de bingo
    */
@@ -150,6 +205,8 @@ class BingoService {
       if (shouldCommit) {
         await client.query('COMMIT');
       }
+
+      await this.updateRoomActivity(room.id, client);
 
       logger.info('Sala de bingo creada', {
         roomId: room.id,
@@ -352,6 +409,8 @@ class BingoService {
 
       await client.query('COMMIT');
 
+      await this.updateRoomActivity(room.id, client);
+
       const totalCardsOwned = currentCards + numberOfCards;
 
       logger.info(isAlreadyInRoom ? 'Jugador compró cartones adicionales' : 'Jugador unido a sala de bingo', {
@@ -411,6 +470,8 @@ class BingoService {
         readyPlayers: ready
       });
 
+      await this.updateRoomActivity(roomId);
+
       return {
         success: true,
         allReady: total === ready,
@@ -464,10 +525,12 @@ class BingoService {
       // Cambiar estado a jugando
       await client.query(
         `UPDATE bingo_rooms 
-         SET status = 'playing', started_at = CURRENT_TIMESTAMP 
+         SET status = 'playing', started_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [roomId]
       );
+
+      await this.updateRoomActivity(roomId, client);
 
       await client.query('COMMIT');
 
@@ -489,7 +552,7 @@ class BingoService {
   }
 
   /**
-   * Cantar un número (solo host)
+   * Cantar un número (host o Admin/Tote en sala abandonada)
    */
   static async drawNumber(roomId, hostId) {
     const client = await getClient();
@@ -497,10 +560,12 @@ class BingoService {
     try {
       await client.query('BEGIN');
 
-      // Verificar que es el host y la partida está en curso
+      // Verificar que es el host o substitute_host y la partida está en curso
       const roomResult = await client.query(
         `SELECT * FROM bingo_rooms 
-         WHERE id = $1 AND host_id = $2 AND status = 'playing'`,
+         WHERE id = $1 
+         AND status = 'playing'
+         AND (host_id = $2 OR substitute_host_id = $2)`,
         [roomId, hostId]
       );
 
@@ -509,6 +574,22 @@ class BingoService {
       }
 
       const room = roomResult.rows[0];
+      
+      // Si es substitute_host, actualizar host_last_activity
+      if (room.substitute_host_id === hostId) {
+        await client.query(
+          `UPDATE bingo_rooms 
+           SET host_last_activity = NOW() 
+           WHERE id = $1`,
+          [roomId]
+        );
+        
+        logger.info('🎯 Admin/Tote cantando número en sala abandonada', {
+          roomId,
+          substituteHostId: hostId,
+          originalHostId: room.host_id
+        });
+      }
 
       // Obtener números ya cantados
       const drawnResult = await client.query(
@@ -554,6 +635,8 @@ class BingoService {
          AND numbers::jsonb @> $1::jsonb`,
         [JSON.stringify([drawnNumber]), roomId]
       );
+
+      await this.updateRoomActivity(roomId, client);
 
       await client.query('COMMIT');
 
@@ -632,6 +715,8 @@ class BingoService {
           [JSON.stringify(markedNumbers), cardId]
         );
       }
+
+      await this.updateRoomActivity(card.room_id, client);
 
       // Verificar si hay patrón ganador
       const hasWinningPattern = await this.checkWinningPattern(
@@ -750,6 +835,8 @@ class BingoService {
         );
       }
 
+      await this.updateRoomActivity(card.room_id, client);
+
       await client.query('COMMIT');
 
       logger.info('Bingo cantado', {
@@ -776,7 +863,9 @@ class BingoService {
   }
 
   /**
-   * Distribuir premios (70% ganador, 20% host, 10% plataforma)
+   * Distribuir premios
+   * Normal: 70% ganador, 20% host, 10% plataforma
+   * Host abandonado: 70% ganador, 0% host, 30% plataforma
    */
   static async distributePrizes(roomId, client) {
     try {
@@ -788,6 +877,7 @@ class BingoService {
 
       const room = roomResult.rows[0];
       const totalPot = parseFloat(room.pot_total);
+      const hostAbandoned = room.host_abandoned || false;
 
       // Obtener ganadores validados
       const winnersResult = await client.query(
@@ -804,10 +894,28 @@ class BingoService {
         throw new Error('No hay ganadores validados');
       }
 
-      // Calcular distribución
-      const winnerShare = totalPot * 0.7;
-      const hostShare = totalPot * 0.2;
-      const platformShare = totalPot * 0.1;
+      // Calcular distribución según si el host abandonó
+      let winnerShare, hostShare, platformShare;
+      
+      if (hostAbandoned) {
+        // Host abandonó: 70% ganador, 0% host, 30% plataforma
+        winnerShare = totalPot * 0.7;
+        hostShare = 0;
+        platformShare = totalPot * 0.3;
+        
+        logger.info('💰 Distribución ajustada por abandono de host', {
+          roomId,
+          totalPot,
+          winnerShare: '70%',
+          hostShare: '0%',
+          platformShare: '30%'
+        });
+      } else {
+        // Distribución normal: 70% ganador, 20% host, 10% plataforma
+        winnerShare = totalPot * 0.7;
+        hostShare = totalPot * 0.2;
+        platformShare = totalPot * 0.1;
+      }
 
       // Premio por ganador (se divide en caso de empate)
       const prizePerWinner = winnerShare / winners.length;
@@ -881,28 +989,38 @@ class BingoService {
         );
       }
 
-      // Pagar al host
-      await client.query(
-        `UPDATE wallets 
-         SET ${room.currency}_balance = ${room.currency}_balance + $1 
-         WHERE user_id = $2`,
-        [hostShare, room.host_id]
-      );
+      // Pagar al host (solo si NO abandonó)
+      if (!hostAbandoned && hostShare > 0) {
+        await client.query(
+          `UPDATE wallets 
+           SET ${room.currency}_balance = ${room.currency}_balance + $1 
+           WHERE user_id = $2`,
+          [hostShare, room.host_id]
+        );
 
-      // Transacción host
-      await client.query(
-        `INSERT INTO bingo_transactions (
-          room_id, user_id, type, amount, currency, description
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
+        // Transacción host
+        await client.query(
+          `INSERT INTO bingo_transactions (
+            room_id, user_id, type, amount, currency, description
+          ) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            roomId,
+            room.host_id,
+            'host_commission',
+            hostShare,
+            room.currency,
+            'Comisión por ser anfitrión'
+          ]
+        );
+        
+        logger.info(`💵 Comisión de host pagada: ${hostShare} ${room.currency}`);
+      } else if (hostAbandoned) {
+        logger.warn(`⚠️  Host abandonó sala - No recibe comisión`, {
           roomId,
-          room.host_id,
-          'host_commission',
-          hostShare,
-          room.currency,
-          'Comisión por ser anfitrión'
-        ]
-      );
+          hostId: room.host_id,
+          forfeitedAmount: totalPot * 0.2
+        });
+      }
 
       // Pagar a la plataforma (usuario con tg_id = 1417856820)
       const platformUserResult = await client.query(
@@ -994,21 +1112,12 @@ class BingoService {
   /**
    * Obtener detalles completos de una sala
    */
-  static async getRoomDetails(roomCode) {
-    const { query } = require('../db');
-    
+  static async getRoomDetails(roomCode, client) {
     try {
       // Información de la sala
-      const roomResult = await query(`
+      const roomResult = await client.query(`
         SELECT 
-          r.id,
-          r.code,
-          r.host_id,
-          r.room_name,
-          r.room_type,
-          r.currency,
-          r.numbers_mode,
-          r.victory_mode,
+          r.*, u.username as host_name
           r.card_cost,
           r.max_players,
           r.max_cards_per_player,

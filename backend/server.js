@@ -290,6 +290,10 @@ async function startServer() {
           // Iniciar jobs de cleanup periódico
           const BingoCleanupJob = require('./jobs/bingoCleanup');
           BingoCleanupJob.start();
+          
+          // Iniciar job de detección de abandono de host
+          const BingoAbandonmentJob = require('./jobs/bingoAbandonmentJob');
+          BingoAbandonmentJob.start();
         } catch (bingoError) {
           logger.warn('⚠️  Bingo recovery system failed to start:', bingoError.message);
           logger.info('Server will continue without Bingo recovery features');
