@@ -1,23 +1,20 @@
 -- FIX PARA AMBIGÜEDAD DE COLUMNA CODE
 -- Actualizar la función generate_unique_bingo_room_code para evitar ambigüedad
+-- Genera códigos de 6 dígitos numéricos (000000-999999) para facilitar acceso
 
 DROP FUNCTION IF EXISTS generate_unique_bingo_room_code();
 
 CREATE OR REPLACE FUNCTION generate_unique_bingo_room_code()
 RETURNS VARCHAR(6) AS $$
 DECLARE
-    chars VARCHAR := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    new_code VARCHAR(6) := '';
-    i INTEGER;
+    new_code VARCHAR(6);
     max_attempts INTEGER := 100;
     attempt_count INTEGER := 0;
     room_exists BOOLEAN;
 BEGIN
     LOOP
-        new_code := '';
-        FOR i IN 1..6 LOOP
-            new_code := new_code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
-        END LOOP;
+        -- Generar código de 6 dígitos (000000 a 999999)
+        new_code := LPAD(floor(random() * 1000000)::text, 6, '0');
         
         -- Verificar si el código ya existe
         -- Sin ambigüedad: new_code es variable local, code es columna de tabla
