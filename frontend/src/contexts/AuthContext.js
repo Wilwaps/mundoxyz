@@ -47,6 +47,14 @@ axios.interceptors.request.use(
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Manejar error 429 (rate limit) - NO hacer logout
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers['retry-after'] || 5;
+      console.warn(`Rate limit alcanzado. Reintentando en ${retryAfter}s...`);
+      // No redirigir ni limpiar sesión
+      return Promise.reject(error);
+    }
+    
     if (error.response?.status === 401) {
       // Excluir endpoints de contraseña del logout automático
       const url = error.config?.url || '';
@@ -102,8 +110,15 @@ export const AuthProvider = ({ children }) => {
           });
         } catch (error) {
           console.error('Session validation failed:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          // Solo limpiar sesión si es error de autenticación (401/403)
+          // NO limpiar en error 429 (rate limit) o errores de red
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          } else if (error.response?.status === 429) {
+            console.warn('Rate limit alcanzado, sesión válida pero temporalmente bloqueada');
+            // Mantener token y user, solo loggear el warning
+          }
         }
       }
       

@@ -54,7 +54,7 @@ const TicTacToeRoom = () => {
       const response = await axios.get(`/api/tictactoe/room/${code}`);
       return response.data.room;
     },
-    refetchInterval: 2000, // Poll every 2 seconds
+    refetchInterval: 5000, // Poll every 5 seconds (reducido de 2s para evitar rate limiting)
   });
   
   // Handle room data updates (replacement for onSuccess in v5)
