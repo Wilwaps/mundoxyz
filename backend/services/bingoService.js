@@ -187,10 +187,10 @@ class BingoService {
     try {
       await client.query('BEGIN');
 
-      // Obtener sala (permitir compra solo en waiting o ready)
+      // Obtener sala (permitir compra solo en lobby, waiting o ready)
       const roomResult = await client.query(
         `SELECT * FROM bingo_rooms 
-         WHERE bingo_rooms.code = $1 AND status IN ('waiting', 'ready')`,
+         WHERE bingo_rooms.code = $1 AND status IN ('lobby', 'waiting', 'ready')`,
         [roomCode]
       );
 
