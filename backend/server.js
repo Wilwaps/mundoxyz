@@ -281,6 +281,14 @@ async function startServer() {
         await initDatabase();
         dbReady = true;
         logger.info('✅ Database connected');
+        
+        // Inicializar sistema de recuperación de Bingo
+        const { initializeBingoRecovery } = require('./utils/bingo-recovery');
+        await initializeBingoRecovery();
+        
+        // Iniciar jobs de cleanup periódico
+        const BingoCleanupJob = require('./jobs/bingoCleanup');
+        BingoCleanupJob.start();
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }
