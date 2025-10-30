@@ -158,9 +158,21 @@ const BingoRoom = () => {
   }, [code, socket, isAutoDrawing]);
 
   // Cantar número manual (solo host)
-  const drawNumber = useCallback(() => {
-    socket.emit('bingo:draw_number', { code });
-  }, [code, socket]);
+  const drawNumber = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(`/api/bingo/rooms/${code}/draw`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`¡Número ${data.drawnNumber} cantado!`);
+      setDrawnNumbers(prev => [...prev, data.drawnNumber]);
+      setLastNumber(data.drawnNumber);
+      queryClient.invalidateQueries(['bingo-room', code]);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al cantar número');
+    }
+  });
 
   // Marcar jugador listo
   const markReady = useMutation({
@@ -193,7 +205,7 @@ const BingoRoom = () => {
   });
 
   const isHost = room?.host_id === user?.id;
-  const myCards = room?.cards?.filter(card => card.player_id === user?.id) || [];
+  const myCards = room?.user_cards || room?.myCards || room?.cards || [];
   const players = room?.players || [];
   const currentPlayer = players.find(p => p.user_id === user?.id);
 
@@ -266,22 +278,30 @@ const BingoRoom = () => {
             {isHost && gameStatus === 'playing' && (
               <div className="flex gap-2">
                 <button
-                  onClick={drawNumber}
+                  onClick={() => drawNumber.mutate()}
+                  disabled={drawNumber.isPending}
                   className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 
                            text-white rounded-lg font-semibold hover:shadow-lg 
-                           hover:shadow-yellow-500/25 transition-all flex items-center gap-2"
+                           hover:shadow-yellow-500/25 transition-all flex items-center gap-2
+                           disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <FaPlay /> Cantar Número
+                  <FaPlay /> {drawNumber.isPending ? 'Cantando...' : 'Cantar Número'}
                 </button>
                 <button
-                  onClick={toggleAutoDraw}
+                  onClick={user?.experience >= 400 ? toggleAutoDraw : null}
+                  disabled={user?.experience < 400}
+                  title={user?.experience < 400 ? 'Se activa con 400 puntos de experiencia' : ''}
                   className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2
-                            ${isAutoDrawing 
-                              ? 'bg-red-600 text-white hover:bg-red-700' 
-                              : 'bg-green-600 text-white hover:bg-green-700'}`}
+                            ${user?.experience < 400 
+                              ? 'bg-gray-600 text-white/50 cursor-not-allowed' 
+                              : isAutoDrawing 
+                                ? 'bg-red-600 text-white hover:bg-red-700' 
+                                : 'bg-green-600 text-white hover:bg-green-700'}`}
                 >
                   {isAutoDrawing ? <FaStop /> : <FaRobot />}
-                  {isAutoDrawing ? 'Detener Auto' : 'Auto-Draw'}
+                  {user?.experience < 400 
+                    ? 'Se activa con 400 XP' 
+                    : isAutoDrawing ? 'Detener Auto' : 'Auto-Cantar'}
                 </button>
               </div>
             )}
@@ -290,16 +310,9 @@ const BingoRoom = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda - Tablero de números */}
-          <div className="lg:col-span-1">
-            <NumberBoard 
-              drawnNumbers={drawnNumbers}
-              lastNumber={lastNumber}
-              mode={room.numbers_mode || 75}
-              isAutoDrawing={isAutoDrawing}
-            />
-
+        <div className="grid grid-cols-1 gap-6">
+          {/* Información de la sala */}
+          <div className="lg:max-w-xs">
             {/* Información de la sala */}
             <div className="glass-effect p-4 rounded-xl mt-6">
               <h3 className="text-lg font-bold text-white mb-3">Información</h3>
