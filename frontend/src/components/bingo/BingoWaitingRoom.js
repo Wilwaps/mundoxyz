@@ -20,18 +20,30 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
   
   // Usar propiedades del backend directamente
   const amIReady = room?.amIReady || false;
+  
+  // Debug logs
+  console.log('🎰 BingoWaitingRoom Debug:', {
+    status: room?.status,
+    amIReady,
+    myCardsLength: myCards.length,
+    showReadyButton: (room?.status === 'lobby' || room?.status === 'ready') && !amIReady && myCards.length > 0
+  });
 
   // Marcar jugador listo
   const markReady = useMutation({
     mutationFn: async () => {
+      console.log('🎯 Llamando a /ready para sala:', room.code);
       const response = await axios.post(`/api/bingo/rooms/${room.code}/ready`);
+      console.log('✅ Respuesta de /ready:', response.data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('🎉 Marcado como listo exitoso:', data);
       toast.success('¡Marcado como listo!');
       queryClient.invalidateQueries(['bingo-room', room.code]);
     },
     onError: (error) => {
+      console.error('❌ Error al marcar listo:', error);
       toast.error(error.response?.data?.error || 'Error al marcar listo');
     }
   });
@@ -272,11 +284,14 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
               {/* Marcar listo */}
               {(room?.status === 'lobby' || room?.status === 'ready') && !amIReady && myCards.length > 0 && (
                 <button
-                  onClick={() => markReady.mutate()}
+                  onClick={() => {
+                    console.log('🟢 Click en botón Estoy Listo');
+                    markReady.mutate();
+                  }}
                   disabled={markReady.isPending}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3 border-2 border-green-400/50"
                 >
-                  <FaCheck /> Estoy Listo
+                  <FaCheck className="text-2xl" /> {markReady.isPending ? 'Marcando...' : 'Estoy Listo'}
                 </button>
               )}
 
