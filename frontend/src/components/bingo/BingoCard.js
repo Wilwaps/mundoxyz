@@ -14,21 +14,21 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
   };
 
   const getCellClass = (number) => {
-    const base = "relative flex items-center justify-center text-lg font-bold rounded-lg transition-all cursor-pointer";
+    const base = "relative flex items-center justify-center text-sm sm:text-base md:text-lg font-bold rounded-lg transition-all cursor-pointer";
     
     if (number === 'FREE' || number === null) {
-      return `${base} bg-purple-600 text-white`;
+      return `${base} bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30`;
     }
     
     const isDrawn = isNumberDrawn(number);
     const isMarked = isNumberMarked(number);
     
     if (isMarked) {
-      return `${base} bg-green-500 text-white ring-2 ring-green-300`;
+      return `${base} bg-gradient-to-br from-green-500 to-emerald-600 text-white ring-2 ring-green-300 shadow-lg shadow-green-500/40 scale-95`;
     } else if (isDrawn) {
-      return `${base} bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 animate-pulse`;
+      return `${base} bg-gradient-to-br from-cyan-500/30 to-blue-600/30 text-cyan-300 ring-2 ring-cyan-400/50 hover:bg-cyan-500/40 animate-pulse shadow-lg shadow-cyan-500/30`;
     } else {
-      return `${base} bg-white/10 text-white/70 hover:bg-white/20`;
+      return `${base} bg-white/10 text-white/70 hover:bg-white/20 hover:scale-105`;
     }
   };
 
@@ -41,13 +41,13 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className={`glass-effect p-4 rounded-xl ${isWinner ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`}
+        className={`glass-effect p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl ${isWinner ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`}
       >
         {/* Header con número de cartón */}
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm text-white/60">Cartón #{card.card_number || card.id}</span>
+        <div className="flex justify-between items-center mb-2 sm:mb-3">
+          <span className="text-xs sm:text-sm text-white/60">Cartón #{card.card_number || card.id}</span>
           {isWinner && (
-            <span className="flex items-center gap-1 text-yellow-400">
+            <span className="flex items-center gap-1 text-yellow-400 text-xs sm:text-sm">
               <FaStar /> ¡GANADOR!
             </span>
           )}
@@ -56,14 +56,14 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
         {/* Columnas B-I-N-G-O */}
         <div className="grid grid-cols-5 gap-1 mb-1">
           {columns.map((letter) => (
-            <div key={letter} className="text-center font-bold text-2xl text-purple-400">
+            <div key={letter} className="text-center font-bold text-lg sm:text-xl md:text-2xl text-purple-400">
               {letter}
             </div>
           ))}
         </div>
 
         {/* Grid del cartón */}
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-5 gap-0.5 sm:gap-1">
           {grid.map((column, colIndex) => 
             column.map((number, rowIndex) => {
               const cellKey = `${colIndex}-${rowIndex}`;
@@ -112,20 +112,20 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className={`glass-effect p-4 rounded-xl ${isWinner ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`}
+        className={`glass-effect p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl ${isWinner ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`}
       >
         {/* Header con número de cartón */}
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm text-white/60">Cartón #{card.card_number || card.id}</span>
+        <div className="flex justify-between items-center mb-2 sm:mb-3">
+          <span className="text-xs sm:text-sm text-white/60">Cartón #{card.card_number || card.id}</span>
           {isWinner && (
-            <span className="flex items-center gap-1 text-yellow-400">
+            <span className="flex items-center gap-1 text-yellow-400 text-xs sm:text-sm">
               <FaStar /> ¡GANADOR!
             </span>
           )}
         </div>
 
         {/* Grid del cartón 9x3 */}
-        <div className="grid grid-cols-9 gap-1">
+        <div className="grid grid-cols-9 gap-0.5 sm:gap-1">
           {grid.map((row, rowIndex) => 
             row.map((number, colIndex) => {
               const cellKey = `${rowIndex}-${colIndex}`;
