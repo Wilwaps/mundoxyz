@@ -1,4 +1,4 @@
-const { query, getClient } = require('../config/database');
+const { query, getClient } = require('../db');
 const logger = require('../utils/logger');
 
 /**

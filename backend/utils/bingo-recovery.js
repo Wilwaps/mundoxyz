@@ -1,4 +1,4 @@
-const { query } = require('../config/database');
+const { query } = require('../db');
 const logger = require('./logger');
 const BingoRefundService = require('../services/bingoRefundService');
 
