@@ -7,7 +7,7 @@
 -- Agregar campos para manejo de abandono del host
 ALTER TABLE bingo_rooms
 ADD COLUMN IF NOT EXISTS host_abandoned BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS substitute_host_id UUID REFERENCES users(id),
+ADD COLUMN IF NOT EXISTS substitute_host_id UUID, -- Referencia a users(id) sin FK por ahora
 ADD COLUMN IF NOT EXISTS host_last_activity TIMESTAMP DEFAULT NOW(),
 ADD COLUMN IF NOT EXISTS abandonment_detected_at TIMESTAMP;
 
@@ -46,10 +46,11 @@ FOR EACH ROW
 EXECUTE FUNCTION update_bingo_host_activity();
 
 -- Tabla de notificaciones de abandono (para tracking)
+-- NOTA: Sin foreign key por incompatibilidad de tipos en producción
 CREATE TABLE IF NOT EXISTS bingo_abandonment_notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id INTEGER REFERENCES bingo_rooms(id) ON DELETE CASCADE,
-  notified_user_id UUID REFERENCES users(id),
+  room_id INTEGER, -- Referencia a bingo_rooms(id) sin FK por ahora
+  notified_user_id UUID, -- Referencia a users(id) sin FK por ahora
   notification_type VARCHAR(50) DEFAULT 'telegram',
   notification_status VARCHAR(20) DEFAULT 'pending', -- pending, sent, failed
   room_link TEXT,
