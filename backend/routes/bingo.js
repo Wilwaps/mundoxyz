@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const BingoService = require('../services/bingoService');
+const BingoRefundService = require('../services/bingoRefundService');
 const logger = require('../utils/logger');
 
 // ============================================
@@ -566,6 +567,25 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
     }
     
     const room = roomResult.rows[0];
+    const isHost = room.host_id === req.user.id;
+
+    // Si el host abandona la sala antes de iniciar, cancelar y reembolsar a todos
+    if (isHost) {
+      const refundResult = await BingoRefundService.refundRoom(room.id, 'host_left_before_start');
+
+      if (req.io) {
+        req.io.to(`bingo:${code}`).emit('room:cancelled', {
+          reason: 'host_left',
+          refundedUsers: refundResult.refundedUsers
+        });
+      }
+
+      return res.json({
+        success: true,
+        refunded: refundResult.refundedUsers.reduce((sum, user) => sum + user.amount, 0),
+        refundedUsers: refundResult.refundedUsers
+      });
+    }
     
     // Obtener info del jugador
     const playerResult = await query(`
@@ -581,11 +601,23 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
     const player = playerResult.rows[0];
     const refundAmount = parseFloat(room.card_cost) * player.cards_owned;
     
-    const client = await query.getClient();
+    const client = await getClient();
     
     try {
       await client.query('BEGIN');
       
+      // Obtener wallet antes del reembolso para registrar transacción
+      const walletResult = await client.query(
+        `SELECT id, ${room.currency}_balance as balance 
+         FROM wallets 
+         WHERE user_id = $1 FOR UPDATE`,
+        [req.user.id]
+      );
+
+      const wallet = walletResult.rows[0];
+      const balanceBefore = parseFloat(wallet.balance || 0);
+      const balanceAfter = balanceBefore + refundAmount;
+
       // Eliminar cartones
       await client.query(
         `DELETE FROM bingo_cards 
@@ -607,6 +639,22 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
            SET ${room.currency}_balance = ${room.currency}_balance + $1 
            WHERE user_id = $2`,
           [refundAmount, req.user.id]
+        );
+
+        await client.query(
+          `INSERT INTO wallet_transactions (
+            wallet_id, type, currency, amount,
+            balance_before, balance_after, description, reference
+          ) VALUES ($1, 'refund', $2, $3, $4, $5, $6, $7)` ,
+          [
+            wallet.id,
+            room.currency,
+            refundAmount,
+            balanceBefore,
+            balanceAfter,
+            'Reembolso por salir de sala Bingo',
+            room.code
+          ]
         );
         
         // Actualizar pozo
@@ -631,6 +679,23 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
           ]
         );
       }
+
+      // Si no quedan jugadores en la sala, cancelarla
+      const remainingPlayersResult = await client.query(
+        `SELECT COUNT(*)::int as total 
+         FROM bingo_room_players 
+         WHERE room_id = $1`,
+        [room.id]
+      );
+
+      if (remainingPlayersResult.rows[0].total === 0) {
+        await client.query(
+          `UPDATE bingo_rooms 
+           SET status = 'cancelled', ended_at = NOW() 
+           WHERE id = $1`,
+          [room.id]
+        );
+      }
       
       await client.query('COMMIT');
       
@@ -644,7 +709,9 @@ router.post('/rooms/:code/leave', verifyToken, async (req, res) => {
       
       res.json({
         success: true,
-        refunded: refundAmount
+        refunded: refundAmount,
+        balanceBefore,
+        balanceAfter
       });
       
     } catch (error) {
