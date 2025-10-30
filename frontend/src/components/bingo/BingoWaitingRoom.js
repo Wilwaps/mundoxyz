@@ -55,7 +55,7 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
   });
 
   const allPlayersReady = room?.players?.every(p => p.is_ready) && room?.players?.length > 0;
-  const canStart = isHost && allPlayersReady && room.status === 'ready';
+  const canStart = isHost && allPlayersReady && (room.status === 'lobby' || room.status === 'ready');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900/20 to-blue-900/20 p-4">
@@ -257,7 +257,7 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
             <h2 className="text-xl font-bold text-white mb-4">Acciones</h2>
             <div className="space-y-3">
               {/* Comprar más cartones */}
-              {(room?.status === 'waiting' || room?.status === 'ready') && 
+              {(room?.status === 'lobby' || room?.status === 'ready') && 
                myCards.length < room?.max_cards_per_player && (
                 <button
                   onClick={() => setShowBuyCardsModal(true)}
@@ -268,7 +268,7 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
               )}
 
               {/* Marcar listo */}
-              {room?.status === 'waiting' && !currentPlayer?.is_ready && myCards.length > 0 && (
+              {(room?.status === 'lobby' || room?.status === 'ready') && !currentPlayer?.is_ready && myCards.length > 0 && (
                 <button
                   onClick={() => markReady.mutate()}
                   disabled={markReady.isPending}
