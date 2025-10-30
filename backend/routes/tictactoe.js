@@ -665,6 +665,13 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
         );
       }
       
+      // Emitir evento de solicitud de revancha al oponente
+      const io = req.app.get('io');
+      io.to(`tictactoe:${code}`).emit('room:rematch-request', {
+        roomCode: code,
+        playerId: userId
+      });
+      
       // Verificar si ambos solicitaron revancha
       const updatedResult = await client.query(
         'SELECT * FROM tictactoe_rooms WHERE id = $1',

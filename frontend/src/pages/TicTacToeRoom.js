@@ -38,6 +38,15 @@ const TicTacToeRoom = () => {
     disconnectTimeout: null
   });
   
+  // Reset states when room code changes (for rematch navigation)
+  useEffect(() => {
+    setRematchRequested({ byMe: false, byOpponent: false });
+    setGameOver(false);
+    setShowGameOverModal(false);
+    setBoard([[null, null, null], [null, null, null], [null, null, null]]);
+    setTimeLeft(15);
+  }, [code]);
+  
   // Fetch room details
   const { data: roomData, refetch: refetchRoom } = useQuery({
     queryKey: ['tictactoe-room', code],
@@ -164,7 +173,7 @@ const TicTacToeRoom = () => {
         toast.success(`¡Revancha aceptada! Sala: ${data.newRoomCode}`);
         navigate(`/tictactoe/room/${data.newRoomCode}`);
       } else {
-        setRematchRequested({ ...rematchRequested, byMe: true });
+        setRematchRequested(prev => ({ ...prev, byMe: true }));
         toast.success('Revancha solicitada. Esperando al oponente...');
       }
     },
@@ -254,7 +263,7 @@ const TicTacToeRoom = () => {
     
     const handleRematchRequest = (data) => {
       if (data.roomCode === code && data.playerId !== user?.id) {
-        setRematchRequested({ ...rematchRequested, byOpponent: true });
+        setRematchRequested(prev => ({ ...prev, byOpponent: true }));
         toast('El oponente solicita revancha');
       }
     };
