@@ -560,12 +560,13 @@ class BingoService {
     try {
       await client.query('BEGIN');
 
-      // Verificar que es el host o substitute_host y la partida está en curso
+      // Verificar que es el host y la partida está en curso
+      // NOTA: substitute_host_id requiere migración 006, temporalmente solo host
       const roomResult = await client.query(
         `SELECT * FROM bingo_rooms 
          WHERE id = $1 
          AND status = 'playing'
-         AND (host_id = $2 OR substitute_host_id = $2)`,
+         AND host_id = $2`,
         [roomId, hostId]
       );
 
@@ -575,20 +576,17 @@ class BingoService {
 
       const room = roomResult.rows[0];
       
-      // Si es substitute_host, actualizar host_last_activity
-      if (room.substitute_host_id === hostId) {
+      // Actualizar host_last_activity si el campo existe (retrocompatible)
+      try {
         await client.query(
           `UPDATE bingo_rooms 
            SET host_last_activity = NOW() 
            WHERE id = $1`,
           [roomId]
         );
-        
-        logger.info('🎯 Admin/Tote cantando número en sala abandonada', {
-          roomId,
-          substituteHostId: hostId,
-          originalHostId: room.host_id
-        });
+      } catch (error) {
+        // Campo no existe aún, ignorar silenciosamente
+        logger.debug('host_last_activity field not available yet');
       }
 
       // Obtener números ya cantados
@@ -877,7 +875,8 @@ class BingoService {
 
       const room = roomResult.rows[0];
       const totalPot = parseFloat(room.pot_total);
-      const hostAbandoned = room.host_abandoned || false;
+      // Retrocompatible: si el campo no existe, asume false
+      const hostAbandoned = room.host_abandoned === true;
 
       // Obtener ganadores validados
       const winnersResult = await client.query(

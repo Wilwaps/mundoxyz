@@ -292,8 +292,10 @@ async function startServer() {
           BingoCleanupJob.start();
           
           // Iniciar job de detección de abandono de host
-          const BingoAbandonmentJob = require('./jobs/bingoAbandonmentJob');
-          BingoAbandonmentJob.start();
+          // TEMPORAL: Deshabilitado hasta que migración 006 se ejecute
+          // const BingoAbandonmentJob = require('./jobs/bingoAbandonmentJob');
+          // BingoAbandonmentJob.start();
+          logger.info('⏳ BingoAbandonmentJob deshabilitado temporalmente - requiere migración 006');
         } catch (bingoError) {
           logger.warn('⚠️  Bingo recovery system failed to start:', bingoError.message);
           logger.info('Server will continue without Bingo recovery features');
