@@ -7,24 +7,26 @@ CREATE OR REPLACE FUNCTION generate_unique_bingo_room_code()
 RETURNS VARCHAR(6) AS $$
 DECLARE
     chars VARCHAR := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    code VARCHAR(6) := '';
+    new_code VARCHAR(6) := '';
     i INTEGER;
     max_attempts INTEGER := 100;
     attempt_count INTEGER := 0;
     room_exists BOOLEAN;
 BEGIN
     LOOP
-        code := '';
+        new_code := '';
         FOR i IN 1..6 LOOP
-            code := code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
+            new_code := new_code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
         END LOOP;
         
-        -- Usar EXISTS con subconsulta explícita para evitar ambigüedad
-        -- Calificar nombres: bingo_rooms.code (columna) vs generate_unique_bingo_room_code.code (variable local)
-        SELECT EXISTS(SELECT 1 FROM bingo_rooms br WHERE br.code = generate_unique_bingo_room_code.code) INTO room_exists;
+        -- Verificar si el código ya existe
+        -- Sin ambigüedad: new_code es variable local, code es columna de tabla
+        SELECT EXISTS(
+            SELECT 1 FROM bingo_rooms WHERE code = new_code
+        ) INTO room_exists;
         
         IF NOT room_exists THEN
-            RETURN code;
+            RETURN new_code;
         END IF;
         
         attempt_count := attempt_count + 1;
