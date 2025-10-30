@@ -562,11 +562,13 @@ class BingoService {
 
       // Verificar que es el host y la partida está en curso
       // NOTA: substitute_host_id requiere migración 006, temporalmente solo host
+      // SELECT FOR UPDATE bloquea la fila para prevenir race conditions
       const roomResult = await client.query(
         `SELECT * FROM bingo_rooms 
          WHERE id = $1 
          AND status = 'playing'
-         AND host_id = $2`,
+         AND host_id = $2
+         FOR UPDATE`,
         [roomId, hostId]
       );
 
@@ -589,10 +591,11 @@ class BingoService {
         logger.debug('host_last_activity field not available yet');
       }
 
-      // Obtener números ya cantados
+      // Obtener números ya cantados (con lock para consistencia)
       const drawnResult = await client.query(
         `SELECT drawn_number FROM bingo_drawn_numbers 
-         WHERE room_id = $1`,
+         WHERE room_id = $1
+         FOR UPDATE`,
         [roomId]
       );
 

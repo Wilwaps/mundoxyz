@@ -33,6 +33,7 @@ const BingoRoom = () => {
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
   const [showNumberBoardModal, setShowNumberBoardModal] = useState(false);
+  const [drawCooldown, setDrawCooldown] = useState(false);
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -116,9 +117,16 @@ const BingoRoom = () => {
 
   // Marcar número en cartón
   const handleNumberClick = useCallback((cardId, number) => {
-    if (!drawnNumbers.includes(number)) {
+    // FREE se puede marcar siempre, sin necesidad de ser cantado
+    if (number !== 'FREE' && !drawnNumbers.includes(number)) {
       toast.error('Este número aún no ha sido cantado');
       return;
+    }
+
+    // Prevenir doble-marcado
+    const currentMarked = markedNumbers[cardId] || [];
+    if (currentMarked.includes(number)) {
+      return; // Ya está marcado, no hacer nada
     }
 
     socket.emit('bingo:mark_number', { code, cardId, number });
@@ -127,7 +135,7 @@ const BingoRoom = () => {
       ...prev,
       [cardId]: [...(prev[cardId] || []), number]
     }));
-  }, [code, socket, drawnNumbers]);
+  }, [code, socket, drawnNumbers, markedNumbers]);
 
   // Llamar BINGO
   const callBingo = useCallback((cardId) => {
@@ -157,6 +165,12 @@ const BingoRoom = () => {
   // Cantar número manual (solo host)
   const drawNumber = useMutation({
     mutationFn: async () => {
+      // Prevenir llamadas múltiples rápidas
+      if (drawCooldown) {
+        throw new Error('Por favor espera un momento antes de cantar otro número');
+      }
+      setDrawCooldown(true);
+      
       const response = await axios.post(`/api/bingo/rooms/${code}/draw`);
       return response.data;
     },
@@ -165,9 +179,13 @@ const BingoRoom = () => {
       setDrawnNumbers(prev => [...prev, data.drawnNumber]);
       setLastNumber(data.drawnNumber);
       queryClient.invalidateQueries(['bingo-room', code]);
+      
+      // Cooldown de 300ms para prevenir race conditions
+      setTimeout(() => setDrawCooldown(false), 300);
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al cantar número');
+      setDrawCooldown(false);
     }
   });
 
@@ -276,13 +294,13 @@ const BingoRoom = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => drawNumber.mutate()}
-                  disabled={drawNumber.isPending}
+                  disabled={drawNumber.isPending || drawCooldown}
                   className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 
                            text-white rounded-lg font-semibold hover:shadow-lg 
                            hover:shadow-yellow-500/25 transition-all flex items-center gap-2
                            disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <FaPlay /> {drawNumber.isPending ? 'Cantando...' : 'Cantar Número'}
+                  <FaPlay /> {drawNumber.isPending || drawCooldown ? 'Cantando...' : 'Cantar Número'}
                 </button>
                 <button
                   onClick={user?.experience >= 400 ? toggleAutoDraw : null}
