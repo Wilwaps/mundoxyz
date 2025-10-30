@@ -442,10 +442,14 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
     
     const room = roomResult.rows[0];
     
-    // Jugadores
+    // Jugadores con información completa
     const playersResult = await query(`
       SELECT 
-        p.*,
+        p.user_id,
+        p.cards_owned,
+        p.is_host,
+        p.joined_at,
+        p.ready_at,
         u.username,
         u.avatar_url
       FROM bingo_room_players p
@@ -454,12 +458,36 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
       ORDER BY p.joined_at
     `, [room.id]);
     
+    // Formatear jugadores con propiedades esperadas por el frontend
+    const players = playersResult.rows.map(p => ({
+      user_id: p.user_id,
+      username: p.username,
+      avatar_url: p.avatar_url,
+      cards_count: p.cards_owned || 0,
+      is_ready: p.ready_at !== null,
+      is_host: p.is_host,
+      joined_at: p.joined_at
+    }));
+    
     // Cartones del usuario actual
     const myCardsResult = await query(`
-      SELECT * FROM bingo_cards 
+      SELECT 
+        id,
+        card_number,
+        numbers,
+        marked_numbers
+      FROM bingo_cards 
       WHERE room_id = $1 AND owner_id = $2
       ORDER BY card_number
     `, [room.id, req.user.id]);
+    
+    // Formatear cartones
+    const userCards = myCardsResult.rows.map(card => ({
+      id: card.id,
+      card_number: card.card_number,
+      numbers: card.numbers,
+      marked_numbers: card.marked_numbers || []
+    }));
     
     // Números cantados
     const drawnNumbersResult = await query(`
@@ -479,17 +507,28 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
       WHERE w.room_id = $1 AND w.validated = true
     `, [room.id]);
     
+    // Calcular pozo total actualizado
+    const totalPot = parseFloat(room.pot_total) || 0;
+    
+    // Calcular jugadores actuales
+    const currentPlayers = players.length;
+    
     res.json({
       success: true,
       room: {
         ...room,
-        players: playersResult.rows,
-        myCards: myCardsResult.rows,
+        host_username: room.host_name,
+        players: players,
+        user_cards: userCards,  // Nombre correcto esperado por frontend
+        myCards: userCards,     // Alias por compatibilidad
+        cards: userCards,       // Otro alias
+        current_players: currentPlayers,
+        total_pot: totalPot,
         drawnNumbers: drawnNumbersResult.rows.map(r => r.drawn_number),
         drawnSequence: drawnNumbersResult.rows,
         winners: winnersResult.rows,
         isHost: room.host_id === req.user.id,
-        amIReady: playersResult.rows.find(p => p.user_id === req.user.id)?.ready_at !== null
+        amIReady: players.find(p => p.user_id === req.user.id)?.is_ready || false
       }
     });
     
