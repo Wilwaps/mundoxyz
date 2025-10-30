@@ -6,11 +6,15 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
   if (!card) return null;
 
   const isNumberDrawn = (number) => {
-    return drawnNumbers.includes(number);
+    // Si number es un objeto, extraer value
+    const numValue = typeof number === 'object' && number !== null ? number.value : number;
+    return drawnNumbers.includes(numValue);
   };
 
   const isNumberMarked = (number) => {
-    return markedNumbers.includes(number);
+    // Si number es un objeto, extraer value
+    const numValue = typeof number === 'object' && number !== null ? number.value : number;
+    return markedNumbers.includes(numValue);
   };
 
   const getCellClass = (number) => {
@@ -65,9 +69,12 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
         {/* Grid del cartón */}
         <div className="grid grid-cols-5 gap-0.5 sm:gap-1">
           {grid.map((column, colIndex) => 
-            column.map((number, rowIndex) => {
+            column.map((cellData, rowIndex) => {
               const cellKey = `${colIndex}-${rowIndex}`;
               const isFreeSpace = colIndex === 2 && rowIndex === 2;
+              
+              // Extraer número del objeto o usar directamente si es número
+              const number = typeof cellData === 'object' && cellData !== null ? cellData.value : cellData;
               
               return (
                 <motion.div
@@ -127,8 +134,11 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
         {/* Grid del cartón 9x3 */}
         <div className="grid grid-cols-9 gap-0.5 sm:gap-1">
           {grid.map((row, rowIndex) => 
-            row.map((number, colIndex) => {
+            row.map((cellData, colIndex) => {
               const cellKey = `${rowIndex}-${colIndex}`;
+              
+              // Extraer número del objeto o usar directamente si es número
+              const number = typeof cellData === 'object' && cellData !== null ? cellData.value : cellData;
               
               return (
                 <motion.div
