@@ -15,9 +15,11 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
   
   const myCards = room?.user_cards || [];
-  const currentPlayer = room?.players?.find(p => p.user_id === user?.id);
   const totalPot = room?.total_pot || 0;
   const currency = room?.currency || 'coins';
+  
+  // Usar propiedades del backend directamente
+  const amIReady = room?.amIReady || false;
 
   // Marcar jugador listo
   const markReady = useMutation({
@@ -268,7 +270,7 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
               )}
 
               {/* Marcar listo */}
-              {(room?.status === 'lobby' || room?.status === 'ready') && !currentPlayer?.is_ready && myCards.length > 0 && (
+              {(room?.status === 'lobby' || room?.status === 'ready') && !amIReady && myCards.length > 0 && (
                 <button
                   onClick={() => markReady.mutate()}
                   disabled={markReady.isPending}
@@ -289,7 +291,7 @@ const BingoWaitingRoom = ({ room, user, isHost, onLeave, onStartGame }) => {
               )}
 
               {/* Estado de listo */}
-              {currentPlayer?.is_ready && (
+              {amIReady && (
                 <div className="text-center py-2 px-4 bg-green-600/20 rounded-lg">
                   <span className="text-green-400 font-semibold flex items-center justify-center gap-2">
                     <FaCheck /> ¡Estás listo!
