@@ -485,8 +485,10 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
     const userCards = myCardsResult.rows.map(card => ({
       id: card.id,
       card_number: card.card_number,
-      numbers: card.numbers,
-      marked_numbers: card.marked_numbers || []
+      numbers: typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers,
+      marked_numbers: card.marked_numbers ? 
+        (typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers) : 
+        []
     }));
     
     // Números cantados
