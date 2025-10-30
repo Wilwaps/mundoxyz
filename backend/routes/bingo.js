@@ -489,7 +489,8 @@ router.get('/rooms/:code', verifyToken, async (req, res) => {
         id: card.id,
         card_number: card.card_number,
         numbers: numbersObj.allNumbers || numbersObj, // Usar allNumbers si existe, sino el objeto completo
-        numbersGrid: numbersObj.grid || null, // Grid completo disponible si se necesita
+        grid: numbersObj.grid || null, // Grid para el componente BingoCard
+        card_data: numbersObj.grid || null, // Alias por compatibilidad
         marked_numbers: card.marked_numbers ? 
           (typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers) : 
           []

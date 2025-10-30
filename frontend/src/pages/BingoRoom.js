@@ -11,12 +11,10 @@ import NumberBoard from '../components/bingo/NumberBoard';
 import BuyCardsModal from '../components/bingo/BuyCardsModal';
 import BingoWaitingRoom from '../components/bingo/BingoWaitingRoom';
 import NumberBoardModal from '../components/bingo/NumberBoardModal';
-import FloatingActionButton from '../components/bingo/FloatingActionButton';
-import NumberTableModal from '../components/bingo/NumberTableModal';
 import { 
   FaArrowLeft, FaUsers, FaPlay, FaCheck, FaTrophy, 
   FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart,
-  FaThLarge, FaTable
+  FaThLarge
 } from 'react-icons/fa';
 
 const BingoRoom = () => {
@@ -35,7 +33,6 @@ const BingoRoom = () => {
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
   const [showNumberBoardModal, setShowNumberBoardModal] = useState(false);
-  const [showNumberTableModal, setShowNumberTableModal] = useState(false);
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -310,9 +307,16 @@ const BingoRoom = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 gap-6">
-          {/* Información de la sala */}
-          <div className="lg:max-w-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Columna izquierda - Tablero de números */}
+          <div className="lg:col-span-1">
+            <NumberBoard 
+              drawnNumbers={drawnNumbers}
+              lastNumber={lastNumber}
+              mode={room.numbers_mode || 75}
+              isAutoDrawing={isAutoDrawing}
+            />
+
             {/* Información de la sala */}
             <div className="glass-effect p-4 rounded-xl mt-6">
               <h3 className="text-lg font-bold text-white mb-3">Información</h3>
@@ -397,7 +401,7 @@ const BingoRoom = () => {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {myCards.map((card) => (
                     <div key={card.id}>
                       <BingoCard 
@@ -564,24 +568,6 @@ const BingoRoom = () => {
         drawnNumbers={drawnNumbers}
         totalNumbers={room?.numbers_mode || 75}
         mode={room?.numbers_mode || 75}
-      />
-
-      {/* Botón flotante para abrir tabla de números */}
-      {room?.status === 'playing' && (
-        <FloatingActionButton
-          icon={FaTable}
-          onClick={() => setShowNumberTableModal(true)}
-          label="Ver tabla de números"
-        />
-      )}
-
-      {/* Modal hermoso de tabla completa */}
-      <NumberTableModal
-        isOpen={showNumberTableModal}
-        onClose={() => setShowNumberTableModal(false)}
-        mode={room?.numbers_mode || 75}
-        drawnNumbers={drawnNumbers}
-        markedNumbers={Object.values(markedNumbers).flat()}
       />
     </div>
   );
