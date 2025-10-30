@@ -769,6 +769,70 @@ router.get('/my-active-room', verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bingo/clear-my-room
+ * Limpiar sala activa del usuario (útil cuando hay errores)
+ */
+router.post('/clear-my-room', verifyToken, async (req, res) => {
+  try {
+    // Buscar sala activa del usuario
+    const roomResult = await query(`
+      SELECT r.id, r.code, r.status, r.host_id
+      FROM bingo_rooms r
+      JOIN bingo_room_players p ON p.room_id = r.id
+      WHERE p.user_id = $1 
+      AND r.status IN ('lobby', 'ready', 'playing')
+      LIMIT 1
+    `, [req.user.id]);
+    
+    if (roomResult.rows.length === 0) {
+      return res.json({ success: true, message: 'No hay sala activa' });
+    }
+    
+    const room = roomResult.rows[0];
+    const isHost = room.host_id === req.user.id;
+    
+    // Si es el host y la sala está en lobby, cancelar sala completa
+    if (isHost && room.status === 'lobby') {
+      // Reembolsar a todos los jugadores
+      await BingoRefundService.refundEntireRoom(room.id);
+      
+      // Cancelar sala
+      await query(`
+        UPDATE bingo_rooms 
+        SET status = 'cancelled' 
+        WHERE id = $1
+      `, [room.id]);
+      
+      logger.info(`Sala ${room.code} cancelada por limpieza de host ${req.user.username}`);
+      
+      return res.json({
+        success: true,
+        message: 'Sala cancelada y todos los jugadores reembolsados'
+      });
+    }
+    
+    // Si no es host o la sala no está en lobby, solo remover al usuario
+    await BingoRefundService.refundPlayer(room.id, req.user.id);
+    
+    await query(`
+      DELETE FROM bingo_room_players 
+      WHERE room_id = $1 AND user_id = $2
+    `, [room.id, req.user.id]);
+    
+    logger.info(`Usuario ${req.user.username} removido de sala ${room.code}`);
+    
+    res.json({
+      success: true,
+      message: 'Has salido de la sala y recibido reembolso'
+    });
+    
+  } catch (error) {
+    logger.error('Error limpiando sala activa:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // NOTA: Rutas de abandonment (/abandon, /take-control, /abandoned-rooms)
 // temporalmente removidas hasta que se ejecute migración 006.
 // Se volverán a agregar después de ejecutar:

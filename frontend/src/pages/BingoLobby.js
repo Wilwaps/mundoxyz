@@ -48,20 +48,41 @@ const BingoLobby = () => {
     refetchInterval: 10000
   });
 
+  // Handler para limpiar sala problemática
+  const handleClearRoom = async () => {
+    try {
+      await axios.post('/api/bingo/clear-my-room');
+      toast.success('Sala limpiada exitosamente');
+      queryClient.invalidateQueries(['bingo-active-room']);
+      queryClient.invalidateQueries(['bingo-rooms']);
+    } catch (error) {
+      console.error('Error limpiando sala:', error);
+      toast.error('Error al limpiar sala');
+    }
+  };
+
   // Efecto para notificar sala activa
   useEffect(() => {
     if (activeRoom?.hasActiveRoom) {
       toast(
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2">
           <span>🎰 Tienes una sala activa: {activeRoom.room.code}</span>
-          <button
-            onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
-            className="ml-3 px-3 py-1 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
-          >
-            Volver a Sala
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
+              className="flex-1 px-3 py-1 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
+            >
+              Volver a Sala
+            </button>
+            <button
+              onClick={handleClearRoom}
+              className="flex-1 px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+            >
+              Limpiar Sala
+            </button>
+          </div>
         </div>,
-        { duration: 8000, icon: '🎰' }
+        { duration: 10000, icon: '🎰' }
       );
     }
   }, [activeRoom, navigate]);
@@ -213,12 +234,12 @@ const BingoLobby = () => {
         )}
       </div>
 
-      {/* Botón flotante para sala activa */}
+      {/* Botones flotantes para sala activa */}
       {activeRoom?.hasActiveRoom && (
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="fixed bottom-6 right-6 z-50"
+          className="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
         >
           <button
             onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
@@ -231,6 +252,15 @@ const BingoLobby = () => {
             <span className="bg-white/20 px-2 py-1 rounded-full text-sm">
               {activeRoom.room.code}
             </span>
+          </button>
+          <button
+            onClick={handleClearRoom}
+            className="px-4 py-2 bg-red-600/90 backdrop-blur-sm
+                     text-white rounded-full text-sm font-medium hover:bg-red-700
+                     transition-all flex items-center justify-center gap-2"
+            title="Limpiar sala si hay problemas"
+          >
+            🧹 Limpiar Sala
           </button>
         </motion.div>
       )}
