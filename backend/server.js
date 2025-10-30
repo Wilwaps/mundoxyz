@@ -282,13 +282,18 @@ async function startServer() {
         dbReady = true;
         logger.info('✅ Database connected');
         
-        // Inicializar sistema de recuperación de Bingo
-        const { initializeBingoRecovery } = require('./utils/bingo-recovery');
-        await initializeBingoRecovery();
-        
-        // Iniciar jobs de cleanup periódico
-        const BingoCleanupJob = require('./jobs/bingoCleanup');
-        BingoCleanupJob.start();
+        // Inicializar sistema de recuperación de Bingo (no bloqueante)
+        try {
+          const { initializeBingoRecovery } = require('./utils/bingo-recovery');
+          await initializeBingoRecovery();
+          
+          // Iniciar jobs de cleanup periódico
+          const BingoCleanupJob = require('./jobs/bingoCleanup');
+          BingoCleanupJob.start();
+        } catch (bingoError) {
+          logger.warn('⚠️  Bingo recovery system failed to start:', bingoError.message);
+          logger.info('Server will continue without Bingo recovery features');
+        }
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }
