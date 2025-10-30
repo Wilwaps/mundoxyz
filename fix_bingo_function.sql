@@ -20,7 +20,8 @@ BEGIN
         END LOOP;
         
         -- Usar EXISTS con subconsulta explícita para evitar ambigüedad
-        SELECT EXISTS(SELECT 1 FROM bingo_rooms WHERE code = code) INTO room_exists;
+        -- Calificar nombres: bingo_rooms.code (columna) vs generate_unique_bingo_room_code.code (variable local)
+        SELECT EXISTS(SELECT 1 FROM bingo_rooms br WHERE br.code = generate_unique_bingo_room_code.code) INTO room_exists;
         
         IF NOT room_exists THEN
             RETURN code;
