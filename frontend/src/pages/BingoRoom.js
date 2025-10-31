@@ -39,6 +39,7 @@ const BingoRoom = () => {
   const [winningCardId, setWinningCardId] = useState(null);
   const [winningCardNumber, setWinningCardNumber] = useState(null);
   const [showBingoModal, setShowBingoModal] = useState(false);
+  const [lastMarkedNumber, setLastMarkedNumber] = useState(null);
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -124,6 +125,10 @@ const BingoRoom = () => {
   useEffect(() => {
     if (!room || !room.user_cards || gameStatus !== 'playing') return;
     if (showBingoModal) return; // Ya hay un modal abierto
+    
+    // NO disparar modal si el último número marcado fue FREE
+    // FREE solo se marca para completar el patrón, no dispara victoria
+    if (lastMarkedNumber === 'FREE') return;
 
     // Revisar todos los cartones del usuario
     for (const card of room.user_cards) {
@@ -146,7 +151,7 @@ const BingoRoom = () => {
         break; // Solo mostrar modal para el primer cartón ganador
       }
     }
-  }, [markedNumbers, room, gameStatus, showBingoModal]);
+  }, [markedNumbers, room, gameStatus, showBingoModal, lastMarkedNumber]);
 
   // Marcar número en cartón
   const handleNumberClick = useCallback((cardId, number) => {
@@ -163,6 +168,9 @@ const BingoRoom = () => {
     }
 
     socket.emit('bingo:mark_number', { code, cardId, number });
+    
+    // Guardar el último número marcado
+    setLastMarkedNumber(number);
     
     setMarkedNumbers(prev => ({
       ...prev,
