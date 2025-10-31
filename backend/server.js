@@ -27,6 +27,7 @@ const bingoRoutes = require('./routes/bingo');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
+const diagnosticRoutes = require('./routes/diagnostic');
 
 // Create Express app
 const app = express();
@@ -219,6 +220,7 @@ app.use('/api/bingo', (req, res, next) => {
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/diagnostic', diagnosticRoutes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
