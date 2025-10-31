@@ -825,7 +825,7 @@ class BingoService {
           card.victory_mode,
           0, // Se calculará después
           JSON.stringify({ 
-            markedNumbers: card.marked_numbers,
+            markedNumbers: markedNumbers,
             timestamp: new Date().toISOString()
           })
         ]
@@ -862,6 +862,13 @@ class BingoService {
 
       await this.updateRoomActivity(card.room_id, client);
 
+      // Obtener totalPot antes del COMMIT para retornarlo
+      const potResult = await client.query(
+        `SELECT pot_total FROM bingo_rooms WHERE id = $1`,
+        [card.room_id]
+      );
+      const totalPot = potResult.rows[0]?.pot_total || 0;
+
       await client.query('COMMIT');
 
       logger.info('Bingo cantado', {
@@ -869,7 +876,8 @@ class BingoService {
         userId,
         cardId,
         isFirstWinner,
-        victoryMode: card.victory_mode
+        victoryMode: card.victory_mode,
+        totalPot
       });
 
       return {
@@ -878,7 +886,8 @@ class BingoService {
         isWinner: true,
         isFirstWinner,
         winnerName,
-        pattern: card.victory_mode
+        pattern: card.victory_mode,
+        totalPot
       };
 
     } catch (error) {

@@ -126,19 +126,19 @@ const handleBingoSocket = (io, socket) => {
       if (result.success && result.isValid) {
         // BINGO válido! (distributePrizes ya se ejecutó dentro de callBingo)
         
-        // Obtener detalles de la sala para el pot total
-        const room = await bingoService.getRoomDetails(code);
-        
         io.to(`bingo:${code}`).emit('bingo:game_over', {
           winnerId: socket.userId,
           winnerName: result.winnerName,
           cardId,
           pattern: result.pattern,
-          totalPot: room.pot_total,
+          totalPot: result.totalPot,
           celebration: true
         });
         
-        logger.info(`BINGO! User ${socket.userId} won room ${code}`);
+        logger.info(`BINGO! User ${socket.userId} won room ${code}`, {
+          totalPot: result.totalPot,
+          pattern: result.pattern
+        });
       } else {
         // Bingo inválido
         io.to(`bingo:${code}`).emit('bingo:claim_invalid', {
