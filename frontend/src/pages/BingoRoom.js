@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -41,6 +41,7 @@ const BingoRoom = () => {
   const [showBingoModal, setShowBingoModal] = useState(false);
   const [lastMarkedNumber, setLastMarkedNumber] = useState(null);
   const [bingoCalled, setBingoCalled] = useState(false);
+  const previousVictoryState = useRef({});
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -159,6 +160,7 @@ const BingoRoom = () => {
     if (!room || !room.user_cards || gameStatus !== 'playing') return;
     if (showBingoModal) return; // Ya hay un modal abierto
     if (bingoCalled) return; // Ya se cantó BINGO, no volver a mostrar modal
+    if (!lastMarkedNumber) return; // No hay número marcado aún
     
     // NO disparar modal si el último número marcado fue FREE
     // FREE solo se marca para completar el patrón, no dispara victoria
@@ -167,14 +169,26 @@ const BingoRoom = () => {
     // Revisar todos los cartones del usuario
     for (const card of room.user_cards) {
       const cardMarked = markedNumbers[card.id] || [];
-      const hasVictory = checkVictoryPattern(
+      
+      // Verificar estado ANTERIOR (sin el último número)
+      const previousMarked = cardMarked.filter(num => num !== lastMarkedNumber);
+      const hadVictoryBefore = checkVictoryPattern(
+        card.grid || card.card_data,
+        previousMarked,
+        room.victory_mode
+      );
+      
+      // Verificar estado ACTUAL (con el último número)
+      const hasVictoryNow = checkVictoryPattern(
         card.grid || card.card_data,
         cardMarked,
         room.victory_mode
       );
 
-      if (hasVictory) {
-        // ¡Patrón ganador detectado!
+      // Solo disparar si ANTES no tenía victoria y AHORA sí
+      // Esto significa que el ÚLTIMO número marcado completó el patrón
+      if (!hadVictoryBefore && hasVictoryNow) {
+        // ¡El ÚLTIMO número completó el patrón!
         setWinningCardId(card.id);
         setWinningCardNumber(card.card_number || card.id);
         setShowBingoModal(true);
