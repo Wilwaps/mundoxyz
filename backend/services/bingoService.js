@@ -762,7 +762,9 @@ class BingoService {
 
       // Verificar cartón y validar patrón
       const cardResult = await client.query(
-        `SELECT c.*, r.*
+        `SELECT 
+           c.id, c.card_number, c.numbers, c.marked_numbers, c.owner_id, c.room_id,
+           r.code, r.victory_mode, r.status, r.drawn_numbers
          FROM bingo_cards c
          JOIN bingo_rooms r ON r.id = c.room_id
          WHERE c.id = $1 AND c.owner_id = $2 AND r.status = 'playing' AND r.code = $3`,
@@ -779,11 +781,14 @@ class BingoService {
       }
 
       const card = cardResult.rows[0];
+      
+      // Verificar que el cartón tenga números marcados
+      const markedNumbers = card.marked_numbers || [];
 
       // Validar patrón ganador
       const isValid = await this.validateWinningPattern(
         card,
-        card.marked_numbers,
+        markedNumbers,
         card.victory_mode,
         client
       );
@@ -1158,7 +1163,7 @@ class BingoService {
         if (typeof num === 'object' && num !== null) {
           num = num.value;
         }
-        return marked.includes(num) || marked.includes('FREE');
+        return marked.includes(num);
       };
       
       // Validar según modo de victoria
