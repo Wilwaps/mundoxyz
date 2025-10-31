@@ -816,6 +816,15 @@ class BingoService {
         isArray: Array.isArray(markedNumbers)
       });
 
+      // LOG SUPER EXPLÍCITO PARA DEBUGGING
+      console.log('========================================');
+      console.log('🔥 PARSEO DE MARKED_NUMBERS');
+      console.log('Type:', typeof markedNumbers);
+      console.log('IsArray:', Array.isArray(markedNumbers));
+      console.log('Count:', markedNumbers.length);
+      console.log('Content:', JSON.stringify(markedNumbers));
+      console.log('========================================');
+
       // Validar patrón ganador
       logger.info('🔍 Iniciando validación de patrón', {
         victoryMode: card.victory_mode,
@@ -835,6 +844,14 @@ class BingoService {
         markedNumbers,
         victoryMode: card.victory_mode
       });
+
+      // LOG SUPER EXPLÍCITO DEL RESULTADO
+      console.log('========================================');
+      console.log('🎯 RESULTADO DE VALIDACIÓN');
+      console.log('isValid:', isValid);
+      console.log('Victory Mode:', card.victory_mode);
+      console.log('Marked Count:', markedNumbers.length);
+      console.log('========================================');
 
       if (!isValid) {
         logger.warn('❌ BINGO INVÁLIDO - Patrón no completo', {
@@ -929,6 +946,17 @@ class BingoService {
         winnerName,
         markedNumbers
       });
+
+      // LOG SUPER EXPLÍCITO ANTES DEL RETURN
+      console.log('========================================');
+      console.log('🎉 RETORNANDO BINGO VÁLIDO');
+      console.log('success: true');
+      console.log('isValid: true');
+      console.log('isWinner: true');
+      console.log('winnerName:', winnerName);
+      console.log('pattern:', card.victory_mode);
+      console.log('totalPot:', totalPot);
+      console.log('========================================');
 
       return {
         success: true,
