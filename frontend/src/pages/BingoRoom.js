@@ -40,6 +40,7 @@ const BingoRoom = () => {
   const [winningCardNumber, setWinningCardNumber] = useState(null);
   const [showBingoModal, setShowBingoModal] = useState(false);
   const [lastMarkedNumber, setLastMarkedNumber] = useState(null);
+  const [bingoCalled, setBingoCalled] = useState(false);
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -106,10 +107,40 @@ const BingoRoom = () => {
       setIsAutoDrawing(false);
     });
 
+    socket.on('bingo:claim_in_progress', (data) => {
+      toast.info(`${data.message}`, {
+        icon: '⏳',
+        duration: 2000
+      });
+    });
+
+    socket.on('bingo:claim_invalid', (data) => {
+      toast.error('BINGO inválido - Continúa jugando', {
+        icon: '❌',
+        duration: 4000
+      });
+      // Permitir cantar BINGO de nuevo
+      setBingoCalled(false);
+    });
+
     socket.on('bingo:game_over', (data) => {
       setGameStatus('finished');
       setWinnerInfo(data);
       setShowWinnerModal(true);
+      setShowBingoModal(false); // Cerrar modal de BINGO
+      
+      // Mensaje diferenciado para ganador vs otros jugadores
+      if (data.winnerId === user?.id) {
+        toast.success('¡Felicitaciones! ¡Has ganado!', {
+          icon: '🎉',
+          duration: 5000
+        });
+      } else {
+        toast(`${data.winnerName} ha ganado el BINGO`, {
+          icon: '🏆',
+          duration: 4000
+        });
+      }
     });
 
     return () => {
@@ -117,14 +148,17 @@ const BingoRoom = () => {
       socket.off('bingo:player_update');
       socket.off('bingo:game_started');
       socket.off('bingo:number_drawn');
+      socket.off('bingo:claim_in_progress');
+      socket.off('bingo:claim_invalid');
       socket.off('bingo:game_over');
     };
-  }, [socket, code, queryClient]);
+  }, [socket, code, queryClient, user]);
 
   // Detectar automáticamente cuando se completa un patrón ganador
   useEffect(() => {
     if (!room || !room.user_cards || gameStatus !== 'playing') return;
     if (showBingoModal) return; // Ya hay un modal abierto
+    if (bingoCalled) return; // Ya se cantó BINGO, no volver a mostrar modal
     
     // NO disparar modal si el último número marcado fue FREE
     // FREE solo se marca para completar el patrón, no dispara victoria
@@ -151,7 +185,7 @@ const BingoRoom = () => {
         break; // Solo mostrar modal para el primer cartón ganador
       }
     }
-  }, [markedNumbers, room, gameStatus, showBingoModal, lastMarkedNumber]);
+  }, [markedNumbers, room, gameStatus, showBingoModal, lastMarkedNumber, bingoCalled]);
 
   // Marcar número en cartón
   const handleNumberClick = useCallback((cardId, number) => {
@@ -187,7 +221,15 @@ const BingoRoom = () => {
       return;
     }
     
+    // Marcar que ya se cantó BINGO para prevenir que modal vuelva a aparecer
+    setBingoCalled(true);
+    
     socket.emit('bingo:call_bingo', { code, cardId });
+    
+    toast.info('Validando BINGO...', {
+      icon: '⏳',
+      duration: 3000
+    });
   }, [code, socket, markedNumbers]);
 
   // Iniciar auto-draw (solo host)
@@ -541,47 +583,94 @@ const BingoRoom = () => {
         userBalance={room.currency === 'coins' ? balance?.coins_balance : balance?.fires_balance}
       />
 
-      {/* Modal de ganador */}
+      {/* Modal de celebración del ganador */}
       <AnimatePresence>
         {showWinnerModal && winnerInfo && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 
                      flex items-center justify-center p-4"
-            onClick={() => setShowWinnerModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-effect p-8 rounded-2xl max-w-md w-full text-center"
+              initial={{ scale: 0.5, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.5, opacity: 0, y: 50 }}
+              transition={{ type: 'spring', damping: 15, stiffness: 300 }}
+              className="glass-effect p-8 md:p-12 rounded-3xl max-w-lg w-full text-center relative overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-6xl mb-4">🎉</div>
-              <h2 className="text-3xl font-bold text-white mb-2">¡BINGO!</h2>
-              <p className="text-xl text-white mb-4">
-                {winnerInfo.winnerName} ha ganado
-              </p>
-              <div className="bg-yellow-500/20 p-4 rounded-lg mb-6">
-                <p className="text-sm text-white/80 mb-2">Premio total:</p>
-                <p className="text-2xl font-bold text-yellow-400 flex items-center justify-center gap-2">
-                  {winnerInfo.totalPot}
-                  {room.currency === 'coins' ? 
-                    <FaCoins /> : 
-                    <FaFire />
+              {/* Confetti decorativo */}
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500"></div>
+              
+              {/* Emoji celebración */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.2, type: 'spring' }}
+                className="text-8xl mb-6"
+              >
+                🎉
+              </motion.div>
+              
+              {/* Título */}
+              <motion.h2
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 mb-4"
+              >
+                ¡BINGO!
+              </motion.h2>
+              
+              {/* Ganador */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mb-6"
+              >
+                <p className="text-white/70 text-sm mb-2">🏆 Ganador:</p>
+                <p className="text-2xl md:text-3xl font-bold text-white">
+                  {winnerInfo.winnerName}
+                </p>
+              </motion.div>
+              
+              {/* Premio */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+                className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 p-6 rounded-2xl mb-8 border-2 border-yellow-500/30"
+              >
+                <p className="text-sm text-white/80 mb-3">💰 Premio Total:</p>
+                <p className="text-4xl md:text-5xl font-black text-yellow-400 flex items-center justify-center gap-3">
+                  {winnerInfo.totalPot?.toLocaleString()}
+                  {room?.currency === 'coins' ? 
+                    <FaCoins className="text-yellow-500" /> : 
+                    <FaFire className="text-orange-500" />
                   }
                 </p>
-              </div>
-              <button
+              </motion.div>
+              
+              {/* Botón */}
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
                 onClick={() => navigate('/bingo/lobby')}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 
-                         text-white rounded-xl font-semibold hover:shadow-lg 
-                         hover:shadow-purple-500/25 transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-full px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 
+                         text-white rounded-xl font-bold text-lg shadow-2xl 
+                         hover:shadow-purple-500/50 transition-all"
               >
-                Volver al Lobby
-              </button>
+                Aceptar - Volver al Lobby
+              </motion.button>
+              
+              {/* Decoración inferior */}
+              <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600"></div>
             </motion.div>
           </motion.div>
         )}
