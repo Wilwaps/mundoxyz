@@ -746,23 +746,36 @@ class BingoService {
   /**
    * Cantar bingo (reclamar victoria)
    */
-  static async callBingo(cardId, userId) {
+  static async callBingo(code, cardId, userId) {
     const client = await getClient();
 
     try {
       await client.query('BEGIN');
+
+      // Obtener datos del usuario
+      const userResult = await client.query(
+        `SELECT username FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      const winnerName = userResult.rows[0]?.username || 'Jugador';
 
       // Verificar cartón y validar patrón
       const cardResult = await client.query(
         `SELECT c.*, r.*
          FROM bingo_cards c
          JOIN bingo_rooms r ON r.id = c.room_id
-         WHERE c.id = $1 AND c.owner_id = $2 AND r.status = 'playing'`,
-        [cardId, userId]
+         WHERE c.id = $1 AND c.owner_id = $2 AND r.status = 'playing' AND r.code = $3`,
+        [cardId, userId, code]
       );
 
       if (!cardResult.rows.length) {
-        throw new Error('Cartón inválido o partida no en curso');
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          isValid: false,
+          message: 'Cartón inválido o partida no en curso'
+        };
       }
 
       const card = cardResult.rows[0];
@@ -776,7 +789,13 @@ class BingoService {
       );
 
       if (!isValid) {
-        throw new Error('No tienes un patrón ganador válido');
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          isValid: false,
+          message: 'No tienes un patrón ganador válido',
+          winnerName
+        };
       }
 
       // Verificar si ya hay ganadores (para empates)
@@ -850,8 +869,11 @@ class BingoService {
 
       return {
         success: true,
+        isValid: true,
         isWinner: true,
-        isFirstWinner
+        isFirstWinner,
+        winnerName,
+        pattern: card.victory_mode
       };
 
     } catch (error) {
