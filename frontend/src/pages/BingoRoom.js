@@ -11,6 +11,8 @@ import NumberBoard from '../components/bingo/NumberBoard';
 import BuyCardsModal from '../components/bingo/BuyCardsModal';
 import BingoWaitingRoom from '../components/bingo/BingoWaitingRoom';
 import NumberBoardModal from '../components/bingo/NumberBoardModal';
+import BingoWinnerModal from '../components/bingo/BingoWinnerModal';
+import { checkVictoryPattern } from '../utils/bingoValidation';
 import { 
   FaArrowLeft, FaUsers, FaPlay, FaCheck, FaTrophy, 
   FaCoins, FaFire, FaCrown, FaTicketAlt, FaStop, FaRobot, FaShoppingCart,
@@ -34,6 +36,9 @@ const BingoRoom = () => {
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
   const [showNumberBoardModal, setShowNumberBoardModal] = useState(false);
   const [drawCooldown, setDrawCooldown] = useState(false);
+  const [winningCardId, setWinningCardId] = useState(null);
+  const [winningCardNumber, setWinningCardNumber] = useState(null);
+  const [showBingoModal, setShowBingoModal] = useState(false);
 
   // Obtener detalles de la sala
   const { data: roomData, isLoading } = useQuery({
@@ -114,6 +119,34 @@ const BingoRoom = () => {
       socket.off('bingo:game_over');
     };
   }, [socket, code, queryClient]);
+
+  // Detectar automáticamente cuando se completa un patrón ganador
+  useEffect(() => {
+    if (!room || !room.user_cards || gameStatus !== 'playing') return;
+    if (showBingoModal) return; // Ya hay un modal abierto
+
+    // Revisar todos los cartones del usuario
+    for (const card of room.user_cards) {
+      const cardMarked = markedNumbers[card.id] || [];
+      const hasVictory = checkVictoryPattern(
+        card.grid || card.card_data,
+        cardMarked,
+        room.victory_mode
+      );
+
+      if (hasVictory) {
+        // ¡Patrón ganador detectado!
+        setWinningCardId(card.id);
+        setWinningCardNumber(card.card_number || card.id);
+        setShowBingoModal(true);
+        toast.success('¡Has completado el patrón ganador!', {
+          icon: '🎉',
+          duration: 5000
+        });
+        break; // Solo mostrar modal para el primer cartón ganador
+      }
+    }
+  }, [markedNumbers, room, gameStatus, showBingoModal]);
 
   // Marcar número en cartón
   const handleNumberClick = useCallback((cardId, number) => {
@@ -429,16 +462,6 @@ const BingoRoom = () => {
                         onNumberClick={(number) => handleNumberClick(card.id, number)}
                         mode={room.numbers_mode || 75}
                       />
-                      {room.status === 'playing' && (
-                        <button
-                          onClick={() => callBingo(card.id)}
-                          className="w-full mt-2 px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 
-                                   text-white rounded-lg font-bold hover:shadow-lg 
-                                   hover:shadow-yellow-500/25 transition-all"
-                        >
-                          ¡BINGO! 🎉
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -586,6 +609,17 @@ const BingoRoom = () => {
         drawnNumbers={drawnNumbers}
         totalNumbers={room?.numbers_mode || 75}
         mode={room?.numbers_mode || 75}
+      />
+
+      {/* Modal central de BINGO (aparece automáticamente al completar patrón) */}
+      <BingoWinnerModal
+        isOpen={showBingoModal}
+        onCallBingo={(cardId) => {
+          callBingo(cardId);
+          setShowBingoModal(false);
+        }}
+        cardId={winningCardId}
+        cardNumber={winningCardNumber}
       />
     </div>
   );
