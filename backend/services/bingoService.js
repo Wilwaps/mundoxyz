@@ -750,6 +750,13 @@ class BingoService {
     const client = await getClient();
 
     try {
+      logger.info('🎯 CALL BINGO INICIADO', {
+        code,
+        cardId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+
       await client.query('BEGIN');
 
       // Obtener datos del usuario
@@ -759,6 +766,7 @@ class BingoService {
       );
 
       const winnerName = userResult.rows[0]?.username || 'Jugador';
+      logger.info('👤 Usuario obtenido', { winnerName, userId });
 
       // Verificar cartón y validar patrón
       const cardResult = await client.query(
@@ -782,10 +790,31 @@ class BingoService {
 
       const card = cardResult.rows[0];
       
+      logger.info('🎴 Cartón encontrado', {
+        cardId: card.id,
+        roomId: card.room_id,
+        victoryMode: card.victory_mode,
+        status: card.status,
+        markedNumbersRaw: card.marked_numbers,
+        markedNumbersType: typeof card.marked_numbers
+      });
+      
       // Verificar que el cartón tenga números marcados
       const markedNumbers = card.marked_numbers || [];
+      
+      logger.info('✅ Números marcados parseados', {
+        markedNumbers,
+        count: markedNumbers.length,
+        isArray: Array.isArray(markedNumbers)
+      });
 
       // Validar patrón ganador
+      logger.info('🔍 Iniciando validación de patrón', {
+        victoryMode: card.victory_mode,
+        markedCount: markedNumbers.length,
+        cardNumbers: card.numbers
+      });
+
       const isValid = await this.validateWinningPattern(
         card,
         markedNumbers,
@@ -793,7 +822,18 @@ class BingoService {
         client
       );
 
+      logger.info('📊 Resultado de validación', {
+        isValid,
+        markedNumbers,
+        victoryMode: card.victory_mode
+      });
+
       if (!isValid) {
+        logger.warn('❌ BINGO INVÁLIDO - Patrón no completo', {
+          cardId,
+          markedNumbers,
+          victoryMode: card.victory_mode
+        });
         await client.query('ROLLBACK');
         return {
           success: false,
@@ -871,13 +911,15 @@ class BingoService {
 
       await client.query('COMMIT');
 
-      logger.info('Bingo cantado', {
+      logger.info('✅ BINGO VÁLIDO - Proceso completo', {
         roomId: card.room_id,
         userId,
         cardId,
         isFirstWinner,
         victoryMode: card.victory_mode,
-        totalPot
+        totalPot,
+        winnerName,
+        markedNumbers
       });
 
       return {
@@ -1143,9 +1185,24 @@ class BingoService {
    */
   static async validateWinningPattern(card, markedNumbers, victoryMode, client) {
     try {
+      logger.info('🔍 [VALIDATE] Iniciando validación de patrón', {
+        cardId: card.id,
+        victoryMode,
+        markedNumbersRaw: markedNumbers,
+        markedNumbersType: typeof markedNumbers
+      });
+
       // Parsear números del cartón
       const numbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
       const marked = typeof markedNumbers === 'string' ? JSON.parse(markedNumbers) : (markedNumbers || []);
+      
+      logger.info('📄 [VALIDATE] Datos parseados', {
+        numbersType: typeof numbers,
+        markedType: typeof marked,
+        markedCount: marked.length,
+        markedArray: marked,
+        numbersKeys: Object.keys(numbers || {})
+      });
       
       // Obtener grid del cartón
       let grid;
@@ -1169,29 +1226,53 @@ class BingoService {
       // Función helper para verificar si un número está marcado
       const isMarked = (num) => {
         if (num === 'FREE' || num === null) return true; // FREE siempre cuenta como marcado
+        
+        let actualNum = num;
         if (typeof num === 'object' && num !== null) {
-          num = num.value;
+          actualNum = num.value;
         }
-        return marked.includes(num);
+        
+        // Normalizar ambos a string para comparación
+        const numStr = String(actualNum);
+        const result = marked.some(m => String(m) === numStr);
+        
+        logger.debug('🔎 [VALIDATE] Verificando número', {
+          num: actualNum,
+          numStr,
+          marked,
+          result
+        });
+        
+        return result;
       };
       
       // Validar según modo de victoria
+      logger.info('🎯 [VALIDATE] Validando modo', { victoryMode: victoryMode.toLowerCase() });
+
       switch (victoryMode.toLowerCase()) {
         case 'linea':
         case 'línea':
         case 'line':
+          logger.info('📏 [VALIDATE] Verificando líneas (filas, columnas, diagonales)');
+
           // Verificar filas (horizontal)
           for (let row = 0; row < 5; row++) {
             let rowComplete = true;
+            const rowNumbers = [];
             for (let col = 0; col < 5; col++) {
               const cell = grid[col][row];
               const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
+              rowNumbers.push(num);
               if (!isMarked(num)) {
                 rowComplete = false;
                 break;
               }
             }
-            if (rowComplete) return true;
+            logger.debug(`🔵 [VALIDATE] Fila ${row}`, { rowNumbers, rowComplete });
+            if (rowComplete) {
+              logger.info('✅ [VALIDATE] ¡FILA COMPLETA!', { row, rowNumbers });
+              return true;
+            }
           }
           
           // Verificar columnas (vertical)

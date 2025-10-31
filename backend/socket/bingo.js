@@ -87,23 +87,39 @@ const handleBingoSocket = (io, socket) => {
     const { code, cardId, number } = data;
     
     try {
-      const result = await bingoService.markNumber(code, cardId, number, socket.userId);
+      logger.info('🔵 [SOCKET] Marcar número - Evento recibido', {
+        code,
+        cardId,
+        number,
+        userId: socket.userId
+      });
+
+      const result = await bingoService.markNumber(cardId, number, socket.userId);
       
-      if (result.success) {
-        socket.emit('bingo:number_marked', {
-          cardId,
-          number,
-          markedNumbers: result.markedNumbers
-        });
-        
-        // Enviar actualización de progreso a todos
-        io.to(`bingo:${code}`).emit('bingo:player_progress', {
-          playerId: socket.userId,
-          cardsProgress: result.cardsProgress
-        });
-      }
+      logger.info('✅ [SOCKET] Número marcado exitosamente', {
+        cardId,
+        number,
+        markedNumbers: result.markedNumbers,
+        markedCount: result.markedNumbers.length,
+        hasWinningPattern: result.hasWinningPattern
+      });
+
+      io.to(`bingo:${code}`).emit('bingo:number_marked', {
+        userId: socket.userId,
+        cardId,
+        number,
+        markedNumbers: result.markedNumbers,
+        hasWinningPattern: result.hasWinningPattern
+      });
+      
     } catch (error) {
-      logger.error('Error marking number:', error);
+      logger.error('💥 [SOCKET] Error marcando número', {
+        error: error.message,
+        code,
+        cardId,
+        number,
+        userId: socket.userId
+      });
       socket.emit('bingo:error', { message: error.message });
     }
   });
@@ -113,6 +129,13 @@ const handleBingoSocket = (io, socket) => {
     const { code, cardId } = data;
     
     try {
+      logger.info('🎲 [SOCKET] BINGO cantado - Evento recibido', {
+        code,
+        cardId,
+        userId: socket.userId,
+        timestamp: new Date().toISOString()
+      });
+
       // Notificar a todos que alguien cantó bingo
       io.to(`bingo:${code}`).emit('bingo:claim_in_progress', {
         playerId: socket.userId,
@@ -120,34 +143,60 @@ const handleBingoSocket = (io, socket) => {
         message: 'Validando bingo...'
       });
       
+      logger.info('📢 [SOCKET] Emitido bingo:claim_in_progress', { code, userId: socket.userId });
+
       // Validar el bingo
       const result = await bingoService.callBingo(code, cardId, socket.userId);
       
+      logger.info('📊 [SOCKET] Resultado de callBingo', {
+        success: result.success,
+        isValid: result.isValid,
+        winnerName: result.winnerName,
+        pattern: result.pattern,
+        totalPot: result.totalPot,
+        message: result.message
+      });
+
       if (result.success && result.isValid) {
         // BINGO válido! (distributePrizes ya se ejecutó dentro de callBingo)
         
-        io.to(`bingo:${code}`).emit('bingo:game_over', {
+        const gameOverData = {
           winnerId: socket.userId,
           winnerName: result.winnerName,
           cardId,
           pattern: result.pattern,
           totalPot: result.totalPot,
           celebration: true
-        });
+        };
+
+        logger.info('🏆 [SOCKET] Emitiendo bingo:game_over', gameOverData);
+
+        io.to(`bingo:${code}`).emit('bingo:game_over', gameOverData);
         
-        logger.info(`BINGO! User ${socket.userId} won room ${code}`, {
+        logger.info(`✅ BINGO VÁLIDO! User ${socket.userId} ganó sala ${code}`, {
           totalPot: result.totalPot,
-          pattern: result.pattern
+          pattern: result.pattern,
+          winnerName: result.winnerName
         });
       } else {
         // Bingo inválido
-        io.to(`bingo:${code}`).emit('bingo:claim_invalid', {
+        const invalidData = {
           playerId: socket.userId,
           message: result.message || 'Bingo inválido, continúa el juego'
-        });
+        };
+
+        logger.warn('❌ [SOCKET] BINGO INVÁLIDO - Emitiendo bingo:claim_invalid', invalidData);
+
+        io.to(`bingo:${code}`).emit('bingo:claim_invalid', invalidData);
       }
     } catch (error) {
-      logger.error('Error calling bingo:', error);
+      logger.error('💥 [SOCKET] Error crítico en call_bingo', {
+        error: error.message,
+        stack: error.stack,
+        code,
+        cardId,
+        userId: socket.userId
+      });
       socket.emit('bingo:error', { message: error.message });
     }
   });

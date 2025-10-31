@@ -105,18 +105,21 @@ const BingoRoom = () => {
     });
 
     socket.on('bingo:auto_draw_stopped', (data) => {
+      console.log('🛑️ [FRONTEND] Evento bingo:auto_draw_stopped recibido', data);
       setIsAutoDrawing(false);
     });
 
     socket.on('bingo:claim_in_progress', (data) => {
-      toast.info(`${data.message}`, {
+      console.log('📢 [FRONTEND] Evento bingo:claim_in_progress recibido', data);
+      toast.info('Alguien cantó BINGO, validando...', {
         icon: '⏳',
-        duration: 2000
+        duration: 3000
       });
     });
 
     socket.on('bingo:claim_invalid', (data) => {
-      toast.error('BINGO inválido - Continúa jugando', {
+      console.log('❌ [FRONTEND] Evento bingo:claim_invalid recibido', data);
+      toast.error(`BINGO inválido: ${data.message || 'Patrón no completo'}`, {
         icon: '❌',
         duration: 4000
       });
@@ -125,11 +128,24 @@ const BingoRoom = () => {
     });
 
     socket.on('bingo:game_over', (data) => {
+      console.log('🏆 [FRONTEND] Evento bingo:game_over recibido', {
+        data,
+        currentUser: user?.id,
+        isWinner: data.winnerId === user?.id
+      });
+
       setGameStatus('finished');
       setWinnerInfo(data);
       setShowWinnerModal(true);
       setShowBingoModal(false); // Cerrar modal de BINGO
       
+      console.log('✅ [FRONTEND] Estados actualizados', {
+        gameStatus: 'finished',
+        showWinnerModal: true,
+        showBingoModal: false,
+        winnerInfo: data
+      });
+
       // Mensaje diferenciado para ganador vs otros jugadores
       if (data.winnerId === user?.id) {
         toast.success('¡Felicitaciones! ¡Has ganado!', {
@@ -230,7 +246,16 @@ const BingoRoom = () => {
   const callBingo = useCallback((cardId) => {
     const cardMarked = markedNumbers[cardId] || [];
     
+    console.log('🎯 [FRONTEND] callBingo invocado', {
+      cardId,
+      markedNumbers: cardMarked,
+      markedCount: cardMarked.length,
+      code,
+      timestamp: new Date().toISOString()
+    });
+
     if (cardMarked.length < 5) {
+      console.warn('⚠️ [FRONTEND] No hay suficientes números marcados', { count: cardMarked.length });
       toast.error('Necesitas más números marcados');
       return;
     }
@@ -238,7 +263,10 @@ const BingoRoom = () => {
     // Marcar que ya se cantó BINGO para prevenir que modal vuelva a aparecer
     setBingoCalled(true);
     
-    socket.emit('bingo:call_bingo', { code, cardId });
+    const emitData = { code, cardId };
+    console.log('📤 [FRONTEND] Emitiendo bingo:call_bingo', emitData);
+    
+    socket.emit('bingo:call_bingo', emitData);
     
     toast.info('Validando BINGO...', {
       icon: '⏳',
