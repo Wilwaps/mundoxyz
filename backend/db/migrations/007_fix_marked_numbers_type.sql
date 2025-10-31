@@ -62,9 +62,9 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_bingo_cards_marked_numbers 
 ON bingo_cards USING gin(marked_numbers);
 
--- Índice para búsquedas por room_id y user_id
-CREATE INDEX IF NOT EXISTS idx_bingo_cards_room_user
-ON bingo_cards(room_id, user_id);
+-- Índice para búsquedas por room_id y owner_id
+CREATE INDEX IF NOT EXISTS idx_bingo_cards_room_owner
+ON bingo_cards(room_id, owner_id);
 
 -- Verificación del tipo después de migración
 DO $$
