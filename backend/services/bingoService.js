@@ -799,8 +799,16 @@ class BingoService {
         markedNumbersType: typeof card.marked_numbers
       });
       
-      // Verificar que el cartón tenga números marcados
-      const markedNumbers = card.marked_numbers || [];
+      // Verificar que el cartón tenga números marcados y parsear si es string
+      let markedNumbers = card.marked_numbers || [];
+      if (typeof markedNumbers === 'string') {
+        try {
+          markedNumbers = JSON.parse(markedNumbers);
+        } catch (e) {
+          logger.error('Error parseando marked_numbers', { markedNumbers, error: e.message });
+          markedNumbers = [];
+        }
+      }
       
       logger.info('✅ Números marcados parseados', {
         markedNumbers,
