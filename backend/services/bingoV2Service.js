@@ -222,20 +222,21 @@ class BingoV2Service {
       // Check user balance
       const totalCost = room.card_cost * cardsToBuy;
       const userResult = await dbQuery(
-        `SELECT coins, fires FROM users WHERE id = $1`,
+        `SELECT coins_balance, fires_balance FROM users WHERE id = $1`,
         [userId]
       );
 
       const user = userResult.rows[0];
-      const userBalance = room.currency_type === 'coins' ? user.coins : user.fires;
+      const userBalance = room.currency_type === 'coins' ? user.coins_balance : user.fires_balance;
 
       if (userBalance < totalCost) {
         throw new Error(`Insufficient ${room.currency_type}`);
       }
 
       // Deduct cost
+      const columnName = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
       await dbQuery(
-        `UPDATE users SET ${room.currency_type} = ${room.currency_type} - $1 WHERE id = $2`,
+        `UPDATE users SET ${columnName} = ${columnName} - $1 WHERE id = $2`,
         [totalCost, userId]
       );
 
@@ -735,9 +736,10 @@ class BingoV2Service {
       const winnerUserId = winnerResult.rows[0].user_id;
 
       // Award prizes
+      const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
       await dbQuery(
         `UPDATE users 
-         SET ${room.currency_type} = ${room.currency_type} + $1,
+         SET ${currencyColumn} = ${currencyColumn} + $1,
              experience = experience + 1,
              total_games_played = total_games_played + 1,
              total_games_won = total_games_won + 1
@@ -749,7 +751,7 @@ class BingoV2Service {
       if (room.host_id !== winnerUserId) {
         await dbQuery(
           `UPDATE users 
-           SET ${room.currency_type} = ${room.currency_type} + $1,
+           SET ${currencyColumn} = ${currencyColumn} + $1,
                experience = experience + 1,
                total_games_played = total_games_played + 1
            WHERE id = $2`,
@@ -759,7 +761,7 @@ class BingoV2Service {
         // If host is winner, they get both prizes
         await dbQuery(
           `UPDATE users 
-           SET ${room.currency_type} = ${room.currency_type} + $1
+           SET ${currencyColumn} = ${currencyColumn} + $1
            WHERE id = $2`,
           [hostPrize, winnerUserId]
         );
