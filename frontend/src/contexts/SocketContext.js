@@ -50,8 +50,10 @@ export const SocketProvider = ({ children }) => {
       },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
+      reconnectionDelay: 3000,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 10,
+      timeout: 20000
     });
 
     // Connection events

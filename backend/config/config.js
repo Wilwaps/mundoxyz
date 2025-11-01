@@ -56,7 +56,7 @@ const config = {
     cookieDomain: process.env.COOKIE_DOMAIN || 'localhost',
     rateLimit: {
       windowMs: parseInt(process.env.RL_WINDOW_MS || '60000', 10),
-      maxRequests: parseInt(process.env.RL_MAX_REQ || '120', 10)
+      maxRequests: parseInt(process.env.RL_MAX_REQ || '500', 10)
     }
   },
   

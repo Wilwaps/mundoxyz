@@ -211,7 +211,7 @@ function adminAuth(req, res, next) {
 // Rate limiting per user
 const userRateLimits = new Map();
 
-function userRateLimit(maxRequests = 60, windowMs = 60000) {
+function userRateLimit(maxRequests = 300, windowMs = 60000) {
   return (req, res, next) => {
     if (!req.user) {
       return next();
@@ -230,6 +230,7 @@ function userRateLimit(maxRequests = 60, windowMs = 60000) {
     const recentRequests = userRequests.filter(time => now - time < windowMs);
     
     if (recentRequests.length >= maxRequests) {
+      logger.warn(`Rate limit exceeded for user ${userId}: ${recentRequests.length} requests in window`);
       return res.status(429).json({ 
         error: 'Too many requests',
         retryAfter: Math.ceil((recentRequests[0] + windowMs - now) / 1000)
