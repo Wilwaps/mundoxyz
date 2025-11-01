@@ -221,13 +221,17 @@ class BingoV2Service {
 
       // Check user balance
       const totalCost = room.card_cost * cardsToBuy;
-      const userResult = await dbQuery(
-        `SELECT coins_balance, fires_balance FROM users WHERE id = $1`,
+      const walletResult = await dbQuery(
+        `SELECT coins_balance, fires_balance FROM wallets WHERE user_id = $1`,
         [userId]
       );
 
-      const user = userResult.rows[0];
-      const userBalance = room.currency_type === 'coins' ? user.coins_balance : user.fires_balance;
+      if (walletResult.rows.length === 0) {
+        throw new Error('Wallet not found');
+      }
+
+      const wallet = walletResult.rows[0];
+      const userBalance = room.currency_type === 'coins' ? wallet.coins_balance : wallet.fires_balance;
 
       if (userBalance < totalCost) {
         throw new Error(`Insufficient ${room.currency_type}`);
@@ -236,7 +240,7 @@ class BingoV2Service {
       // Deduct cost
       const columnName = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
       await dbQuery(
-        `UPDATE users SET ${columnName} = ${columnName} - $1 WHERE id = $2`,
+        `UPDATE wallets SET ${columnName} = ${columnName} - $1 WHERE user_id = $2`,
         [totalCost, userId]
       );
 
@@ -738,31 +742,44 @@ class BingoV2Service {
       // Award prizes
       const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
       await dbQuery(
+        `UPDATE wallets 
+         SET ${currencyColumn} = ${currencyColumn} + $1
+         WHERE user_id = $2`,
+        [winnerPrize, winnerUserId]
+      );
+
+      // Update user stats
+      await dbQuery(
         `UPDATE users 
-         SET ${currencyColumn} = ${currencyColumn} + $1,
-             experience = experience + 1,
+         SET experience = experience + 1,
              total_games_played = total_games_played + 1,
              total_games_won = total_games_won + 1
-         WHERE id = $2`,
-        [winnerPrize, winnerUserId]
+         WHERE id = $1`,
+        [winnerUserId]
       );
 
       // Award host (if not the winner)
       if (room.host_id !== winnerUserId) {
         await dbQuery(
-          `UPDATE users 
-           SET ${currencyColumn} = ${currencyColumn} + $1,
-               experience = experience + 1,
-               total_games_played = total_games_played + 1
-           WHERE id = $2`,
+          `UPDATE wallets 
+           SET ${currencyColumn} = ${currencyColumn} + $1
+           WHERE user_id = $2`,
           [hostPrize, room.host_id]
+        );
+
+        await dbQuery(
+          `UPDATE users 
+           SET experience = experience + 1,
+               total_games_played = total_games_played + 1
+           WHERE id = $1`,
+          [room.host_id]
         );
       } else {
         // If host is winner, they get both prizes
         await dbQuery(
-          `UPDATE users 
+          `UPDATE wallets 
            SET ${currencyColumn} = ${currencyColumn} + $1
-           WHERE id = $2`,
+           WHERE user_id = $2`,
           [hostPrize, winnerUserId]
         );
       }
