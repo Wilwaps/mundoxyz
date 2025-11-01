@@ -44,7 +44,7 @@ const BingoV2WaitingRoom = () => {
       });
 
       socket.on('bingo:game_started', () => {
-        navigate(`/games/bingo/v2/play/${code}`);
+        navigate(`/bingo/v2/play/${code}`);
       });
 
       socket.on('bingo:error', (data) => {
@@ -69,6 +69,12 @@ const BingoV2WaitingRoom = () => {
       
       if (data.success) {
         setRoom(data.room);
+        
+        // Redirect to game if already started
+        if (data.room.status === 'in_progress') {
+          navigate(`/bingo/v2/play/${code}`);
+          return;
+        }
         
         // Check if current user is ready
         const currentPlayer = data.room.players?.find(p => p.user_id === user?.id);
@@ -135,7 +141,7 @@ const BingoV2WaitingRoom = () => {
         userId: user.id
       });
     }
-    navigate('/games/bingo');
+    navigate('/bingo');
   };
 
   if (loading) return <div className="loading">Cargando sala...</div>;
