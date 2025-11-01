@@ -18,7 +18,8 @@ import Market from './pages/Market';
 import Roles from './pages/Roles';
 import Upcoming from './pages/Upcoming';
 import BingoLobby from './pages/BingoLobby';
-import BingoRoom from './pages/BingoRoom';
+import BingoV2WaitingRoom from './pages/BingoV2WaitingRoom';
+import BingoV2GameRoom from './pages/BingoV2GameRoom';
 import RaffleDetails from './pages/RaffleDetails';
 import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
@@ -121,8 +122,9 @@ function App() {
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />
                 <Route path="upcoming" element={<Upcoming />} />
-                <Route path="bingo/lobby" element={<BingoLobby />} />
-                <Route path="bingo/room/:code" element={<BingoRoom />} />
+                <Route path="bingo" element={<BingoLobby />} />
+                <Route path="bingo/v2/room/:code" element={<BingoV2WaitingRoom />} />
+                <Route path="bingo/v2/play/:code" element={<BingoV2GameRoom />} />
                 <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
                 <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
                 <Route path="admin/*" element={<Admin />} />

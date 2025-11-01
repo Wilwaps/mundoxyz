@@ -6,17 +6,19 @@ RAILWAY NO TIENE QUERY!!
 
 esa es la pagina de produccion que se esta usando
 https://confident-bravery-production-ce7b.up.railway.app/games
-realiza pruebas con 2 usuarios chromedevtools, ventana normal o incognito como puedas iniciar sesion en ambas cuentas para pruebas completas
-prueba1/123456
+realiza pruebas con 2 usuarios chromedevtools, ventana normal o incognito
+iniciar sesion en ambas cuentas para pruebas completas
+prueba1/123456789
+modo incognito
 prueba2/Mirame12veces.
 
-crea un script mejorado para ejecucion con node para base de datos
-
-node Ejemplo.js "postgresql://postgres:jaUlzMfMxrTAXGtAWbYjTLBgJDSNxBPR@trolley.proxy.rlwy.net:28951/railway"
+cuando sea necesario crear un script Node.js que use el módulo pg para ejecutar directamente el SQL.
 
 Cuando se hace una modificación que debe debe representar cambios en produccion, se realiza commit y push a github
-
-
+git add backend/routes/tictactoe.js frontend/src/pages/TicTacToeRoom.js TICTACTOE_REMATCH_BUGFIX.md
+git commit --amend -m "fix: sistema revanchas TicTacToe"
+git push -u origin HEAD
+se ejecuta automaticamente chromedevtools con sleep 369 segundos en powershell para realizar las pruebas necesarias
 
 esta es la direccion asignada por railway
 

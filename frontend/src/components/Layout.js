@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import MessageInbox from './MessageInbox';
 import {
   User,
   DoorOpen,
@@ -43,6 +44,7 @@ const Layout = () => {
 
   const displayCoins = parseFloat(balanceData?.coins_balance ?? user?.coins_balance ?? 0);
   const displayFires = parseFloat(balanceData?.fires_balance ?? user?.fires_balance ?? 0);
+  const displayExperience = user?.experience || 0;
 
   const navItems = [
     { path: '/profile', icon: User, label: 'Perfil' },
@@ -68,6 +70,13 @@ const Layout = () => {
             {/* Balance Display - Clickeable */}
             <div className="flex items-center gap-3">
               <div 
+                className="badge-experience cursor-pointer hover:scale-110 transition-transform"
+                onClick={() => navigate('/profile')}
+                title="Experiencia"
+              >
+                <span className="text-sm">⭐ {displayExperience} XP</span>
+              </div>
+              <div 
                 className="badge-coins cursor-pointer hover:scale-110 transition-transform"
                 onClick={() => navigate('/profile?tab=coins')}
                 title="Ver historial de coins"
@@ -86,6 +95,9 @@ const Layout = () => {
         </div>
       </header>
 
+      {/* Message Inbox Component */}
+      <MessageInbox />
+      
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-20">
         <Outlet />

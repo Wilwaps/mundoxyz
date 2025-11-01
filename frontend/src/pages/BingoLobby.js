@@ -32,28 +32,20 @@ const BingoLobby = () => {
       if (filters.currency !== 'all') params.append('currency', filters.currency);
       if (filters.mode !== 'all') params.append('mode', filters.mode);
       
-      const response = await axios.get(`/api/bingo/rooms/public?${params}`);
+      const response = await axios.get(`/api/bingo/v2/rooms?${params}`);
       return response.data.rooms;
     },
     refetchInterval: 5000
   });
 
-  // Verificar sala activa
-  const { data: activeRoom } = useQuery({
-    queryKey: ['bingo-active-room'],
-    queryFn: async () => {
-      const response = await axios.get('/api/bingo/my-active-room');
-      return response.data;
-    },
-    refetchInterval: 10000
-  });
+  // V2 doesn't need activeRoom check
+  const activeRoom = null;
 
   // Handler para limpiar sala problemática
   const handleClearRoom = async () => {
     try {
       await axios.post('/api/bingo/clear-my-room');
       toast.success('Sala limpiada exitosamente');
-      queryClient.invalidateQueries(['bingo-active-room']);
       queryClient.invalidateQueries(['bingo-rooms']);
     } catch (error) {
       console.error('Error limpiando sala:', error);
@@ -94,12 +86,12 @@ const BingoLobby = () => {
 
   const handleJoinSuccess = (code) => {
     queryClient.invalidateQueries(['bingo-rooms']);
-    navigate(`/bingo/room/${code}`);
+    navigate(`/bingo/v2/room/${code}`);
   };
 
   const handleCreateSuccess = (code) => {
     queryClient.invalidateQueries(['bingo-rooms']);
-    navigate(`/bingo/room/${code}`);
+    navigate(`/bingo/v2/room/${code}`);
   };
 
   // Filtrar salas

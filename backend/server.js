@@ -23,7 +23,7 @@ const adminRoutes = require('./routes/admin');
 const rolesRoutes = require('./routes/roles');
 const healthRoutes = require('./routes/health');
 const gameRoutes = require('./routes/games');
-const bingoRoutes = require('./routes/bingo');
+const bingoV2Routes = require('./routes/bingoV2');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
@@ -71,9 +71,9 @@ io.on('connection', (socket) => {
   const { initTicTacToeSocket } = require('./socket/tictactoe');
   initTicTacToeSocket(io, socket);
   
-  // Initialize Bingo socket handlers
-  const handleBingoSocket = require('./socket/bingo');
-  handleBingoSocket(io, socket);
+  // Initialize Bingo V2 socket handlers
+  const handleBingoV2Socket = require('./socket/bingoV2');
+  handleBingoV2Socket(io);
   
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
@@ -213,10 +213,10 @@ app.use('/api/tictactoe', (req, res, next) => {
   req.io = io;
   next();
 }, tictactoeRoutes);
-app.use('/api/bingo', (req, res, next) => {
+app.use('/api/bingo/v2', (req, res, next) => {
   req.io = io;
   next();
-}, bingoRoutes);
+}, bingoV2Routes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
@@ -293,10 +293,7 @@ async function startServer() {
           const BingoCleanupJob = require('./jobs/bingoCleanup');
           BingoCleanupJob.start();
           
-          // Iniciar job de detección de abandono de host
-          const BingoAbandonmentJob = require('./jobs/bingoAbandonmentJob');
-          BingoAbandonmentJob.start();
-          logger.info('✅ BingoAbandonmentJob iniciado - cada 60 segundos');
+          // V2 handles abandonment internally via socket disconnect
         } catch (bingoError) {
           logger.warn('⚠️  Bingo recovery system failed to start:', bingoError.message);
           logger.info('Server will continue without Bingo recovery features');
