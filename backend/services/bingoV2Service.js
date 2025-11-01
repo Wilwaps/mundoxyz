@@ -432,8 +432,8 @@ class BingoV2Service {
 
       const room = roomResult.rows[0];
       
-      // Rate limiting: verificar último número cantado
-      if (room.last_called_at && !isAuto) {
+      // Rate limiting: verificar último número cantado (solo si la columna existe)
+      if (room.hasOwnProperty('last_called_at') && room.last_called_at && !isAuto) {
         const timeSinceLastCall = Date.now() - new Date(room.last_called_at).getTime();
         if (timeSinceLastCall < 1500) { // 1.5 segundos mínimo entre cantos manuales
           throw new Error('Por favor espera un momento antes de cantar otro número');
@@ -456,13 +456,27 @@ class BingoV2Service {
       // Add to drawn numbers
       drawnNumbers.push(nextNumber);
 
-      // Update room
-      await dbQuery(
-        `UPDATE bingo_v2_rooms 
-         SET drawn_numbers = $1, last_called_number = $2, last_called_at = NOW()
-         WHERE id = $3`,
-        [JSON.stringify(drawnNumbers), nextNumber, roomId]
-      );
+      // Update room (incluye last_called_at solo si existe la columna)
+      try {
+        await dbQuery(
+          `UPDATE bingo_v2_rooms 
+           SET drawn_numbers = $1, last_called_number = $2, last_called_at = NOW()
+           WHERE id = $3`,
+          [JSON.stringify(drawnNumbers), nextNumber, roomId]
+        );
+      } catch (err) {
+        // Si falla por last_called_at, intentar sin esa columna
+        if (err.message.includes('last_called_at')) {
+          await dbQuery(
+            `UPDATE bingo_v2_rooms 
+             SET drawn_numbers = $1, last_called_number = $2
+             WHERE id = $3`,
+            [JSON.stringify(drawnNumbers), nextNumber, roomId]
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // Record in draw history
       await dbQuery(
