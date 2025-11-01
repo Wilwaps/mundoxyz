@@ -169,9 +169,24 @@ const handleBingoSocket = (io, socket) => {
           celebration: true
         };
 
+        console.log('════════════════════════════════════════');
+        console.log('🏆 PREPARANDO EMISIÓN DE GAME_OVER');
+        console.log('════════════════════════════════════════');
+        console.log('Socket ID:', socket.id);
+        console.log('Socket Connected:', socket.connected);
+        console.log('User ID:', socket.userId);
+        console.log('Room:', `bingo:${code}`);
+        console.log('Data a emitir:', JSON.stringify(gameOverData, null, 2));
+        console.log('════════════════════════════════════════');
+
         logger.info('🏆 [SOCKET] Emitiendo bingo:game_over', gameOverData);
 
         io.to(`bingo:${code}`).emit('bingo:game_over', gameOverData);
+        
+        console.log('════════════════════════════════════════');
+        console.log('✅ GAME_OVER EMITIDO');
+        console.log('Timestamp:', new Date().toISOString());
+        console.log('════════════════════════════════════════');
         
         logger.info(`✅ BINGO VÁLIDO! User ${socket.userId} ganó sala ${code}`, {
           totalPot: result.totalPot,
@@ -179,9 +194,10 @@ const handleBingoSocket = (io, socket) => {
           winnerName: result.winnerName
         });
         
-        // Responder al callback si existe
+        // Responder al callback si existe DESPUÉS de emitir
         if (callback && typeof callback === 'function') {
           callback({ success: true });
+          console.log('✅ Callback ejecutado');
         }
       } else {
         // Bingo inválido

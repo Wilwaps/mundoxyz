@@ -128,26 +128,41 @@ const BingoRoom = () => {
     });
 
     socket.on('bingo:game_over', (data) => {
-      console.log('🏆 [FRONTEND] Evento bingo:game_over recibido', {
-        data,
-        currentUser: user?.id,
-        isWinner: data.winnerId === user?.id
-      });
+      console.log('════════════════════════════════════════');
+      console.log('🏆🏆🏆 GAME_OVER RECIBIDO EN FRONTEND');
+      console.log('════════════════════════════════════════');
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('Data recibida:', JSON.stringify(data, null, 2));
+      console.log('Socket connected:', socket.connected);
+      console.log('Current user:', user?.id);
+      console.log('Is winner:', data.winnerId === user?.id);
+      console.log('════════════════════════════════════════');
 
       // Actualizar estados inmediatamente
+      console.log('🔄 Actualizando estados...');
+      
       setGameStatus('finished');
+      console.log('✅ setGameStatus(finished)');
+      
       setWinnerInfo(data);
-      setShowBingoModal(false); // Cerrar modal de BINGO
+      console.log('✅ setWinnerInfo:', data);
+      
+      setShowBingoModal(false);
+      console.log('✅ setShowBingoModal(false)');
       
       // Forzar actualización del modal de celebración
       setTimeout(() => {
+        console.log('⏱️ Timeout ejecutándose...');
         setShowWinnerModal(true);
-        console.log('✅ [FRONTEND] Modal de celebración activado');
+        console.log('✅✅✅ setShowWinnerModal(TRUE)');
+        console.log('════════════════════════════════════════');
+        console.log('🎉 MODAL DE CELEBRACIÓN ACTIVADO');
+        console.log('════════════════════════════════════════');
       }, 100);
       
       console.log('✅ [FRONTEND] Estados actualizados', {
         gameStatus: 'finished',
-        showWinnerModal: true,
+        showWinnerModal: 'will be true in 100ms',
         showBingoModal: false,
         winnerInfo: data
       });
@@ -270,11 +285,25 @@ const BingoRoom = () => {
     setBingoCalled(true);
     
     const emitData = { code, cardId };
-    console.log('📤 [FRONTEND] Emitiendo bingo:call_bingo', emitData);
+    
+    console.log('════════════════════════════════════════');
+    console.log('📤 EMITIENDO CALL_BINGO');
+    console.log('════════════════════════════════════════');
+    console.log('Socket connected:', socket.connected);
+    console.log('Socket ID:', socket.id);
+    console.log('Emit data:', emitData);
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('════════════════════════════════════════');
     
     // Agregar callback para manejar respuesta
     socket.emit('bingo:call_bingo', emitData, (response) => {
-      console.log('📨 [FRONTEND] Respuesta de bingo:call_bingo', response);
+      console.log('════════════════════════════════════════');
+      console.log('📨 RESPUESTA DE CALL_BINGO');
+      console.log('════════════════════════════════════════');
+      console.log('Response:', JSON.stringify(response, null, 2));
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('════════════════════════════════════════');
+      
       if (response && response.error) {
         toast.error(response.error || 'Error al validar BINGO');
         // Reabrir modal si hay error
