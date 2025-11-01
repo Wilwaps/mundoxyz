@@ -125,7 +125,7 @@ const handleBingoSocket = (io, socket) => {
   });
 
   // Jugador canta BINGO
-  socket.on('bingo:call_bingo', async (data) => {
+  socket.on('bingo:call_bingo', async (data, callback) => {
     const { code, cardId } = data;
     
     try {
@@ -178,6 +178,11 @@ const handleBingoSocket = (io, socket) => {
           pattern: result.pattern,
           winnerName: result.winnerName
         });
+        
+        // Responder al callback si existe
+        if (callback && typeof callback === 'function') {
+          callback({ success: true });
+        }
       } else {
         // Bingo inválido
         const invalidData = {
@@ -188,6 +193,11 @@ const handleBingoSocket = (io, socket) => {
         logger.warn('❌ [SOCKET] BINGO INVÁLIDO - Emitiendo bingo:claim_invalid', invalidData);
 
         io.to(`bingo:${code}`).emit('bingo:claim_invalid', invalidData);
+        
+        // Responder al callback con error
+        if (callback && typeof callback === 'function') {
+          callback({ success: false, error: result.message || 'Bingo inválido' });
+        }
       }
     } catch (error) {
       logger.error('💥 [SOCKET] Error crítico en call_bingo', {
@@ -198,6 +208,11 @@ const handleBingoSocket = (io, socket) => {
         userId: socket.userId
       });
       socket.emit('bingo:error', { message: error.message });
+      
+      // Responder al callback con error
+      if (callback && typeof callback === 'function') {
+        callback({ success: false, error: error.message });
+      }
     }
   });
 

@@ -134,10 +134,16 @@ const BingoRoom = () => {
         isWinner: data.winnerId === user?.id
       });
 
+      // Actualizar estados inmediatamente
       setGameStatus('finished');
       setWinnerInfo(data);
-      setShowWinnerModal(true);
       setShowBingoModal(false); // Cerrar modal de BINGO
+      
+      // Forzar actualización del modal de celebración
+      setTimeout(() => {
+        setShowWinnerModal(true);
+        console.log('✅ [FRONTEND] Modal de celebración activado');
+      }, 100);
       
       console.log('✅ [FRONTEND] Estados actualizados', {
         gameStatus: 'finished',
@@ -266,7 +272,16 @@ const BingoRoom = () => {
     const emitData = { code, cardId };
     console.log('📤 [FRONTEND] Emitiendo bingo:call_bingo', emitData);
     
-    socket.emit('bingo:call_bingo', emitData);
+    // Agregar callback para manejar respuesta
+    socket.emit('bingo:call_bingo', emitData, (response) => {
+      console.log('📨 [FRONTEND] Respuesta de bingo:call_bingo', response);
+      if (response && response.error) {
+        toast.error(response.error || 'Error al validar BINGO');
+        // Reabrir modal si hay error
+        setShowBingoModal(true);
+        setBingoCalled(false);
+      }
+    });
     
     toast.info('Validando BINGO...', {
       icon: '⏳',
