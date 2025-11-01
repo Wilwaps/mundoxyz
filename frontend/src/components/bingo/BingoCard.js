@@ -68,10 +68,10 @@ const BingoCard = ({ card, drawnNumbers = [], markedNumbers = [], onNumberClick,
 
         {/* Grid del cartón */}
         <div className="grid grid-cols-5 gap-0.5 sm:gap-1">
-          {grid.map((column, colIndex) => 
-            column.map((cellData, rowIndex) => {
-              const cellKey = `${colIndex}-${rowIndex}`;
-              const isFreeSpace = colIndex === 2 && rowIndex === 2;
+          {grid.map((row, rowIndex) => 
+            row.map((cellData, colIndex) => {
+              const cellKey = `${rowIndex}-${colIndex}`;
+              const isFreeSpace = rowIndex === 2 && colIndex === 2;
               
               // Extraer número del objeto o usar directamente si es número
               const number = typeof cellData === 'object' && cellData !== null ? cellData.value : cellData;
