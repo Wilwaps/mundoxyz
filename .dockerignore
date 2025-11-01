@@ -1,0 +1,42 @@
+# Node
+node_modules
+npm-debug.log
+
+# Build
+frontend/build
+frontend/.cache
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test scripts
+*.ps1
+test_*.js
+verify_*.js
+check_*.js
+wait_and_test.js
+railway_deploy_check.js
+auto_test_*.ps1
+
+# Logs
+*.log
