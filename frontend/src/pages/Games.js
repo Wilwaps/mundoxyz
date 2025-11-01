@@ -89,7 +89,7 @@ const Games = () => {
 
   const handleGameClick = (gameId) => {
     if (gameId === 'bingo') {
-      navigate('/bingo/lobby');
+      navigate('/bingo');
     } else if (gameId === 'raffles') {
       navigate('/raffles/lobby');
     } else if (gameId === 'tictactoe') {

@@ -431,6 +431,14 @@ class BingoV2Service {
       }
 
       const room = roomResult.rows[0];
+      
+      // Rate limiting: verificar último número cantado
+      if (room.last_called_at && !isAuto) {
+        const timeSinceLastCall = Date.now() - new Date(room.last_called_at).getTime();
+        if (timeSinceLastCall < 1500) { // 1.5 segundos mínimo entre cantos manuales
+          throw new Error('Por favor espera un momento antes de cantar otro número');
+        }
+      }
 
       // Generate next number
       const maxNumber = room.mode === '75' ? 75 : 90;
@@ -451,7 +459,7 @@ class BingoV2Service {
       // Update room
       await dbQuery(
         `UPDATE bingo_v2_rooms 
-         SET drawn_numbers = $1, last_called_number = $2
+         SET drawn_numbers = $1, last_called_number = $2, last_called_at = NOW()
          WHERE id = $3`,
         [JSON.stringify(drawnNumbers), nextNumber, roomId]
       );

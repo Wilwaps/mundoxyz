@@ -24,6 +24,7 @@ const BingoV2GameRoom = () => {
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [userExperience, setUserExperience] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isCallingNumber, setIsCallingNumber] = useState(false);
 
   useEffect(() => {
     loadRoomAndCards();
@@ -62,7 +63,16 @@ const BingoV2GameRoom = () => {
       });
 
       socket.on('bingo:error', (data) => {
-        alert(data.message);
+        console.warn('Bingo Error:', data.message);
+        // Mostrar mensaje más amigable según el error
+        if (data.message.includes('espera un momento')) {
+          // Ignorar errores de rate limiting si ya tenemos throttling en cliente
+          return;
+        } else if (data.message.includes('All numbers')) {
+          alert('¡Todos los números han sido cantados!');
+        } else {
+          alert(data.message);
+        }
       });
 
       return () => {
@@ -126,12 +136,18 @@ const BingoV2GameRoom = () => {
   };
 
   const handleCallNumber = () => {
-    if (socket && room && room.host_id === user.id) {
+    if (socket && room && room.host_id === user.id && !isCallingNumber) {
+      setIsCallingNumber(true);
       socket.emit('bingo:call_number', {
         roomCode: code,
         userId: user.id,
         isAuto: false
       });
+      
+      // Re-habilitar después de 2 segundos
+      setTimeout(() => {
+        setIsCallingNumber(false);
+      }, 2000);
     }
   };
 
@@ -190,9 +206,49 @@ const BingoV2GameRoom = () => {
     if (mode === '75') {
       switch (pattern) {
         case 'line':
-          // Check rows, columns, and diagonals
-          // Simplified check - implement full logic similar to backend
-          return marked.size >= 5;
+          // Verificar filas completas (horizontal)
+          for (let row = 0; row < 5; row++) {
+            let complete = true;
+            for (let col = 0; col < 5; col++) {
+              if (!(row === 2 && col === 2) && !marked.has(`${row},${col}`)) {
+                complete = false;
+                break;
+              }
+            }
+            if (complete) return true;
+          }
+          
+          // Verificar columnas completas (vertical)
+          for (let col = 0; col < 5; col++) {
+            let complete = true;
+            for (let row = 0; row < 5; row++) {
+              if (!(row === 2 && col === 2) && !marked.has(`${row},${col}`)) {
+                complete = false;
+                break;
+              }
+            }
+            if (complete) return true;
+          }
+          
+          // Verificar diagonal principal
+          let diag1Complete = true;
+          for (let i = 0; i < 5; i++) {
+            if (i !== 2 && !marked.has(`${i},${i}`)) {
+              diag1Complete = false;
+              break;
+            }
+          }
+          if (diag1Complete) return true;
+          
+          // Verificar diagonal secundaria
+          let diag2Complete = true;
+          for (let i = 0; i < 5; i++) {
+            if (i !== 2 && !marked.has(`${i},${4-i}`)) {
+              diag2Complete = false;
+              break;
+            }
+          }
+          return diag2Complete;
           
         case 'corners':
           return marked.has('0,0') && marked.has('0,4') && 
@@ -205,8 +261,15 @@ const BingoV2GameRoom = () => {
           return false;
       }
     } else {
-      // 90-ball logic
-      return marked.size >= 5;
+      // 90-ball: verificar línea horizontal completa
+      for (let row = 0; row < 3; row++) {
+        let count = 0;
+        for (let col = 0; col < 9; col++) {
+          if (marked.has(`${row},${col}`)) count++;
+        }
+        if (count >= 5) return true; // 90-ball tiene 5 números por línea
+      }
+      return false;
     }
   };
 
@@ -221,7 +284,8 @@ const BingoV2GameRoom = () => {
         if (response.success) {
           console.log('¡BINGO VALIDADO!');
         } else {
-          alert(response.message || 'Patrón no válido');
+          console.warn('Bingo inválido:', response.message);
+          alert('El patrón aún no está completo. Continúa marcando números.');
           setCanCallBingo(false);
         }
       });
@@ -235,7 +299,7 @@ const BingoV2GameRoom = () => {
         userId: user.id
       });
     }
-    navigate('/games/bingo');
+    navigate('/bingo');
   };
 
   if (loading) return <div className="loading">Cargando juego...</div>;
@@ -295,9 +359,9 @@ const BingoV2GameRoom = () => {
             <button 
               className="call-number-btn"
               onClick={handleCallNumber}
-              disabled={autoCallEnabled}
+              disabled={autoCallEnabled || isCallingNumber}
             >
-              Cantar Número
+              {isCallingNumber ? 'Esperando...' : 'Cantar Número'}
             </button>
             
             <button 
@@ -363,7 +427,7 @@ const BingoV2GameRoom = () => {
               <p>Pozo total: {room.total_pot} {room.currency_type}</p>
             </div>
             
-            <button onClick={() => navigate('/games/bingo')}>
+            <button onClick={() => navigate('/bingo')}>
               Volver al Lobby
             </button>
           </div>
