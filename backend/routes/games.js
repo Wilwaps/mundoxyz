@@ -54,11 +54,11 @@ router.get('/list', optionalAuth, async (req, res) => {
     
     try {
       const bingoCount = await query(
-        "SELECT COUNT(*) as count FROM bingo_rooms WHERE status IN ('waiting', 'ready', 'playing')"
+        "SELECT COUNT(*) as count FROM bingo_v2_rooms WHERE status IN ('waiting', 'in_progress')"
       );
       games[1].active_rooms = parseInt(bingoCount.rows[0].count);
     } catch (err) {
-      logger.warn('Bingo table not found:', err.message);
+      logger.error('Error fetching bingo rooms:', err);
       games[1].active_rooms = 0;
     }
     
@@ -267,10 +267,10 @@ router.get('/active', async (req, res) => {
           br.max_players,
           COUNT(bp.id) as current_players,
           u.username as host_username
-        FROM bingo_rooms br
-        LEFT JOIN bingo_room_players bp ON bp.room_id = br.id AND bp.status != 'left'
+        FROM bingo_v2_rooms br
+        LEFT JOIN bingo_v2_room_players bp ON bp.room_id = br.id
         JOIN users u ON u.id = br.host_id
-        WHERE br.status IN ('waiting', 'ready') 
+        WHERE br.status IN ('waiting', 'in_progress') 
           AND br.visibility = 'public'
         GROUP BY br.id, u.username
         ORDER BY br.created_at DESC

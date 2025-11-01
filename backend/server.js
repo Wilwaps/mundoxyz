@@ -63,6 +63,10 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
+// Initialize Bingo V2 Socket handlers
+const BingoV2Socket = require('./socket/bingoV2');
+BingoV2Socket.initialize(io);
+
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
@@ -70,10 +74,6 @@ io.on('connection', (socket) => {
   // Initialize TicTacToe socket handlers
   const { initTicTacToeSocket } = require('./socket/tictactoe');
   initTicTacToeSocket(io, socket);
-  
-  // Initialize Bingo V2 socket handlers
-  const handleBingoV2Socket = require('./socket/bingoV2');
-  handleBingoV2Socket(io);
   
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
@@ -284,20 +284,12 @@ async function startServer() {
         dbReady = true;
         logger.info('✅ Database connected');
         
-        // Inicializar sistema de recuperación de Bingo (no bloqueante)
-        try {
-          const { initializeBingoRecovery } = require('./utils/bingo-recovery');
-          await initializeBingoRecovery();
-          
-          // Iniciar jobs de cleanup periódico
-          const BingoCleanupJob = require('./jobs/bingoCleanup');
-          BingoCleanupJob.start();
-          
-          // V2 handles abandonment internally via socket disconnect
-        } catch (bingoError) {
-          logger.warn('⚠️  Bingo recovery system failed to start:', bingoError.message);
-          logger.info('Server will continue without Bingo recovery features');
-        }
+        // Sistema de recuperación de Bingo V2 - Temporalmente deshabilitado
+        // TODO: Actualizar para usar tablas bingo_v2_*
+        logger.info('🔄 Sistema de recuperación Bingo V2 en desarrollo');
+        
+        // Cleanup jobs disabled until migration to v2 tables
+        logger.info('✅ Bingo cleanup jobs disabled - using V2 system');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }
@@ -317,7 +309,9 @@ async function startServer() {
     (async () => {
       try {
         const bot = require('./bot/telegram-bot');
+        const telegramService = require('./services/telegramService');
         if (bot) {
+          telegramService.setBot(bot);
           logger.info('✅ Telegram bot started');
         } else {
           logger.warn('⚠️  Telegram bot not initialized (missing token)');

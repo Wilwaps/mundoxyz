@@ -23,8 +23,8 @@ async function recoverActiveBingoRooms() {
         id, code, host_id, status, 
         created_at, last_activity,
         EXTRACT(EPOCH FROM (NOW() - last_activity)) as inactive_seconds
-      FROM bingo_rooms
-      WHERE status IN ('lobby', 'waiting', 'ready', 'playing')
+      FROM bingo_v2_rooms
+      WHERE status IN ('waiting', 'in_progress')
       AND created_at > NOW() - INTERVAL '24 hours'
       ORDER BY created_at DESC
     `);
@@ -93,9 +93,9 @@ async function recoverActiveBingoRooms() {
 async function cleanupOldRooms() {
   try {
     const result = await query(`
-      DELETE FROM bingo_rooms
+      DELETE FROM bingo_v2_rooms
       WHERE status IN ('finished', 'cancelled')
-      AND ended_at < NOW() - INTERVAL '7 days'
+      AND finished_at < NOW() - INTERVAL '7 days'
       RETURNING id, code
     `);
     
