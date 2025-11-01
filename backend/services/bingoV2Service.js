@@ -1,4 +1,4 @@
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 const logger = require('../utils/logger');
 
 class BingoV2Service {
@@ -417,12 +417,21 @@ class BingoV2Service {
    * Call a number
    */
   static async callNumber(roomId, calledBy, isAuto = false, client = null) {
-    const dbQuery = client ? client.query.bind(client) : query;
+    let dbQuery = client ? client.query.bind(client) : query;
+    let transactionClient = null;
+    const useTransaction = !client; // If no client provided, use transaction
 
     try {
-      // Get room
+      // Start transaction if needed
+      if (useTransaction) {
+        transactionClient = await getClient();
+        await transactionClient.query('BEGIN');
+        dbQuery = transactionClient.query.bind(transactionClient);
+      }
+
+      // Get room with lock to prevent race conditions
       const roomResult = await dbQuery(
-        `SELECT * FROM bingo_v2_rooms WHERE id = $1 AND status = 'in_progress'`,
+        `SELECT * FROM bingo_v2_rooms WHERE id = $1 AND status = 'in_progress' FOR UPDATE`,
         [roomId]
       );
 
@@ -492,14 +501,32 @@ class BingoV2Service {
         [roomId, calledBy, isAuto ? 'auto_called_number' : 'called_number', { number: nextNumber }]
       );
 
+      // Commit transaction if used
+      if (useTransaction && transactionClient) {
+        await transactionClient.query('COMMIT');
+      }
+
       return {
         number: nextNumber,
         totalCalled: drawnNumbers.length,
         drawnNumbers
       };
     } catch (error) {
+      // Rollback transaction on error
+      if (useTransaction && transactionClient) {
+        try {
+          await transactionClient.query('ROLLBACK');
+        } catch (rollbackError) {
+          logger.error('Error rolling back transaction:', rollbackError);
+        }
+      }
       logger.error('Error calling number:', error);
       throw error;
+    } finally {
+      // Release client if used
+      if (transactionClient) {
+        transactionClient.release();
+      }
     }
   }
 
