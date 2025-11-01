@@ -26,7 +26,7 @@ CREATE TABLE bingo_v2_rooms (
     id SERIAL PRIMARY KEY,
     code VARCHAR(6) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
-    host_id INTEGER NOT NULL REFERENCES users(id),
+    host_id UUID NOT NULL REFERENCES users(id),
     
     -- Configuration
     mode VARCHAR(10) NOT NULL CHECK (mode IN ('75', '90')),
@@ -52,7 +52,7 @@ CREATE TABLE bingo_v2_rooms (
     current_game_number INTEGER DEFAULT 0,
     last_called_number INTEGER,
     drawn_numbers JSONB DEFAULT '[]'::jsonb,
-    winner_id INTEGER REFERENCES users(id),
+    winner_id UUID REFERENCES users(id),
     
     -- Timestamps
     created_at TIMESTAMP DEFAULT NOW(),
@@ -66,7 +66,7 @@ CREATE TABLE bingo_v2_rooms (
 CREATE TABLE bingo_v2_room_players (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id UUID NOT NULL REFERENCES users(id),
     
     -- Player status
     is_ready BOOLEAN DEFAULT false,
@@ -120,7 +120,7 @@ CREATE TABLE bingo_v2_draws (
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     number INTEGER NOT NULL,
     draw_order INTEGER NOT NULL,
-    drawn_by INTEGER REFERENCES users(id), -- Who drew it (host or admin)
+    drawn_by UUID REFERENCES users(id), -- Who drew it (host or admin)
     drawn_at TIMESTAMP DEFAULT NOW(),
     
     -- Unique constraint
@@ -134,7 +134,7 @@ CREATE TABLE bingo_v2_draws (
 CREATE TABLE bingo_v2_audit_logs (
     id SERIAL PRIMARY KEY,
     room_id INTEGER REFERENCES bingo_v2_rooms(id) ON DELETE SET NULL,
-    user_id INTEGER REFERENCES users(id),
+    user_id UUID REFERENCES users(id),
     action VARCHAR(50) NOT NULL,
     details JSONB,
     ip_address INET,
@@ -147,7 +147,7 @@ CREATE TABLE bingo_v2_audit_logs (
 CREATE TABLE bingo_v2_room_chat_messages (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id UUID NOT NULL REFERENCES users(id),
     message TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -157,7 +157,7 @@ CREATE TABLE bingo_v2_room_chat_messages (
 -- ============================================
 CREATE TABLE bingo_v2_messages (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id UUID NOT NULL REFERENCES users(id),
     category VARCHAR(20) NOT NULL CHECK (category IN ('system', 'friends')),
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,
