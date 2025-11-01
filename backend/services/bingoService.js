@@ -1398,12 +1398,15 @@ class BingoService {
   /**
    * Obtener detalles completos de una sala
    */
-  static async getRoomDetails(roomCode, client) {
+  static async getRoomDetails(roomCode, client = null) {
     try {
+      // Usar client si se proporciona, sino usar query
+      const dbQuery = client ? client.query.bind(client) : query;
+      
       // Información de la sala
-      const roomResult = await client.query(`
+      const roomResult = await dbQuery(`
         SELECT 
-          r.*, u.username as host_name
+          r.*, u.username as host_name,
           r.card_cost,
           r.max_players,
           r.max_cards_per_player,
@@ -1411,8 +1414,7 @@ class BingoService {
           r.pot_total,
           r.status,
           r.created_at,
-          r.last_activity,
-          u.username as host_name
+          r.last_activity
         FROM bingo_rooms r
         JOIN users u ON u.id = r.host_id
         WHERE r.code = $1
@@ -1425,7 +1427,7 @@ class BingoService {
       const room = roomResult.rows[0];
       
       // Jugadores
-      const playersResult = await query(`
+      const playersResult = await dbQuery(`
         SELECT 
           p.*,
           u.username,
@@ -1437,14 +1439,14 @@ class BingoService {
       `, [room.id]);
       
       // Cartones de cada jugador
-      const cardsResult = await query(`
+      const cardsResult = await dbQuery(`
         SELECT * FROM bingo_cards 
         WHERE room_id = $1
         ORDER BY owner_id, card_number
       `, [room.id]);
       
       // Números cantados
-      const drawnNumbersResult = await query(`
+      const drawnNumbersResult = await dbQuery(`
         SELECT * FROM bingo_drawn_numbers 
         WHERE room_id = $1
         ORDER BY sequence_number
