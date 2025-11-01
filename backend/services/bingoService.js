@@ -1296,7 +1296,7 @@ class BingoService {
             let rowComplete = true;
             const rowNumbers = [];
             for (let col = 0; col < 5; col++) {
-              const cell = grid[col][row];
+              const cell = grid[row][col];
               const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
               rowNumbers.push(num);
               if (!isMarked(num)) {
@@ -1315,7 +1315,7 @@ class BingoService {
           for (let col = 0; col < 5; col++) {
             let colComplete = true;
             for (let row = 0; row < 5; row++) {
-              const cell = grid[col][row];
+              const cell = grid[row][col];
               const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
               if (!isMarked(num)) {
                 colComplete = false;
@@ -1356,8 +1356,8 @@ class BingoService {
           // Verificar las 4 esquinas
           const corners = [
             grid[0][0],  // Top-left
-            grid[4][0],  // Top-right
-            grid[0][4],  // Bottom-left
+            grid[0][4],  // Top-right
+            grid[4][0],  // Bottom-left
             grid[4][4]   // Bottom-right
           ];
           
@@ -1373,9 +1373,9 @@ class BingoService {
         case 'full':
         case 'blackout':
           // Verificar que todo el cartón esté marcado
-          for (let col = 0; col < 5; col++) {
-            for (let row = 0; row < 5; row++) {
-              const cell = grid[col][row];
+          for (let row = 0; row < 5; row++) {
+            for (let col = 0; col < 5; col++) {
+              const cell = grid[row][col];
               const num = typeof cell === 'object' && cell !== null ? cell.value : cell;
               if (!isMarked(num)) {
                 return false;
