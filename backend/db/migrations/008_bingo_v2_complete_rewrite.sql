@@ -57,13 +57,7 @@ CREATE TABLE bingo_v2_rooms (
     -- Timestamps
     created_at TIMESTAMP DEFAULT NOW(),
     started_at TIMESTAMP,
-    finished_at TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_bingo_v2_rooms_code (code),
-    INDEX idx_bingo_v2_rooms_host (host_id),
-    INDEX idx_bingo_v2_rooms_status (status),
-    INDEX idx_bingo_v2_rooms_created (created_at)
+    finished_at TIMESTAMP
 );
 
 -- ============================================
@@ -89,11 +83,7 @@ CREATE TABLE bingo_v2_room_players (
     left_at TIMESTAMP,
     
     -- Unique constraint: one player per room
-    UNIQUE(room_id, user_id),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_players_room (room_id),
-    INDEX idx_bingo_v2_players_user (user_id)
+    UNIQUE(room_id, user_id)
 );
 
 -- ============================================
@@ -119,11 +109,7 @@ CREATE TABLE bingo_v2_cards (
     completed_at TIMESTAMP,
     
     -- Unique constraint
-    UNIQUE(room_id, player_id, card_number),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_cards_room (room_id),
-    INDEX idx_bingo_v2_cards_player (player_id)
+    UNIQUE(room_id, player_id, card_number)
 );
 
 -- ============================================
@@ -139,11 +125,7 @@ CREATE TABLE bingo_v2_draws (
     
     -- Unique constraint
     UNIQUE(room_id, number),
-    UNIQUE(room_id, draw_order),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_draws_room (room_id),
-    INDEX idx_bingo_v2_draws_order (draw_order)
+    UNIQUE(room_id, draw_order)
 );
 
 -- ============================================
@@ -156,12 +138,7 @@ CREATE TABLE bingo_v2_audit_logs (
     action VARCHAR(50) NOT NULL,
     details JSONB,
     ip_address INET,
-    created_at TIMESTAMP DEFAULT NOW(),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_audit_room (room_id),
-    INDEX idx_bingo_v2_audit_user (user_id),
-    INDEX idx_bingo_v2_audit_created (created_at)
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================
@@ -172,11 +149,7 @@ CREATE TABLE bingo_v2_room_chat_messages (
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id),
     message TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_chat_room (room_id),
-    INDEX idx_bingo_v2_chat_created (created_at DESC)
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================
@@ -190,12 +163,7 @@ CREATE TABLE bingo_v2_messages (
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
     metadata JSONB, -- Extra data like game results
-    created_at TIMESTAMP DEFAULT NOW(),
-    
-    -- Indexes
-    INDEX idx_bingo_v2_messages_user (user_id),
-    INDEX idx_bingo_v2_messages_unread (user_id, is_read),
-    INDEX idx_bingo_v2_messages_created (created_at DESC)
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================
@@ -238,14 +206,44 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- INITIAL INDEXES FOR PERFORMANCE
+-- CREATE INDEXES FOR PERFORMANCE
 -- ============================================
+
+-- Rooms indexes
+CREATE INDEX idx_bingo_v2_rooms_code ON bingo_v2_rooms(code);
+CREATE INDEX idx_bingo_v2_rooms_host ON bingo_v2_rooms(host_id);
+CREATE INDEX idx_bingo_v2_rooms_status ON bingo_v2_rooms(status);
+CREATE INDEX idx_bingo_v2_rooms_created ON bingo_v2_rooms(created_at);
 CREATE INDEX idx_bingo_v2_rooms_active ON bingo_v2_rooms(status, created_at DESC) 
     WHERE status IN ('waiting', 'in_progress');
 
+-- Room players indexes
+CREATE INDEX idx_bingo_v2_players_room ON bingo_v2_room_players(room_id);
+CREATE INDEX idx_bingo_v2_players_user ON bingo_v2_room_players(user_id);
 CREATE INDEX idx_bingo_v2_players_active ON bingo_v2_room_players(room_id, is_connected) 
     WHERE is_connected = true;
 
+-- Cards indexes
+CREATE INDEX idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
+CREATE INDEX idx_bingo_v2_cards_player ON bingo_v2_cards(player_id);
+
+-- Draws indexes
+CREATE INDEX idx_bingo_v2_draws_room ON bingo_v2_draws(room_id);
+CREATE INDEX idx_bingo_v2_draws_order ON bingo_v2_draws(draw_order);
+
+-- Audit logs indexes
+CREATE INDEX idx_bingo_v2_audit_room ON bingo_v2_audit_logs(room_id);
+CREATE INDEX idx_bingo_v2_audit_user ON bingo_v2_audit_logs(user_id);
+CREATE INDEX idx_bingo_v2_audit_created ON bingo_v2_audit_logs(created_at);
+
+-- Chat messages indexes
+CREATE INDEX idx_bingo_v2_chat_room ON bingo_v2_room_chat_messages(room_id);
+CREATE INDEX idx_bingo_v2_chat_created ON bingo_v2_room_chat_messages(created_at DESC);
+
+-- User messages indexes
+CREATE INDEX idx_bingo_v2_messages_user ON bingo_v2_messages(user_id);
+CREATE INDEX idx_bingo_v2_messages_unread ON bingo_v2_messages(user_id, is_read);
+CREATE INDEX idx_bingo_v2_messages_created ON bingo_v2_messages(created_at DESC);
 CREATE INDEX idx_bingo_v2_messages_recent ON bingo_v2_messages(user_id, created_at DESC) 
     WHERE is_read = false;
 
