@@ -64,8 +64,8 @@ const io = new Server(server, {
 });
 
 // Initialize Bingo V2 Socket handlers
-const BingoV2Socket = require('./socket/bingoV2');
-BingoV2Socket.initialize(io);
+const handleBingoV2Socket = require('./socket/bingoV2');
+handleBingoV2Socket(io);
 
 // Socket.IO connection handler
 io.on('connection', (socket) => {
