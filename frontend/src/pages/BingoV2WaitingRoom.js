@@ -17,6 +17,8 @@ const BingoV2WaitingRoom = () => {
   const [isReady, setIsReady] = useState(false);
   const [showBuyCardsModal, setShowBuyCardsModal] = useState(false);
   const [cardsToBuy, setCardsToBuy] = useState(1);
+  const [canCloseRoom, setCanCloseRoom] = useState(false);
+  const [closingRoom, setClosingRoom] = useState(false);
 
   useEffect(() => {
     loadRoomDetails();
@@ -37,6 +39,7 @@ const BingoV2WaitingRoom = () => {
 
       socket.on('bingo:player_left', (data) => {
         loadRoomDetails();
+        checkCanCloseRoom();
       });
 
       socket.on('bingo:player_ready', (data) => {
@@ -61,6 +64,12 @@ const BingoV2WaitingRoom = () => {
       };
     }
   }, [socket, user, code, navigate]);
+
+  useEffect(() => {
+    if (room && user && room.host_id === user.id) {
+      checkCanCloseRoom();
+    }
+  }, [room, user, code]);
 
   const loadRoomDetails = async () => {
     try {
@@ -142,6 +151,56 @@ const BingoV2WaitingRoom = () => {
       });
     }
     navigate('/bingo');
+  };
+
+  const checkCanCloseRoom = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/can-close`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCanCloseRoom(data.allowed);
+      }
+    } catch (err) {
+      console.error('Error checking if can close room:', err);
+    }
+  };
+
+  const handleCloseRoom = async () => {
+    if (!window.confirm('¿Estás seguro de que quieres cerrar la sala? Se reembolsará a todos los jugadores.')) {
+      return;
+    }
+
+    setClosingRoom(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message || 'Sala cerrada exitosamente');
+        navigate('/bingo');
+      } else {
+        alert(data.error || 'No se pudo cerrar la sala');
+        setClosingRoom(false);
+      }
+    } catch (err) {
+      console.error('Error closing room:', err);
+      alert('Error al cerrar la sala');
+      setClosingRoom(false);
+    }
   };
 
   if (loading) return <div className="loading">Cargando sala...</div>;
@@ -239,6 +298,16 @@ const BingoV2WaitingRoom = () => {
               >
                 Iniciar Partida
               </button>
+              {canCloseRoom && (
+                <button 
+                  className="close-room-button"
+                  onClick={handleCloseRoom}
+                  disabled={closingRoom}
+                  style={{ marginTop: '10px', backgroundColor: '#dc3545' }}
+                >
+                  {closingRoom ? 'Cerrando...' : 'Cerrar Sala y Reembolsar'}
+                </button>
+              )}
             </div>
           ) : (
             <div className="player-actions">

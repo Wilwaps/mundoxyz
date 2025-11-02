@@ -197,4 +197,160 @@ router.get('/stats', verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * Check if user can close a room
+ */
+router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    // Get room ID
+    const roomResult = await query(
+      `SELECT id FROM bingo_v2_rooms WHERE code = $1`,
+      [code]
+    );
+    
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    
+    const result = await BingoV2Service.canCloseRoom(
+      roomResult.rows[0].id,
+      req.user.id
+    );
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error checking if can close room:', error);
+    res.status(500).json({ error: 'Error checking permissions' });
+  }
+});
+
+/**
+ * Close a room and refund all players (host only, waiting status only)
+ */
+router.delete('/rooms/:code', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    // Get room ID
+    const roomResult = await query(
+      `SELECT id FROM bingo_v2_rooms WHERE code = $1`,
+      [code]
+    );
+    
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada' });
+    }
+    
+    const roomId = roomResult.rows[0].id;
+    
+    // Check if host can close
+    const canClose = await BingoV2Service.canCloseRoom(roomId, req.user.id);
+    
+    if (!canClose.allowed) {
+      return res.status(403).json({ error: canClose.reason });
+    }
+    
+    // Close room and refund
+    const result = await BingoV2Service.cancelRoom(
+      roomId,
+      'host_closed',
+      req.user.id
+    );
+    
+    logger.info(`Host ${req.user.id} closed room #${code}`);
+    
+    res.json({
+      success: true,
+      message: `Sala cerrada. ${result.refunded} jugador(es) reembolsados.`,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error closing room:', error);
+    res.status(500).json({ error: error.message || 'Error cerrando sala' });
+  }
+});
+
+/**
+ * ADMIN ONLY: Emergency refund for a room
+ */
+router.post('/admin/rooms/:code/emergency-refund', verifyToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminResult = await query(
+      `SELECT role FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    
+    if (adminResult.rows.length === 0 || adminResult.rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+    }
+    
+    const { code } = req.params;
+    const { reason, notes } = req.body;
+    
+    // Get room ID
+    const roomResult = await query(
+      `SELECT id FROM bingo_v2_rooms WHERE code = $1`,
+      [code]
+    );
+    
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada' });
+    }
+    
+    const roomId = roomResult.rows[0].id;
+    
+    // Force refund
+    const result = await BingoV2Service.cancelRoom(
+      roomId,
+      reason || 'admin_forced',
+      req.user.id
+    );
+    
+    logger.warn(`ADMIN ${req.user.id} forced refund for room #${code}. Reason: ${reason}. Notes: ${notes}`);
+    
+    res.json({
+      success: true,
+      message: `Reembolso administrativo completado. ${result.refunded} jugador(es) reembolsados.`,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error in admin emergency refund:', error);
+    res.status(500).json({ error: error.message || 'Error en reembolso administrativo' });
+  }
+});
+
+/**
+ * ADMIN ONLY: Detect and list system failures
+ */
+router.get('/admin/detect-failures', verifyToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminResult = await query(
+      `SELECT role FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    
+    if (adminResult.rows.length === 0 || adminResult.rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+    }
+    
+    const failedRooms = await BingoV2Service.detectSystemFailures();
+    
+    res.json({
+      success: true,
+      failedRooms,
+      count: failedRooms.length
+    });
+  } catch (error) {
+    logger.error('Error detecting failures:', error);
+    res.status(500).json({ error: 'Error detectando fallas' });
+  }
+});
+
 module.exports = router;

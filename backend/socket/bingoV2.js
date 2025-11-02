@@ -495,12 +495,31 @@ function handleBingoV2Socket(io) {
           );
           
           if (roomResult.rows.length > 0 && roomResult.rows[0].host_id === userId) {
-            // Start 5-minute timer for host reconnection
+            const roomId = roomResult.rows[0].id;
+            
+            // Try to force auto-call if host has >=500 XP
+            try {
+              const autoCallResult = await BingoV2Service.forceAutoCallOnHostLeave(roomId, userId);
+              
+              if (autoCallResult.activated) {
+                // Notify room that auto-call was activated
+                io.to(roomCode).emit('bingo:auto_call_forced', {
+                  message: autoCallResult.message,
+                  roomCode: autoCallResult.roomCode
+                });
+                
+                logger.info(`Auto-call forced for room ${roomCode} after host ${userId} left`);
+              }
+            } catch (err) {
+              logger.error('Error forcing auto-call on host leave:', err);
+            }
+            
+            // Start 5-minute timer for host reconnection monitoring
             setTimeout(async () => {
               const hostCheck = await query(
                 `SELECT is_connected FROM bingo_v2_room_players 
                  WHERE room_id = $1 AND user_id = $2`,
-                [roomResult.rows[0].id, userId]
+                [roomId, userId]
               );
               
               if (hostCheck.rows.length > 0 && !hostCheck.rows[0].is_connected) {

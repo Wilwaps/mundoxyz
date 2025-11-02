@@ -57,6 +57,11 @@ const BingoV2GameRoom = () => {
         setAutoCallEnabled(false);
       });
 
+      socket.on('bingo:auto_call_forced', (data) => {
+        setAutoCallEnabled(true);
+        alert(data.message || 'Autocanto activado automáticamente');
+      });
+
       socket.on('bingo:game_over', (data) => {
         setWinner(data.winner);
         setShowWinnerModal(true);
@@ -80,6 +85,7 @@ const BingoV2GameRoom = () => {
         socket.off('bingo:number_called');
         socket.off('bingo:auto_call_enabled');
         socket.off('bingo:auto_call_disabled');
+        socket.off('bingo:auto_call_forced');
         socket.off('bingo:game_over');
         socket.off('bingo:error');
       };

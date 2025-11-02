@@ -284,12 +284,10 @@ async function startServer() {
         dbReady = true;
         logger.info('✅ Database connected');
         
-        // Sistema de recuperación de Bingo V2 - Temporalmente deshabilitado
-        // TODO: Actualizar para usar tablas bingo_v2_*
-        logger.info('🔄 Sistema de recuperación Bingo V2 en desarrollo');
-        
-        // Cleanup jobs disabled until migration to v2 tables
-        logger.info('✅ Bingo cleanup jobs disabled - using V2 system');
+        // Start Bingo V2 failure detection job
+        const bingoV2FailureDetection = require('./jobs/bingoV2FailureDetection');
+        bingoV2FailureDetection.start();
+        logger.info('✅ Bingo V2 Failure Detection Job started');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }

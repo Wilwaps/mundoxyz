@@ -11,19 +11,78 @@ class BingoV2Service {
   }
 
   /**
+   * Check room creation limits based on user XP
+   * Returns: { allowed: boolean, reason: string, currentRooms: number, maxRooms: number }
+   */
+  static async checkRoomLimits(hostId, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+    
+    try {
+      // Get user XP
+      const userResult = await dbQuery(
+        `SELECT experience FROM users WHERE id = $1`,
+        [hostId]
+      );
+
+      if (userResult.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const userXP = userResult.rows[0].experience || 0;
+      const maxRooms = userXP >= 500 ? 3 : 1;
+
+      // Count active rooms (waiting status only)
+      const roomsResult = await dbQuery(
+        `SELECT COUNT(*) as count 
+         FROM bingo_v2_rooms 
+         WHERE host_id = $1 AND status = 'waiting'`,
+        [hostId]
+      );
+
+      const currentRooms = parseInt(roomsResult.rows[0].count);
+
+      const allowed = currentRooms < maxRooms;
+      const reason = allowed 
+        ? 'OK' 
+        : `Has alcanzado el límite de ${maxRooms} sala(s) activa(s). ${userXP < 500 ? 'Alcanza 500 XP para crear hasta 3 salas.' : ''}`;
+
+      return {
+        allowed,
+        reason,
+        currentRooms,
+        maxRooms,
+        userXP
+      };
+    } catch (error) {
+      logger.error('Error checking room limits:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Create a new bingo room
    */
   static async createRoom(hostId, config, client = null) {
     const dbQuery = client ? client.query.bind(client) : query;
     
     try {
+      // Check room limits
+      const limits = await this.checkRoomLimits(hostId, client);
+      if (!limits.allowed) {
+        throw new Error(limits.reason);
+      }
+
       const roomCode = await this.generateRoomCode();
+      
+      // Determine if auto-call should be enabled based on XP
+      const autoCallEnabled = limits.userXP >= 500;
       
       const result = await dbQuery(
         `INSERT INTO bingo_v2_rooms (
           code, name, host_id, mode, pattern_type, is_public,
-          max_players, max_cards_per_player, currency_type, card_cost
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          max_players, max_cards_per_player, currency_type, card_cost,
+          auto_call_enabled, auto_call_interval
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           roomCode,
@@ -35,7 +94,9 @@ class BingoV2Service {
           config.max_players || 10,
           config.max_cards_per_player || 5,
           config.currency_type || 'coins',
-          config.card_cost || 10
+          config.card_cost || 10,
+          autoCallEnabled,
+          config.auto_call_interval || 5
         ]
       );
 
@@ -45,7 +106,7 @@ class BingoV2Service {
       await dbQuery(
         `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
          VALUES ($1, $2, $3, $4)`,
-        [room.id, hostId, 'room_created', { config }]
+        [room.id, hostId, 'room_created', { config, autoCallEnabled, userXP: limits.userXP }]
       );
 
       return room;
@@ -911,9 +972,63 @@ class BingoV2Service {
   }
 
   /**
-   * Cancel room and refund
+   * Check if host can close a room
+   * Rules: Room must be in 'waiting' status AND (no players joined OR all players left)
    */
-  static async cancelRoom(roomId, reason = 'Manual cancellation', client = null) {
+  static async canCloseRoom(roomId, hostId, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+
+    try {
+      // Get room details
+      const roomResult = await dbQuery(
+        `SELECT * FROM bingo_v2_rooms WHERE id = $1 AND host_id = $2`,
+        [roomId, hostId]
+      );
+
+      if (roomResult.rows.length === 0) {
+        return { allowed: false, reason: 'Room not found or you are not the host' };
+      }
+
+      const room = roomResult.rows[0];
+
+      if (room.status !== 'waiting') {
+        return { 
+          allowed: false, 
+          reason: 'No puedes cerrar una sala que ya está en progreso. Contacta a un administrador si hay problemas.'
+        };
+      }
+
+      // Count non-host players who have purchased cards
+      const playersResult = await dbQuery(
+        `SELECT COUNT(*) as count 
+         FROM bingo_v2_room_players 
+         WHERE room_id = $1 AND user_id != $2 AND cards_purchased > 0`,
+        [roomId, hostId]
+      );
+
+      const otherPlayersCount = parseInt(playersResult.rows[0].count);
+
+      if (otherPlayersCount > 0) {
+        return {
+          allowed: false,
+          reason: `Hay ${otherPlayersCount} jugador(es) con cartones comprados. No puedes cerrar la sala.`
+        };
+      }
+
+      return { allowed: true, reason: 'OK' };
+    } catch (error) {
+      logger.error('Error checking if can close room:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel room and refund all players
+   * @param {number} roomId - Room ID
+   * @param {string} reason - Reason code: 'host_closed', 'system_failure', 'admin_forced', 'timeout'
+   * @param {UUID} refundedBy - User ID of who initiated the refund (host or admin)
+   */
+  static async cancelRoom(roomId, reason = 'host_closed', refundedBy = null, client = null) {
     const dbQuery = client ? client.query.bind(client) : query;
 
     try {
@@ -935,53 +1050,248 @@ class BingoV2Service {
 
       // Get all players and refund
       const playersResult = await dbQuery(
-        `SELECT * FROM bingo_v2_room_players WHERE room_id = $1`,
+        `SELECT rp.*, u.username 
+         FROM bingo_v2_room_players rp
+         JOIN users u ON u.id = rp.user_id
+         WHERE rp.room_id = $1 AND rp.cards_purchased > 0`,
         [roomId]
       );
 
+      const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      let totalRefunded = 0;
+
       for (const player of playersResult.rows) {
-        // Refund the player
+        if (player.total_spent <= 0) continue;
+
+        // Refund to wallet
         await dbQuery(
-          `UPDATE users 
-           SET ${room.currency_type} = ${room.currency_type} + $1
-           WHERE id = $2`,
+          `UPDATE wallets 
+           SET ${currencyColumn} = ${currencyColumn} + $1
+           WHERE user_id = $2`,
           [player.total_spent, player.user_id]
         );
 
-        // Send refund message
+        // Register refund in history
+        await dbQuery(
+          `INSERT INTO bingo_v2_refunds (room_id, player_id, user_id, amount, currency_type, reason, refunded_by, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            roomId,
+            player.id,
+            player.user_id,
+            player.total_spent,
+            room.currency_type,
+            reason,
+            refundedBy,
+            `Sala #${room.code} cancelada. Motivo: ${reason}`
+          ]
+        );
+
+        // Send notification message
+        const reasonText = {
+          'host_closed': 'El anfitrión cerró la sala',
+          'system_failure': 'Falla del sistema',
+          'admin_forced': 'Acción administrativa',
+          'timeout': 'Sala inactiva por tiempo prolongado'
+        }[reason] || reason;
+
         await dbQuery(
           `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
            VALUES ($1, 'system', 'Reembolso de Bingo', $2, $3)`,
           [
             player.user_id,
-            `La sala de Bingo #${room.code} fue cancelada. Se te han devuelto ${player.total_spent} ${room.currency_type}.`,
+            `La sala de Bingo #${room.code} fue cancelada. Motivo: ${reasonText}. Se te han devuelto ${player.total_spent} ${room.currency_type}.`,
             JSON.stringify({
               room_code: room.code,
-              refund: player.total_spent,
+              room_id: roomId,
+              refund_amount: player.total_spent,
+              currency: room.currency_type,
               reason
             })
           ]
         );
+
+        totalRefunded += parseFloat(player.total_spent);
       }
 
       // Update room status
       await dbQuery(
         `UPDATE bingo_v2_rooms 
-         SET status = 'cancelled', finished_at = NOW()
+         SET status = 'cancelled', finished_at = NOW(), total_pot = 0
          WHERE id = $1`,
         [roomId]
       );
 
       // Log cancellation
       await dbQuery(
-        `INSERT INTO bingo_v2_audit_logs (room_id, action, details)
-         VALUES ($1, 'room_cancelled', $2)`,
-        [roomId, { reason }]
+        `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
+         VALUES ($1, $2, 'room_cancelled', $3)`,
+        [roomId, refundedBy, { reason, refunded_players: playersResult.rows.length, total_refunded: totalRefunded }]
       );
 
-      return { success: true, refunded: playersResult.rows.length };
+      logger.info(`Room #${room.code} cancelled. Reason: ${reason}. Refunded ${playersResult.rows.length} players totaling ${totalRefunded} ${room.currency_type}`);
+
+      return { 
+        success: true, 
+        refunded: playersResult.rows.length,
+        totalRefunded,
+        roomCode: room.code
+      };
     } catch (error) {
       logger.error('Error cancelling room:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Force auto-call when host with >=500 XP leaves the room
+   */
+  static async forceAutoCallOnHostLeave(roomId, hostId, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+
+    try {
+      // Get user XP and room status
+      const userResult = await dbQuery(
+        `SELECT experience FROM users WHERE id = $1`,
+        [hostId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return { activated: false, reason: 'User not found' };
+      }
+
+      const userXP = userResult.rows[0].experience || 0;
+
+      if (userXP < 500) {
+        return { activated: false, reason: 'User XP below 500' };
+      }
+
+      // Get room details
+      const roomResult = await dbQuery(
+        `SELECT * FROM bingo_v2_rooms WHERE id = $1 AND host_id = $2 AND status = 'in_progress'`,
+        [roomId, hostId]
+      );
+
+      if (roomResult.rows.length === 0) {
+        return { activated: false, reason: 'Room not found or not in progress' };
+      }
+
+      const room = roomResult.rows[0];
+
+      // Activate auto-call if not already active
+      if (!room.auto_call_enabled) {
+        await dbQuery(
+          `UPDATE bingo_v2_rooms 
+           SET auto_call_enabled = TRUE, auto_call_forced = TRUE
+           WHERE id = $1`,
+          [roomId]
+        );
+
+        // Send notification to host
+        await dbQuery(
+          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+           VALUES ($1, 'system', 'Autocanto Activado', $2, $3)`,
+          [
+            hostId,
+            `El autocanto se ha activado automáticamente en la sala #${room.code} al salir. Seguirás recibiendo el 20% del pozo.`,
+            JSON.stringify({
+              room_code: room.code,
+              room_id: roomId,
+              auto_call_forced: true
+            })
+          ]
+        );
+
+        // Log action
+        await dbQuery(
+          `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
+           VALUES ($1, $2, 'auto_call_forced', $3)`,
+          [roomId, hostId, { reason: 'host_left_with_xp_500', userXP }]
+        );
+
+        logger.info(`Auto-call forced for room #${room.code}. Host ${hostId} left with ${userXP} XP`);
+
+        return { 
+          activated: true, 
+          roomCode: room.code,
+          message: `Autocanto activado en sala #${room.code}`
+        };
+      }
+
+      return { activated: false, reason: 'Auto-call already enabled' };
+    } catch (error) {
+      logger.error('Error forcing auto-call on host leave:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect system failures that warrant automatic refund
+   * Returns rooms that should be refunded
+   */
+  static async detectSystemFailures(client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+
+    try {
+      const failedRooms = [];
+
+      // Scenario A: Inactivity for 15+ minutes
+      const inactiveResult = await dbQuery(
+        `SELECT r.*, u.username as host_name
+         FROM bingo_v2_rooms r
+         JOIN users u ON u.id = r.host_id
+         WHERE r.status = 'in_progress' 
+           AND r.last_activity_at < NOW() - INTERVAL '15 minutes'
+           AND r.is_stalled = FALSE`,
+        []
+      );
+
+      for (const room of inactiveResult.rows) {
+        // Mark as stalled
+        await dbQuery(
+          `UPDATE bingo_v2_rooms SET is_stalled = TRUE WHERE id = $1`,
+          [room.id]
+        );
+
+        failedRooms.push({
+          ...room,
+          failure_type: 'timeout',
+          failure_reason: 'Inactivity for 15+ minutes'
+        });
+
+        logger.warn(`Room #${room.code} marked as stalled due to inactivity`);
+      }
+
+      // Scenario B: Host disconnected >10 min without auto-call
+      const disconnectedHostResult = await dbQuery(
+        `SELECT r.*, u.username as host_name, u.experience
+         FROM bingo_v2_rooms r
+         JOIN users u ON u.id = r.host_id
+         WHERE r.status = 'in_progress'
+           AND r.auto_call_enabled = FALSE
+           AND r.last_activity_at < NOW() - INTERVAL '10 minutes'
+           AND r.is_stalled = FALSE`,
+        []
+      );
+
+      for (const room of disconnectedHostResult.rows) {
+        await dbQuery(
+          `UPDATE bingo_v2_rooms SET is_stalled = TRUE WHERE id = $1`,
+          [room.id]
+        );
+
+        failedRooms.push({
+          ...room,
+          failure_type: 'timeout',
+          failure_reason: 'Host disconnected >10 min without auto-call'
+        });
+
+        logger.warn(`Room #${room.code} marked as stalled due to host disconnection`);
+      }
+
+      return failedRooms;
+    } catch (error) {
+      logger.error('Error detecting system failures:', error);
       throw error;
     }
   }
