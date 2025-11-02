@@ -669,6 +669,14 @@ class BingoV2Service {
       const grid = card.grid;
       const markedPositions = card.marked_positions || [];
 
+      logger.info('🔍 VALIDATING BINGO:', {
+        cardId,
+        pattern,
+        gridSize: grid ? `${grid.length}x${grid[0]?.length}` : 'null',
+        markedCount: markedPositions.length,
+        markedPositions: JSON.stringify(markedPositions)
+      });
+
       // Get room mode
       const roomResult = await dbQuery(
         `SELECT mode FROM bingo_v2_rooms WHERE id = $1`,
@@ -681,6 +689,8 @@ class BingoV2Service {
       const isValid = mode === '75' 
         ? this.validatePattern75(grid, markedPositions, pattern)
         : this.validatePattern90(grid, markedPositions, pattern);
+
+      logger.info(`🎯 Pattern validation result: ${isValid}`);
 
       if (isValid) {
         // Mark as winner
@@ -724,6 +734,8 @@ class BingoV2Service {
    */
   static validatePattern75(grid, markedPositions, pattern) {
     const marked = new Set(markedPositions.map(p => `${p.row},${p.col}`));
+
+    logger.info(`🎲 validatePattern75 - Pattern: ${pattern}, Marked positions: ${Array.from(marked).join(', ')}`);
 
     switch (pattern) {
       case 'line':
