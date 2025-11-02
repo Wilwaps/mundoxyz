@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaUser, FaCoins, FaFire } from 'react-icons/fa';
+import { FaUser, FaCoins, FaFire, FaTimes } from 'react-icons/fa';
 
-const RoomCard = ({ room, onClick }) => {
+const RoomCard = ({ room, onClick, user, onClose }) => {
+  const [isClosing, setIsClosing] = useState(false);
   const isFull = (room.player_count || 0) >= room.max_players;
   const isInProgress = room.status === 'in_progress';
+  
+  // Verificar si el usuario es admin/tote
+  const isAdmin = user?.roles?.includes('admin') || user?.roles?.includes('tote');
+  const canClose = isAdmin && (room.status === 'waiting' || room.status === 'in_progress');
 
   const getCurrencyIcon = () => {
     return room.currency_type === 'coins' ? <FaCoins /> : <FaFire />;
@@ -22,16 +27,45 @@ const RoomCard = ({ room, onClick }) => {
     return 'Esperando';
   };
 
+  const handleCloseClick = async (e) => {
+    e.stopPropagation(); // Evitar que se abra el modal de unirse
+    
+    if (!onClose) return;
+    
+    const confirmMessage = `⚠️ CERRAR SALA #${room.code}\n\nHost: ${room.host_name}\nEstado: ${getStatusText()}\nJugadores: ${room.player_count || 0}\n\n¿Continuar?`;
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    setIsClosing(true);
+    try {
+      await onClose(room.code);
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02 }}
       onClick={() => !isFull && !isInProgress && onClick()}
-      className={`glass-effect rounded-xl p-6 cursor-pointer transition-all ${
+      className={`glass-effect rounded-xl p-6 cursor-pointer transition-all relative ${
         (isFull || isInProgress) ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl hover:shadow-purple-500/20'
       }`}
     >
+      {/* Admin Close Button */}
+      {canClose && (
+        <button
+          onClick={handleCloseClick}
+          disabled={isClosing}
+          className="absolute top-3 right-3 z-10 w-8 h-8 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
+          title="Cerrar sala (Admin)"
+        >
+          {isClosing ? '⏳' : <FaTimes />}
+        </button>
+      )}
+      
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>

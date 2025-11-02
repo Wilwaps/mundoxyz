@@ -972,21 +972,47 @@ class BingoV2Service {
   }
 
   /**
-   * Check if host can close a room
-   * Rules: Room must be in 'waiting' status AND (no players joined OR all players left)
+   * Check if user can close a room
+   * Rules: 
+   * - Admin/tote: Always can close (waiting or in_progress)
+   * - Host: Room must be in 'waiting' status AND (no other players with cards)
    */
-  static async canCloseRoom(roomId, hostId, client = null) {
+  static async canCloseRoom(roomId, userId, isAdmin = false, client = null) {
     const dbQuery = client ? client.query.bind(client) : query;
 
     try {
-      // Get room details
+      // Admin/tote can always close
+      if (isAdmin) {
+        // Verificar que la sala exista y esté en estado cerrable
+        const roomResult = await dbQuery(
+          `SELECT * FROM bingo_v2_rooms WHERE id = $1`,
+          [roomId]
+        );
+
+        if (roomResult.rows.length === 0) {
+          return { allowed: false, reason: 'Sala no encontrada' };
+        }
+
+        const room = roomResult.rows[0];
+
+        if (room.status !== 'waiting' && room.status !== 'in_progress') {
+          return { 
+            allowed: false, 
+            reason: 'Solo se pueden cerrar salas en espera o en progreso'
+          };
+        }
+
+        return { allowed: true, reason: 'OK', isAdmin: true };
+      }
+
+      // Para hosts regulares: validaciones normales
       const roomResult = await dbQuery(
         `SELECT * FROM bingo_v2_rooms WHERE id = $1 AND host_id = $2`,
-        [roomId, hostId]
+        [roomId, userId]
       );
 
       if (roomResult.rows.length === 0) {
-        return { allowed: false, reason: 'Room not found or you are not the host' };
+        return { allowed: false, reason: 'Sala no encontrada o no eres el host' };
       }
 
       const room = roomResult.rows[0];
@@ -1003,7 +1029,7 @@ class BingoV2Service {
         `SELECT COUNT(*) as count 
          FROM bingo_v2_room_players 
          WHERE room_id = $1 AND user_id != $2 AND cards_purchased > 0`,
-        [roomId, hostId]
+        [roomId, userId]
       );
 
       const otherPlayersCount = parseInt(playersResult.rows[0].count);
@@ -1027,8 +1053,9 @@ class BingoV2Service {
    * @param {number} roomId - Room ID
    * @param {string} reason - Reason code: 'host_closed', 'system_failure', 'admin_forced', 'timeout'
    * @param {UUID} refundedBy - User ID of who initiated the refund (host or admin)
+   * @param {boolean} isAdmin - Whether the cancellation was done by admin/tote
    */
-  static async cancelRoom(roomId, reason = 'host_closed', refundedBy = null, client = null) {
+  static async cancelRoom(roomId, reason = 'host_closed', refundedBy = null, isAdmin = false, client = null) {
     const dbQuery = client ? client.query.bind(client) : query;
 
     try {
@@ -1126,7 +1153,17 @@ class BingoV2Service {
       await dbQuery(
         `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
          VALUES ($1, $2, 'room_cancelled', $3)`,
-        [roomId, refundedBy, { reason, refunded_players: playersResult.rows.length, total_refunded: totalRefunded }]
+        [
+          roomId, 
+          refundedBy, 
+          { 
+            reason, 
+            refunded_players: playersResult.rows.length, 
+            total_refunded: totalRefunded,
+            closed_by_admin: isAdmin,
+            timestamp: new Date().toISOString()
+          }
+        ]
       );
 
       logger.info(`Room #${room.code} cancelled. Reason: ${reason}. Refunded ${playersResult.rows.length} players totaling ${totalRefunded} ${room.currency_type}`);

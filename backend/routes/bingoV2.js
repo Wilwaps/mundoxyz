@@ -46,12 +46,24 @@ router.get('/rooms', async (req, res) => {
 });
 
 /**
- * Get my rooms (for admin panel in profile)
+ * Get all rooms (admin panel in profile - only for tote/admin roles)
  */
 router.get('/my-rooms', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const userRoles = req.user.roles || [];
     
+    // Verificar si el usuario es admin o tote
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('tote');
+    
+    if (!isAdmin) {
+      return res.status(403).json({ 
+        error: 'Acceso denegado',
+        message: 'Solo administradores pueden ver este panel'
+      });
+    }
+    
+    // Para admin/tote: mostrar TODAS las salas globales
     const sql = `
       SELECT 
         r.id,
@@ -62,14 +74,16 @@ router.get('/my-rooms', verifyToken, async (req, res) => {
         r.currency_type,
         r.card_price,
         r.prize_pool,
+        r.host_id,
         r.created_at,
         r.started_at,
         r.finished_at,
+        u.username as host_name,
         (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id) as player_count,
         (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id AND cards_purchased > 0) as players_with_cards,
         (SELECT SUM(total_spent) FROM bingo_v2_room_players WHERE room_id = r.id) as total_collected
       FROM bingo_v2_rooms r
-      WHERE r.host_id = $1
+      LEFT JOIN users u ON r.host_id = u.id
       ORDER BY 
         CASE 
           WHEN r.status = 'waiting' THEN 1
@@ -78,19 +92,20 @@ router.get('/my-rooms', verifyToken, async (req, res) => {
           ELSE 4
         END,
         r.created_at DESC
-      LIMIT 50
+      LIMIT 100
     `;
     
-    const result = await query(sql, [userId]);
+    const result = await query(sql);
     
     res.json({
       success: true,
-      rooms: result.rows
+      rooms: result.rows,
+      isAdmin: true
     });
   } catch (error) {
-    logger.error('Error getting my rooms:', error);
+    logger.error('Error getting admin rooms:', error);
     res.status(500).json({ 
-      error: 'Error getting your rooms',
+      error: 'Error getting rooms',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -282,11 +297,13 @@ router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
 });
 
 /**
- * Close a room and refund all players (host only, waiting status only)
+ * Close a room and refund all players (host or admin/tote)
  */
 router.delete('/rooms/:code', verifyToken, async (req, res) => {
   try {
     const { code } = req.params;
+    const userRoles = req.user.roles || [];
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('tote');
     
     // Get room ID
     const roomResult = await query(
@@ -300,21 +317,23 @@ router.delete('/rooms/:code', verifyToken, async (req, res) => {
     
     const roomId = roomResult.rows[0].id;
     
-    // Check if host can close
-    const canClose = await BingoV2Service.canCloseRoom(roomId, req.user.id);
+    // Check if user can close (admin/tote always can)
+    const canClose = await BingoV2Service.canCloseRoom(roomId, req.user.id, isAdmin);
     
     if (!canClose.allowed) {
       return res.status(403).json({ error: canClose.reason });
     }
     
-    // Close room and refund
+    // Close room and refund (pasar info de admin)
     const result = await BingoV2Service.cancelRoom(
       roomId,
-      'host_closed',
-      req.user.id
+      isAdmin ? 'admin_forced' : 'host_closed',
+      req.user.id,
+      isAdmin // Nuevo parámetro para indicar que es admin
     );
     
-    logger.info(`Host ${req.user.id} closed room #${code}`);
+    const action = isAdmin ? 'Admin' : 'Host';
+    logger.info(`${action} ${req.user.username || req.user.id} closed room #${code}`);
     
     res.json({
       success: true,

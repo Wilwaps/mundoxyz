@@ -94,6 +94,30 @@ const BingoLobby = () => {
     navigate(`/bingo/v2/room/${code}`);
   };
 
+  const handleCloseRoom = async (roomCode) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://confident-bravery-production-ce7b.up.railway.app'}/api/bingo/v2/rooms/${roomCode}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || 'Sala cerrada exitosamente');
+        queryClient.invalidateQueries(['bingo-rooms']);
+      } else {
+        toast.error(data.error || 'No se pudo cerrar la sala');
+      }
+    } catch (error) {
+      console.error('Error closing room:', error);
+      toast.error('Error al cerrar la sala');
+    }
+  };
+
   // Filtrar salas
   const filteredRooms = rooms.filter(room => 
     filters.search === '' || 
@@ -220,6 +244,8 @@ const BingoLobby = () => {
                 key={room.id} 
                 room={room} 
                 onClick={() => handleRoomClick(room)}
+                user={user}
+                onClose={handleCloseRoom}
               />
             ))}
           </div>
