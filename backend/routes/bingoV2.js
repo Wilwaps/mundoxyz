@@ -46,6 +46,54 @@ router.get('/rooms', async (req, res) => {
 });
 
 /**
+ * Get my rooms (for admin panel in profile)
+ */
+router.get('/my-rooms', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const sql = `
+      SELECT 
+        r.id,
+        r.code,
+        r.status,
+        r.mode,
+        r.winning_pattern,
+        r.currency_type,
+        r.card_price,
+        r.prize_pool,
+        r.created_at,
+        r.started_at,
+        r.finished_at,
+        (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id) as player_count,
+        (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id AND cards_purchased > 0) as players_with_cards,
+        (SELECT SUM(total_spent) FROM bingo_v2_room_players WHERE room_id = r.id) as total_collected
+      FROM bingo_v2_rooms r
+      WHERE r.host_id = $1
+      ORDER BY 
+        CASE 
+          WHEN r.status = 'waiting' THEN 1
+          WHEN r.status = 'in_progress' THEN 2
+          WHEN r.status = 'finished' THEN 3
+          ELSE 4
+        END,
+        r.created_at DESC
+      LIMIT 50
+    `;
+    
+    const result = await query(sql, [userId]);
+    
+    res.json({
+      success: true,
+      rooms: result.rows
+    });
+  } catch (error) {
+    logger.error('Error getting my rooms:', error);
+    res.status(500).json({ error: 'Error getting your rooms' });
+  }
+});
+
+/**
  * Create a new room
  */
 router.post('/rooms', verifyToken, async (req, res) => {

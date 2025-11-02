@@ -23,6 +23,7 @@ import SendFiresModal from '../components/SendFiresModal';
 import BuyFiresModal from '../components/BuyFiresModal';
 import ReceiveFiresModal from '../components/ReceiveFiresModal';
 import MyDataModal from '../components/MyDataModal';
+import MyRoomsManager from '../components/bingo/MyRoomsManager';
 
 const Profile = () => {
   const queryClient = useQueryClient();
@@ -208,6 +209,15 @@ const Profile = () => {
           </div>
         </motion.div>
       )}
+
+      {/* My Rooms Manager - Solo para usuarios que crean salas */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <MyRoomsManager />
+      </motion.div>
 
       {/* Achievements */}
       {stats?.achievements?.length > 0 && (
