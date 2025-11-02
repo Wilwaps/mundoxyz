@@ -346,12 +346,12 @@ class BingoV2Service {
     for (let i = 0; i < count; i++) {
       const grid = mode === '75' ? this.generate75BallCard() : this.generate90BallCard();
       
-      // CRITICAL FIX: Don't JSON.stringify for JSONB columns
+      // CRITICAL FIX: pg driver needs JSON string with ::jsonb cast
       const result = await dbQuery(
         `INSERT INTO bingo_v2_cards (room_id, player_id, card_number, grid)
          VALUES ($1, $2, $3, $4::jsonb)
          RETURNING *`,
-        [roomId, playerId, i + 1, grid]
+        [roomId, playerId, i + 1, JSON.stringify(grid)]
       );
       
       cards.push(result.rows[0]);
@@ -528,13 +528,13 @@ class BingoV2Service {
       drawnNumbers.push(nextNumber);
 
       // Update room (incluye last_called_at solo si existe la columna)
-      // CRITICAL FIX: Don't JSON.stringify for JSONB columns
+      // CRITICAL FIX: pg driver needs JSON string with ::jsonb cast
       try {
         await dbQuery(
           `UPDATE bingo_v2_rooms 
            SET drawn_numbers = $1::jsonb, last_called_number = $2, last_called_at = NOW()
            WHERE id = $3`,
-          [drawnNumbers, nextNumber, roomId]
+          [JSON.stringify(drawnNumbers), nextNumber, roomId]
         );
       } catch (err) {
         // Si falla por last_called_at, intentar sin esa columna
@@ -543,7 +543,7 @@ class BingoV2Service {
             `UPDATE bingo_v2_rooms 
              SET drawn_numbers = $1::jsonb, last_called_number = $2
              WHERE id = $3`,
-            [drawnNumbers, nextNumber, roomId]
+            [JSON.stringify(drawnNumbers), nextNumber, roomId]
           );
         } else {
           throw err;
@@ -635,12 +635,12 @@ class BingoV2Service {
         markedNumbers.push(number);
         markedPositions.push(position);
 
-        // CRITICAL FIX: Don't JSON.stringify for JSONB columns - pg driver handles it
+        // CRITICAL FIX: pg driver needs JSON string with ::jsonb cast
         await dbQuery(
           `UPDATE bingo_v2_cards 
            SET marked_numbers = $1::jsonb, marked_positions = $2::jsonb
            WHERE id = $3`,
-          [markedNumbers, markedPositions, cardId]
+          [JSON.stringify(markedNumbers), JSON.stringify(markedPositions), cardId]
         );
         
         logger.info('✅ Marked number saved:', {
