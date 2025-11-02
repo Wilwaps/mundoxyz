@@ -90,14 +90,14 @@ const Layout = () => {
               >
                 <span className="text-sm">🔥 {displayFires.toFixed(2)}</span>
               </div>
+              
+              {/* Message Inbox Button */}
+              <MessageInbox />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Message Inbox Component */}
-      <MessageInbox />
-      
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-20">
         <Outlet />
