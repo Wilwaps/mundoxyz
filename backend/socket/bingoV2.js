@@ -285,7 +285,7 @@ function handleBingoV2Socket(io) {
     });
 
     // Mark number
-    socket.on('bingo:mark_number', async (data) => {
+    socket.on('bingo:mark_number', async (data, callback) => {
       try {
         const { roomCode, userId, cardId, position } = data;
         
@@ -317,11 +317,23 @@ function handleBingoV2Socket(io) {
           position
         );
         
-        socket.emit('bingo:number_marked', result);
+        // Broadcast to room
+        io.to(roomCode).emit('bingo:number_marked', result);
+        
+        // Send callback confirmation
+        if (callback) {
+          callback({ marked: true, ...result });
+        }
         
         logger.info(`Number marked on card ${cardId} in room ${roomCode}`);
       } catch (error) {
         logger.error('Error marking number:', error);
+        
+        // Send error callback
+        if (callback) {
+          callback({ marked: false, error: error.message });
+        }
+        
         socket.emit('bingo:error', { message: error.message });
       }
     });

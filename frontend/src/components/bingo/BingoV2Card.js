@@ -10,8 +10,28 @@ const BingoV2Card = ({
   onCallBingo,
   canCallBingo 
 }) => {
-  const [markedPositions, setMarkedPositions] = useState(new Set());
+  // Initialize marked positions from card data
+  const [markedPositions, setMarkedPositions] = useState(() => {
+    const initialMarked = new Set();
+    if (card?.marked_positions) {
+      card.marked_positions.forEach(pos => {
+        initialMarked.add(`${pos.row},${pos.col}`);
+      });
+    }
+    return initialMarked;
+  });
   const [highlightedNumbers, setHighlightedNumbers] = useState(new Set());
+
+  // Sync marked positions when card changes
+  useEffect(() => {
+    if (card?.marked_positions) {
+      const newMarked = new Set();
+      card.marked_positions.forEach(pos => {
+        newMarked.add(`${pos.row},${pos.col}`);
+      });
+      setMarkedPositions(newMarked);
+    }
+  }, [card?.marked_positions]);
 
   useEffect(() => {
     // Highlight drawn numbers

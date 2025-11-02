@@ -168,32 +168,44 @@ const BingoV2GameRoom = () => {
 
   const handleMarkNumber = (cardId, position) => {
     if (socket) {
+      // Emit to backend and wait for confirmation
       socket.emit('bingo:mark_number', {
         roomCode: code,
         userId: user.id,
         cardId,
         position
+      }, (response) => {
+        // Only update local state if backend confirms
+        if (response && response.marked) {
+          setMyCards(prevCards => 
+            prevCards.map(card => {
+              if (card.id === cardId) {
+                // Check if position already exists
+                const posExists = card.marked_positions?.some(
+                  p => p.row === position.row && p.col === position.col
+                );
+                
+                if (posExists) return card;
+                
+                const newMarkedPositions = [...(card.marked_positions || []), position];
+                const updatedCard = {
+                  ...card,
+                  marked_positions: newMarkedPositions
+                };
+                
+                // Check if pattern is complete
+                const patternComplete = checkPatternComplete(updatedCard, room?.pattern_type);
+                setCanCallBingo(patternComplete);
+                
+                return updatedCard;
+              }
+              return card;
+            })
+          );
+        } else if (response && response.error) {
+          console.error('Error marcando número:', response.error);
+        }
       });
-
-      // Update local state
-      setMyCards(prevCards => 
-        prevCards.map(card => {
-          if (card.id === cardId) {
-            const newMarkedPositions = [...(card.marked_positions || []), position];
-            const updatedCard = {
-              ...card,
-              marked_positions: newMarkedPositions
-            };
-            
-            // Check if pattern is complete
-            const patternComplete = checkPatternComplete(updatedCard, room?.pattern_type);
-            setCanCallBingo(patternComplete);
-            
-            return updatedCard;
-          }
-          return card;
-        })
-      );
     }
   };
 
