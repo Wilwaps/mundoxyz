@@ -89,7 +89,11 @@ router.get('/my-rooms', verifyToken, async (req, res) => {
     });
   } catch (error) {
     logger.error('Error getting my rooms:', error);
-    res.status(500).json({ error: 'Error getting your rooms' });
+    res.status(500).json({ 
+      error: 'Error getting your rooms',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
