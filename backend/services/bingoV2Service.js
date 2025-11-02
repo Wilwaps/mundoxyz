@@ -667,15 +667,38 @@ class BingoV2Service {
 
       const card = cardResult.rows[0];
       const grid = card.grid;
-      const markedPositions = card.marked_positions || [];
+      
+      // CRITICAL FIX: Ensure marked_positions is always an array
+      let markedPositions = card.marked_positions || [];
+      
+      // If it's a string (shouldn't happen with JSONB but being defensive)
+      if (typeof markedPositions === 'string') {
+        logger.warn('⚠️ marked_positions is STRING, parsing...');
+        try {
+          markedPositions = JSON.parse(markedPositions);
+        } catch (e) {
+          logger.error('❌ Failed to parse marked_positions string:', e);
+          markedPositions = [];
+        }
+      }
+      
+      // Ensure it's actually an array
+      if (!Array.isArray(markedPositions)) {
+        logger.error('❌ marked_positions is not an array after checks:', typeof markedPositions);
+        markedPositions = [];
+      }
 
-      logger.info('🔍 VALIDATING BINGO:', {
-        cardId,
-        pattern,
-        gridSize: grid ? `${grid.length}x${grid[0]?.length}` : 'null',
-        markedCount: markedPositions.length,
-        markedPositions: JSON.stringify(markedPositions)
-      });
+      logger.info('🔍 VALIDATING BINGO - START');
+      logger.info('  Card ID:', cardId);
+      logger.info('  Pattern:', pattern);
+      logger.info('  Grid size:', grid ? `${grid.length}x${grid[0]?.length}` : 'null');
+      logger.info('  Marked count:', markedPositions.length);
+      logger.info('  Marked positions TYPE:', typeof markedPositions);
+      logger.info('  Marked positions IS ARRAY:', Array.isArray(markedPositions));
+      logger.info('  Marked positions RAW:', markedPositions);
+      logger.info('  Marked positions JSON:', JSON.stringify(markedPositions));
+      logger.info('  Card marked_positions column TYPE:', typeof card.marked_positions);
+      logger.info('  Card raw data:', JSON.stringify(card, null, 2));
 
       // Get room mode
       const roomResult = await dbQuery(
@@ -735,48 +758,99 @@ class BingoV2Service {
   static validatePattern75(grid, markedPositions, pattern) {
     const marked = new Set(markedPositions.map(p => `${p.row},${p.col}`));
 
-    logger.info(`🎲 validatePattern75 - Pattern: ${pattern}, Marked positions: ${Array.from(marked).join(', ')}`);
+    logger.info(`🎲 validatePattern75 START - Pattern: ${pattern}`);
+    logger.info(`📊 Marked positions count: ${markedPositions.length}`);
+    logger.info(`📊 Marked positions raw:`, markedPositions);
+    logger.info(`📊 Marked Set:`, Array.from(marked));
+    logger.info(`📊 Grid structure:`, {
+      rows: grid.length,
+      cols: grid[0]?.length,
+      centerValue: grid[2]?.[2]?.value
+    });
 
     switch (pattern) {
       case 'line':
         // Check horizontal lines
+        logger.info('✅ Checking HORIZONTAL lines...');
         for (let row = 0; row < 5; row++) {
           let complete = true;
+          let rowCells = [];
           for (let col = 0; col < 5; col++) {
-            if (grid[row][col].value === 'FREE') continue;
-            if (!marked.has(`${row},${col}`)) {
+            const cellValue = grid[row][col].value;
+            const isFree = cellValue === 'FREE';
+            const isMarked = marked.has(`${row},${col}`);
+            rowCells.push({ col, value: cellValue, isFree, isMarked });
+            
+            if (!isFree && !isMarked) {
               complete = false;
-              break;
             }
           }
-          if (complete) return true;
+          logger.info(`  Row ${row}:`, rowCells, `Complete: ${complete}`);
+          if (complete) {
+            logger.info(`✅✅✅ HORIZONTAL LINE FOUND at row ${row}`);
+            return true;
+          }
         }
 
         // Check vertical lines
+        logger.info('✅ Checking VERTICAL lines...');
         for (let col = 0; col < 5; col++) {
           let complete = true;
+          let colCells = [];
           for (let row = 0; row < 5; row++) {
-            if (grid[row][col].value === 'FREE') continue;
-            if (!marked.has(`${row},${col}`)) {
+            const cellValue = grid[row][col].value;
+            const isFree = cellValue === 'FREE';
+            const isMarked = marked.has(`${row},${col}`);
+            colCells.push({ row, value: cellValue, isFree, isMarked });
+            
+            if (!isFree && !isMarked) {
               complete = false;
-              break;
             }
           }
-          if (complete) return true;
+          logger.info(`  Col ${col}:`, colCells, `Complete: ${complete}`);
+          if (complete) {
+            logger.info(`✅✅✅ VERTICAL LINE FOUND at col ${col}`);
+            return true;
+          }
         }
 
         // Check diagonals
+        logger.info('✅ Checking DIAGONALS...');
         let diagonal1 = true;
         let diagonal2 = true;
+        let diag1Cells = [];
+        let diag2Cells = [];
+        
         for (let i = 0; i < 5; i++) {
-          if (grid[i][i].value !== 'FREE' && !marked.has(`${i},${i}`)) {
+          // Diagonal 1 (top-left to bottom-right)
+          const d1Value = grid[i][i].value;
+          const d1Free = d1Value === 'FREE';
+          const d1Marked = marked.has(`${i},${i}`);
+          diag1Cells.push({ pos: `${i},${i}`, value: d1Value, isFree: d1Free, isMarked: d1Marked });
+          if (!d1Free && !d1Marked) {
             diagonal1 = false;
           }
-          if (grid[i][4-i].value !== 'FREE' && !marked.has(`${i},${4-i}`)) {
+          
+          // Diagonal 2 (top-right to bottom-left)
+          const d2Value = grid[i][4-i].value;
+          const d2Free = d2Value === 'FREE';
+          const d2Marked = marked.has(`${i},${4-i}`);
+          diag2Cells.push({ pos: `${i},${4-i}`, value: d2Value, isFree: d2Free, isMarked: d2Marked });
+          if (!d2Free && !d2Marked) {
             diagonal2 = false;
           }
         }
-        return diagonal1 || diagonal2;
+        
+        logger.info('  Diagonal 1 (\\\\):', diag1Cells, `Complete: ${diagonal1}`);
+        logger.info('  Diagonal 2 (//):', diag2Cells, `Complete: ${diagonal2}`);
+        
+        if (diagonal1 || diagonal2) {
+          logger.info(`✅✅✅ DIAGONAL FOUND: ${diagonal1 ? 'Diagonal 1' : 'Diagonal 2'}`);
+          return true;
+        }
+        
+        logger.warn('❌ NO VALID LINE PATTERN FOUND');
+        return false;
 
       case 'corners':
         const corners = [
