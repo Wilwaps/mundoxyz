@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaUser, FaCoins, FaFire, FaTimes } from 'react-icons/fa';
 
-const RoomCard = ({ room, onClick, user, onClose }) => {
+const RoomCard = ({ room, onClick, user, onClose, isActive = false }) => {
   const [isClosing, setIsClosing] = useState(false);
   const isFull = (room.player_count || 0) >= room.max_players;
   const isInProgress = room.status === 'in_progress';
@@ -49,11 +49,29 @@ const RoomCard = ({ room, onClick, user, onClose }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02 }}
-      onClick={() => !isFull && !isInProgress && onClick()}
+      onClick={() => {
+        // Si es sala activa, siempre permitir click
+        if (isActive) {
+          onClick();
+        } else if (!isFull && !isInProgress) {
+          onClick();
+        }
+      }}
       className={`glass-effect rounded-xl p-6 cursor-pointer transition-all relative ${
-        (isFull || isInProgress) ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl hover:shadow-purple-500/20'
+        isActive 
+          ? 'ring-4 ring-purple-500 ring-opacity-70 shadow-2xl shadow-purple-500/50 hover:ring-purple-400'
+          : (isFull || isInProgress) 
+            ? 'opacity-60 cursor-not-allowed' 
+            : 'hover:shadow-xl hover:shadow-purple-500/20'
       }`}
     >
+      {/* Badge TU SALA si es sala activa */}
+      {isActive && (
+        <div className="absolute top-3 left-3 z-10 px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-bold shadow-lg animate-pulse">
+          🎮 TU SALA
+        </div>
+      )}
+
       {/* Admin Close Button */}
       {canClose && (
         <button

@@ -156,12 +156,13 @@
 /* Floating Board Button */
 .floating-board-btn {
   position: fixed;
-  bottom: 20px;
+  bottom: 90px; /* Subido para no solapar con footer (60px) + margen (30px) */
   right: 20px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
   background: #ffd700;
+  color: #333; /* TEXTO NEGRO en fondo amarillo */
   border: none;
   font-size: 24px;
   cursor: pointer;
@@ -222,6 +223,8 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   font-weight: bold;
+  color: #333; /* TEXTO NEGRO en fondo claro */
+  font-size: 0.9rem;
   transition: all 0.3s;
 }
 

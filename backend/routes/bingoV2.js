@@ -176,6 +176,46 @@ router.get('/rooms/:code', async (req, res) => {
 });
 
 /**
+ * Get user's active rooms (rooms where user has purchased cards and game is waiting/in_progress)
+ */
+router.get('/active-rooms', verifyToken, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT 
+        r.id,
+        r.code,
+        r.mode,
+        r.pattern_type,
+        r.status,
+        r.currency_type,
+        r.card_price,
+        r.max_players,
+        r.total_pot,
+        r.created_at,
+        u.username as host_name,
+        p.cards_purchased,
+        (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id) as current_players
+       FROM bingo_v2_rooms r
+       JOIN users u ON r.host_id = u.id
+       JOIN bingo_v2_room_players p ON p.room_id = r.id AND p.user_id = $1
+       WHERE r.status IN ('waiting', 'in_progress')
+         AND p.cards_purchased > 0
+       ORDER BY r.created_at DESC`,
+      [req.user.id]
+    );
+    
+    res.json({
+      success: true,
+      rooms: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Error getting active rooms:', error);
+    res.status(500).json({ error: 'Error getting active rooms' });
+  }
+});
+
+/**
  * Get user messages/inbox
  */
 router.get('/messages', verifyToken, async (req, res) => {

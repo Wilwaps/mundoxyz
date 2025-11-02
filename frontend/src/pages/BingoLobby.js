@@ -38,8 +38,16 @@ const BingoLobby = () => {
     refetchInterval: 5000
   });
 
-  // V2 doesn't need activeRoom check
-  const activeRoom = null;
+  // Obtener salas activas del usuario (donde tiene cartones comprados)
+  const { data: activeRooms = [] } = useQuery({
+    queryKey: ['active-bingo-rooms', user?.id],
+    queryFn: async () => {
+      const response = await axios.get('/api/bingo/v2/active-rooms');
+      return response.data.rooms || [];
+    },
+    enabled: !!user,
+    refetchInterval: 10000
+  });
 
   // Handler para limpiar sala problemática
   const handleClearRoom = async () => {
@@ -53,31 +61,51 @@ const BingoLobby = () => {
     }
   };
 
-  // Efecto para notificar sala activa
+  // Efecto para notificar salas activas
   useEffect(() => {
-    if (activeRoom?.hasActiveRoom) {
+    if (activeRooms.length > 0) {
+      const activeCount = activeRooms.length;
+      const firstRoom = activeRooms[0];
+      
       toast(
         <div className="flex flex-col gap-2">
-          <span>🎰 Tienes una sala activa: {activeRoom.room.code}</span>
-          <div className="flex gap-2">
+          <span className="font-bold">
+            🎰 {activeCount === 1 
+              ? `Tienes una sala activa: #${firstRoom.code}` 
+              : `Tienes ${activeCount} salas activas`
+            }
+          </span>
+          {activeCount === 1 ? (
             <button
-              onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
-              className="flex-1 px-3 py-1 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
+              onClick={() => {
+                const path = firstRoom.status === 'waiting' 
+                  ? `/bingo/v2/room/${firstRoom.code}`
+                  : `/bingo/v2/play/${firstRoom.code}`;
+                navigate(path);
+              }}
+              className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm hover:from-purple-700 hover:to-pink-700 font-semibold"
             >
-              Volver a Sala
+              Volver a Sala #{firstRoom.code}
             </button>
-            <button
-              onClick={handleClearRoom}
-              className="flex-1 px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-            >
-              Limpiar Sala
-            </button>
-          </div>
+          ) : (
+            <div className="text-xs text-gray-300">
+              Busca las salas resaltadas en 🟣 morado abajo
+            </div>
+          )}
         </div>,
-        { duration: 10000, icon: '🎰' }
+        {
+          duration: 8000,
+          position: 'top-center',
+          icon: '🎮'
+        }
       );
     }
-  }, [activeRoom, navigate]);
+  }, [activeRooms, navigate]);
+
+  // Función helper para verificar si una sala está activa
+  const isActiveRoom = (roomCode) => {
+    return activeRooms.some(ar => ar.code === roomCode);
+  };
 
   const handleRoomClick = (room) => {
     setSelectedRoom(room);
@@ -246,42 +274,12 @@ const BingoLobby = () => {
                 onClick={() => handleRoomClick(room)}
                 user={user}
                 onClose={handleCloseRoom}
+                isActive={isActiveRoom(room.code)}
               />
             ))}
           </div>
         )}
       </div>
-
-      {/* Botones flotantes para sala activa */}
-      {activeRoom?.hasActiveRoom && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
-        >
-          <button
-            onClick={() => navigate(`/bingo/room/${activeRoom.room.code}`)}
-            className="px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 
-                     text-white rounded-full font-bold hover:shadow-xl 
-                     hover:shadow-purple-500/50 transition-all flex items-center gap-3
-                     animate-pulse border-2 border-white/30"
-          >
-            🎰 Volver a Sala
-            <span className="bg-white/20 px-2 py-1 rounded-full text-sm">
-              {activeRoom.room.code}
-            </span>
-          </button>
-          <button
-            onClick={handleClearRoom}
-            className="px-4 py-2 bg-red-600/90 backdrop-blur-sm
-                     text-white rounded-full text-sm font-medium hover:bg-red-700
-                     transition-all flex items-center justify-center gap-2"
-            title="Limpiar sala si hay problemas"
-          >
-            🧹 Limpiar Sala
-          </button>
-        </motion.div>
-      )}
 
       {/* Modales */}
       <CreateRoomModal
