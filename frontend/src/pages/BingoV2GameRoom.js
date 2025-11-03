@@ -269,12 +269,18 @@ const BingoV2GameRoom = () => {
     const marked = new Set(card.marked_positions.map(p => `${p.row},${p.col}`));
     const mode = room?.mode || '75';
     
+    // CRITICAL FIX: Auto-mark FREE space for 75-ball mode
+    if (mode === '75') {
+      marked.add('2,2');  // Always consider FREE as marked
+    }
+    
     console.log('🔍 checkPatternComplete:', {
       cardId: card.id,
       pattern,
       mode,
       markedCount: marked.size,
-      markedPositions: Array.from(marked)
+      markedPositions: Array.from(marked),
+      hasFree: marked.has('2,2')
     });
     
     if (mode === '75') {
