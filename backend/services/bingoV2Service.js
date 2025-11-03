@@ -1116,13 +1116,14 @@ class BingoV2Service {
          VALUES ($1, $2, $3, $4)`,
         [
           roomId, 
-          winnerId, 
+          winnerUserId,  // ✅ FIX: Usar winnerUserId (UUID) en lugar de winnerId (INTEGER)
           'prizes_distributed',
           {
             winner_prize: winnerPrize,
             host_prize: hostPrize,
             platform_fee: platformFee,
-            total_pot: totalPot
+            total_pot: totalPot,
+            player_id: winnerId  // Guardar playerId en details para referencia
           }
         ]
       );
