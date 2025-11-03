@@ -188,7 +188,7 @@ router.get('/active-rooms', verifyToken, async (req, res) => {
         r.pattern_type,
         r.status,
         r.currency_type,
-        r.card_price,
+        r.card_cost,
         r.max_players,
         r.total_pot,
         r.created_at,
