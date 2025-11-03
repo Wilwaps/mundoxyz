@@ -771,6 +771,19 @@ class BingoV2Service {
       logger.info(`🎯 Pattern validation result: ${isValid}`);
 
       if (isValid) {
+        // CRITICAL FIX: Get user_id (UUID) from playerId
+        const playerResult = await dbQuery(
+          `SELECT user_id FROM bingo_v2_room_players WHERE id = $1`,
+          [playerId]
+        );
+        
+        if (playerResult.rows.length === 0) {
+          throw new Error('Player not found');
+        }
+        
+        const userId = playerResult.rows[0].user_id;
+        logger.info('🏆 Winner identified:', { playerId, userId });
+        
         // Mark as winner
         await dbQuery(
           `UPDATE bingo_v2_cards 
@@ -779,19 +792,19 @@ class BingoV2Service {
           [pattern, cardId]
         );
 
-        // Update room with winner
+        // Update room with winner (use userId UUID, not playerId INTEGER)
         await dbQuery(
           `UPDATE bingo_v2_rooms 
            SET winner_id = $1, status = 'finished', finished_at = NOW()
            WHERE id = $2`,
-          [playerId, roomId]
+          [userId, roomId]
         );
 
-        // Log the win
+        // Log the win (use userId for audit)
         await dbQuery(
           `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
            VALUES ($1, $2, $3, $4)`,
-          [roomId, playerId, 'bingo_validated', { pattern, card_id: cardId }]
+          [roomId, userId, 'bingo_validated', { pattern, card_id: cardId, player_id: playerId }]
         );
 
         // Distribute prizes
