@@ -746,6 +746,8 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
                ended_at = NULL,
                rematch_requested_by_x = FALSE,
                rematch_requested_by_o = FALSE,
+               player_x_left = FALSE,
+               player_o_left = FALSE,
                rematch_count = $2,
                pot_coins = $3,
                pot_fires = $4,
@@ -796,6 +798,85 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
   }
 });
 
+// POST /api/tictactoe/room/:code/leave - Abandonar sala (después de terminar)
+router.post('/room/:code/leave', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const userId = req.user.id;
+    
+    const result = await transaction(async (client) => {
+      // Obtener sala
+      const roomResult = await client.query(
+        'SELECT * FROM tictactoe_rooms WHERE code = $1 FOR UPDATE',
+        [code]
+      );
+      
+      if (roomResult.rows.length === 0) {
+        throw new Error('Sala no encontrada');
+      }
+      
+      const room = roomResult.rows[0];
+      
+      // Determinar qué jugador es
+      const isPlayerX = userId === room.player_x_id;
+      const isPlayerO = userId === room.player_o_id;
+      
+      if (!isPlayerX && !isPlayerO) {
+        throw new Error('No eres parte de esta sala');
+      }
+      
+      // Marcar que el jugador abandonó
+      if (isPlayerX) {
+        await client.query(
+          'UPDATE tictactoe_rooms SET player_x_left = TRUE WHERE id = $1',
+          [room.id]
+        );
+      } else {
+        await client.query(
+          'UPDATE tictactoe_rooms SET player_o_left = TRUE WHERE id = $1',
+          [room.id]
+        );
+      }
+      
+      // Verificar si ambos jugadores ya abandonaron
+      const updatedResult = await client.query(
+        'SELECT player_x_left, player_o_left FROM tictactoe_rooms WHERE id = $1',
+        [room.id]
+      );
+      
+      const updatedRoom = updatedResult.rows[0];
+      
+      if (updatedRoom.player_x_left && updatedRoom.player_o_left) {
+        // Ambos jugadores abandonaron - archivar sala
+        await client.query(
+          `UPDATE tictactoe_rooms 
+           SET archived_at = NOW() 
+           WHERE id = $1`,
+          [room.id]
+        );
+        
+        logger.info('TicTacToe room archived (both players left)', {
+          roomId: room.id,
+          roomCode: code
+        });
+        
+        return { archived: true };
+      }
+      
+      return { archived: false };
+    });
+    
+    res.json({
+      success: true,
+      ...result
+    });
+    
+  } catch (error) {
+    logger.error('Error leaving room:', error);
+    res.status(400).json({ error: error.message || 'Failed to leave room' });
+  }
+});
+
 // GET /api/tictactoe/rooms/public - Listar salas públicas
 router.get('/rooms/public', optionalAuth, async (req, res) => {
   try {
@@ -813,6 +894,7 @@ router.get('/rooms/public', optionalAuth, async (req, res) => {
         AND r.visibility = 'public'
         AND r.player_o_id IS NULL
         AND r.expires_at > NOW()
+        AND r.archived_at IS NULL
     `;
     
     const params = [];

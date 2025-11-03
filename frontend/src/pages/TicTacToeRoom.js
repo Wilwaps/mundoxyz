@@ -829,7 +829,17 @@ const TicTacToeRoom = () => {
                 
                 <div className="flex gap-3">
                   <button
-                    onClick={() => navigate('/tictactoe/lobby')}
+                    onClick={async () => {
+                      try {
+                        // Marcar que el jugador abandonó la sala
+                        await axios.post(`/api/tictactoe/room/${code}/leave`);
+                      } catch (error) {
+                        console.error('Error leaving room:', error);
+                      } finally {
+                        // Navegar al lobby siempre
+                        navigate('/tictactoe/lobby');
+                      }
+                    }}
                     className="flex-1 btn-secondary"
                   >
                     Volver al Lobby

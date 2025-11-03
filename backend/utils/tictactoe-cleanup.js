@@ -191,8 +191,14 @@ async function cleanupOldFinishedRooms(maxAgeDays = 30) {
   try {
     const result = await query(`
       DELETE FROM tictactoe_rooms
-      WHERE status IN ('finished', 'cancelled', 'abandoned')
-      AND finished_at < NOW() - INTERVAL '${maxAgeDays} days'
+      WHERE (
+        status IN ('finished', 'cancelled', 'abandoned')
+        AND finished_at < NOW() - INTERVAL '${maxAgeDays} days'
+      )
+      OR (
+        archived_at IS NOT NULL
+        AND archived_at < NOW() - INTERVAL '${maxAgeDays} days'
+      )
       RETURNING id
     `);
     
