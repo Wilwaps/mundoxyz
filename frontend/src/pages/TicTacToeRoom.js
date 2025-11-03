@@ -168,21 +168,27 @@ const TicTacToeRoom = () => {
       const response = await axios.post(`/api/tictactoe/room/${code}/rematch`);
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.rematchAccepted) {
         // Nueva lógica: misma sala, solo refrescar estado
         if (data.sameRoom) {
           toast.success(`¡Revancha aceptada! Reiniciando partida...`);
-          // Actualizar balance
-          refreshUser();
+          
           // Resetear estados locales (el useEffect con [code] no se ejecutará porque code no cambia)
           setRematchRequested({ byMe: false, byOpponent: false });
           setGameOver(false);
           setShowGameOverModal(false);
           setBoard([[null, null, null], [null, null, null], [null, null, null]]);
           setTimeLeft(15);
-          // Refrescar datos de la sala desde el servidor
-          refetchRoom();
+          
+          // Invalidar queries para forzar refetch
+          queryClient.invalidateQueries(['tictactoe-room', code]);
+          queryClient.invalidateQueries(['balance']);
+          queryClient.invalidateQueries(['economy']);
+          
+          // Refrescar datos inmediatamente
+          await refetchRoom();
+          await refreshUser();
         } else {
           // Fallback por si acaso (no debería pasar con nueva lógica)
           toast.success(`¡Revancha aceptada! Sala: ${data.roomCode}`);
@@ -323,18 +329,24 @@ const TicTacToeRoom = () => {
         // Nueva lógica: misma sala, solo refrescar
         if (data.sameRoom) {
           toast.success(`¡Revancha aceptada! Nueva partida iniciando...`);
-          // Actualizar balance
-          refreshUser();
-          // Resetear estados locales
+          
+          // Resetear estados locales inmediatamente
           setRematchRequested({ byMe: false, byOpponent: false });
           setGameOver(false);
           setShowGameOverModal(false);
           setBoard([[null, null, null], [null, null, null], [null, null, null]]);
           setTimeLeft(15);
-          // Refrescar sala
-          setTimeout(() => {
-            refetchRoom();
-          }, 500);
+          
+          // Invalidar y refrescar datos inmediatamente
+          queryClient.invalidateQueries(['tictactoe-room', code]);
+          queryClient.invalidateQueries(['balance']);
+          queryClient.invalidateQueries(['economy']);
+          
+          // Refrescar sala y balance
+          setTimeout(async () => {
+            await refetchRoom();
+            await refreshUser();
+          }, 100);
         } else {
           // Fallback (código viejo, no debería ejecutarse)
           toast.success(`¡Revancha aceptada! Redirigiendo a nueva sala...`);
@@ -383,7 +395,7 @@ const TicTacToeRoom = () => {
       socket.off('room:host-transferred', handleHostTransferred);
       socket.off('room:abandoned', handleRoomAbandoned);
     };
-  }, [socket, code, user, rematchRequested, navigate, refreshUser]);
+  }, [socket, code, user, rematchRequested, navigate, refreshUser, refetchRoom, queryClient]);
   
   const handleCellClick = (row, col) => {
     if (!isMyTurn || board[row][col] || gameOver) return;
