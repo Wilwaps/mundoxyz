@@ -70,20 +70,23 @@ router.get('/my-rooms', verifyToken, async (req, res) => {
         r.code,
         r.status,
         r.mode,
-        r.winning_pattern,
+        r.pattern_type,
         r.currency_type,
-        r.card_price,
-        r.prize_pool,
+        r.card_cost,
+        r.total_pot,
         r.host_id,
+        r.winner_id,
         r.created_at,
         r.started_at,
         r.finished_at,
         u.username as host_name,
+        w.username as winner_name,
         (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id) as player_count,
         (SELECT COUNT(*) FROM bingo_v2_room_players WHERE room_id = r.id AND cards_purchased > 0) as players_with_cards,
         (SELECT SUM(total_spent) FROM bingo_v2_room_players WHERE room_id = r.id) as total_collected
       FROM bingo_v2_rooms r
       LEFT JOIN users u ON r.host_id = u.id
+      LEFT JOIN users w ON r.winner_id = w.id
       ORDER BY 
         CASE 
           WHEN r.status = 'waiting' THEN 1
