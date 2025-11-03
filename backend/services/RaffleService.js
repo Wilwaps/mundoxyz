@@ -66,15 +66,21 @@ class RaffleService {
         try {
             await client.query('BEGIN');
 
-            // Verificar límites de XP
-            const limitCheck = await client.query(
-                'SELECT * FROM check_user_raffle_limit($1)',
+            // Verificar límites de experiencia del usuario (simple check)
+            const userCheck = await client.query(
+                'SELECT experience FROM users WHERE id = $1',
                 [hostId]
             );
 
-            const limit = limitCheck.rows[0];
-            if (!limit.can_create) {
-                throw new Error(`No puedes crear más rifas. Necesitas ${limit.needed_xp} XP más.`);
+            if (!userCheck.rows[0]) {
+                throw new Error('Usuario no encontrado');
+            }
+
+            const userExperience = parseInt(userCheck.rows[0].experience) || 0;
+            
+            // Límite simple: necesita al menos 10 de experiencia para crear rifas
+            if (userExperience < 10) {
+                throw new Error(`Necesitas al menos 10 puntos de experiencia para crear rifas. Tienes ${userExperience}.`);
             }
 
             // Generar código único de 6 dígitos numéricos
