@@ -183,8 +183,8 @@ const BingoV2GameRoom = () => {
       }, (response) => {
         // Only update local state if backend confirms
         if (response && response.marked) {
-          setMyCards(prevCards => 
-            prevCards.map(card => {
+          setMyCards(prevCards => {
+            const updatedCards = prevCards.map(card => {
               if (card.id === cardId) {
                 // Check if position already exists
                 const posExists = card.marked_positions?.some(
@@ -199,15 +199,28 @@ const BingoV2GameRoom = () => {
                   marked_positions: newMarkedPositions
                 };
                 
-                // Check if pattern is complete
-                const patternComplete = checkPatternComplete(updatedCard, room?.pattern_type);
-                setCanCallBingo(patternComplete);
-                
                 return updatedCard;
               }
               return card;
-            })
-          );
+            });
+            
+            // CRITICAL FIX: Check ALL cards, not just the one updated
+            const anyCardComplete = updatedCards.some(card => 
+              checkPatternComplete(card, room?.pattern_type)
+            );
+            
+            console.log('🎯 Pattern check after mark:', {
+              cardId,
+              position,
+              pattern: room?.pattern_type,
+              anyCardComplete,
+              markedPositions: updatedCards.find(c => c.id === cardId)?.marked_positions
+            });
+            
+            setCanCallBingo(anyCardComplete);
+            
+            return updatedCards;
+          });
         } else if (response && response.error) {
           console.error('Error marcando número:', response.error);
         }
@@ -216,10 +229,21 @@ const BingoV2GameRoom = () => {
   };
 
   const checkPatternComplete = (card, pattern) => {
-    if (!card.grid || !card.marked_positions) return false;
+    if (!card.grid || !card.marked_positions) {
+      console.warn('❌ No grid or marked_positions');
+      return false;
+    }
     
     const marked = new Set(card.marked_positions.map(p => `${p.row},${p.col}`));
     const mode = room?.mode || '75';
+    
+    console.log('🔍 checkPatternComplete:', {
+      cardId: card.id,
+      pattern,
+      mode,
+      markedCount: marked.size,
+      markedPositions: Array.from(marked)
+    });
     
     if (mode === '75') {
       switch (pattern) {
@@ -233,7 +257,10 @@ const BingoV2GameRoom = () => {
                 break;
               }
             }
-            if (complete) return true;
+            if (complete) {
+              console.log(`✅ HORIZONTAL line complete at row ${row}`);
+              return true;
+            }
           }
           
           // Verificar columnas completas (vertical)
@@ -245,28 +272,50 @@ const BingoV2GameRoom = () => {
                 break;
               }
             }
-            if (complete) return true;
+            if (complete) {
+              console.log(`✅ VERTICAL line complete at col ${col}`);
+              return true;
+            }
           }
           
-          // Verificar diagonal principal
+          // Verificar diagonal principal (top-left to bottom-right)
           let diag1Complete = true;
+          let diag1Debug = [];
           for (let i = 0; i < 5; i++) {
-            if (i !== 2 && !marked.has(`${i},${i}`)) {
+            const pos = `${i},${i}`;
+            const isMarked = marked.has(pos);
+            const isFree = i === 2;
+            diag1Debug.push({ pos, isMarked, isFree });
+            if (i !== 2 && !isMarked) {
               diag1Complete = false;
-              break;
             }
           }
-          if (diag1Complete) return true;
+          console.log('🔹 Diagonal 1 (\\\\):', diag1Debug, 'Complete:', diag1Complete);
+          if (diag1Complete) {
+            console.log('✅ DIAGONAL 1 complete!');
+            return true;
+          }
           
-          // Verificar diagonal secundaria
+          // Verificar diagonal secundaria (top-right to bottom-left)
           let diag2Complete = true;
+          let diag2Debug = [];
           for (let i = 0; i < 5; i++) {
-            if (i !== 2 && !marked.has(`${i},${4-i}`)) {
+            const pos = `${i},${4-i}`;
+            const isMarked = marked.has(pos);
+            const isFree = i === 2;
+            diag2Debug.push({ pos, isMarked, isFree });
+            if (i !== 2 && !isMarked) {
               diag2Complete = false;
-              break;
             }
           }
-          return diag2Complete;
+          console.log('🔹 Diagonal 2 (//):', diag2Debug, 'Complete:', diag2Complete);
+          if (diag2Complete) {
+            console.log('✅ DIAGONAL 2 complete!');
+            return true;
+          }
+          
+          console.warn('❌ No line pattern found');
+          return false;
           
         case 'corners':
           return marked.has('0,0') && marked.has('0,4') && 
