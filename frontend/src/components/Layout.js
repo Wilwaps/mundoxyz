@@ -14,12 +14,14 @@ import {
   Clock,
   Settings
 } from 'lucide-react';
+import ExperienceModal from './ExperienceModal';
 
 const Layout = () => {
   const { user, isAdmin, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showBalanceTooltip, setShowBalanceTooltip] = useState(false);
+  const [showExperienceModal, setShowExperienceModal] = useState(false);
 
   // Fetch balance en tiempo real
   const { data: balanceData } = useQuery({
@@ -71,8 +73,8 @@ const Layout = () => {
             <div className="flex items-center gap-3">
               <div 
                 className="badge-experience cursor-pointer hover:scale-110 transition-transform"
-                onClick={() => navigate('/profile')}
-                title="Experiencia"
+                onClick={() => setShowExperienceModal(true)}
+                title="Ver detalles de experiencia"
               >
                 <span className="text-sm">⭐ {displayExperience} XP</span>
               </div>
@@ -123,6 +125,13 @@ const Layout = () => {
           })}
         </div>
       </nav>
+
+      {/* Experience Modal */}
+      <ExperienceModal 
+        isOpen={showExperienceModal}
+        onClose={() => setShowExperienceModal(false)}
+        user={user}
+      />
     </div>
   );
 };
