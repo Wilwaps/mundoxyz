@@ -838,6 +838,7 @@ class BingoV2Service {
         for (let col = 0; col < 5; col++) {
           let complete = true;
           let colCells = [];
+          let unmarkedCells = [];
           for (let row = 0; row < 5; row++) {
             const cellValue = grid[row][col].value;
             const isFree = cellValue === 'FREE';
@@ -846,9 +847,13 @@ class BingoV2Service {
             
             if (!isFree && !isMarked) {
               complete = false;
+              unmarkedCells.push({ pos: `${row},${col}`, value: cellValue });
             }
           }
           logger.info(`  Col ${col}:`, colCells, `Complete: ${complete}`);
+          if (!complete && unmarkedCells.length > 0) {
+            logger.warn(`    ❌ Col ${col} INCOMPLETE - Missing:`, unmarkedCells);
+          }
           if (complete) {
             logger.info(`✅✅✅ VERTICAL LINE FOUND at col ${col}`);
             return true;
