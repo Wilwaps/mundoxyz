@@ -108,8 +108,23 @@ const BingoLobby = () => {
   };
 
   const handleRoomClick = (room) => {
-    setSelectedRoom(room);
-    setShowJoinModal(true);
+    // Verificar si el usuario ya está jugando en esta sala
+    const isAlreadyPlaying = activeRooms.some(ar => ar.code === room.code);
+    
+    if (isAlreadyPlaying) {
+      // Ya está jugando, redirigir directo a la sala
+      const activeRoom = activeRooms.find(ar => ar.code === room.code);
+      const path = activeRoom.status === 'waiting' 
+        ? `/bingo/v2/room/${room.code}`
+        : `/bingo/v2/play/${room.code}`;
+      
+      toast.success(`Volviendo a tu sala #${room.code}`);
+      navigate(path);
+    } else {
+      // No está jugando, mostrar modal de compra
+      setSelectedRoom(room);
+      setShowJoinModal(true);
+    }
   };
 
   const handleJoinSuccess = (code) => {
