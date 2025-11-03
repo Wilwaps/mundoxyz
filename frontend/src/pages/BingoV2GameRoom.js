@@ -431,9 +431,20 @@ const BingoV2GameRoom = () => {
           )}
         </div>
 
-        <button className="exit-button" onClick={handleExitRoom}>
-          Salir
-        </button>
+        <div className="header-buttons">
+          {isHost && (
+            <button 
+              className={`auto-call-btn ${autoCallEnabled ? 'active' : ''}`}
+              onClick={toggleAutoCall}
+            >
+              {autoCallEnabled ? '⏸ Detener Auto' : '▶ Auto-Canto'}
+            </button>
+          )}
+          
+          <button className="exit-button" onClick={handleExitRoom}>
+            Salir
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -457,30 +468,10 @@ const BingoV2GameRoom = () => {
           </div>
         </div>
 
-        {/* Controls Section */}
-        {isHost && (
-          <div className="host-controls">
-            <h3>Controles del Host</h3>
-            <button 
-              className="call-number-btn"
-              onClick={handleCallNumber}
-              disabled={autoCallEnabled || isCallingNumber}
-            >
-              {isCallingNumber ? 'Esperando...' : 'Cantar Número'}
-            </button>
-            
-            <button 
-              className={`auto-call-btn ${autoCallEnabled ? 'active' : ''}`}
-              onClick={toggleAutoCall}
-            >
-              {autoCallEnabled ? 'Detener Auto-Canto' : 'Activar Auto-Canto'}
-            </button>
-            
-            {userExperience < 400 && (
-              <p className="exp-warning">
-                Necesitas {400 - userExperience} exp más para auto-canto
-              </p>
-            )}
+        {/* Experience Warning */}
+        {isHost && userExperience < 400 && (
+          <div className="exp-warning-banner">
+            ⚠️ Necesitas {400 - userExperience} exp más para usar auto-canto
           </div>
         )}
 
@@ -488,13 +479,27 @@ const BingoV2GameRoom = () => {
         <BingoV2Chat roomCode={code} userId={user?.id} />
       </div>
 
-      {/* Floating Numbers Board Button */}
-      <button 
-        className="floating-board-btn"
-        onClick={() => setShowNumbersBoard(!showNumbersBoard)}
-      >
-        📋
-      </button>
+      {/* Floating Buttons */}
+      <div className="floating-buttons">
+        {isHost && (
+          <button 
+            className="floating-call-btn"
+            onClick={handleCallNumber}
+            disabled={autoCallEnabled || isCallingNumber}
+            title="Cantar Número"
+          >
+            {isCallingNumber ? '⏳' : '🎲'}
+          </button>
+        )}
+        
+        <button 
+          className="floating-board-btn"
+          onClick={() => setShowNumbersBoard(!showNumbersBoard)}
+          title="Ver Números Cantados"
+        >
+          📋
+        </button>
+      </div>
 
       {/* Numbers Board Modal */}
       {showNumbersBoard && (
