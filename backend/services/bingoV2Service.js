@@ -779,11 +779,15 @@ class BingoV2Service {
    */
   static validatePattern75(grid, markedPositions, pattern) {
     const marked = new Set(markedPositions.map(p => `${p.row},${p.col}`));
+    
+    // CRITICAL FIX: Auto-add FREE space (2,2) as it's always considered marked
+    marked.add('2,2');
 
     logger.info(`🎲 validatePattern75 START - Pattern: ${pattern}`);
     logger.info(`📊 Marked positions count: ${markedPositions.length}`);
     logger.info(`📊 Marked positions raw:`, markedPositions);
-    logger.info(`📊 Marked Set:`, Array.from(marked));
+    logger.info(`📊 Marked Set (with FREE):`, Array.from(marked));
+    logger.info(`📊 Has FREE (2,2):`, marked.has('2,2'));
     logger.info(`📊 Grid structure:`, {
       rows: grid.length,
       cols: grid[0]?.length,
