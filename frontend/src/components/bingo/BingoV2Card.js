@@ -56,14 +56,9 @@ const BingoV2Card = ({
     
     const posKey = `${row},${col}`;
     
-    // For FREE space, always allow marking
+    // CRITICAL: FREE space is ALWAYS marked and cannot be unmarked
     if (value === 'FREE') {
-      if (!markedPositions.has(posKey)) {
-        const newMarked = new Set(markedPositions);
-        newMarked.add(posKey);
-        setMarkedPositions(newMarked);
-        onMarkNumber({ row, col });
-      }
+      // Do nothing - FREE is permanently marked from card creation
       return;
     }
     

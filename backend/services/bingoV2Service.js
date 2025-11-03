@@ -346,13 +346,30 @@ class BingoV2Service {
     for (let i = 0; i < count; i++) {
       const grid = mode === '75' ? this.generate75BallCard() : this.generate90BallCard();
       
+      // CRITICAL FIX: For 75-ball, auto-mark FREE space (2,2)
+      const markedNumbers = mode === '75' ? ['FREE'] : [];
+      const markedPositions = mode === '75' ? [{row: 2, col: 2}] : [];
+      
       // CRITICAL FIX: pg driver needs JSON string with ::jsonb cast
       const result = await dbQuery(
-        `INSERT INTO bingo_v2_cards (room_id, player_id, card_number, grid)
-         VALUES ($1, $2, $3, $4::jsonb)
+        `INSERT INTO bingo_v2_cards (room_id, player_id, card_number, grid, marked_numbers, marked_positions)
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb)
          RETURNING *`,
-        [roomId, playerId, i + 1, JSON.stringify(grid)]
+        [
+          roomId, 
+          playerId, 
+          i + 1, 
+          JSON.stringify(grid),
+          JSON.stringify(markedNumbers),
+          JSON.stringify(markedPositions)
+        ]
       );
+      
+      logger.info('✅ Card created with FREE pre-marked:', {
+        cardId: result.rows[0].id,
+        mode,
+        hasFreePre: mode === '75'
+      });
       
       cards.push(result.rows[0]);
     }
@@ -630,6 +647,12 @@ class BingoV2Service {
       // Get the number at position
       const number = grid[position.row][position.col].value;
 
+      // CRITICAL: FREE space is always marked, reject attempts to mark/unmark it
+      if (number === 'FREE') {
+        logger.info('✅ FREE space already marked - ignoring request');
+        return { marked: true, number: 'FREE', position, alreadyMarked: true };
+      }
+
       // Check if number was called
       const roomResult = await dbQuery(
         `SELECT drawn_numbers FROM bingo_v2_rooms WHERE id = $1`,
@@ -638,7 +661,7 @@ class BingoV2Service {
 
       const drawnNumbers = roomResult.rows[0].drawn_numbers || [];
 
-      if (number !== 'FREE' && !drawnNumbers.includes(number)) {
+      if (!drawnNumbers.includes(number)) {
         throw new Error('Number not yet called');
       }
 
