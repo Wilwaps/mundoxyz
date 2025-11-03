@@ -215,26 +215,46 @@ router.get('/stats', adminAuth, async (req, res) => {
     const stats = {};
     
     // User stats
-    const userStats = await query(`
-      SELECT 
-        COUNT(*) as total_users,
-        COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as new_users_24h,
-        COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '24 hours' THEN 1 END) as active_users_24h,
-        COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '7 days' THEN 1 END) as active_users_7d
-      FROM users
-    `);
-    stats.users = userStats.rows[0];
+    try {
+      const userStats = await query(`
+        SELECT 
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as new_users_24h,
+          COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '24 hours' THEN 1 END) as active_users_24h,
+          COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '7 days' THEN 1 END) as active_users_7d
+        FROM users
+      `);
+      stats.users = userStats.rows[0];
+    } catch (userStatsError) {
+      logger.warn('Error fetching user stats, using defaults:', userStatsError.message);
+      stats.users = {
+        total_users: 0,
+        new_users_24h: 0,
+        active_users_24h: 0,
+        active_users_7d: 0
+      };
+    }
     
     // Economy stats
-    const economyStats = await query(`
-      SELECT 
-        SUM(coins_balance) as total_coins_circulation,
-        SUM(fires_balance) as total_fires_circulation,
-        AVG(coins_balance) as avg_coins_balance,
-        AVG(fires_balance) as avg_fires_balance
-      FROM wallets
-    `);
-    stats.economy = economyStats.rows[0];
+    try {
+      const economyStats = await query(`
+        SELECT 
+          SUM(coins_balance) as total_coins_circulation,
+          SUM(fires_balance) as total_fires_circulation,
+          AVG(coins_balance) as avg_coins_balance,
+          AVG(fires_balance) as avg_fires_balance
+        FROM wallets
+      `);
+      stats.economy = economyStats.rows[0];
+    } catch (economyStatsError) {
+      logger.warn('Error fetching economy stats, using defaults:', economyStatsError.message);
+      stats.economy = {
+        total_coins_circulation: 0,
+        total_fires_circulation: 0,
+        avg_coins_balance: 0,
+        avg_fires_balance: 0
+      };
+    }
     
     // Supply stats - Crear tabla si no existe
     try {
@@ -280,28 +300,45 @@ router.get('/stats', adminAuth, async (req, res) => {
       total_reserved: 0
     };
     
-    // Game stats
-    const gameStats = await query(`
-      SELECT 
-        (SELECT COUNT(*) FROM raffles) as total_raffles,
-        (SELECT COUNT(*) FROM raffles WHERE status = 'active') as active_raffles,
-        (SELECT COUNT(*) FROM bingo_v2_rooms) as total_bingo_rooms,
-        (SELECT COUNT(*) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as active_bingo_rooms,
-        (SELECT SUM(pot_fires) FROM raffles WHERE status = 'active') as total_raffle_pot_fires,
-        (SELECT SUM(pot_fires) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as total_bingo_pot_fires
-    `);
-    stats.games = gameStats.rows[0];
+    // Game stats - Con manejo de errores para tablas que no existan
+    try {
+      const gameStats = await query(`
+        SELECT 
+          (SELECT COUNT(*) FROM raffles WHERE status = 'active') as active_raffles,
+          (SELECT COUNT(*) FROM bingo_v2_rooms) as total_bingo_rooms,
+          (SELECT COUNT(*) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as active_bingo_rooms,
+          (SELECT COALESCE(SUM(pot_fires), 0) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as total_bingo_pot_fires
+      `);
+      stats.games = gameStats.rows[0];
+    } catch (gameStatsError) {
+      logger.warn('Error fetching game stats, using defaults:', gameStatsError.message);
+      stats.games = {
+        active_raffles: 0,
+        total_bingo_rooms: 0,
+        active_bingo_rooms: 0,
+        total_bingo_pot_fires: 0
+      };
+    }
     
     // Transaction volume (last 24h)
-    const txVolume = await query(`
-      SELECT 
-        COUNT(*) as total_transactions,
-        SUM(CASE WHEN currency = 'fires' THEN amount ELSE 0 END) as fires_volume,
-        SUM(CASE WHEN currency = 'coins' THEN amount ELSE 0 END) as coins_volume
-      FROM wallet_transactions
-      WHERE created_at > NOW() - INTERVAL '24 hours'
-    `);
-    stats.transactions_24h = txVolume.rows[0];
+    try {
+      const txVolume = await query(`
+        SELECT 
+          COUNT(*) as total_transactions,
+          SUM(CASE WHEN currency = 'fires' THEN amount ELSE 0 END) as fires_volume,
+          SUM(CASE WHEN currency = 'coins' THEN amount ELSE 0 END) as coins_volume
+        FROM wallet_transactions
+        WHERE created_at > NOW() - INTERVAL '24 hours'
+      `);
+      stats.transactions_24h = txVolume.rows[0];
+    } catch (txError) {
+      logger.warn('Error fetching transaction stats, using defaults:', txError.message);
+      stats.transactions_24h = {
+        total_transactions: 0,
+        fires_volume: 0,
+        coins_volume: 0
+      };
+    }
     
     res.json(stats);
   } catch (error) {
