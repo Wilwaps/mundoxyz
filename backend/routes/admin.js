@@ -39,7 +39,24 @@ router.get('/welcome/events', adminAuth, async (req, res) => {
 // Create welcome event
 router.post('/welcome/events', adminAuth, async (req, res) => {
   try {
-    const { name, message, coins_amount, fires_amount, duration_hours, max_claims, priority } = req.body;
+    const { 
+      name, 
+      message, 
+      coins_amount, 
+      fires_amount, 
+      duration_hours, 
+      max_claims, 
+      priority,
+      event_type,
+      recurrence,
+      target_segment,
+      min_user_level,
+      max_per_user,
+      cooldown_hours,
+      require_claim,
+      auto_send,
+      expires_hours
+    } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'Event name is required' });
@@ -47,8 +64,10 @@ router.post('/welcome/events', adminAuth, async (req, res) => {
     
     const result = await query(
       `INSERT INTO welcome_events 
-       (name, message, coins_amount, fires_amount, duration_hours, max_claims, priority, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (name, message, coins_amount, fires_amount, duration_hours, max_claims, priority, created_by,
+        event_type, recurrence, target_segment, min_user_level, max_per_user, cooldown_hours,
+        require_claim, auto_send, expires_hours)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         name,
@@ -58,13 +77,23 @@ router.post('/welcome/events', adminAuth, async (req, res) => {
         duration_hours || 72,
         max_claims || null,
         priority || 0,
-        req.user?.id || null
+        req.user?.id || null,
+        event_type || 'manual',
+        recurrence || null,
+        JSON.stringify(target_segment || { type: 'all' }),
+        min_user_level || 0,
+        max_per_user || null,
+        cooldown_hours || null,
+        require_claim !== undefined ? require_claim : true,
+        auto_send || false,
+        expires_hours || 72
       ]
     );
     
     logger.info('Welcome event created', { 
       eventId: result.rows[0].id, 
       name,
+      eventType: event_type,
       by: req.user?.username 
     });
     

@@ -269,7 +269,7 @@ const AdminWelcome = () => {
   const { data: events, refetch } = useQuery({
     queryKey: ['admin-welcome-events'],
     queryFn: async () => {
-      const response = await axios.get('/admin/welcome/events');
+      const response = await axios.get('/api/admin/welcome/events');
       return response.data;
     }
   });
@@ -277,7 +277,7 @@ const AdminWelcome = () => {
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/admin/welcome/events', eventData);
+      await axios.post('/api/admin/welcome/events', eventData);
       toast.success('Evento creado exitosamente');
       setShowCreateModal(false);
       refetch();
@@ -288,7 +288,7 @@ const AdminWelcome = () => {
 
   const handleActivateEvent = async (eventId) => {
     try {
-      await axios.post(`/admin/welcome/events/${eventId}/activate`);
+      await axios.post(`/api/admin/welcome/events/${eventId}/activate`);
       toast.success('Evento activado');
       refetch();
     } catch (error) {

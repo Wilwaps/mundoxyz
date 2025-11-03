@@ -206,6 +206,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/economy', economyRoutes);
 app.use('/api/welcome', welcomeRoutes);
+app.use('/api/gifts', require('./routes/gifts'));
 app.use('/api/admin', adminRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/games', gameRoutes);
