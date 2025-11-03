@@ -285,10 +285,10 @@ router.get('/stats', adminAuth, async (req, res) => {
       SELECT 
         (SELECT COUNT(*) FROM raffles) as total_raffles,
         (SELECT COUNT(*) FROM raffles WHERE status = 'active') as active_raffles,
-        (SELECT COUNT(*) FROM bingo_rooms) as total_bingo_rooms,
-        (SELECT COUNT(*) FROM bingo_rooms WHERE status IN ('waiting', 'playing')) as active_bingo_rooms,
+        (SELECT COUNT(*) FROM bingo_v2_rooms) as total_bingo_rooms,
+        (SELECT COUNT(*) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as active_bingo_rooms,
         (SELECT SUM(pot_fires) FROM raffles WHERE status = 'active') as total_raffle_pot_fires,
-        (SELECT SUM(pot_fires) FROM bingo_rooms WHERE status IN ('waiting', 'playing')) as total_bingo_pot_fires
+        (SELECT SUM(pot_fires) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as total_bingo_pot_fires
     `);
     stats.games = gameStats.rows[0];
     
