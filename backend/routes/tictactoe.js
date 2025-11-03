@@ -736,6 +736,17 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           ? parseFloat(updatedRoom.pot_fires) + (parseFloat(updatedRoom.bet_amount) * 2)
           : parseFloat(updatedRoom.pot_fires);
         
+        // CRÍTICO: Limpiar movimientos previos para evitar violación de unique constraint
+        await client.query(
+          'DELETE FROM tictactoe_moves WHERE room_id = $1',
+          [updatedRoom.id]
+        );
+        
+        logger.info('Tictactoe moves cleared for rematch', { 
+          roomId: updatedRoom.id,
+          roomCode: code
+        });
+        
         // Resetear sala para nueva partida (misma sala, nuevo juego)
         await client.query(
           `UPDATE tictactoe_rooms 
