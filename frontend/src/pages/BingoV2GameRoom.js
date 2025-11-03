@@ -130,8 +130,9 @@ const BingoV2GameRoom = () => {
       });
       const data = await response.json();
       
+      // Stats loaded successfully (reserved for future use)
       if (data.success) {
-        setUserExperience(data.stats.experience || 0);
+        // Future: Podemos agregar estadísticas aquí
       }
     } catch (err) {
       console.error('Error loading user stats:', err);
