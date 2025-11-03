@@ -23,13 +23,33 @@ import toast from 'react-hot-toast';
 
 // Stats Component
 const AdminStats = () => {
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading, error } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const response = await axios.get('/admin/stats');
+      const response = await axios.get('/api/admin/stats');
       return response.data;
-    }
+    },
+    refetchInterval: 10000 // Actualizar cada 10 segundos
   });
+
+  if (isLoading) {
+    return (
+      <div className="p-4 flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="card-glass bg-error/20 border border-error/50 text-error p-6 text-center">
+          <p className="font-bold mb-2">Error al cargar estadísticas</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4">
@@ -62,29 +82,39 @@ const AdminStats = () => {
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-text/60">Max Supply (Total Creados)</span>
-            <span className="font-bold text-violet">🔥 {parseFloat(stats?.supply?.total_max || 0).toLocaleString()}</span>
+            <span className="font-bold text-violet">
+              🔥 {Number(stats?.supply?.total_max || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-text/60">Fuegos Emitidos</span>
-            <span className="font-bold text-accent">🔥 {parseFloat(stats?.supply?.total_emitted || 0).toLocaleString()}</span>
+            <span className="font-bold text-accent">
+              🔥 {Number(stats?.supply?.total_emitted || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-text/60">Fuegos en Circulación</span>
-            <span className="font-bold text-fire-orange">🔥 {parseFloat(stats?.supply?.total_circulating || 0).toLocaleString()}</span>
+            <span className="font-bold text-fire-orange">
+              🔥 {Number(stats?.supply?.total_circulating || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-text/60">Fuegos Quemados 🔥</span>
-            <span className="font-bold text-error">🔥 {parseFloat(stats?.supply?.total_burned || 0).toLocaleString()}</span>
+            <span className="font-bold text-error">
+              🔥 {Number(stats?.supply?.total_burned || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-text/60">Fuegos Reservados</span>
-            <span className="font-bold text-warning">🔥 {parseFloat(stats?.supply?.total_reserved || 0).toLocaleString()}</span>
+            <span className="font-bold text-warning">
+              🔥 {Number(stats?.supply?.total_reserved || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="border-t border-white/10 pt-3 mt-3">
             <div className="flex justify-between items-center">
               <span className="text-text/60 font-semibold">Fuegos Disponibles</span>
               <span className="font-bold text-success">
-                🔥 {((stats?.supply?.total_max || 0) - (stats?.supply?.total_emitted || 0)).toLocaleString()}
+                🔥 {Number((stats?.supply?.total_max || 0) - (stats?.supply?.total_emitted || 0)).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -100,11 +130,27 @@ const AdminStats = () => {
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-text/60">Total Coins en Circulación</span>
-            <span className="font-bold text-accent">🪙 {parseFloat(stats?.economy?.total_coins_circulation || 0).toLocaleString()}</span>
+            <span className="font-bold text-accent">
+              🪙 {Number(stats?.economy?.total_coins_circulation || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-text/60">Promedio por Usuario</span>
-            <span className="font-bold text-text">🪙 {parseFloat(stats?.economy?.avg_coins_balance || 0).toFixed(2)}</span>
+            <span className="text-text/60">Total Fires en Wallets</span>
+            <span className="font-bold text-fire-orange">
+              🔥 {Number(stats?.economy?.total_fires_circulation || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Promedio Coins/Usuario</span>
+            <span className="font-bold text-text">
+              🪙 {Number(stats?.economy?.avg_coins_balance || 0).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Promedio Fires/Usuario</span>
+            <span className="font-bold text-text">
+              🔥 {Number(stats?.economy?.avg_fires_balance || 0).toFixed(2)}
+            </span>
           </div>
         </div>
       </div>

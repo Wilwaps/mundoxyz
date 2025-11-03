@@ -236,9 +236,49 @@ router.get('/stats', adminAuth, async (req, res) => {
     `);
     stats.economy = economyStats.rows[0];
     
-    // Supply stats
+    // Supply stats - Crear tabla si no existe
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS fire_supply (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          total_max DECIMAL(20, 2) NOT NULL DEFAULT 10000,
+          total_emitted DECIMAL(20, 2) NOT NULL DEFAULT 0,
+          total_burned DECIMAL(20, 2) NOT NULL DEFAULT 0,
+          total_circulating DECIMAL(20, 2) NOT NULL DEFAULT 0,
+          total_reserved DECIMAL(20, 2) NOT NULL DEFAULT 0,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT single_row CHECK (id = 1)
+        )
+      `);
+      
+      // Insertar registro inicial si no existe
+      await query(`
+        INSERT INTO fire_supply (id, total_max, total_emitted, total_burned, total_circulating, total_reserved)
+        VALUES (1, 10000, 0, 0, 0, 0)
+        ON CONFLICT (id) DO NOTHING
+      `);
+      
+      // Calcular y actualizar valores reales
+      await query(`
+        UPDATE fire_supply 
+        SET 
+          total_circulating = COALESCE((SELECT SUM(fires_balance) FROM wallets), 0),
+          total_emitted = COALESCE((SELECT SUM(fires_balance) FROM wallets), 0) + COALESCE(total_burned, 0),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `);
+    } catch (initError) {
+      logger.error('Error initializing fire_supply:', initError);
+    }
+    
     const supplyStats = await query('SELECT * FROM fire_supply WHERE id = 1');
-    stats.supply = supplyStats.rows[0];
+    stats.supply = supplyStats.rows[0] || {
+      total_max: 10000,
+      total_emitted: 0,
+      total_burned: 0,
+      total_circulating: 0,
+      total_reserved: 0
+    };
     
     // Game stats
     const gameStats = await query(`
