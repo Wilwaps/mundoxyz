@@ -945,55 +945,63 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t border-white/20">
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
-                  const currentIndex = tabs.indexOf(activeTab);
-                  if (currentIndex > 0) {
-                    setActiveTab(tabs[currentIndex - 1]);
-                  }
-                }}
-                disabled={activeTab === 'basic'}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
-              >
-                Anterior
-              </button>
-              
-              <button
-                onClick={() => {
-                  const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
-                  const currentIndex = tabs.indexOf(activeTab);
-                  if (currentIndex < tabs.length - 1) {
-                    setActiveTab(tabs[currentIndex + 1]);
-                  }
-                }}
-                disabled={activeTab === 'summary'}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
-
-            {activeTab === 'summary' && (
-              <button
-                onClick={handleSubmit}
-                disabled={createRaffleMutation.isLoading}
-                className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity/50 text-white font-bold rounded-xl transition-all duration-300 flex items-center gap-2"
-              >
-                {createRaffleMutation.isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    <FaTrophy />
-                    Crear Rifa
-                  </>
-                )}
-              </button>
+          <div className="p-4 md:p-6 border-t border-white/20">
+            {activeTab === 'summary' ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleSubmit}
+                  disabled={createRaffleMutation.isLoading}
+                  className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 text-white font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  {createRaffleMutation.isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <FaTrophy />
+                      Crear Rifa
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('prize')}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                >
+                  Anterior
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
+                    const currentIndex = tabs.indexOf(activeTab);
+                    if (currentIndex > 0) {
+                      setActiveTab(tabs[currentIndex - 1]);
+                    }
+                  }}
+                  disabled={activeTab === 'basic'}
+                  className="px-4 md:px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm md:text-base"
+                >
+                  Anterior
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
+                    const currentIndex = tabs.indexOf(activeTab);
+                    if (currentIndex < tabs.length - 1) {
+                      setActiveTab(tabs[currentIndex + 1]);
+                    }
+                  }}
+                  disabled={activeTab === 'summary'}
+                  className="px-4 md:px-6 py-3 bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm md:text-base"
+                >
+                  Siguiente
+                </button>
+              </div>
             )}
           </div>
         </motion.div>

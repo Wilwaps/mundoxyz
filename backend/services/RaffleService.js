@@ -573,6 +573,17 @@ class RaffleService {
                 INSERT INTO raffle_winners (raffle_id, user_id, winning_number, prize_amount, prize_type)
                 VALUES ($1, $2, $3, (SELECT pot_fires * 0.7 FROM raffles WHERE id = $1), 'fire')
             `, [raffleId, purchasedBy.rows[0].purchased_by, winningNumber]);
+
+            // Dar experiencia a todos los participantes (2 puntos)
+            await client.query(`
+                UPDATE users 
+                SET experience = experience + 2
+                WHERE id IN (
+                    SELECT DISTINCT purchased_by 
+                    FROM raffle_numbers 
+                    WHERE raffle_id = $1 AND status = 'purchased' AND purchased_by IS NOT NULL
+                )
+            `, [raffleId]);
         }
     }
 
