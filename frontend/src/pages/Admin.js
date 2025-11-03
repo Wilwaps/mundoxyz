@@ -53,26 +53,58 @@ const AdminStats = () => {
         </div>
       </div>
 
-      {/* Economy Stats */}
+      {/* Fire Supply Stats */}
       <div className="card-glass mb-6">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <DollarSign size={20} className="text-fire-orange" />
-          Economía
+          <Flame size={20} className="text-fire-orange" />
+          Suministro de Fuegos
         </h3>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-text/60">Total Fires en Circulación</span>
-            <span className="font-bold text-fire-orange">🔥 {stats?.supply?.total_circulating || 0}</span>
+            <span className="text-text/60">Max Supply (Total Creados)</span>
+            <span className="font-bold text-violet">🔥 {parseFloat(stats?.supply?.total_max || 0).toLocaleString()}</span>
           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Fuegos Emitidos</span>
+            <span className="font-bold text-accent">🔥 {parseFloat(stats?.supply?.total_emitted || 0).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Fuegos en Circulación</span>
+            <span className="font-bold text-fire-orange">🔥 {parseFloat(stats?.supply?.total_circulating || 0).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Fuegos Quemados 🔥</span>
+            <span className="font-bold text-error">🔥 {parseFloat(stats?.supply?.total_burned || 0).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-text/60">Fuegos Reservados</span>
+            <span className="font-bold text-warning">🔥 {parseFloat(stats?.supply?.total_reserved || 0).toLocaleString()}</span>
+          </div>
+          <div className="border-t border-white/10 pt-3 mt-3">
+            <div className="flex justify-between items-center">
+              <span className="text-text/60 font-semibold">Fuegos Disponibles</span>
+              <span className="font-bold text-success">
+                🔥 {((stats?.supply?.total_max || 0) - (stats?.supply?.total_emitted || 0)).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Coins Stats */}
+      <div className="card-glass mb-6">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <DollarSign size={20} className="text-accent" />
+          Economía de Monedas
+        </h3>
+        <div className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-text/60">Total Coins en Circulación</span>
-            <span className="font-bold text-accent">🪙 {stats?.economy?.total_coins_circulation || 0}</span>
+            <span className="font-bold text-accent">🪙 {parseFloat(stats?.economy?.total_coins_circulation || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-text/60">Fires Disponibles</span>
-            <span className="font-bold text-success">
-              🔥 {((stats?.supply?.total_max || 0) - (stats?.supply?.total_emitted || 0)).toFixed(2)}
-            </span>
+            <span className="text-text/60">Promedio por Usuario</span>
+            <span className="font-bold text-text">🪙 {parseFloat(stats?.economy?.avg_coins_balance || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
