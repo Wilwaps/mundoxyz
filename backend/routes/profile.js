@@ -27,6 +27,9 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         u.nickname,
         u.bio,
         u.security_answer,
+        u.experience,
+        u.total_games_played,
+        u.total_games_won,
         w.id as wallet_id,
         w.coins_balance,
         w.fires_balance,
@@ -74,6 +77,10 @@ router.get('/:userId', optionalAuth, async (req, res) => {
       last_seen_at: user.last_seen_at,
       is_verified: user.is_verified,
       roles: user.roles || [],
+      // Experiencia y juegos (públicos)
+      experience: user.experience || 0,
+      total_games_played: user.total_games_played || 0,
+      total_games_won: user.total_games_won || 0,
       stats: {
         coins_balance: user.coins_balance || 0,
         fires_balance: user.fires_balance || 0,
