@@ -16,7 +16,8 @@ import {
   Flame,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Repeat
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -575,6 +576,328 @@ const AdminFireRequests = () => {
   );
 };
 
+// Admin Redemptions Component
+const AdminRedemptions = () => {
+  const queryClient = useQueryClient();
+  const [selectedStatus, setSelectedStatus] = useState('pending');
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [selectedRedemption, setSelectedRedemption] = useState(null);
+  const [actionType, setActionType] = useState(null);
+  const [actionNotes, setActionNotes] = useState('');
+  const [transactionId, setTransactionId] = useState('');
+  const [proofUrl, setProofUrl] = useState('');
+
+  const { data: redemptions, isLoading } = useQuery({
+    queryKey: ['admin-redemptions', selectedStatus],
+    queryFn: async () => {
+      const params = selectedStatus !== 'all' ? `?status=${selectedStatus}` : '';
+      const response = await axios.get(`/api/market/redeems/list${params}`);
+      return response.data.redemptions;
+    },
+    refetchInterval: 10000
+  });
+
+  const handleAction = (redemption, type) => {
+    setSelectedRedemption(redemption);
+    setActionType(type);
+    setShowActionModal(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedRedemption) return;
+
+    try {
+      if (actionType === 'accept') {
+        if (!transactionId.trim()) {
+          toast.error('El ID de transacción es requerido');
+          return;
+        }
+
+        await axios.post(`/api/market/redeems/${selectedRedemption.id}/accept`, {
+          transaction_id: transactionId,
+          proof_url: proofUrl,
+          notes: actionNotes
+        });
+        toast.success('Canje aceptado exitosamente');
+      } else {
+        if (!actionNotes.trim()) {
+          toast.error('La razón del rechazo es requerida');
+          return;
+        }
+
+        await axios.post(`/api/market/redeems/${selectedRedemption.id}/reject`, {
+          reason: actionNotes
+        });
+        toast.success('Canje rechazado');
+      }
+
+      queryClient.invalidateQueries(['admin-redemptions']);
+      setShowActionModal(false);
+      setSelectedRedemption(null);
+      setActionType(null);
+      setActionNotes('');
+      setTransactionId('');
+      setProofUrl('');
+    } catch (error) {
+      console.error('Error processing redemption:', error);
+      toast.error(error.response?.data?.error || 'Error al procesar canje');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <Repeat className="text-violet" />
+        Canjes de Fuegos
+      </h2>
+
+      {/* Status Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {['pending', 'completed', 'rejected', 'all'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setSelectedStatus(status)}
+            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+              selectedStatus === status
+                ? 'bg-violet/20 text-violet'
+                : 'bg-glass hover:bg-glass-hover'
+            }`}
+          >
+            {status === 'pending' && '⏳ Pendientes'}
+            {status === 'completed' && '✅ Completados'}
+            {status === 'rejected' && '❌ Rechazados'}
+            {status === 'all' && '📋 Todos'}
+          </button>
+        ))}
+      </div>
+
+      {/* Redemptions List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+        </div>
+      ) : !redemptions || redemptions.length === 0 ? (
+        <div className="card-glass text-center py-12">
+          <Repeat size={48} className="mx-auto text-text/30 mb-3" />
+          <p className="text-text/60">No hay canjes {selectedStatus === 'all' ? '' : selectedStatus}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {redemptions.map((redemption) => (
+            <motion.div
+              key={redemption.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-glass"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-bold text-lg">{redemption.username}</span>
+                    {redemption.status === 'pending' && (
+                      <span className="text-xs px-2 py-1 bg-warning/20 text-warning rounded-full">
+                        Pendiente
+                      </span>
+                    )}
+                    {redemption.status === 'completed' && (
+                      <span className="text-xs px-2 py-1 bg-success/20 text-success rounded-full">
+                        Completado
+                      </span>
+                    )}
+                    {redemption.status === 'rejected' && (
+                      <span className="text-xs px-2 py-1 bg-error/20 text-error rounded-full">
+                        Rechazado
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-text/60 mb-1">
+                    📧 {redemption.email}
+                  </p>
+                  <p className="text-xs text-text/40">
+                    📅 Solicitado: {formatDate(redemption.created_at)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-fire-orange">
+                    {redemption.fires_amount} 🔥
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <div className="glass-panel p-3 mb-4 space-y-2">
+                <div className="text-sm">
+                  <span className="text-text/60">Cédula:</span>
+                  <span className="ml-2 font-mono">{redemption.cedula}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-text/60">Teléfono:</span>
+                  <span className="ml-2 font-mono">{redemption.phone}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-text/60">Banco:</span>
+                  <span className="ml-2">{redemption.bank_name} ({redemption.bank_code})</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-text/60">Cuenta:</span>
+                  <span className="ml-2 font-mono">{redemption.bank_account}</span>
+                </div>
+              </div>
+
+              {redemption.notes && (
+                <div className="bg-glass/50 p-3 rounded-lg mb-4">
+                  <p className="text-xs text-text/60 mb-1">Notas:</p>
+                  <p className="text-sm">{redemption.notes}</p>
+                  {redemption.processed_by_username && (
+                    <p className="text-xs text-text/40 mt-1">
+                      Procesado por: {redemption.processed_by_username} • {formatDate(redemption.processed_at)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {redemption.transaction_id && (
+                <div className="bg-success/10 p-3 rounded-lg mb-4">
+                  <p className="text-xs text-success/80 mb-1">ID de Transacción:</p>
+                  <p className="text-sm font-mono">{redemption.transaction_id}</p>
+                  {redemption.proof_url && (
+                    <a 
+                      href={redemption.proof_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-accent hover:underline mt-1 inline-block"
+                    >
+                      Ver comprobante →
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {redemption.reason && (
+                <div className="bg-error/10 p-3 rounded-lg mb-4">
+                  <p className="text-xs text-error/80 mb-1">Razón del rechazo:</p>
+                  <p className="text-sm">{redemption.reason}</p>
+                </div>
+              )}
+
+              {redemption.status === 'pending' && (
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => handleAction(redemption, 'reject')}
+                    className="flex-1 py-2 px-4 bg-error/20 hover:bg-error/30 text-error rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <XCircle size={18} />
+                    Rechazar
+                  </button>
+                  <button
+                    onClick={() => handleAction(redemption, 'accept')}
+                    className="flex-1 py-2 px-4 bg-success/20 hover:bg-success/30 text-success rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={18} />
+                    Aceptar
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Action Modal */}
+      {showActionModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card rounded-2xl max-w-md w-full p-6"
+          >
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              {actionType === 'accept' ? (
+                <>
+                  <CheckCircle className="text-success" />
+                  Aceptar Canje
+                </>
+              ) : (
+                <>
+                  <XCircle className="text-error" />
+                  Rechazar Canje
+                </>
+              )}
+            </h3>
+
+            <div className="mb-4 p-3 bg-glass rounded-lg">
+              <p className="text-sm text-text/60 mb-1">Usuario:</p>
+              <p className="font-bold">{selectedRedemption?.username}</p>
+              <p className="text-sm text-text/60 mt-2 mb-1">Monto:</p>
+              <p className="text-xl font-bold text-fire-orange">{selectedRedemption?.fires_amount} 🔥</p>
+            </div>
+
+            {actionType === 'accept' ? (
+              <>
+                <input
+                  type="text"
+                  placeholder="ID de Transacción *"
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="w-full px-4 py-3 bg-glass rounded-lg text-text mb-3"
+                />
+                <input
+                  type="url"
+                  placeholder="URL del Comprobante (opcional)"
+                  value={proofUrl}
+                  onChange={(e) => setProofUrl(e.target.value)}
+                  className="w-full px-4 py-3 bg-glass rounded-lg text-text mb-3"
+                />
+              </>
+            ) : null}
+
+            <textarea
+              placeholder={actionType === 'accept' ? 'Notas (opcional)' : 'Razón del rechazo *'}
+              value={actionNotes}
+              onChange={(e) => setActionNotes(e.target.value)}
+              className="w-full px-4 py-3 bg-glass rounded-lg text-text mb-4 min-h-[100px] resize-none"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowActionModal(false);
+                  setActionNotes('');
+                  setTransactionId('');
+                  setProofUrl('');
+                }}
+                className="flex-1 py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${
+                  actionType === 'accept'
+                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                    : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                }`}
+              >
+                Confirmar {actionType === 'accept' ? 'Aceptación' : 'Rechazo'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Main Admin Component
 const Admin = () => {
   const { isAdmin } = useAuth();
@@ -633,6 +956,17 @@ const Admin = () => {
             <Flame size={18} />
             Solicitudes
           </NavLink>
+          <NavLink
+            to="/admin/redemptions"
+            className={({ isActive }) => 
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+              }`
+            }
+          >
+            <Repeat size={18} />
+            Canjes
+          </NavLink>
         </div>
       </nav>
 
@@ -642,6 +976,7 @@ const Admin = () => {
         <Route path="users" element={<AdminUsers />} />
         <Route path="welcome" element={<AdminWelcome />} />
         <Route path="fire-requests" element={<AdminFireRequests />} />
+        <Route path="redemptions" element={<AdminRedemptions />} />
       </Routes>
     </div>
   );
