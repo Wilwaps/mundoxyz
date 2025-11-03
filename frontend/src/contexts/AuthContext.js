@@ -268,7 +268,11 @@ export const AuthProvider = ({ children }) => {
         total_coins_earned: profileData.stats?.total_coins_earned || 0,
         total_fires_earned: profileData.stats?.total_fires_earned || 0,
         total_coins_spent: profileData.total_coins_spent || 0,
-        total_fires_spent: profileData.total_fires_spent || 0
+        total_fires_spent: profileData.total_fires_spent || 0,
+        // Experiencia
+        experience: profileData.experience || 0,
+        total_games_played: profileData.total_games_played || 0,
+        total_games_won: profileData.total_games_won || 0
       };
       
       updateUser(updatedUser);
