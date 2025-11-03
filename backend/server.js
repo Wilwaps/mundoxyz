@@ -28,6 +28,7 @@ const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
 const diagnosticRoutes = require('./routes/diagnostic');
+const debugXpRoutes = require('./routes/debug-xp');
 
 // Create Express app
 const app = express();
@@ -222,6 +223,7 @@ app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
+app.use('/api/debug-xp', debugXpRoutes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
