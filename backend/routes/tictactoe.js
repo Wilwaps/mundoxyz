@@ -718,12 +718,11 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           
           await client.query(
             `INSERT INTO wallet_transactions 
-             (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+             (wallet_id, type, currency, amount, balance_before, balance_after, description)
              VALUES (
                (SELECT id FROM wallets WHERE user_id = $1),
                'game_bet', $2, $3, $4, $5,
-               'Revancha La Vieja #' || $6,
-               $7
+               'Revancha La Vieja #' || $6 || ' - Sala ' || $7
              )`,
             [playerId, currency, -betAmount, balance, balance - betAmount, newRematchCount, code]
           );
