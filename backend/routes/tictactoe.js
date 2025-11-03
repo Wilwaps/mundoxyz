@@ -767,13 +767,21 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           newPotFires
         });
         
-        // Emitir evento de revancha aceptada (sin cambio de sala)
+        // Obtener estado completo actualizado de la sala
+        const updatedRoomResult = await client.query(
+          'SELECT * FROM tictactoe_rooms WHERE id = $1',
+          [room.id]
+        );
+        const fullUpdatedRoom = updatedRoomResult.rows[0];
+        
+        // Emitir evento de revancha aceptada con estado completo
         const io = req.app.get('io');
         io.to(`tictactoe:${code}`).emit('room:rematch-accepted', {
           roomCode: code,
-          sameRoom: true, // Flag para indicar que es la misma sala
+          sameRoom: true,
           rematchCount: newRematchCount,
-          initialTurn
+          initialTurn,
+          room: fullUpdatedRoom // Enviar estado completo de la sala
         });
         
         return {

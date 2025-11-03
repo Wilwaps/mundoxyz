@@ -337,7 +337,12 @@ const TicTacToeRoom = () => {
           setBoard([[null, null, null], [null, null, null], [null, null, null]]);
           setTimeLeft(15);
           
-          // Invalidar y refrescar datos inmediatamente
+          // Si el backend envió el estado completo de la sala, úsalo inmediatamente
+          if (data.room) {
+            queryClient.setQueryData(['tictactoe-room', code], data.room);
+          }
+          
+          // Invalidar y refrescar datos
           queryClient.invalidateQueries(['tictactoe-room', code]);
           queryClient.invalidateQueries(['balance']);
           queryClient.invalidateQueries(['economy']);
