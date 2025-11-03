@@ -44,7 +44,8 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
     prize_meta: {
       description: '',
       estimated_value: '',
-      delivery_info: ''
+      delivery_info: '',
+      prize_image_url: ''
     }
   });
 
@@ -52,9 +53,9 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
 
-  // Generar código aleatorio para preview
+  // Generar código numérico de 6 dígitos para preview
   useEffect(() => {
-    const code = 'R' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedCode(code);
   }, []);
 
@@ -177,6 +178,44 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
     }
   };
 
+  // Upload de foto del premio
+  const uploadPrizeImage = async (file) => {
+    if (!file) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('prize_image', file);
+
+    try {
+      setIsUploading(true);
+      const response = await fetch('/api/raffles/upload-prize-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formDataUpload
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al subir imagen del premio');
+      }
+
+      const result = await response.json();
+      setFormData(prev => ({
+        ...prev,
+        prize_meta: {
+          ...prev.prize_meta,
+          prize_image_url: result.data.image_url
+        }
+      }));
+
+      toast.success('Imagen del premio subida exitosamente');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Submit del formulario
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -195,18 +234,18 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
     createRaffleMutation.mutate(submitData);
   };
 
-  // Componente de tabs
+  // Componente de tabs - Responsive
   const TabButton = ({ id, label, icon, completed }) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+      className={`flex items-center gap-1 md:gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl text-sm md:text-base font-semibold transition-all duration-300 whitespace-nowrap ${
         activeTab === id
           ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
           : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
       }`}
     >
       {icon}
-      {label}
+      <span className="hidden sm:inline">{label}</span>
       {completed && <FaCheck className="text-green-400 text-sm" />}
     </button>
   );
@@ -230,7 +269,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
           <span className="text-white/60 text-sm">Código: {generatedCode}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-white/5 rounded-xl">
             <h4 className="text-white font-semibold mb-2">Información Básica</h4>
             <ul className="space-y-1 text-sm text-white/70">
@@ -290,12 +329,21 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-white/80">
-              <span>Modo {formData.is_company_mode ? 'Empresa (+3000 fuegos)' : 'Estándar'}:</span>
-              <span>{formData.is_company_mode ? '3000' : '0'} fuegos</span>
+              <span>Costo de creación (1 número):</span>
+              <span>{formData.cost_per_number || 0} fuegos</span>
             </div>
+            {formData.is_company_mode && (
+              <div className="flex justify-between text-white/80">
+                <span>Modo Empresa:</span>
+                <span>+3000 fuegos</span>
+              </div>
+            )}
             <div className="flex justify-between text-white font-semibold pt-2 border-t border-white/20">
               <span>Total necesario:</span>
-              <span>{formData.is_company_mode ? 3000 : 0} fuegos</span>
+              <span>{(parseFloat(formData.cost_per_number) || 0) + (formData.is_company_mode ? 3000 : 0)} fuegos</span>
+            </div>
+            <div className="text-xs text-white/60 pt-2 border-t border-white/20">
+              💡 El host debe pagar {formData.cost_per_number} fuegos como primer número
             </div>
           </div>
         </div>
@@ -316,12 +364,12 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-gradient-to-br from-purple-900/90 to-pink-900/90 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-white/20"
+          className="bg-gradient-to-br from-purple-900/90 to-pink-900/90 rounded-2xl md:rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-white/20"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/20">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/20">
+            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
               <FaTrophy className="text-yellow-400" />
               Crear Nueva Rifa
             </h2>
@@ -333,8 +381,8 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex items-center space-x-2 p-6 border-b border-white/20">
+          {/* Tabs - Responsive */}
+          <div className="flex items-center overflow-x-auto space-x-2 p-4 md:p-6 border-b border-white/20 scrollbar-hide">
             <TabButton
               id="basic"
               label="Información Básica"
@@ -368,7 +416,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div className="p-4 md:p-6 overflow-y-auto max-h-[60vh]">
             <form onSubmit={handleSubmit}>
               {activeTab === 'basic' && (
                 <div className="space-y-6">
@@ -403,7 +451,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-white font-semibold mb-2">
                         Modo de Juego <span className="text-red-400">*</span>
@@ -489,7 +537,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
 
               {activeTab === 'config' && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-white font-semibold mb-2">
                         Visibilidad
@@ -647,7 +695,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
 
                   {formData.is_company_mode && (
                     <div className="space-y-4 p-6 bg-white/5 rounded-xl border border-white/10">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-white font-semibold mb-2">
                             Nombre de la Empresa <span className="text-red-400">*</span>
@@ -688,7 +736,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-white font-semibold mb-2">
                             Color Primario
@@ -809,7 +857,40 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                     {errors.prize_description && <p className="text-red-400 text-sm mt-1">{errors.prize_description}</p>}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white font-semibold mb-2">
+                      Foto del Premio <span className="text-red-400">*</span>
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-3 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl cursor-pointer transition-colors">
+                        <FaUpload />
+                        <span className="text-white">Subir Foto del Premio</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => uploadPrizeImage(e.target.files[0])}
+                          className="hidden"
+                          disabled={isUploading}
+                        />
+                      </label>
+                      
+                      {formData.prize_meta.prize_image_url && (
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={formData.prize_meta.prize_image_url} 
+                            alt="Premio preview"
+                            className="w-16 h-16 rounded-lg object-cover border border-white/20"
+                          />
+                          <span className="text-green-400 text-sm">✓ Foto subida</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-white/60 text-xs mt-2">
+                      Los usuarios podrán ver esta foto en el botón "Premio" dentro del tablero de rifa
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-white font-semibold mb-2">
                         Valor Estimado

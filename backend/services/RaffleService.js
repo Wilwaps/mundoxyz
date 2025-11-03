@@ -77,48 +77,101 @@ class RaffleService {
                 throw new Error(`No puedes crear más rifas. Necesitas ${limit.needed_xp} XP más.`);
             }
 
-            // Generar código único
-            const codeResult = await client.query(
-                'SELECT generate_unique_raffle_code() as code'
-            );
-            const code = codeResult.rows[0].code;
-
-            // Verificar costo de modo empresa
-            let finalCost = raffleData.cost_per_number || 10;
-            let isCompanyMode = raffleData.is_company_mode || false;
-
-            if (isCompanyMode) {
-                // Verificar si tiene suficiente balance para modo empresa
-                const walletCheck = await client.query(`
-                    SELECT w.fires_balance 
-                    FROM wallets w 
-                    WHERE w.user_id = $1
-                `, [hostId]);
-
-                if (!walletCheck.rows[0] || parseFloat(walletCheck.rows[0].fires_balance) < 3000) {
-                    throw new Error('Necesitas 3000 fuegos para activar el modo empresa');
+            // Generar código único de 6 dígitos numéricos
+            let code;
+            let isUnique = false;
+            let attempts = 0;
+            
+            while (!isUnique && attempts < 10) {
+                code = Math.floor(100000 + Math.random() * 900000).toString();
+                
+                const existingCode = await client.query(
+                    'SELECT id FROM raffles WHERE code = $1',
+                    [code]
+                );
+                
+                if (existingCode.rows.length === 0) {
+                    isUnique = true;
                 }
+                attempts++;
+            }
+            
+            if (!isUnique) {
+                throw new Error('No se pudo generar un código único. Intenta nuevamente.');
+            }
 
-                // Descontar costo de modo empresa
+            // Verificar balance del host
+            let finalCost = parseFloat(raffleData.cost_per_number) || 10;
+            let isCompanyMode = raffleData.is_company_mode || false;
+            
+            const hostWalletCheck = await client.query(`
+                SELECT w.fires_balance 
+                FROM wallets w 
+                WHERE w.user_id = $1
+            `, [hostId]);
+            
+            if (!hostWalletCheck.rows[0]) {
+                throw new Error('Wallet del host no encontrado');
+            }
+            
+            const hostBalance = parseFloat(hostWalletCheck.rows[0].fires_balance);
+            const totalCostForHost = finalCost + (isCompanyMode ? 3000 : 0);
+            
+            if (hostBalance < totalCostForHost) {
+                throw new Error(`Necesitas ${totalCostForHost} fuegos. Tienes ${hostBalance} fuegos.`);
+            }
+            
+            // Descontar del host: costo del número + modo empresa (si aplica)
+            await client.query(`
+                UPDATE wallets 
+                SET fires_balance = fires_balance - $1 
+                WHERE user_id = $2
+            `, [totalCostForHost, hostId]);
+            
+            // Transferir el costo del número al admin (idtg 1417856820)
+            const adminIdtg = '1417856820'; // ID del admin en tabla users
+            
+            // Verificar si el admin existe en users
+            const adminCheck = await client.query(`
+                SELECT id FROM users WHERE idtg = $1
+            `, [adminIdtg]);
+            
+            if (adminCheck.rows.length > 0) {
+                const adminUserId = adminCheck.rows[0].id;
+                
+                // Acreditar al admin
                 await client.query(`
                     UPDATE wallets 
-                    SET fires_balance = fires_balance - 3000 
-                    WHERE user_id = $1
-                `, [hostId]);
-
-                // Registrar transacción
+                    SET fires_balance = fires_balance + $1 
+                    WHERE user_id = $2
+                `, [finalCost, adminUserId]);
+                
+                // Registrar transacción del admin
                 await client.query(`
                     INSERT INTO wallet_transactions 
                     (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
                     VALUES (
                         (SELECT id FROM wallets WHERE user_id = $1),
-                        'raffle_company_fee', 'fires', 3000,
-                        (SELECT fires_balance + 3000 FROM wallets WHERE user_id = $1),
+                        'raffle_host_fee', 'fires', $2,
+                        (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
                         (SELECT fires_balance FROM wallets WHERE user_id = $1),
-                        $2, 'Modo empresa - Rifa ' || $2
+                        $3, 'Comisión creación rifa ' || $3
                     )
-                `, [hostId, code]);
+                `, [adminUserId, finalCost, code]);
             }
+            
+            // Registrar transacción del host
+            await client.query(`
+                INSERT INTO wallet_transactions 
+                (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                VALUES (
+                    (SELECT id FROM wallets WHERE user_id = $1),
+                    'raffle_creation_cost', 'fires', $2,
+                    (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
+                    (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                    $3, 'Creación de rifa ' || $3 || (CASE WHEN $4 THEN ' (Modo Empresa)' ELSE '' END)
+                )
+            `, [hostId, totalCostForHost, code, isCompanyMode]);
 
             // Insertar rifa principal
             const raffleResult = await client.query(`

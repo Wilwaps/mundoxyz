@@ -431,6 +431,47 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
 });
 
 /**
+ * POST /api/raffles/upload-prize-image
+ * Subir imagen del premio (AWS S3)
+ */
+router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo de imagen del premio'
+            });
+        }
+
+        const fileName = `raffle-prizes/${Date.now()}-${req.file.originalname}`;
+        
+        const params = {
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+        
+        res.json({
+            success: true,
+            data: {
+                image_url: uploadResult.Location
+            },
+            message: 'Imagen del premio subida exitosamente'
+        });
+    } catch (error) {
+        console.error('Error uploading prize image:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
  * GET /api/raffles/:code/numbers
  * Obtener grid completo de números de una rifa
  */
@@ -712,6 +753,47 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
         });
     } catch (error) {
         console.error('Error uploading logo:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/upload-prize-image
+ * Subir imagen del premio (AWS S3)
+ */
+router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo de imagen del premio'
+            });
+        }
+
+        const fileName = `raffle-prizes/${Date.now()}-${req.file.originalname}`;
+        
+        const params = {
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+        
+        res.json({
+            success: true,
+            data: {
+                image_url: uploadResult.Location
+            },
+            message: 'Imagen del premio subida exitosamente'
+        });
+    } catch (error) {
+        console.error('Error uploading prize image:', error);
         res.status(500).json({
             success: false,
             error: error.message
