@@ -289,6 +289,17 @@ async function startServer() {
         const bingoV2FailureDetection = require('./jobs/bingoV2FailureDetection');
         bingoV2FailureDetection.start();
         logger.info('✅ Bingo V2 Failure Detection Job started');
+        
+        // Start Gift Expiration Job
+        const giftService = require('./services/giftService');
+        setInterval(async () => {
+          try {
+            await giftService.expireOldGifts();
+          } catch (error) {
+            logger.error('Error in gift expiration job:', error);
+          }
+        }, 3600000); // Run every hour
+        logger.info('✅ Gift Expiration Job started - runs every hour');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }

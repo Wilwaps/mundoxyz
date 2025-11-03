@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import API_URL from '../config/api';
 import './MessageInbox.css';
+import GiftClaimButton from './gifts/GiftClaimButton';
 
 const MessageInbox = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -184,6 +185,19 @@ const MessageInbox = () => {
                           <span>Premio: {message.metadata.prize}</span>
                         )}
                       </div>
+                    )}
+                    
+                    {/* Gift Claim Button */}
+                    {message.metadata?.type === 'gift_pending' && message.metadata.gift_id && (
+                      <GiftClaimButton
+                        giftId={message.metadata.gift_id}
+                        coinsAmount={message.metadata.coins_amount || 0}
+                        firesAmount={message.metadata.fires_amount || 0}
+                        onClaimed={() => {
+                          deleteMessage(message.id);
+                          loadMessages();
+                        }}
+                      />
                     )}
                     
                     <button 
