@@ -17,9 +17,12 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Repeat
+  Repeat,
+  Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
+import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 
 // Stats Component
 const AdminStats = () => {
@@ -257,150 +260,39 @@ const AdminUsers = () => {
 
 // Welcome Events Component  
 const AdminWelcome = () => {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [eventData, setEventData] = useState({
-    name: '',
-    message: '',
-    coins_amount: 0,
-    fires_amount: 0,
-    duration_hours: 72
-  });
-
-  const { data: events, refetch } = useQuery({
-    queryKey: ['admin-welcome-events'],
-    queryFn: async () => {
-      const response = await axios.get('/api/admin/welcome/events');
-      return response.data;
-    }
-  });
-
-  const handleCreateEvent = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('/api/admin/welcome/events', eventData);
-      toast.success('Evento creado exitosamente');
-      setShowCreateModal(false);
-      refetch();
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Error al crear evento');
-    }
-  };
-
-  const handleActivateEvent = async (eventId) => {
-    try {
-      await axios.post(`/api/admin/welcome/events/${eventId}/activate`);
-      toast.success('Evento activado');
-      refetch();
-    } catch (error) {
-      toast.error('Error al activar evento');
-    }
-  };
+  const [activeTab, setActiveTab] = useState('events');
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6">Eventos de Bienvenida</h2>
-
-      <button
-        onClick={() => setShowCreateModal(true)}
-        className="w-full btn-primary mb-6"
-      >
-        Crear Nuevo Evento
-      </button>
-
-      {/* Events List */}
-      <div className="space-y-3">
-        {events?.map((event) => (
-          <div key={event.id} className="card-glass">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <div className="font-semibold text-text">{event.name}</div>
-                <div className="text-sm text-text/60">{event.message}</div>
-              </div>
-              {event.is_active ? (
-                <span className="badge-coins text-xs">Activo</span>
-              ) : (
-                <button
-                  onClick={() => handleActivateEvent(event.id)}
-                  className="text-xs px-2 py-1 bg-success/20 text-success rounded"
-                >
-                  Activar
-                </button>
-              )}
-            </div>
-            <div className="flex gap-4 text-sm">
-              <span className="text-accent">🪙 {event.coins_amount}</span>
-              <span className="text-fire-orange">🔥 {event.fires_amount}</span>
-              <span className="text-text/60">{event.total_claims || 0} claims</span>
-            </div>
-          </div>
-        ))}
+    <div>
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-text/10 mb-6 px-4">
+        <button
+          onClick={() => setActiveTab('events')}
+          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
+            activeTab === 'events'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-text/60 hover:text-text'
+          }`}
+        >
+          <Gift size={18} />
+          Eventos
+        </button>
+        <button
+          onClick={() => setActiveTab('direct')}
+          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
+            activeTab === 'direct'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-text/60 hover:text-text'
+          }`}
+        >
+          <Send size={18} />
+          Envío Directo
+        </button>
       </div>
 
-      {/* Create Event Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="card-glass w-full max-w-md"
-          >
-            <h3 className="text-xl font-bold mb-4">Crear Evento de Bienvenida</h3>
-            
-            <form onSubmit={handleCreateEvent} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Nombre del evento"
-                value={eventData.name}
-                onChange={(e) => setEventData({...eventData, name: e.target.value})}
-                className="input-glass w-full"
-                required
-              />
-              
-              <textarea
-                placeholder="Mensaje"
-                value={eventData.message}
-                onChange={(e) => setEventData({...eventData, message: e.target.value})}
-                className="input-glass w-full"
-                rows="3"
-              />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-text/60 mb-1">Coins</label>
-                  <input
-                    type="number"
-                    value={eventData.coins_amount}
-                    onChange={(e) => setEventData({...eventData, coins_amount: e.target.value})}
-                    className="input-glass w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-text/60 mb-1">Fires</label>
-                  <input
-                    type="number"
-                    value={eventData.fires_amount}
-                    onChange={(e) => setEventData({...eventData, fires_amount: e.target.value})}
-                    className="input-glass w-full"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 bg-gray-600 text-text py-3 px-6 rounded-lg"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="flex-1 btn-primary">
-                  Crear Evento
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
+      {/* Content */}
+      {activeTab === 'events' && <WelcomeEventsManager />}
+      {activeTab === 'direct' && <DirectGiftsSender />}
     </div>
   );
 };
