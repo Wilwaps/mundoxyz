@@ -173,6 +173,17 @@ const BingoV2GameRoom = () => {
   };
 
   const handleMarkNumber = (cardId, position) => {
+    // CRITICAL DEBUG: Log what we're sending
+    console.log('📤 Sending mark_number:', {
+      cardId,
+      position,
+      positionType: typeof position,
+      hasRow: position?.row !== undefined,
+      hasCol: position?.col !== undefined,
+      roomCode: code,
+      userId: user?.id
+    });
+    
     if (socket) {
       // Emit to backend and wait for confirmation
       socket.emit('bingo:mark_number', {

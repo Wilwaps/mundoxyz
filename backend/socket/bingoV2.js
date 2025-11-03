@@ -289,6 +289,16 @@ function handleBingoV2Socket(io) {
       try {
         const { roomCode, userId, cardId, position } = data;
         
+        // CRITICAL DEBUG: Log incoming data
+        logger.info('📍 mark_number received:', {
+          roomCode,
+          userId,
+          cardId,
+          position,
+          positionType: typeof position,
+          dataKeys: Object.keys(data || {})
+        });
+        
         // Get room
         const roomResult = await query(
           `SELECT id FROM bingo_v2_rooms WHERE code = $1`,

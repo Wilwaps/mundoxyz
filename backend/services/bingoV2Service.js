@@ -600,6 +600,18 @@ class BingoV2Service {
     const dbQuery = client ? client.query.bind(client) : query;
 
     try {
+      // CRITICAL VALIDATION: Check position
+      if (!position || typeof position !== 'object' || 
+          typeof position.row !== 'number' || typeof position.col !== 'number') {
+        logger.error('❌ Invalid position received:', {
+          position,
+          type: typeof position,
+          hasRow: position?.row !== undefined,
+          hasCol: position?.col !== undefined
+        });
+        throw new Error('Invalid position data');
+      }
+
       // Get card
       const cardResult = await dbQuery(
         `SELECT * FROM bingo_v2_cards WHERE id = $1 AND room_id = $2 AND player_id = $3`,
