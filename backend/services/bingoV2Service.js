@@ -720,7 +720,17 @@ class BingoV2Service {
       logger.info('  Marked positions RAW:', markedPositions);
       logger.info('  Marked positions JSON:', JSON.stringify(markedPositions));
       logger.info('  Card marked_positions column TYPE:', typeof card.marked_positions);
-      logger.info('  Card raw data:', JSON.stringify(card, null, 2));
+      
+      // CRITICAL DEBUG: Show grid values for each row
+      logger.info('📋 GRID VALUES BY ROW:');
+      for (let row = 0; row < grid.length; row++) {
+        const rowValues = grid[row].map((cell, col) => ({
+          col,
+          value: cell.value,
+          marked: markedPositions.some(p => p.row === row && p.col === col)
+        }));
+        logger.info(`  Row ${row}:`, rowValues);
+      }
 
       // Get room mode
       const roomResult = await dbQuery(
@@ -801,6 +811,7 @@ class BingoV2Service {
         for (let row = 0; row < 5; row++) {
           let complete = true;
           let rowCells = [];
+          let unmarkedCells = [];
           for (let col = 0; col < 5; col++) {
             const cellValue = grid[row][col].value;
             const isFree = cellValue === 'FREE';
@@ -809,9 +820,13 @@ class BingoV2Service {
             
             if (!isFree && !isMarked) {
               complete = false;
+              unmarkedCells.push({ pos: `${row},${col}`, value: cellValue });
             }
           }
           logger.info(`  Row ${row}:`, rowCells, `Complete: ${complete}`);
+          if (!complete && unmarkedCells.length > 0) {
+            logger.warn(`    ❌ Row ${row} INCOMPLETE - Missing:`, unmarkedCells);
+          }
           if (complete) {
             logger.info(`✅✅✅ HORIZONTAL LINE FOUND at row ${row}`);
             return true;
