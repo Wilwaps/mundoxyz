@@ -22,7 +22,6 @@ const BingoV2GameRoom = () => {
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [winner, setWinner] = useState(null);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
-  const [userExperience, setUserExperience] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isCallingNumber, setIsCallingNumber] = useState(false);
 
@@ -167,15 +166,10 @@ const BingoV2GameRoom = () => {
 
   const toggleAutoCall = () => {
     if (socket && room && room.host_id === user.id) {
-      if (!autoCallEnabled && userExperience < 400) {
-        alert(`Aún te falta ${400 - userExperience} experiencia para activar este modo`);
-        return;
-      }
-
       socket.emit('bingo:toggle_auto_call', {
         roomCode: code,
         userId: user.id,
-        enable: !autoCallEnabled
+        enabled: !autoCallEnabled
       });
     }
   };
@@ -468,38 +462,30 @@ const BingoV2GameRoom = () => {
           </div>
         </div>
 
-        {/* Experience Warning */}
-        {isHost && userExperience < 400 && (
-          <div className="exp-warning-banner">
-            ⚠️ Necesitas {400 - userExperience} exp más para usar auto-canto
-          </div>
-        )}
 
         {/* Chat Section */}
         <BingoV2Chat roomCode={code} userId={user?.id} />
       </div>
 
       {/* Floating Buttons */}
-      <div className="floating-buttons">
-        {isHost && (
-          <button 
-            className="floating-call-btn"
-            onClick={handleCallNumber}
-            disabled={autoCallEnabled || isCallingNumber}
-            title="Cantar Número"
-          >
-            {isCallingNumber ? '⏳' : '🎲'}
-          </button>
-        )}
-        
+      {isHost && (
         <button 
-          className="floating-board-btn"
-          onClick={() => setShowNumbersBoard(!showNumbersBoard)}
-          title="Ver Números Cantados"
+          className="floating-call-btn"
+          onClick={handleCallNumber}
+          disabled={autoCallEnabled || isCallingNumber}
+          title="Cantar Número"
         >
-          📋
+          {isCallingNumber ? '⏳' : '🎲'}
         </button>
-      </div>
+      )}
+      
+      <button 
+        className="floating-board-btn"
+        onClick={() => setShowNumbersBoard(!showNumbersBoard)}
+        title="Ver Números Cantados"
+      >
+        📋
+      </button>
 
       {/* Numbers Board Modal */}
       {showNumbersBoard && (

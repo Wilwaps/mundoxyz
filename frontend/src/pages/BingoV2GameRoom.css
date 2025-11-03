@@ -360,18 +360,11 @@
   cursor: not-allowed;
 }
 
-/* Floating Buttons Container */
-.floating-buttons {
-  position: fixed;
-  bottom: 90px; /* Subido para no solapar con footer */
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  z-index: 100;
-}
-
+/* Floating Call Button (Cantar Número) */
 .floating-call-btn {
+  position: fixed;
+  bottom: 165px; /* Arriba del botón de tabla */
+  right: 20px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -385,6 +378,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 100;
 }
 
 .floating-call-btn:hover:not(:disabled) {
@@ -400,19 +394,6 @@
 
 .floating-call-btn:active:not(:disabled) {
   transform: scale(0.95);
-}
-
-/* Experience Warning Banner */
-.exp-warning-banner {
-  background: rgba(255, 193, 7, 0.2);
-  border: 2px solid #ffc107;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 20px;
-  color: #ffc107;
-  text-align: center;
-  font-weight: bold;
-  font-size: 1rem;
 }
 
 /* Loading & Error States */
