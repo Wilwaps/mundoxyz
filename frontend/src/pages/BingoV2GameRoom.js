@@ -70,6 +70,7 @@ const BingoV2GameRoom = () => {
       });
 
       socket.on('bingo:game_over', (data) => {
+        console.log('🎉 GAME OVER EVENT RECEIVED:', data);
         setWinner(data.winner);
         setShowWinnerModal(true);
       });
@@ -375,20 +376,34 @@ const BingoV2GameRoom = () => {
 
   const handleCallBingo = (cardId) => {
     if (socket && canCallBingo) {
+      // CRITICAL DEBUG: Log what we're sending
+      const cardData = myCards.find(c => c.id === cardId);
+      console.log('🎯 CALLING BINGO:', {
+        cardId,
+        pattern: room?.pattern_type,
+        roomCode: code,
+        userId: user.id,
+        markedPositions: cardData?.marked_positions,
+        markedCount: cardData?.marked_positions?.length
+      });
+      
       socket.emit('bingo:call_bingo', {
         roomCode: code,
         userId: user.id,
         cardId,
         pattern: room?.pattern_type
       }, (response) => {
+        console.log('📩 BINGO RESPONSE:', response);
         if (response.success) {
-          console.log('¡BINGO VALIDADO!');
+          console.log('✅ ¡BINGO VALIDADO!');
+          // El modal aparecerá automáticamente cuando el backend emita 'bingo:game_over'
         } else {
-          console.warn('Bingo inválido:', response.message);
+          console.warn('❌ Bingo inválido:', response.message);
           alert('El patrón aún no está completo. Continúa marcando números.');
-          setCanCallBingo(false);
         }
       });
+    } else {
+      console.warn('⚠️ Cannot call BINGO:', { socket: !!socket, canCallBingo });
     }
   };
 
