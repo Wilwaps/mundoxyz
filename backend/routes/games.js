@@ -99,16 +99,16 @@ router.get('/history', verifyToken, async (req, res) => {
           br.mode,
           br.status,
           br.created_at,
-          br.ends_at,
-          bp.cards_count,
-          bp.fires_spent,
-          bp.coins_spent,
-          bp.is_winner,
+          br.finished_at as ends_at,
+          bp.cards_purchased as cards_count,
+          bp.total_spent as fires_spent,
+          bp.total_spent as coins_spent,
+          CASE WHEN br.winner_id = $1 THEN true ELSE false END as is_winner,
           CASE WHEN br.winner_id = $1 THEN true ELSE false END as won
-        FROM bingo_room_players bp
-        JOIN bingo_rooms br ON br.id = bp.room_id
+        FROM bingo_v2_room_players bp
+        JOIN bingo_v2_rooms br ON br.id = bp.room_id
         WHERE bp.user_id = $1 AND br.status = 'finished'
-        ORDER BY br.ends_at DESC
+        ORDER BY br.finished_at DESC
         LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       );

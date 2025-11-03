@@ -212,13 +212,13 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
         COUNT(DISTINCT CASE WHEN b.winner_id = u.id THEN b.id END) as bingo_won,
         COALESCE(SUM(rp.fires_spent), 0) as total_fires_in_raffles,
         COALESCE(SUM(rp.coins_spent), 0) as total_coins_in_raffles,
-        COALESCE(SUM(bp.fires_spent), 0) as total_fires_in_bingo,
-        COALESCE(SUM(bp.coins_spent), 0) as total_coins_in_bingo
+        COALESCE(SUM(bp.total_spent), 0) as total_fires_in_bingo,
+        COALESCE(SUM(bp.total_spent), 0) as total_coins_in_bingo
       FROM users u
       LEFT JOIN raffle_participants rp ON rp.user_id = u.id
       LEFT JOIN raffles r ON r.id = rp.raffle_id
-      LEFT JOIN bingo_room_players bp ON bp.user_id = u.id
-      LEFT JOIN bingo_rooms b ON b.id = bp.room_id
+      LEFT JOIN bingo_v2_room_players bp ON bp.user_id = u.id
+      LEFT JOIN bingo_v2_rooms b ON b.id = bp.room_id
       WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
       GROUP BY u.id`,
       [userId]
@@ -333,14 +333,14 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
         br.name,
         br.status,
         br.mode,
-        br.visibility,
-        bp.cards_count,
+        br.is_public as visibility,
+        bp.cards_purchased as cards_count,
         bp.is_ready,
-        bp.fires_spent,
-        bp.coins_spent
-      FROM bingo_room_players bp
-      JOIN bingo_rooms br ON br.id = bp.room_id
-      WHERE bp.user_id = $1 AND br.status IN ('waiting', 'ready', 'playing')
+        bp.total_spent as fires_spent,
+        bp.total_spent as coins_spent
+      FROM bingo_v2_room_players bp
+      JOIN bingo_v2_rooms br ON br.id = bp.room_id
+      WHERE bp.user_id = $1 AND br.status IN ('waiting', 'in_progress')
       ORDER BY br.created_at DESC`,
       [req.user.id]
     );
