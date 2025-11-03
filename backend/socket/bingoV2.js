@@ -299,6 +299,21 @@ function handleBingoV2Socket(io) {
           dataKeys: Object.keys(data || {})
         });
         
+        // CRITICAL VALIDATION: Check userId
+        if (!userId || typeof userId !== 'string') {
+          logger.error('❌ Invalid userId:', { userId, type: typeof userId });
+          if (callback) callback({ error: 'Invalid user ID' });
+          return;
+        }
+        
+        // CRITICAL VALIDATION: Check position
+        if (!position || typeof position !== 'object' || 
+            typeof position.row !== 'number' || typeof position.col !== 'number') {
+          logger.error('❌ Invalid position:', { position, type: typeof position });
+          if (callback) callback({ error: 'Invalid position data' });
+          return;
+        }
+        
         // Get room
         const roomResult = await query(
           `SELECT id FROM bingo_v2_rooms WHERE code = $1`,

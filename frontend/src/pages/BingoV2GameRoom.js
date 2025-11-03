@@ -27,6 +27,14 @@ const BingoV2GameRoom = () => {
   const [isCallingNumber, setIsCallingNumber] = useState(false);
 
   useEffect(() => {
+    // CRITICAL: Validate user authentication
+    if (!user || !user.id) {
+      console.error('❌ User not authenticated in BingoV2GameRoom');
+      alert('Error: Usuario no autenticado. Redirigiendo al lobby...');
+      navigate('/bingo');
+      return;
+    }
+
     loadRoomAndCards();
     loadUserExperience();
 
@@ -173,6 +181,19 @@ const BingoV2GameRoom = () => {
   };
 
   const handleMarkNumber = (cardId, position) => {
+    // CRITICAL VALIDATION: Check all required data
+    if (!user || !user.id) {
+      console.error('❌ User not authenticated:', user);
+      alert('Error: Usuario no autenticado. Por favor recarga la página.');
+      return;
+    }
+    
+    if (!position || typeof position.row !== 'number' || typeof position.col !== 'number') {
+      console.error('❌ Invalid position:', position);
+      alert('Error: Posición inválida.');
+      return;
+    }
+    
     // CRITICAL DEBUG: Log what we're sending
     console.log('📤 Sending mark_number:', {
       cardId,
@@ -181,7 +202,7 @@ const BingoV2GameRoom = () => {
       hasRow: position?.row !== undefined,
       hasCol: position?.col !== undefined,
       roomCode: code,
-      userId: user?.id
+      userId: user.id
     });
     
     if (socket) {
