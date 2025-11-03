@@ -1110,6 +1110,28 @@ class BingoV2Service {
         );
       }
 
+      // Send additional message to host with their prize (if not the winner)
+      if (room.host_id !== winnerUserId) {
+        const currencyEmoji = room.currency_type === 'coins' ? '🪙' : '🔥';
+        const currencyName = room.currency_type === 'coins' ? 'monedas' : 'fuegos';
+        
+        await dbQuery(
+          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+           VALUES ($1, 'system', 'Recompensa de Bingo', $2, $3)`,
+          [
+            room.host_id,
+            `Has recibido ${hostPrize.toFixed(2)} ${currencyEmoji} de ${currencyName} como host de la sala #${room.code}`,
+            JSON.stringify({
+              room_code: room.code,
+              prize: hostPrize,
+              prize_type: 'host_reward',
+              currency_type: room.currency_type,
+              total_pot: totalPot
+            })
+          ]
+        );
+      }
+
       // Log prize distribution
       await dbQuery(
         `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
