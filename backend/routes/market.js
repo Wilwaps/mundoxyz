@@ -4,6 +4,7 @@ const { query, transaction } = require('../db');
 const { verifyToken, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+const telegramService = require('../services/telegramService');
 
 // Request to redeem 100 fires for fiat
 router.post('/redeem-100-fire', verifyToken, async (req, res) => {
@@ -91,11 +92,34 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
       return {
         success: true,
         redemption_id: redeemResult.rows[0].id,
+        redemption: redeemResult.rows[0],
         message: 'Redemption request created. Waiting for Tote approval.'
       };
     });
     
-    // TODO: Send notification to Tote via Telegram
+    // Get user details for notification
+    const userDetails = await query(
+      'SELECT username, email FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    // Send notification to Tote via Telegram
+    try {
+      await telegramService.notifyRedemptionRequest({
+        redemption_id: result.redemption_id,
+        username: userDetails.rows[0].username,
+        email: userDetails.rows[0].email,
+        fires_amount: 100,
+        cedula,
+        phone: telefono,
+        bank_code,
+        bank_name,
+        bank_account
+      });
+    } catch (notifyError) {
+      logger.error('Error sending Telegram notification:', notifyError);
+      // No fallar la solicitud si falla la notificación
+    }
     
     logger.info('Market redemption requested', { 
       userId, 
@@ -223,9 +247,27 @@ router.post('/redeems/:id/accept', adminAuth, async (req, res) => {
       
       return {
         success: true,
-        message: 'Redemption accepted and marked as completed'
+        message: 'Redemption accepted and marked as completed',
+        redeem
       };
     });
+    
+    // Get user details for notification
+    const userDetails = await query(
+      'SELECT username FROM users WHERE id = $1',
+      [result.redeem.user_id]
+    );
+    
+    // Send notification to admin via Telegram
+    try {
+      await telegramService.notifyRedemptionCompleted({
+        username: userDetails.rows[0].username,
+        fires_amount: result.redeem.fires_amount,
+        transaction_id
+      });
+    } catch (notifyError) {
+      logger.error('Error sending Telegram notification:', notifyError);
+    }
     
     logger.info('Market redemption accepted', { 
       redemptionId: id, 
@@ -319,9 +361,27 @@ router.post('/redeems/:id/reject', adminAuth, async (req, res) => {
       
       return {
         success: true,
-        message: 'Redemption rejected and fires returned to user'
+        message: 'Redemption rejected and fires returned to user',
+        redeem
       };
     });
+    
+    // Get user details for notification
+    const userDetails = await query(
+      'SELECT username FROM users WHERE id = $1',
+      [result.redeem.user_id]
+    );
+    
+    // Send notification to admin via Telegram
+    try {
+      await telegramService.notifyRedemptionRejected({
+        username: userDetails.rows[0].username,
+        fires_amount: result.redeem.fires_amount,
+        reason
+      });
+    } catch (notifyError) {
+      logger.error('Error sending Telegram notification:', notifyError);
+    }
     
     logger.info('Market redemption rejected', { 
       redemptionId: id, 

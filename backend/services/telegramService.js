@@ -13,7 +13,7 @@ class TelegramService {
         return false;
       }
 
-      await this.bot.telegram.sendMessage(this.adminChatId, message, {
+      await this.bot.sendMessage(this.adminChatId, message, {
         parse_mode: 'HTML',
         ...options
       });
@@ -48,6 +48,90 @@ Sala: <code>${roomCode}</code>
 Ganador: ${winnerName}
 Premio: ${prize}
 Tiempo: ${new Date().toLocaleString('es-ES')}
+    `;
+
+    return this.sendAdminMessage(message);
+  }
+
+  async notifyRedemptionRequest(redemptionData) {
+    const {
+      redemption_id,
+      username,
+      email,
+      fires_amount,
+      cedula,
+      phone,
+      bank_code,
+      bank_name,
+      bank_account
+    } = redemptionData;
+
+    const message = `
+🔥 <b>Nueva Solicitud de Canje</b>
+
+<b>Usuario:</b> ${username}
+<b>Email:</b> ${email}
+<b>Monto:</b> ${fires_amount} 🔥
+
+<b>📋 Datos de Pago:</b>
+• <b>Cédula:</b> <code>${cedula}</code>
+• <b>Teléfono:</b> <code>${phone}</code>
+${bank_code ? `• <b>Banco:</b> ${bank_name} (${bank_code})` : ''}
+${bank_account ? `• <b>Cuenta:</b> <code>${bank_account}</code>` : ''}
+
+<b>ID Canje:</b> <code>${redemption_id}</code>
+<b>Fecha:</b> ${new Date().toLocaleString('es-ES', { 
+      dateStyle: 'short', 
+      timeStyle: 'short' 
+    })}
+
+💰 <i>Procesa este canje desde el panel de admin en MundoXYZ</i>
+    `;
+
+    return this.sendAdminMessage(message);
+  }
+
+  async notifyRedemptionCompleted(redemptionData) {
+    const {
+      username,
+      fires_amount,
+      transaction_id
+    } = redemptionData;
+
+    const message = `
+✅ <b>Canje Completado</b>
+
+<b>Usuario:</b> ${username}
+<b>Monto:</b> ${fires_amount} 🔥
+<b>ID Transacción:</b> <code>${transaction_id}</code>
+<b>Fecha:</b> ${new Date().toLocaleString('es-ES', { 
+      dateStyle: 'short', 
+      timeStyle: 'short' 
+    })}
+    `;
+
+    return this.sendAdminMessage(message);
+  }
+
+  async notifyRedemptionRejected(redemptionData) {
+    const {
+      username,
+      fires_amount,
+      reason
+    } = redemptionData;
+
+    const message = `
+❌ <b>Canje Rechazado</b>
+
+<b>Usuario:</b> ${username}
+<b>Monto:</b> ${fires_amount} 🔥
+<b>Razón:</b> ${reason}
+<b>Fecha:</b> ${new Date().toLocaleString('es-ES', { 
+      dateStyle: 'short', 
+      timeStyle: 'short' 
+    })}
+
+<i>Los fuegos han sido devueltos al usuario</i>
     `;
 
     return this.sendAdminMessage(message);
