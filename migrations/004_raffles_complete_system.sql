@@ -175,8 +175,7 @@ SELECT
     ROUND((COUNT(*) FILTER (WHERE rn.state = 'sold')::NUMERIC / NULLIF(r.numbers_range, 0)) * 100, 2) as completion_percentage,
     r.pot_fires,
     r.pot_coins,
-    r.created_at,
-    r.ended_at
+    r.created_at
 FROM raffles r
 LEFT JOIN raffle_numbers rn ON r.id = rn.raffle_id
 LEFT JOIN users u ON r.host_id = u.id
