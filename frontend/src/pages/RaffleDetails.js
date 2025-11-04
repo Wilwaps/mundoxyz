@@ -22,7 +22,8 @@ const RaffleDetails = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
 
   // Verificar si el usuario es admin o tote
-  const isAdminOrTote = user?.role === 'admin' || user?.role === 'tote';
+  // El usuario tiene un array 'roles', no una propiedad 'role'
+  const isAdminOrTote = (user?.roles || []).some(r => r === 'admin' || r === 'tote');
 
   const { data: raffleData, isLoading, refetch } = useQuery({
     queryKey: ['raffle', code],
