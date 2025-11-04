@@ -69,13 +69,14 @@ router.post('/login-telegram', async (req, res) => {
       'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
       'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
       'u.security_answer IS NOT NULL as has_security_answer, ' +
+      'u.experience, u.total_games_played, u.total_games_won, ' +
       'array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
       'WHERE u.id = $1 ' +
-      'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, u.security_answer',
+      'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
       [userId]
     );
 
@@ -102,6 +103,9 @@ router.post('/login-telegram', async (req, res) => {
         wallet_id: user.wallet_id,
         coins_balance: parseFloat(user.coins_balance || 0),
         fires_balance: parseFloat(user.fires_balance || 0),
+        experience: user.experience || 0,
+        total_games_played: user.total_games_played || 0,
+        total_games_won: user.total_games_won || 0,
         has_security_answer: user.has_security_answer || false,
         roles: user.roles?.filter(Boolean) || []
       }
@@ -190,13 +194,15 @@ router.post('/login-email', async (req, res) => {
 
       // Get user data
       const userResult = await query(
-        'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, array_agg(r.name) as roles ' +
+        'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, ' +
+        'u.experience, u.total_games_played, u.total_games_won, ' +
+        'array_agg(r.name) as roles ' +
         'FROM users u ' +
         'LEFT JOIN wallets w ON w.user_id = u.id ' +
         'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
         'LEFT JOIN roles r ON r.id = ur.role_id ' +
         'WHERE u.id = $1 ' +
-        'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance',
+        'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, u.experience, u.total_games_played, u.total_games_won',
         [userId]
       );
 
@@ -223,6 +229,9 @@ router.post('/login-email', async (req, res) => {
           wallet_id: user.wallet_id,
           coins_balance: parseFloat(user.coins_balance || 0),
           fires_balance: parseFloat(user.fires_balance || 0),
+          experience: user.experience || 0,
+          total_games_played: user.total_games_played || 0,
+          total_games_won: user.total_games_won || 0,
           roles: user.roles?.filter(Boolean) || []
         }
       };
@@ -238,6 +247,7 @@ router.post('/login-email', async (req, res) => {
       'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
       'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
       'u.security_answer IS NOT NULL as has_security_answer, ' +
+      'u.experience, u.total_games_played, u.total_games_won, ' +
       'array_agg(r.name) as roles ' +
       'FROM users u ' +
       "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
@@ -245,7 +255,7 @@ router.post('/login-email', async (req, res) => {
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
       'WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1) OR ai.provider_uid = $1 ' +
-      'GROUP BY u.id, ai.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer',
+      'GROUP BY u.id, ai.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
       [identifier]
     );
 
@@ -291,6 +301,9 @@ router.post('/login-email', async (req, res) => {
         wallet_id: row.wallet_id,
         coins_balance: parseFloat(row.coins_balance || 0),
         fires_balance: parseFloat(row.fires_balance || 0),
+        experience: row.experience || 0,
+        total_games_played: row.total_games_played || 0,
+        total_games_won: row.total_games_won || 0,
         has_security_answer: row.has_security_answer || false,
         roles: (row.roles || []).filter(Boolean)
       }
