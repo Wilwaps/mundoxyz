@@ -328,22 +328,35 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
             <span className="text-white font-semibold">Resumen de Costos</span>
           </div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-white/80">
-              <span>Costo de creación (1 número):</span>
-              <span>{formData.cost_per_number || 0} fuegos</span>
-            </div>
-            {formData.is_company_mode && (
-              <div className="flex justify-between text-white/80">
-                <span>Modo Empresa:</span>
-                <span>+3000 fuegos</span>
-              </div>
+            {formData.mode === 'fires' ? (
+              <>
+                <div className="flex justify-between text-white/80">
+                  <span>Comisión plataforma:</span>
+                  <span>{formData.cost_per_number || 0} 🔥</span>
+                </div>
+                <div className="text-xs text-white/60">
+                  Precio por número que cobrarás: {formData.cost_per_number || 0} 🔥
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between text-white/80">
+                  <span>Comisión plataforma:</span>
+                  <span>{formData.is_company_mode ? '3000' : '300'} 🔥</span>
+                </div>
+                <div className="text-xs text-white/60">
+                  {formData.is_company_mode ? 'Modo empresa con branding' : 'Modo premio estándar'}
+                </div>
+              </>
             )}
             <div className="flex justify-between text-white font-semibold pt-2 border-t border-white/20">
-              <span>Total necesario:</span>
-              <span>{(parseFloat(formData.cost_per_number) || 0) + (formData.is_company_mode ? 3000 : 0)} fuegos</span>
-            </div>
-            <div className="text-xs text-white/60 pt-2 border-t border-white/20">
-              💡 El host debe pagar {formData.cost_per_number} fuegos como primer número
+              <span>Total a pagar:</span>
+              <span>
+                {formData.mode === 'fires' 
+                  ? (parseFloat(formData.cost_per_number) || 0)
+                  : (formData.is_company_mode ? 3000 : 300)
+                } 🔥
+              </span>
             </div>
           </div>
         </div>
@@ -463,7 +476,11 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                             name="mode"
                             value="fires"
                             checked={formData.mode === 'fires'}
-                            onChange={(e) => setFormData(prev => ({ ...prev, mode: e.target.value }))}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              mode: e.target.value,
+                              is_company_mode: false  // Resetear empresa al seleccionar fires
+                            }))}
                             className="mr-3"
                           />
                           <div className="flex items-center gap-3">
@@ -676,18 +693,28 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                   </div>
 
                   <div>
-                    <label className="flex items-center p-4 bg-white/10 rounded-xl cursor-pointer hover:bg-white/20 transition-colors">
+                    <label className={`flex items-center p-4 bg-white/10 rounded-xl transition-colors ${
+                      formData.mode === 'fires' 
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : 'cursor-pointer hover:bg-white/20'
+                    }`}>
                       <input
                         type="checkbox"
                         checked={formData.is_company_mode}
                         onChange={(e) => setFormData(prev => ({ ...prev, is_company_mode: e.target.checked }))}
+                        disabled={formData.mode === 'fires'}
                         className="mr-3 w-5 h-5"
                       />
                       <div className="flex items-center gap-3">
                         <FaBuilding className="text-purple-400 text-xl" />
                         <div>
                           <div className="text-white font-semibold">Activar Modo Empresa</div>
-                          <div className="text-white/60 text-sm">Branding personalizado +3000 fuegos</div>
+                          <div className="text-white/60 text-sm">
+                            {formData.mode === 'fires' 
+                              ? 'Solo disponible en modo premio'
+                              : 'Branding personalizado +3000 fuegos'
+                            }
+                          </div>
                         </div>
                       </div>
                     </label>
