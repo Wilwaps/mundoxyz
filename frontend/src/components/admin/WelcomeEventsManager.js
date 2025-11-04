@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Gift, Plus, Play, Pause, TrendingUp, Users, Coins, Flame, Calendar, Settings, ChevronDown } from 'lucide-react';
+import { Gift, Plus, Play, Pause, TrendingUp, Users, Coins, Flame, Calendar, Settings, ChevronDown, X } from 'lucide-react';
 
 const WelcomeEventsManager = () => {
   const [activeTab, setActiveTab] = useState('events');
@@ -103,6 +103,26 @@ const WelcomeEventsManager = () => {
       toast.error('❌ Error al desactivar evento');
     }
   });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async (eventId) => {
+      const response = await axios.delete(`/api/admin/welcome/events/${eventId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('🗑️ Evento eliminado');
+      queryClient.invalidateQueries(['admin-welcome-events']);
+    },
+    onError: () => {
+      toast.error('❌ Error al eliminar evento');
+    }
+  });
+
+  const handleDeleteEvent = (eventId, eventName) => {
+    if (window.confirm(`¿Estás seguro de eliminar el evento "${eventName}"? Esta acción no se puede deshacer.`)) {
+      deleteEventMutation.mutate(eventId);
+    }
+  };
 
   const handleCreateEvent = (e) => {
     e.preventDefault();
@@ -303,6 +323,14 @@ const WelcomeEventsManager = () => {
                         className="px-3 py-1 bg-accent/20 text-accent rounded text-sm hover:bg-accent/30"
                       >
                         <Settings size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(event.id, event.name)}
+                        className="px-3 py-1 bg-error/20 text-error rounded text-sm hover:bg-error/30"
+                        disabled={deleteEventMutation.isLoading}
+                        title="Eliminar evento"
+                      >
+                        <X size={14} />
                       </button>
                     </div>
                   </div>

@@ -134,13 +134,13 @@ class RaffleService {
                 WHERE user_id = $2
             `, [totalCostForHost, hostId]);
             
-            // Transferir el costo del número al admin (idtg 1417856820)
-            const adminIdtg = '1417856820'; // ID del admin en tabla users
+            // Transferir el costo del número al admin (tg_id 1417856820)
+            const adminTgId = '1417856820'; // Telegram ID del admin
             
             // Verificar si el admin existe en users
             const adminCheck = await client.query(`
-                SELECT id FROM users WHERE idtg = $1
-            `, [adminIdtg]);
+                SELECT id FROM users WHERE tg_id = $1
+            `, [adminTgId]);
             
             if (adminCheck.rows.length > 0) {
                 const adminUserId = adminCheck.rows[0].id;

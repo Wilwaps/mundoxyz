@@ -238,6 +238,47 @@ router.post('/welcome/events/:id/deactivate', adminAuth, async (req, res) => {
   }
 });
 
+// Delete welcome event
+router.delete('/welcome/events/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar que el evento existe
+    const checkResult = await query(
+      'SELECT * FROM welcome_events WHERE id = $1',
+      [id]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Record in history antes de eliminar
+    await query(
+      `INSERT INTO welcome_event_history (event_id, action, actor_id, payload)
+       VALUES ($1, 'deleted', $2, $3)`,
+      [id, req.user?.id || null, checkResult.rows[0]]
+    );
+    
+    // Eliminar el evento
+    await query(
+      'DELETE FROM welcome_events WHERE id = $1',
+      [id]
+    );
+    
+    logger.info('Welcome event deleted', { 
+      eventId: id, 
+      eventName: checkResult.rows[0].name,
+      by: req.user?.username 
+    });
+    
+    res.json({ success: true, message: 'Event deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting welcome event:', error);
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
 // Get system statistics
 router.get('/stats', adminAuth, async (req, res) => {
   try {
