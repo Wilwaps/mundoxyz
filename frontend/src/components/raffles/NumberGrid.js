@@ -22,14 +22,15 @@ const NumberGrid = ({
   const [viewMode, setViewMode] = useState('grid'); // grid, list, compact
 
   // Obtener estado visual de un número
-  const getNumberStatus = (num) => {
-    const numberData = numbers.find(n => n.number === num);
-    if (!numberData) return { status: 'loading', label: 'Cargando...' };
+  const getNumberStatus = (numberIdx) => {
+    const numberData = numbers.find(n => n.number_idx === numberIdx);
+    if (!numberData) return { status: 'loading', label: 'Cargando...', state: 'loading' };
 
-    switch (numberData.status) {
+    switch (numberData.state) {
       case 'available':
         return { 
-          status: 'available', 
+          status: 'available',
+          state: 'available',
           label: 'Disponible',
           icon: FaUnlock,
           color: 'text-green-400',
@@ -37,11 +38,12 @@ const NumberGrid = ({
           borderColor: 'border-green-500/30',
           hoverBg: 'hover:bg-green-500/20'
         };
-      case 'purchased':
-        const isUserPurchase = numberData.purchased_by === user?.id;
+      case 'sold':
+        const isUserPurchase = numberData.owner_id === user?.id;
         return {
-          status: 'purchased',
-          label: isUserPurchase ? 'Tuyo' : numberData.purchased_username || 'Comprado',
+          status: 'sold',
+          state: 'sold',
+          label: isUserPurchase ? 'Tuyo' : numberData.owner_username || 'Vendido',
           icon: isUserPurchase ? FaTicketAlt : FaCheck,
           color: isUserPurchase ? 'text-blue-400' : 'text-gray-400',
           bgColor: isUserPurchase ? 'bg-blue-500/10' : 'bg-gray-500/10',
@@ -49,9 +51,10 @@ const NumberGrid = ({
           hoverBg: disabled ? '' : isUserPurchase ? 'hover:bg-blue-500/20' : 'hover:bg-gray-500/20'
         };
       case 'reserved':
-        const isUserReserved = numberData.reserved_by === user?.id;
+        const isUserReserved = numberData.owner_id === user?.id;
         return {
           status: 'reserved',
+          state: 'reserved',
           label: isUserReserved ? 'Reservado por ti' : 'Reservado',
           icon: FaHourglassHalf,
           color: isUserReserved ? 'text-yellow-400' : 'text-orange-400',
@@ -60,7 +63,7 @@ const NumberGrid = ({
           hoverBg: disabled ? '' : 'hover:bg-orange-500/20'
         };
       default:
-        return { status: 'loading', label: 'Cargando...' };
+        return { status: 'loading', label: 'Cargando...', state: 'loading' };
     }
   };
 
@@ -161,11 +164,11 @@ const NumberGrid = ({
   // Vista de lista
   const ListView = () => {
     const groupedNumbers = numbers.reduce((groups, num) => {
-      const status = getNumberStatus(num.number);
-      if (!groups[status.status]) {
-        groups[status.status] = [];
+      const status = getNumberStatus(num.number_idx);
+      if (!groups[status.state]) {
+        groups[status.state] = [];
       }
-      groups[status.status].push(num);
+      groups[status.state].push(num);
       return groups;
     }, {});
 
@@ -181,11 +184,11 @@ const NumberGrid = ({
             <div className="flex flex-wrap gap-2">
               {groupedNumbers.available.map(num => (
                 <button
-                  key={num.number}
-                  onClick={() => onNumberClick && onNumberClick(num.number)}
+                  key={num.number_idx}
+                  onClick={() => onNumberClick && onNumberClick(num.number_idx)}
                   className="px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-white font-semibold transition-all duration-300"
                 >
-                  #{num.number}
+                  #{num.number_idx.toString().padStart(3, '0')}
                 </button>
               ))}
             </div>
@@ -202,11 +205,11 @@ const NumberGrid = ({
             <div className="flex flex-wrap gap-2">
               {userPurchases.map(num => (
                 <div
-                  key={num.number}
+                  key={num.number_idx}
                   className="px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg text-white font-semibold flex items-center gap-2"
                 >
                   <FaTicketAlt className="text-xs" />
-                  #{num.number}
+                  #{num.number_idx.toString().padStart(3, '0')}
                 </div>
               ))}
             </div>
@@ -222,10 +225,10 @@ const NumberGrid = ({
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {groupedNumbers.reserved.map(num => {
-                const isUserReservation = num.reserved_by === user?.id;
+                const isUserReservation = num.owner_id === user?.id;
                 return (
                   <div
-                    key={num.number}
+                    key={num.number_idx}
                     className={`px-3 py-2 rounded-lg text-white font-semibold flex items-center gap-2 ${
                       isUserReservation 
                         ? 'bg-yellow-500/20 border border-yellow-500/30' 
@@ -233,7 +236,7 @@ const NumberGrid = ({
                     }`}
                   >
                     <FaHourglassHalf className="text-xs" />
-                    #{num.number}
+                    #{num.number_idx.toString().padStart(3, '0')}
                     {isUserReservation && <span className="text-xs text-yellow-400">(Tuyo)</span>}
                   </div>
                 );
@@ -243,24 +246,24 @@ const NumberGrid = ({
         )}
 
         {/* Números comprados por otros */}
-        {groupedNumbers.purchased && (
+        {groupedNumbers.sold && (
           <div className="p-4 bg-gray-500/10 rounded-xl border border-gray-500/20">
             <h3 className="text-gray-400 font-semibold mb-3 flex items-center gap-2">
               <FaLock />
-              Comprados por otros ({groupedNumbers.purchased.length})
+              Vendidos ({groupedNumbers.sold.length})
             </h3>
             <div className="grid grid-cols-3 gap-2">
-              {groupedNumbers.purchased.slice(0, 30).map(num => (
+              {groupedNumbers.sold.slice(0, 30).map(num => (
                 <div
-                  key={num.number}
+                  key={num.number_idx}
                   className="px-3 py-2 bg-gray-500/20 border border-gray-500/30 rounded-lg text-white font-semibold text-center"
                 >
-                  #{num.number}
+                  #{num.number_idx.toString().padStart(3, '0')}
                 </div>
               ))}
-              {groupedNumbers.purchased.length > 30 && (
+              {groupedNumbers.sold.length > 30 && (
                 <div className="px-3 py-2 bg-gray-500/20 border border-gray-500/30 rounded-lg text-white font-semibold text-center">
-                  +{groupedNumbers.purchased.length - 30}
+                  +{groupedNumbers.sold.length - 30}
                 </div>
               )}
             </div>
@@ -278,7 +281,7 @@ const NumberGrid = ({
         <div className="grid grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-400">
-              {numbers.filter(n => getNumberStatus(n.number).status === 'available').length}
+              {numbers.filter(n => n.state === 'available').length}
             </div>
             <div className="text-xs text-white/60">Disponibles</div>
           </div>
@@ -290,13 +293,13 @@ const NumberGrid = ({
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-400">
-              {numbers.filter(n => getNumberStatus(n.number).status === 'reserved').length}
+              {numbers.filter(n => n.state === 'reserved').length}
             </div>
             <div className="text-xs text-white/60">Reservados</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-gray-400">
-              {numbers.filter(n => getNumberStatus(n.number).status === 'purchased').length - userPurchases.length}
+              {numbers.filter(n => n.state === 'sold' && n.owner_id !== user?.id).length}
             </div>
             <div className="text-xs text-white/60">Otros</div>
           </div>
@@ -308,14 +311,14 @@ const NumberGrid = ({
             <div className="flex justify-between text-sm mb-1">
               <span className="text-green-400">Disponibles</span>
               <span className="text-white/60">
-                {((numbers.filter(n => getNumberStatus(n.number).status === 'available').length / numbers.length) * 100).toFixed(1)}%
+                {((numbers.filter(n => n.state === 'available').length / numbers.length) * 100).toFixed(1)}%
               </span>
             </div>
             <div className="w-full bg-white/10 rounded-full h-2">
               <div 
                 className="bg-green-500 h-2 rounded-full transition-all duration-500"
                 style={{ 
-                  width: `${(numbers.filter(n => getNumberStatus(n.number).status === 'available').length / numbers.length) * 100}%` 
+                  width: `${(numbers.filter(n => n.state === 'available').length / numbers.length) * 100}%` 
                 }}
               />
             </div>
@@ -342,14 +345,14 @@ const NumberGrid = ({
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-400">Comprados</span>
               <span className="text-white/60">
-                {((numbers.filter(n => getNumberStatus(n.number).status === 'purchased').length / numbers.length) * 100).toFixed(1)}%
+                {((numbers.filter(n => n.state === 'sold').length / numbers.length) * 100).toFixed(1)}%
               </span>
             </div>
             <div className="w-full bg-white/10 rounded-full h-2">
               <div 
                 className="bg-gray-500 h-2 rounded-full transition-all duration-500"
                 style={{ 
-                  width: `${(numbers.filter(n => getNumberStatus(n.number).status === 'purchased').length / numbers.length) * 100}%` 
+                  width: `${(numbers.filter(n => n.state === 'sold').length / numbers.length) * 100}%` 
                 }}
               />
             </div>
@@ -366,10 +369,10 @@ const NumberGrid = ({
             <div className="grid grid-cols-6 gap-2">
               {userPurchases.map(num => (
                 <div
-                  key={num.number}
+                  key={num.number_idx}
                   className="aspect-square bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center justify-center"
                 >
-                  <span className="text-white font-bold text-sm">#{num.number}</span>
+                  <span className="text-white font-bold text-sm">#{num.number_idx.toString().padStart(3, '0')}</span>
                 </div>
               ))}
             </div>
@@ -381,7 +384,7 @@ const NumberGrid = ({
 
   // Generar números si no vienen de props
   const displayNumbers = numbers.length > 0 ? numbers : 
-    Array.from({ length: 100 }, (_, i) => ({ number: i, status: 'loading' }));
+    Array.from({ length: 100 }, (_, i) => ({ number_idx: i, state: 'loading' }));
 
   return (
     <div className="space-y-6">
@@ -421,7 +424,7 @@ const NumberGrid = ({
         </div>
 
         <div className="text-white/60 text-sm">
-          {numbers.filter(n => getNumberStatus(n.number).status === 'available').length} disponibles / {numbers.length} totales
+          {numbers.filter(n => n.state === 'available').length} disponibles / {numbers.length} totales
         </div>
       </div>
 
@@ -438,8 +441,8 @@ const NumberGrid = ({
             <div className="overflow-x-auto">
               <div className={`inline-grid gap-2 p-4 bg-white/5 rounded-xl min-w-full ${getGridConfig()}`}>
                 {displayNumbers.map(num => {
-                  const status = getNumberStatus(num.number);
-                  return <NumberCell key={num.number} num={num.number} status={status} />;
+                  const status = getNumberStatus(num.number_idx);
+                  return <NumberCell key={num.number_idx} num={num.number_idx} status={status} />;
                 })}
               </div>
             </div>
