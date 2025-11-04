@@ -12,6 +12,7 @@ const DirectGiftsSender = () => {
   
   const [giftData, setGiftData] = useState({
     target_type: 'single',
+    target_segment: {},
     message: '',
     coins_amount: 0,
     fires_amount: 0,
@@ -41,6 +42,7 @@ const DirectGiftsSender = () => {
       toast.success('🎁 Regalo enviado exitosamente');
       setGiftData({
         target_type: 'single',
+        target_segment: {},
         message: '',
         coins_amount: 0,
         fires_amount: 0,
@@ -76,7 +78,16 @@ const DirectGiftsSender = () => {
           <label className="block text-sm font-medium mb-2">Destinatario</label>
           <select
             value={giftData.target_type}
-            onChange={(e) => setGiftData({ ...giftData, target_type: e.target.value })}
+            onChange={(e) => {
+              const newGiftData = { ...giftData, target_type: e.target.value };
+              // Si selecciona 'existing_users', agregar fecha actual automáticamente
+              if (e.target.value === 'existing_users') {
+                newGiftData.target_segment = { registered_before: new Date().toISOString() };
+              } else {
+                newGiftData.target_segment = {};
+              }
+              setGiftData(newGiftData);
+            }}
             className="input-glass w-full"
           >
             <option value="single">Usuario Específico</option>
@@ -84,7 +95,13 @@ const DirectGiftsSender = () => {
             <option value="first_time">Primera Vez</option>
             <option value="inactive">Usuarios Inactivos (7 días)</option>
             <option value="low_balance">Saldo Bajo</option>
+            <option value="existing_users">Solo Usuarios Existentes</option>
           </select>
+          {giftData.target_type === 'existing_users' && (
+            <p className="text-xs text-accent mt-1">
+              ℹ️ Este regalo solo llegará a usuarios registrados ANTES de ahora
+            </p>
+          )}
         </div>
 
         {/* Búsqueda de usuario */}

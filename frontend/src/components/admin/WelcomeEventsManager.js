@@ -127,7 +127,8 @@ const WelcomeEventsManager = () => {
       all: 'Todos los usuarios',
       first_time: 'Primera vez',
       inactive: `Inactivos (${segment.days || 7} días)`,
-      low_balance: 'Saldo bajo'
+      low_balance: 'Saldo bajo',
+      existing_users: 'Solo usuarios existentes'
     };
     return types[segment.type] || segment.type;
   };
@@ -472,17 +473,27 @@ const WelcomeEventsManager = () => {
                     <label className="block text-sm font-medium mb-1">Segmento</label>
                     <select
                       value={eventData.target_segment?.type || 'all'}
-                      onChange={(e) => setEventData({ 
-                        ...eventData, 
-                        target_segment: { ...eventData.target_segment, type: e.target.value }
-                      })}
+                      onChange={(e) => {
+                        const newSegment = { ...eventData.target_segment, type: e.target.value };
+                        // Si selecciona 'existing_users', agregar fecha actual automáticamente
+                        if (e.target.value === 'existing_users') {
+                          newSegment.registered_before = new Date().toISOString();
+                        }
+                        setEventData({ ...eventData, target_segment: newSegment });
+                      }}
                       className="input-glass w-full"
                     >
                       <option value="all">Todos</option>
                       <option value="first_time">Primera Vez</option>
                       <option value="inactive">Inactivos</option>
                       <option value="low_balance">Saldo Bajo</option>
+                      <option value="existing_users">Solo Usuarios Existentes</option>
                     </select>
+                    {eventData.target_segment?.type === 'existing_users' && (
+                      <p className="text-xs text-accent mt-1">
+                        ℹ️ Este evento solo llegará a usuarios registrados ANTES de ahora
+                      </p>
+                    )}
                   </div>
                 </div>
 

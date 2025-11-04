@@ -110,6 +110,13 @@ class GiftService {
       query_str += ` AND (w.coins_balance < ${coinLimit} OR w.fires_balance < ${fireLimit})`;
     }
 
+    // Nuevo: Filtro para solo usuarios existentes (registrados antes de cierta fecha)
+    if (targetType === 'existing_users' && segment.registered_before) {
+      paramCount++;
+      params.push(segment.registered_before);
+      query_str += ` AND u.created_at < $${paramCount}`;
+    }
+
     if (segment.min_level) {
       paramCount++;
       params.push(segment.min_level);
