@@ -4,7 +4,7 @@
 BEGIN;
 
 -- 10. BINGO_V2_ROOMS
-CREATE TABLE bingo_v2_rooms (
+CREATE TABLE IF NOT EXISTS bingo_v2_rooms (
   id SERIAL PRIMARY KEY,
   code VARCHAR(6) UNIQUE NOT NULL,
   name VARCHAR(100) NOT NULL,
@@ -33,11 +33,11 @@ CREATE TABLE bingo_v2_rooms (
   finished_at TIMESTAMP
 );
 
-CREATE INDEX idx_bingo_v2_rooms_code ON bingo_v2_rooms(code);
-CREATE INDEX idx_bingo_v2_rooms_status ON bingo_v2_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_code ON bingo_v2_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_status ON bingo_v2_rooms(status);
 
 -- 11. BINGO_V2_ROOM_PLAYERS
-CREATE TABLE bingo_v2_room_players (
+CREATE TABLE IF NOT EXISTS bingo_v2_room_players (
   id SERIAL PRIMARY KEY,
   room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id),
@@ -52,10 +52,10 @@ CREATE TABLE bingo_v2_room_players (
   UNIQUE(room_id, user_id)
 );
 
-CREATE INDEX idx_bingo_v2_players_room ON bingo_v2_room_players(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_room ON bingo_v2_room_players(room_id);
 
 -- 12. BINGO_V2_CARDS
-CREATE TABLE bingo_v2_cards (
+CREATE TABLE IF NOT EXISTS bingo_v2_cards (
   id SERIAL PRIMARY KEY,
   room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
   player_id INTEGER NOT NULL REFERENCES bingo_v2_room_players(id) ON DELETE CASCADE,
@@ -70,10 +70,10 @@ CREATE TABLE bingo_v2_cards (
   UNIQUE(room_id, player_id, card_number)
 );
 
-CREATE INDEX idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
 
 -- 13. BINGO_V2_DRAWS
-CREATE TABLE bingo_v2_draws (
+CREATE TABLE IF NOT EXISTS bingo_v2_draws (
   id SERIAL PRIMARY KEY,
   room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
   number INTEGER NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE bingo_v2_draws (
 );
 
 -- 14. BINGO_V2_AUDIT_LOGS
-CREATE TABLE bingo_v2_audit_logs (
+CREATE TABLE IF NOT EXISTS bingo_v2_audit_logs (
   id SERIAL PRIMARY KEY,
   room_id INTEGER REFERENCES bingo_v2_rooms(id) ON DELETE SET NULL,
   user_id UUID REFERENCES users(id),
@@ -96,7 +96,7 @@ CREATE TABLE bingo_v2_audit_logs (
 );
 
 -- 15. BINGO_V2_ROOM_CHAT_MESSAGES
-CREATE TABLE bingo_v2_room_chat_messages (
+CREATE TABLE IF NOT EXISTS bingo_v2_room_chat_messages (
   id SERIAL PRIMARY KEY,
   room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id),
@@ -105,7 +105,7 @@ CREATE TABLE bingo_v2_room_chat_messages (
 );
 
 -- 16. BINGO_V2_MESSAGES
-CREATE TABLE bingo_v2_messages (
+CREATE TABLE IF NOT EXISTS bingo_v2_messages (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id),
   category VARCHAR(20) NOT NULL CHECK (category IN ('system', 'friends')),
@@ -116,10 +116,10 @@ CREATE TABLE bingo_v2_messages (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_bingo_v2_messages_user ON bingo_v2_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_user ON bingo_v2_messages(user_id);
 
 -- 17. WELCOME_EVENTS
-CREATE TABLE welcome_events (
+CREATE TABLE IF NOT EXISTS welcome_events (
   id SERIAL PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   message TEXT NOT NULL,
@@ -145,7 +145,7 @@ CREATE TABLE welcome_events (
 );
 
 -- 18. WELCOME_EVENT_CLAIMS
-CREATE TABLE welcome_event_claims (
+CREATE TABLE IF NOT EXISTS welcome_event_claims (
   id SERIAL PRIMARY KEY,
   event_id INTEGER NOT NULL REFERENCES welcome_events(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -157,7 +157,7 @@ CREATE TABLE welcome_event_claims (
 );
 
 -- 19. DIRECT_GIFTS
-CREATE TABLE direct_gifts (
+CREATE TABLE IF NOT EXISTS direct_gifts (
   id SERIAL PRIMARY KEY,
   sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
   target_type VARCHAR(50) NOT NULL,
@@ -176,7 +176,7 @@ CREATE TABLE direct_gifts (
 );
 
 -- 20. DIRECT_GIFT_CLAIMS
-CREATE TABLE direct_gift_claims (
+CREATE TABLE IF NOT EXISTS direct_gift_claims (
   id SERIAL PRIMARY KEY,
   gift_id INTEGER REFERENCES direct_gifts(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -188,7 +188,7 @@ CREATE TABLE direct_gift_claims (
 );
 
 -- 21. GIFT_ANALYTICS
-CREATE TABLE gift_analytics (
+CREATE TABLE IF NOT EXISTS gift_analytics (
   id SERIAL PRIMARY KEY,
   event_id INTEGER REFERENCES welcome_events(id) ON DELETE CASCADE,
   gift_id INTEGER REFERENCES direct_gifts(id) ON DELETE CASCADE,

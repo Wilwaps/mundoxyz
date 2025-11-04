@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 1. USERS
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   username VARCHAR(100) UNIQUE NOT NULL,
   display_name VARCHAR(200),
@@ -33,12 +33,12 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_tg_id ON users(tg_id);
-CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_tg_id ON users(tg_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- 2. WALLETS
-CREATE TABLE wallets (
+CREATE TABLE IF NOT EXISTS wallets (
   id SERIAL PRIMARY KEY,
   user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   coins_balance DECIMAL(20,2) DEFAULT 0 CHECK (coins_balance >= 0),
@@ -51,10 +51,10 @@ CREATE TABLE wallets (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_wallets_user ON wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
 
 -- 3. WALLET_TRANSACTIONS
-CREATE TABLE wallet_transactions (
+CREATE TABLE IF NOT EXISTS wallet_transactions (
   id SERIAL PRIMARY KEY,
   wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL,
@@ -68,10 +68,10 @@ CREATE TABLE wallet_transactions (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_wallet_txns_wallet ON wallet_transactions(wallet_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_txns_wallet ON wallet_transactions(wallet_id, created_at DESC);
 
 -- 4. RAFFLES
-CREATE TABLE raffles (
+CREATE TABLE IF NOT EXISTS raffles (
   id SERIAL PRIMARY KEY,
   code VARCHAR(10) UNIQUE NOT NULL,
   name VARCHAR(200) NOT NULL,
@@ -100,12 +100,12 @@ CREATE TABLE raffles (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_raffles_code ON raffles(code);
-CREATE INDEX idx_raffles_host ON raffles(host_id);
-CREATE INDEX idx_raffles_status ON raffles(status);
+CREATE INDEX IF NOT EXISTS idx_raffles_code ON raffles(code);
+CREATE INDEX IF NOT EXISTS idx_raffles_host ON raffles(host_id);
+CREATE INDEX IF NOT EXISTS idx_raffles_status ON raffles(status);
 
 -- 5. RAFFLE_NUMBERS
-CREATE TABLE raffle_numbers (
+CREATE TABLE IF NOT EXISTS raffle_numbers (
   id SERIAL PRIMARY KEY,
   raffle_id INTEGER NOT NULL REFERENCES raffles(id) ON DELETE CASCADE,
   number_idx INTEGER NOT NULL,
@@ -115,10 +115,10 @@ CREATE TABLE raffle_numbers (
   UNIQUE(raffle_id, number_idx)
 );
 
-CREATE INDEX idx_raffle_numbers_raffle ON raffle_numbers(raffle_id, state);
+CREATE INDEX IF NOT EXISTS idx_raffle_numbers_raffle ON raffle_numbers(raffle_id, state);
 
 -- 6. RAFFLE_COMPANIES
-CREATE TABLE raffle_companies (
+CREATE TABLE IF NOT EXISTS raffle_companies (
   id SERIAL PRIMARY KEY,
   raffle_id INTEGER UNIQUE NOT NULL REFERENCES raffles(id) ON DELETE CASCADE,
   company_name VARCHAR(200) NOT NULL,
@@ -130,7 +130,7 @@ CREATE TABLE raffle_companies (
 );
 
 -- 7. RAFFLE_AUDIT_LOGS
-CREATE TABLE raffle_audit_logs (
+CREATE TABLE IF NOT EXISTS raffle_audit_logs (
   id SERIAL PRIMARY KEY,
   raffle_id INTEGER REFERENCES raffles(id) ON DELETE SET NULL,
   action VARCHAR(100) NOT NULL,
@@ -140,10 +140,10 @@ CREATE TABLE raffle_audit_logs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_raffle_audit_raffle ON raffle_audit_logs(raffle_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_audit_raffle ON raffle_audit_logs(raffle_id);
 
 -- 8. TICTACTOE_ROOMS
-CREATE TABLE tictactoe_rooms (
+CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code VARCHAR(6) UNIQUE NOT NULL,
   host_id UUID NOT NULL REFERENCES users(id),
@@ -176,11 +176,11 @@ CREATE TABLE tictactoe_rooms (
   last_move_at TIMESTAMP
 );
 
-CREATE INDEX idx_tictactoe_code ON tictactoe_rooms(code);
-CREATE INDEX idx_tictactoe_status ON tictactoe_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_code ON tictactoe_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_status ON tictactoe_rooms(status);
 
 -- 9. TICTACTOE_MOVES
-CREATE TABLE tictactoe_moves (
+CREATE TABLE IF NOT EXISTS tictactoe_moves (
   id SERIAL PRIMARY KEY,
   room_id UUID NOT NULL REFERENCES tictactoe_rooms(id) ON DELETE CASCADE,
   player_id UUID NOT NULL REFERENCES users(id),
@@ -190,7 +190,7 @@ CREATE TABLE tictactoe_moves (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_tictactoe_moves_room ON tictactoe_moves(room_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_moves_room ON tictactoe_moves(room_id, created_at);
 
 -- VER PARTE 2 EN ARCHIVO: 000_COMPLETE_SCHEMA_PART2.sql
 
