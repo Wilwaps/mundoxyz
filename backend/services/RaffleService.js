@@ -88,7 +88,7 @@ class RaffleService {
             
             // Verificar experiencia del usuario
             const userCheck = await client.query(
-                'SELECT experience FROM users WHERE id = $1',
+                'SELECT experience, username FROM users WHERE id = $1',
                 [hostId]
             );
 
@@ -97,6 +97,7 @@ class RaffleService {
             }
 
             const userExperience = parseInt(userCheck.rows[0].experience) || 0;
+            const hostUsername = userCheck.rows[0].username;
             
             // SOLO modo fires requiere 10 de experiencia
             // Modo prize NO requiere experiencia
@@ -332,19 +333,27 @@ class RaffleService {
 
             // Si es modo empresa, crear configuración de empresa
             if (isCompanyMode && raffleData.company_config) {
-                await client.query(`
-                    INSERT INTO raffle_companies (
-                        raffle_id, company_name, company_rif,
-                        primary_color, secondary_color, logo_url
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
-                `, [
-                    raffle.id,
-                    raffleData.company_config.company_name,
-                    raffleData.company_config.company_rif,
-                    raffleData.company_config.primary_color || '#FF6B6B',
-                    raffleData.company_config.secondary_color || '#4ECDC4',
-                    raffleData.company_config.logo_url || null
-                ]);
+                try {
+                    await client.query(`
+                        INSERT INTO raffle_companies (
+                            raffle_id, company_name, rif_number,
+                            brand_color, logo_url, website_url
+                        ) VALUES ($1, $2, $3, $4, $5, $6)
+                    `, [
+                        raffle.id,
+                        raffleData.company_config.company_name || 'Empresa',
+                        raffleData.company_config.company_rif || raffleData.company_config.rif_number || null,
+                        raffleData.company_config.brand_color || raffleData.company_config.primary_color || '#8B5CF6',
+                        raffleData.company_config.logo_url || null,
+                        raffleData.company_config.website_url || null
+                    ]);
+                } catch (companyError) {
+                    // Si la tabla no existe o tiene problemas, solo logueamos y continuamos
+                    logger.warn('Could not create raffle_companies entry', {
+                        error: companyError.message,
+                        raffleId: raffle.id
+                    });
+                }
             }
 
             // Generar números disponibles para la rifa
@@ -358,8 +367,13 @@ class RaffleService {
                 numbersGenerated: raffle.numbers_range
             });
 
-            // Obtener rifa completa con relaciones
-            return await this.getRaffleDetails(raffle.id);
+            // Retornar datos básicos de la rifa (evitar getRaffleDetails que puede fallar por esquema)
+            return {
+                ...raffle,
+                host_username: hostUsername,
+                purchased_count: 0,
+                numbers: []
+            };
 
         } catch (error) {
             await client.query('ROLLBACK');
@@ -841,16 +855,13 @@ class RaffleService {
                     r.*,
                     u.username as host_username,
                     rc.company_name,
-                    rc.logo_url,
-                    rc.primary_color,
-                    rc.secondary_color,
                     COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
                 LEFT JOIN raffle_numbers rn ON r.id = rn.raffle_id
                 WHERE r.id = $1
-                GROUP BY r.id, u.username, rc.company_name, rc.logo_url, rc.primary_color, rc.secondary_color
+                GROUP BY r.id, u.username, rc.company_name
             `, [raffleId]);
 
             if (result.rows[0]) {
@@ -1008,7 +1019,6 @@ class RaffleService {
                     r.*,
                     u.username as host_username,
                     rc.company_name,
-                    rc.logo_url,
                     rt.ticket_number,
                     rt.qr_code_url,
                     rn.number_idx as user_number
@@ -1039,16 +1049,13 @@ class RaffleService {
                     r.*,
                     u.username as host_username,
                     rc.company_name,
-                    rc.logo_url,
-                    rc.primary_color,
-                    rc.secondary_color,
                     COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
                 LEFT JOIN raffle_numbers rn ON r.id = rn.raffle_id
                 WHERE r.code = $1
-                GROUP BY r.id, u.username, rc.company_name, rc.logo_url, rc.primary_color, rc.secondary_color
+                GROUP BY r.id, u.username, rc.company_name
             `, [code]);
 
             if (result.rows[0]) {
