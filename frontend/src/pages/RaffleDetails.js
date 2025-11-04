@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Ticket, Users, Clock, TrendingUp, Check } from 'lucide-react';
+import { ArrowLeft, Ticket, Users, Clock, TrendingUp, Check, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PurchaseModalPrize from '../components/raffle/PurchaseModalPrize';
+import PendingRequestsModal from '../components/raffle/PendingRequestsModal';
 
 const RaffleDetails = () => {
   const { code } = useParams();
@@ -13,6 +15,9 @@ const RaffleDetails = () => {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [selectedNumbers, setSelectedNumbers] = useState(new Set());
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   const { data: raffleData, isLoading, refetch } = useQuery({
     queryKey: ['raffle', code],
@@ -63,26 +68,51 @@ const RaffleDetails = () => {
     setSelectedNumbers(newSelected);
   };
 
-  const handleBuyNumbers = () => {
+  const handleBuyNumbers = async () => {
     if (selectedNumbers.size === 0) {
       toast.error('Selecciona al menos un número');
       return;
     }
     
-    const totalCost = selectedNumbers.size * (raffle?.cost_per_number || 10);
-    
     const normalizedMode = raffle?.mode === 'fire' ? 'fires' : raffle?.mode;
-    const currency = normalizedMode === 'fires' ? 'fires' : 'coins';
-    const balance = currency === 'fires' ? user?.fires_balance : user?.coins_balance;
     
-    if (totalCost > balance) {
-      toast.error(`Saldo insuficiente. Necesitas ${totalCost} ${currency === 'fires' ? '🔥' : '🪙'}`);
+    // Modo PREMIO: abrir modal con formulario
+    if (normalizedMode === 'prize') {
+      try {
+        const { data } = await axios.get(`/api/raffles/${raffle.id}/payment-methods`);
+        setPaymentMethods(data.data || []);
+        setShowPrizeModal(true);
+      } catch (error) {
+        toast.error('Error al cargar métodos de pago');
+      }
       return;
     }
     
-    if (window.confirm(`¿Comprar ${selectedNumbers.size} número(s) por ${totalCost} ${currency === 'fires' ? '🔥' : '🪙'}?`)) {
+    // Modo FUEGOS: compra directa
+    const totalCost = selectedNumbers.size * (raffle?.entry_price_fire || 10);
+    const balance = user?.fires_balance || 0;
+    
+    if (totalCost > balance) {
+      toast.error(`Saldo insuficiente. Necesitas ${totalCost} 🔥`);
+      return;
+    }
+    
+    if (window.confirm(`¿Comprar ${selectedNumbers.size} número(s) por ${totalCost} 🔥?`)) {
       buyNumbersMutation.mutate(selectedNumbers);
     }
+  };
+
+  const handlePrizeSubmit = (purchaseData) => {
+    axios.post('/api/raffles/purchase', purchaseData)
+      .then(() => {
+        toast.success('Solicitud enviada. Esperando aprobación del anfitrión.');
+        setSelectedNumbers(new Set());
+        setShowPrizeModal(false);
+        refetch();
+      })
+      .catch((error) => {
+        toast.error(error.response?.data?.error || 'Error al enviar solicitud');
+      });
   };
 
   if (isLoading) {
@@ -388,6 +418,49 @@ const RaffleDetails = () => {
           </motion.button>
         </motion.div>
       )}
+
+      {/* Host: Ver Solicitudes Pendientes */}
+      {raffle?.host_id === user?.id && raffle?.mode === 'prize' && (raffle?.status === 'active' || raffle?.status === 'pending') && (
+        <motion.div 
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="fixed top-20 right-4 z-40"
+        >
+          <button
+            onClick={() => setShowRequestsModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 font-semibold"
+          >
+            <FileText size={20} />
+            Ver Solicitudes
+            {raffle?.pending_requests?.length > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                {raffle.pending_requests.length}
+              </span>
+            )}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Modales */}
+      <PurchaseModalPrize
+        isOpen={showPrizeModal}
+        onClose={() => setShowPrizeModal(false)}
+        onSubmit={handlePrizeSubmit}
+        selectedNumbers={selectedNumbers}
+        raffle={raffle}
+        paymentMethods={paymentMethods}
+        user={user}
+      />
+
+      <PendingRequestsModal
+        isOpen={showRequestsModal}
+        onClose={() => setShowRequestsModal(false)}
+        raffleId={raffle?.id}
+        onRequestProcessed={() => {
+          refetch();
+          queryClient.invalidateQueries(['raffle', code]);
+        }}
+      />
     </div>
   );
 };
