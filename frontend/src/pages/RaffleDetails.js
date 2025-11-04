@@ -231,7 +231,7 @@ const RaffleDetails = () => {
       )}
 
       {/* Number Grid */}
-      {raffle?.status === 'active' && (
+      {(raffle?.status === 'active' || raffle?.status === 'pending') && (
         <div className="card-glass mb-6">
           <h3 className="text-lg font-bold mb-3">Seleccionar Números</h3>
           
@@ -342,7 +342,7 @@ const RaffleDetails = () => {
       )}
 
       {/* Buy Button */}
-      {selectedNumbers.size > 0 && raffle?.status === 'active' && (
+      {selectedNumbers.size > 0 && (raffle?.status === 'active' || raffle?.status === 'pending') && (
         <motion.div 
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
