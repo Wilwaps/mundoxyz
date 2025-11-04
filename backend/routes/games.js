@@ -257,21 +257,20 @@ router.get('/active', async (req, res) => {
           br.code,
           br.name,
           br.mode,
-          br.victory_mode,
-          br.ball_count,
+          br.pattern_type,
           br.status,
-          br.entry_price_fire,
-          br.entry_price_coin,
-          br.pot_fires,
-          br.pot_coins,
+          br.currency_type,
+          br.card_cost,
+          br.total_pot,
           br.max_players,
+          br.max_cards_per_player,
           COUNT(bp.id) as current_players,
           u.username as host_username
         FROM bingo_v2_rooms br
         LEFT JOIN bingo_v2_room_players bp ON bp.room_id = br.id
         JOIN users u ON u.id = br.host_id
         WHERE br.status IN ('waiting', 'in_progress') 
-          AND br.visibility = 'public'
+          AND br.is_public = true
         GROUP BY br.id, u.username
         ORDER BY br.created_at DESC
         LIMIT 20`
