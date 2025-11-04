@@ -145,8 +145,11 @@ class RaffleService {
                 logger.info('Prize mode detected - cost set to 0');
             }
             
+            // Calcular costo total (declarar antes del if para que esté disponible en todo el scope)
+            const totalCostForHost = finalCost + (isCompanyMode ? 3000 : 0);
+            
             // Verificar balance del host (solo si hay costo)
-            if (finalCost > 0 || isCompanyMode) {
+            if (totalCostForHost > 0) {
                 const hostWalletCheck = await client.query(`
                     SELECT w.fires_balance 
                     FROM wallets w 
@@ -158,7 +161,6 @@ class RaffleService {
                 }
                 
                 const hostBalance = parseFloat(hostWalletCheck.rows[0].fires_balance);
-                const totalCostForHost = finalCost + (isCompanyMode ? 3000 : 0);
                 
                 if (hostBalance < totalCostForHost) {
                     throw new Error(`Necesitas ${totalCostForHost} fuegos. Tienes ${hostBalance} fuegos.`);
@@ -170,85 +172,100 @@ class RaffleService {
                     totalCost: totalCostForHost,
                     normalizedMode
                 });
+            } else {
+                logger.info('No cost for raffle - skipping balance check', {
+                    hostId,
+                    normalizedMode,
+                    totalCostForHost
+                });
             }
             
             // Normalizar código a texto para evitar conflictos de tipo en SQL
             const raffleCode = String(code);
             
-            logger.info('Creating raffle - deducting from host', {
-                hostId,
-                totalCost: totalCostForHost,
-                raffleCode,
-                isCompanyMode
-            });
-            
-            // Descontar del host: costo del número + modo empresa (si aplica)
-            await client.query(`
-                UPDATE wallets 
-                SET fires_balance = fires_balance - $1 
-                WHERE user_id = $2
-            `, [totalCostForHost, hostId]);
-            
-            // Transferir el costo del número al admin (tg_id 1417856820)
-            const adminTgId = '1417856820'; // Telegram ID del admin
-            
-            // Verificar si el admin existe en users
-            const adminCheck = await client.query(`
-                SELECT id FROM users WHERE tg_id = $1
-            `, [adminTgId]);
-            
-            if (adminCheck.rows.length > 0) {
-                const adminUserId = adminCheck.rows[0].id;
+            // Solo procesar transacciones si hay costo
+            if (totalCostForHost > 0) {
+                logger.info('Creating raffle - deducting from host', {
+                    hostId,
+                    totalCost: totalCostForHost,
+                    raffleCode,
+                    isCompanyMode
+                });
                 
-                logger.info('Transferring raffle fee to admin', {
-                    adminUserId,
-                    fee: finalCost,
+                // Descontar del host: costo del número + modo empresa (si aplica)
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance - $1 
+                    WHERE user_id = $2
+                `, [totalCostForHost, hostId]);
+                
+                // Transferir el costo del número al admin (tg_id 1417856820)
+                const adminTgId = '1417856820'; // Telegram ID del admin
+                
+                // Verificar si el admin existe en users
+                const adminCheck = await client.query(`
+                    SELECT id FROM users WHERE tg_id = $1
+                `, [adminTgId]);
+                
+                if (adminCheck.rows.length > 0) {
+                    const adminUserId = adminCheck.rows[0].id;
+                    
+                    logger.info('Transferring raffle fee to admin', {
+                        adminUserId,
+                        fee: finalCost,
+                        raffleCode
+                    });
+                    
+                    // Acreditar al admin
+                    await client.query(`
+                        UPDATE wallets 
+                        SET fires_balance = fires_balance + $1 
+                        WHERE user_id = $2
+                    `, [finalCost, adminUserId]);
+                    
+                    // Registrar transacción del admin
+                    await client.query(`
+                        INSERT INTO wallet_transactions 
+                        (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                        VALUES (
+                            (SELECT id FROM wallets WHERE user_id = $1),
+                            'raffle_host_fee', 'fires', $2,
+                            (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+                            (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                            $3, $4
+                        )
+                    `, [adminUserId, finalCost, raffleCode, `Comisión creación rifa ${raffleCode}`]);
+                }
+                
+                logger.info('Recording host transaction', {
+                    hostId,
+                    totalCost: totalCostForHost,
                     raffleCode
                 });
                 
-                // Acreditar al admin
-                await client.query(`
-                    UPDATE wallets 
-                    SET fires_balance = fires_balance + $1 
-                    WHERE user_id = $2
-                `, [finalCost, adminUserId]);
+                // Registrar transacción del host
+                const hostDescription = isCompanyMode 
+                    ? `Creación de rifa ${raffleCode} (Modo Empresa)`
+                    : `Creación de rifa ${raffleCode}`;
                 
-                // Registrar transacción del admin
                 await client.query(`
                     INSERT INTO wallet_transactions 
                     (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
                     VALUES (
                         (SELECT id FROM wallets WHERE user_id = $1),
-                        'raffle_host_fee', 'fires', $2,
-                        (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+                        'raffle_creation_cost', 'fires', $2,
+                        (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
                         (SELECT fires_balance FROM wallets WHERE user_id = $1),
                         $3, $4
                     )
-                `, [adminUserId, finalCost, raffleCode, `Comisión creación rifa ${raffleCode}`]);
+                `, [hostId, totalCostForHost, raffleCode, hostDescription]);
+            } else {
+                logger.info('Prize mode - skipping all wallet transactions', {
+                    hostId,
+                    raffleCode,
+                    normalizedMode
+                });
             }
-            
-            logger.info('Recording host transaction', {
-                hostId,
-                totalCost: totalCostForHost,
-                raffleCode
-            });
-            
-            // Registrar transacción del host
-            const hostDescription = isCompanyMode 
-                ? `Creación de rifa ${raffleCode} (Modo Empresa)`
-                : `Creación de rifa ${raffleCode}`;
-            
-            await client.query(`
-                INSERT INTO wallet_transactions 
-                (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
-                VALUES (
-                    (SELECT id FROM wallets WHERE user_id = $1),
-                    'raffle_creation_cost', 'fires', $2,
-                    (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
-                    (SELECT fires_balance FROM wallets WHERE user_id = $1),
-                    $3, $4
-                )
-            `, [hostId, totalCostForHost, raffleCode, hostDescription]);
 
             // Calcular entry_price según modo
             // fires: entry_price_fire > 0, otros en 0
