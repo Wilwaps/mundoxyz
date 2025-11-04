@@ -127,6 +127,16 @@ class RaffleService {
                 throw new Error(`Necesitas ${totalCostForHost} fuegos. Tienes ${hostBalance} fuegos.`);
             }
             
+            // Normalizar código a texto para evitar conflictos de tipo en SQL
+            const raffleCode = String(code);
+            
+            logger.info('Creating raffle - deducting from host', {
+                hostId,
+                totalCost: totalCostForHost,
+                raffleCode,
+                isCompanyMode
+            });
+            
             // Descontar del host: costo del número + modo empresa (si aplica)
             await client.query(`
                 UPDATE wallets 
@@ -145,6 +155,12 @@ class RaffleService {
             if (adminCheck.rows.length > 0) {
                 const adminUserId = adminCheck.rows[0].id;
                 
+                logger.info('Transferring raffle fee to admin', {
+                    adminUserId,
+                    fee: finalCost,
+                    raffleCode
+                });
+                
                 // Acreditar al admin
                 await client.query(`
                     UPDATE wallets 
@@ -161,12 +177,22 @@ class RaffleService {
                         'raffle_host_fee', 'fires', $2,
                         (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
                         (SELECT fires_balance FROM wallets WHERE user_id = $1),
-                        $3, 'Comisión creación rifa ' || $3
+                        $3, $4
                     )
-                `, [adminUserId, finalCost, code]);
+                `, [adminUserId, finalCost, raffleCode, `Comisión creación rifa ${raffleCode}`]);
             }
             
+            logger.info('Recording host transaction', {
+                hostId,
+                totalCost: totalCostForHost,
+                raffleCode
+            });
+            
             // Registrar transacción del host
+            const hostDescription = isCompanyMode 
+                ? `Creación de rifa ${raffleCode} (Modo Empresa)`
+                : `Creación de rifa ${raffleCode}`;
+            
             await client.query(`
                 INSERT INTO wallet_transactions 
                 (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
@@ -175,10 +201,18 @@ class RaffleService {
                     'raffle_creation_cost', 'fires', $2,
                     (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
                     (SELECT fires_balance FROM wallets WHERE user_id = $1),
-                    $3, 'Creación de rifa ' || $3 || (CASE WHEN $4 THEN ' (Modo Empresa)' ELSE '' END)
+                    $3, $4
                 )
-            `, [hostId, totalCostForHost, code, isCompanyMode]);
+            `, [hostId, totalCostForHost, raffleCode, hostDescription]);
 
+            logger.info('Inserting raffle into database', {
+                raffleCode,
+                name: raffleData.name,
+                hostId,
+                numbersRange: raffleData.numbers_range || 100,
+                entryPrice: finalCost
+            });
+            
             // Insertar rifa principal
             const raffleResult = await client.query(`
                 INSERT INTO raffles (
@@ -195,7 +229,7 @@ class RaffleService {
                     $15, $16
                 ) RETURNING *
             `, [
-                code,
+                raffleCode,
                 raffleData.name,
                 hostId,
                 raffleData.description || null,
@@ -214,6 +248,12 @@ class RaffleService {
             ]);
 
             const raffle = raffleResult.rows[0];
+            
+            logger.info('Raffle created successfully', {
+                raffleId: raffle.id,
+                raffleCode: raffle.code,
+                hostId
+            });
 
             // Si es modo empresa, crear configuración de empresa
             if (isCompanyMode && raffleData.company_config) {
@@ -237,11 +277,30 @@ class RaffleService {
 
             await client.query('COMMIT');
 
+            logger.info('Raffle creation completed successfully', {
+                raffleId: raffle.id,
+                raffleCode: raffle.code,
+                numbersGenerated: raffle.numbers_range
+            });
+
             // Obtener rifa completa con relaciones
             return await this.getRaffleDetails(raffle.id);
 
         } catch (error) {
             await client.query('ROLLBACK');
+            logger.error('Error creating raffle - transaction rolled back', {
+                error: error.message,
+                code: error.code,
+                detail: error.detail,
+                hint: error.hint,
+                position: error.position,
+                hostId,
+                raffleData: {
+                    name: raffleData.name,
+                    mode: raffleData.mode,
+                    type: raffleData.type
+                }
+            });
             throw error;
         } finally {
             client.release();
