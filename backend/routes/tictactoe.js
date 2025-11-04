@@ -764,6 +764,7 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
                rematch_count = $2,
                pot_coins = $3,
                pot_fires = $4,
+               xp_awarded = FALSE,
                last_move_at = NOW()
            WHERE id = $5`,
           [initialTurn, newRematchCount, newPotCoins, newPotFires, updatedRoom.id]
