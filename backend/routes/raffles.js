@@ -121,101 +121,11 @@ router.post('/create', verifyToken, async (req, res) => {
             });
         }
 
-        if (!raffleData.mode || !['fire', 'prize'].includes(raffleData.mode)) {
+        // Aceptar fires, fire (legacy), y prize
+        if (!raffleData.mode || !['fire', 'fires', 'prize'].includes(raffleData.mode)) {
             return res.status(400).json({
                 success: false,
-                error: 'Modo de rifa inválido (fire/prize)'
-            });
-        }
-
-        if (raffleData.is_company_mode && !raffleData.company_config) {
-            return res.status(400).json({
-                success: false,
-                error: 'Configuración de empresa requerida para modo empresas'
-            });
-        }
-
-        const raffle = await raffleService.createRaffle(userId, raffleData);
-        
-        res.json({
-            success: true,
-            data: raffle,
-            message: 'Rifa creada exitosamente'
-        });
-    } catch (error) {
-        console.error('Error creating raffle:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/raffles/active
- * Obtener rifas activas del usuario actual
- */
-router.get('/active', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const raffles = await raffleService.getUserActiveRaffles(userId);
-        
-        res.json({
-            success: true,
-            data: raffles
-        });
-    } catch (error) {
-        console.error('Error getting active raffles:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/raffles/participated
- * Obtener rifas en las que participó el usuario
- */
-router.get('/participated', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const raffles = await raffleService.getUserParticipatedRaffles(userId);
-        
-        res.json({
-            success: true,
-            data: raffles
-        });
-    } catch (error) {
-        console.error('Error getting participated raffles:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
- * POST /api/raffles/create
- * Crear nueva rifa con todas las configuraciones
- */
-router.post('/create', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const raffleData = req.body;
-
-        // Validar datos requeridos
-        if (!raffleData.name) {
-            return res.status(400).json({
-                success: false,
-                error: 'El nombre de la rifa es requerido'
-            });
-        }
-
-        if (!raffleData.mode || !['fire', 'prize'].includes(raffleData.mode)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Modo de rifa inválido (fire/prize)'
+                error: 'Modo de rifa inválido. Modos permitidos: fires, prize'
             });
         }
 
