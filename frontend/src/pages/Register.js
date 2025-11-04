@@ -81,9 +81,10 @@ const Register = () => {
         break;
 
       case 'security_answer':
-        if (value.length < 3) {
-          newErrors.security_answer = 'Mínimo 3 caracteres';
-        } else if (value.length > 255) {
+        const trimmedAnswer = value.trim();
+        if (!trimmedAnswer || trimmedAnswer.length < 3) {
+          newErrors.security_answer = 'Mínimo 3 caracteres (sin contar espacios)';
+        } else if (trimmedAnswer.length > 255) {
           newErrors.security_answer = 'Máximo 255 caracteres';
         } else {
           delete newErrors.security_answer;
@@ -135,8 +136,14 @@ const Register = () => {
 
     // Verificar campos requeridos
     if (!formData.username || !formData.email || !formData.emailConfirm || 
-        !formData.password || !formData.passwordConfirm) {
+        !formData.password || !formData.passwordConfirm || !formData.security_answer) {
       toast.error('Por favor completa todos los campos requeridos');
+      return;
+    }
+
+    // Verificar que security_answer no sea solo espacios
+    if (!formData.security_answer.trim()) {
+      toast.error('La respuesta de seguridad no puede estar vacía');
       return;
     }
 

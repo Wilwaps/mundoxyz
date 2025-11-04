@@ -198,12 +198,20 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      // Validar que security_answer exista y tenga contenido
+      const securityAnswer = (formData.security_answer || '').trim();
+      if (!securityAnswer || securityAnswer.length < 3) {
+        toast.error('La respuesta de seguridad debe tener al menos 3 caracteres');
+        return { success: false, error: 'Respuesta de seguridad inválida' };
+      }
+      
       const response = await axios.post('/api/auth/register', {
         username: formData.username,
         email: formData.email,
         emailConfirm: formData.emailConfirm,
         password: formData.password,
         passwordConfirm: formData.passwordConfirm,
+        security_answer: securityAnswer,
         tg_id: formData.tg_id || null
       });
 
@@ -212,8 +220,9 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: response.data.user };
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error(error.response?.data?.error || 'Error al registrar usuario');
-      return { success: false, error: error.message };
+      const errorMessage = error.response?.data?.error || 'Error al registrar usuario';
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
