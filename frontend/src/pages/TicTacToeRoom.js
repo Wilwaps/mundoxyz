@@ -154,6 +154,13 @@ const TicTacToeRoom = () => {
         } else if (data.isDraw) {
           toast('¡Empate!');
         }
+        
+        // Refrescar experiencia y balance del usuario
+        setTimeout(async () => {
+          queryClient.invalidateQueries(['balance']);
+          queryClient.invalidateQueries(['economy']);
+          await refreshUser();
+        }, 500);
       }
       refetchRoom();
     },
@@ -280,6 +287,13 @@ const TicTacToeRoom = () => {
         refetchRoom();
         setGameOver(true);
         setShowGameOverModal(true);
+        
+        // Refrescar experiencia y balance del usuario
+        setTimeout(async () => {
+          queryClient.invalidateQueries(['balance']);
+          queryClient.invalidateQueries(['economy']);
+          await refreshUser();
+        }, 500);
       }
     };
     
