@@ -1,6 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { query } = require('../db');
 const logger = require('../utils/logger');
+const config = require('../config/config');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -8,9 +9,19 @@ if (!token) {
   logger.error('TELEGRAM_BOT_TOKEN not found in environment variables');
   module.exports = null;
 } else {
-  const bot = new TelegramBot(token, { polling: true });
-
-  logger.info('Telegram bot initialized');
+  // Use polling in development, webhook in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  let bot;
+  if (isProduction) {
+    // Webhook mode for Railway
+    bot = new TelegramBot(token, { webHook: false });
+    logger.info('Telegram bot initialized in WEBHOOK mode (manual setup required)');
+  } else {
+    // Polling mode for local development
+    bot = new TelegramBot(token, { polling: true });
+    logger.info('Telegram bot initialized in POLLING mode (development)');
+  }
 
   // Handle /start command with link token
   bot.onText(/\/start (.+)/, async (msg, match) => {

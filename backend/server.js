@@ -29,6 +29,7 @@ const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
 const diagnosticRoutes = require('./routes/diagnostic');
 const debugXpRoutes = require('./routes/debug-xp');
+const telegramWebhookRoutes = require('./routes/telegram-webhook');
 
 // Create Express app
 const app = express();
@@ -224,6 +225,7 @@ app.use('/api/market', marketRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
 app.use('/api/debug-xp', debugXpRoutes);
+app.use('/api/telegram', telegramWebhookRoutes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {

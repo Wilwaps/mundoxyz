@@ -4,17 +4,14 @@ trigger: always_on
 
 RAILWAY NO TIENE QUERY!!
 
-postgresql://postgres:jaUlzMfMxrTAXGtAWbYjTLBgJDSNxBPR@postgres-7ri0.railway.internal:5432/railway
-trolley.proxy.rlwy.net:28951
-postgres-7ri0.railway.internal
-confident-bravery-production-ce7b.up.railway.app
-esa es la pagina de produccion que se esta usando
-https://confident-bravery-production-ce7b.up.railway.app/games
-realiza pruebas con 2 usuarios chromedevtools, ventana normal o incognito
-iniciar sesion en ambas cuentas para pruebas completas
-prueba1/123456789
-modo incognito
-prueba2/Mirame12veces.
+
+te daré la ubicacion postgres y railway
+DATABASE_PUBLIC_URL
+postgresql://postgres:gUUCiUgVwQOOoERDqqGTzNkJTLlsJeWG@shuttle.proxy.rlwy.net:10199/railway
+DATABASE_URL
+postgresql://postgres:gUUCiUgVwQOOoERDqqGTzNkJTLlsJeWG@postgres.railway.internal:5432/railway
+ubicacion en railway
+https://mundoxyz-production.up.railway.app
 
 
 cuando sea necesario crear un script Node.js que use el módulo pg para ejecutar directamente el SQL.
