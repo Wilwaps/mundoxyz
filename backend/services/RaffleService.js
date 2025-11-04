@@ -1645,17 +1645,17 @@ class RaffleService {
     }
 
     /**
-     * Cancelar rifa con reembolso completo (admin)
+     * Cancelar rifa con reembolso completo (admin/tote)
      */
     async cancelRaffleWithRefund(adminId, raffleId, reason) {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Verificar que sea admin
+            // Verificar que sea admin o tote
             const admin = await client.query('SELECT role FROM users WHERE id = $1', [adminId]);
-            if (!admin.rows[0] || admin.rows[0].role !== 'admin') {
-                throw new Error('Requiere permisos de administrador');
+            if (!admin.rows[0] || !['admin', 'tote'].includes(admin.rows[0].role)) {
+                throw new Error('Requiere permisos de administrador o tote');
             }
 
             // Obtener rifa

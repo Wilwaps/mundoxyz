@@ -898,7 +898,7 @@ router.get('/:raffleId/pending-requests', verifyToken, async (req, res) => {
 
 /**
  * POST /api/raffles/admin/cancel-raffle
- * Cancelar rifa con reembolso completo - Solo admin
+ * Cancelar rifa con reembolso completo - Solo admin/tote
  */
 router.post('/admin/cancel-raffle', verifyToken, async (req, res) => {
     try {
