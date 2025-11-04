@@ -412,6 +412,183 @@ class GiftService {
       logger.error('Error tracking user activity:', error);
     }
   }
+
+  /**
+   * Procesar eventos de first_login para usuario nuevo
+   */
+  async processFirstLoginEvents(userId) {
+    try {
+      logger.info('Processing first login events', { userId });
+
+      return await transaction(async (client) => {
+        // Buscar eventos activos de tipo first_login
+        const eventsResult = await client.query(
+          `SELECT * FROM welcome_events 
+           WHERE event_type = 'first_login'
+             AND is_active = true
+             AND (starts_at IS NULL OR starts_at <= NOW())
+             AND (ends_at IS NULL OR ends_at > NOW())
+             AND (max_claims IS NULL OR claimed_count < max_claims)
+           ORDER BY priority DESC, created_at ASC`
+        );
+
+        if (eventsResult.rows.length === 0) {
+          logger.info('No active first_login events found');
+          return { processed: 0, events: [] };
+        }
+
+        const results = [];
+
+        for (const event of eventsResult.rows) {
+          // Verificar si usuario ya reclamó este evento
+          const alreadyClaimed = await client.query(
+            'SELECT 1 FROM welcome_event_claims WHERE event_id = $1 AND user_id = $2',
+            [event.id, userId]
+          );
+
+          if (alreadyClaimed.rows.length > 0) {
+            logger.info('User already claimed this event', { eventId: event.id, userId });
+            continue;
+          }
+
+          const coinsAmount = parseFloat(event.coins_amount) || 0;
+          const firesAmount = parseFloat(event.fires_amount) || 0;
+
+          if (event.require_claim) {
+            // Crear mensaje en bandeja para que usuario acepte
+            await client.query(
+              `INSERT INTO bingo_v2_messages 
+               (user_id, category, title, message, metadata, is_read)
+               VALUES ($1, 'system', $2, $3, $4, false)`,
+              [
+                userId,
+                `🎁 ${event.name}`,
+                event.message,
+                JSON.stringify({
+                  type: 'welcome_event',
+                  event_id: event.id,
+                  coins_amount: coinsAmount,
+                  fires_amount: firesAmount,
+                  require_claim: true
+                })
+              ]
+            );
+
+            logger.info('Welcome event message created', {
+              eventId: event.id,
+              eventName: event.name,
+              userId,
+              coinsAmount,
+              firesAmount
+            });
+
+            results.push({
+              eventId: event.id,
+              eventName: event.name,
+              action: 'message_created',
+              requireClaim: true
+            });
+
+          } else {
+            // Acreditar automáticamente sin requerir claim
+            const walletResult = await client.query(
+              'SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE',
+              [userId]
+            );
+
+            if (walletResult.rows.length === 0) {
+              logger.warn('Wallet not found for user', { userId });
+              continue;
+            }
+
+            const wallet = walletResult.rows[0];
+            const oldCoinsBalance = parseFloat(wallet.coins_balance);
+            const oldFiresBalance = parseFloat(wallet.fires_balance);
+
+            // Actualizar wallet
+            await client.query(
+              `UPDATE wallets 
+               SET coins_balance = coins_balance + $1,
+                   fires_balance = fires_balance + $2,
+                   total_coins_earned = total_coins_earned + $1,
+                   total_fires_earned = total_fires_earned + $2,
+                   updated_at = NOW()
+               WHERE user_id = $3`,
+              [coinsAmount, firesAmount, userId]
+            );
+
+            // Registrar transacciones
+            if (coinsAmount > 0) {
+              await client.query(
+                `INSERT INTO wallet_transactions 
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description)
+                 VALUES ($1, 'welcome_event', 'coins', $2, $3, $4, $5)`,
+                [wallet.id, coinsAmount, oldCoinsBalance, oldCoinsBalance + coinsAmount, 
+                 `Welcome: ${event.name}`]
+              );
+            }
+
+            if (firesAmount > 0) {
+              await client.query(
+                `INSERT INTO wallet_transactions 
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description)
+                 VALUES ($1, 'welcome_event', 'fires', $2, $3, $4, $5)`,
+                [wallet.id, firesAmount, oldFiresBalance, oldFiresBalance + firesAmount, 
+                 `Welcome: ${event.name}`]
+              );
+
+              // Actualizar fire supply
+              await client.query(
+                'UPDATE fire_supply SET total_emitted = total_emitted + $1, total_circulating = total_circulating + $1 WHERE id = 1',
+                [firesAmount]
+              );
+            }
+
+            // Registrar claim
+            await client.query(
+              `INSERT INTO welcome_event_claims 
+               (event_id, user_id, coins_claimed, fires_claimed)
+               VALUES ($1, $2, $3, $4)`,
+              [event.id, userId, coinsAmount, firesAmount]
+            );
+
+            logger.info('Welcome event auto-credited', {
+              eventId: event.id,
+              eventName: event.name,
+              userId,
+              coinsAmount,
+              firesAmount
+            });
+
+            results.push({
+              eventId: event.id,
+              eventName: event.name,
+              action: 'auto_credited',
+              coinsAmount,
+              firesAmount,
+              requireClaim: false
+            });
+          }
+        }
+
+        logger.info('First login events processed', { 
+          userId, 
+          processed: results.length,
+          events: results 
+        });
+
+        return { 
+          processed: results.length, 
+          events: results 
+        };
+      });
+
+    } catch (error) {
+      logger.error('Error processing first login events:', error);
+      // No lanzar error para no bloquear el login
+      return { processed: 0, events: [], error: error.message };
+    }
+  }
 }
 
 module.exports = new GiftService();

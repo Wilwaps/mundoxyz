@@ -457,6 +457,16 @@ router.post('/register', async (req, res) => {
       return userResult.rows[0];
     });
 
+    // Procesar eventos de first_login de forma asíncrona (no bloquear respuesta)
+    const giftService = require('../services/giftService');
+    setImmediate(async () => {
+      try {
+        await giftService.processFirstLoginEvents(result.id);
+      } catch (error) {
+        logger.error('Error processing first login events in background:', error);
+      }
+    });
+
     res.status(201).json({
       success: true,
       message: 'Usuario registrado exitosamente. Por favor inicia sesión.',
@@ -733,6 +743,16 @@ async function findOrCreateTelegramUser(telegramData) {
         userId, 
         tgId: telegramData.id, 
         username: telegramData.username 
+      });
+
+      // Procesar eventos de first_login para usuario nuevo de Telegram
+      const giftService = require('../services/giftService');
+      setImmediate(async () => {
+        try {
+          await giftService.processFirstLoginEvents(userId);
+        } catch (error) {
+          logger.error('Error processing first login events for Telegram user:', error);
+        }
       });
 
       return userId;
