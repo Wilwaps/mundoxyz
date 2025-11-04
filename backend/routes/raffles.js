@@ -605,59 +605,6 @@ router.post('/generate-pdf', verifyToken, async (req, res) => {
 });
 
 /**
- * POST /api/raffles/captcha
- * Generar nuevo CAPTCHA matemático
- */
-router.post('/captcha', (req, res) => {
-    try {
-        const captcha = raffleService.generateMathCaptcha();
-        
-        res.json({
-            success: true,
-            data: captcha
-        });
-    } catch (error) {
-        console.error('Error generating captcha:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
- * POST /api/raffles/approve-purchase
- * Aprobar solicitud de compra (modo premio) - Solo host
- */
-router.post('/approve-purchase', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { request_id } = req.body;
-
-        if (!request_id) {
-            return res.status(400).json({
-                success: false,
-                error: 'ID de solicitud requerido'
-            });
-        }
-
-        const result = await raffleService.approvePurchase(userId, request_id);
-        
-        res.json({
-            success: true,
-            data: result,
-            message: 'Compra aprobada exitosamente'
-        });
-    } catch (error) {
-        console.error('Error approving purchase:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
  * POST /api/raffles/reject-purchase
  * Rechazar solicitud de compra - Solo host
  */
@@ -899,6 +846,70 @@ router.post('/generate-pdf', verifyToken, async (req, res) => {
             success: false,
             error: error.message
         });
+    }
+});
+
+/**
+ * POST /api/raffles/:raffleId/payment-methods
+ * Configurar métodos de cobro - Solo host de rifa modo premio
+ */
+router.post('/:raffleId/payment-methods', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { raffleId } = req.params;
+        const { methods } = req.body;
+
+        const result = await raffleService.setPaymentMethods(userId, raffleId, methods);
+        res.json({ success: true, data: result, message: 'Métodos configurados' });
+    } catch (error) {
+        console.error('Error configurando métodos:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/raffles/:raffleId/payment-methods
+ * Obtener métodos de cobro configurados para una rifa
+ */
+router.get('/:raffleId/payment-methods', async (req, res) => {
+    try {
+        const { raffleId } = req.params;
+        const methods = await raffleService.getPaymentMethods(raffleId);
+        res.json({ success: true, data: methods });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/raffles/:raffleId/pending-requests
+ * Obtener solicitudes de compra pendientes - Solo host
+ */
+router.get('/:raffleId/pending-requests', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { raffleId } = req.params;
+        const requests = await raffleService.getPendingRequests(userId, raffleId);
+        res.json({ success: true, data: requests });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/raffles/admin/cancel-raffle
+ * Cancelar rifa con reembolso completo - Solo admin
+ */
+router.post('/admin/cancel-raffle', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { raffle_id, reason } = req.body;
+
+        const result = await raffleService.cancelRaffleWithRefund(userId, raffle_id, reason);
+        res.json({ success: true, data: result, message: 'Rifa cancelada y reembolsada' });
+    } catch (error) {
+        console.error('Error cancelando rifa:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

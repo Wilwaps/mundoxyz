@@ -1465,6 +1465,166 @@ class RaffleService {
         
         return pdfUrl;
     }
+
+    /**
+     * Configurar métodos de cobro para rifa modo premio
+     */
+    async setPaymentMethods(hostId, raffleId, methods) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Verificar que el usuario sea el host
+            const raffle = await client.query('SELECT host_id, mode FROM raffles WHERE id = $1', [raffleId]);
+            if (!raffle.rows[0] || raffle.rows[0].host_id !== hostId) {
+                throw new Error('No autorizado');
+            }
+
+            // Eliminar métodos existentes
+            await client.query('DELETE FROM raffle_host_payment_methods WHERE raffle_id = $1', [raffleId]);
+
+            // Insertar nuevos métodos
+            for (const method of methods) {
+                if (method.method_type === 'transferencia') {
+                    await client.query(`
+                        INSERT INTO raffle_host_payment_methods (
+                            raffle_id, method_type, bank_name, account_holder, 
+                            account_number, id_number, phone, instructions, is_active
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    `, [raffleId, 'transferencia', method.bank_name, method.account_holder,
+                        method.account_number, method.id_number, method.phone, 
+                        method.instructions, method.is_active !== false]);
+                } else if (method.method_type === 'efectivo') {
+                    await client.query(`
+                        INSERT INTO raffle_host_payment_methods (
+                            raffle_id, method_type, pickup_instructions, is_active
+                        ) VALUES ($1, $2, $3, $4)
+                    `, [raffleId, 'efectivo', method.pickup_instructions, method.is_active !== false]);
+                }
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Obtener métodos de cobro de una rifa
+     */
+    async getPaymentMethods(raffleId) {
+        const result = await this.pool.query(`
+            SELECT * FROM raffle_host_payment_methods 
+            WHERE raffle_id = $1 AND is_active = true
+            ORDER BY method_type
+        `, [raffleId]);
+        return result.rows;
+    }
+
+    /**
+     * Obtener solicitudes pendientes de aprobación
+     */
+    async getPendingRequests(hostId, raffleId) {
+        // Verificar que sea el host
+        const raffle = await this.pool.query('SELECT host_id FROM raffles WHERE id = $1', [raffleId]);
+        if (!raffle.rows[0] || raffle.rows[0].host_id !== hostId) {
+            throw new Error('No autorizado');
+        }
+
+        const requests = await this.pool.query(`
+            SELECT 
+                rr.*,
+                u.username,
+                u.display_name
+            FROM raffle_requests rr
+            JOIN users u ON rr.user_id = u.id
+            WHERE rr.raffle_id = $1 AND rr.status = 'pending'
+            ORDER BY rr.created_at ASC
+        `, [raffleId]);
+
+        return requests.rows;
+    }
+
+    /**
+     * Cancelar rifa con reembolso completo (admin)
+     */
+    async cancelRaffleWithRefund(adminId, raffleId, reason) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Verificar que sea admin
+            const admin = await client.query('SELECT role FROM users WHERE id = $1', [adminId]);
+            if (!admin.rows[0] || admin.rows[0].role !== 'admin') {
+                throw new Error('Requiere permisos de administrador');
+            }
+
+            // Obtener rifa
+            const raffle = await client.query('SELECT * FROM raffles WHERE id = $1', [raffleId]);
+            if (!raffle.rows[0]) {
+                throw new Error('Rifa no encontrada');
+            }
+
+            const raffleData = raffle.rows[0];
+            if (raffleData.status === 'finished') {
+                throw new Error('La rifa ya finalizó');
+            }
+
+            // Obtener todos los números vendidos
+            const soldNumbers = await client.query(`
+                SELECT number_idx, owner_id FROM raffle_numbers 
+                WHERE raffle_id = $1 AND state = 'sold'
+            `, [raffleId]);
+
+            const cost = parseFloat(raffleData.entry_price_fire);
+
+            // Reembolsar a cada comprador
+            for (const num of soldNumbers.rows) {
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance + $1 
+                    WHERE user_id = $2
+                `, [cost, num.owner_id]);
+            }
+
+            // Marcar rifa como cancelada
+            await client.query(`
+                UPDATE raffles 
+                SET status = 'cancelled', ended_at = CURRENT_TIMESTAMP 
+                WHERE id = $1
+            `, [raffleId]);
+
+            // Registrar en audit
+            await client.query(`
+                INSERT INTO raffle_audit_logs (raffle_id, action, admin_id, details)
+                VALUES ($1, 'cancelled_with_refund', $2, $3)
+            `, [raffleId, adminId, JSON.stringify({ reason, refunded_count: soldNumbers.rows.length })]);
+
+            await client.query('COMMIT');
+
+            logger.info('Rifa cancelada con reembolso', {
+                raffleId,
+                adminId,
+                refundedUsers: soldNumbers.rows.length,
+                reason
+            });
+
+            return { 
+                success: true, 
+                refunded_users: soldNumbers.rows.length,
+                refunded_amount: cost * soldNumbers.rows.length
+            };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = RaffleService;
