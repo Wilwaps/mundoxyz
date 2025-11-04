@@ -184,29 +184,121 @@ router.get('/:code', async (req, res) => {
 
 /**
  * POST /api/raffles/purchase
- * Comprar número de rifa con CAPTCHA matemático
+ * Comprar números de rifa
+ * 
+ * Soporta dos modos:
+ * - FUEGOS: compra directa sin CAPTCHA, descuento inmediato de wallet
+ * - PREMIO: reserva con buyer_profile, requiere aprobación del host
+ * 
+ * Body para modo FUEGOS:
+ * {
+ *   raffle_id: UUID,
+ *   numbers: number[],  // Array de índices
+ *   mode: 'fires'
+ * }
+ * 
+ * Body para modo PREMIO:
+ * {
+ *   raffle_id: UUID,
+ *   numbers: number[],
+ *   mode: 'prize',
+ *   buyer_profile: {
+ *     username: string,
+ *     display_name: string,
+ *     full_name: string,      // Obligatorio
+ *     id_number: string,       // Obligatorio
+ *     phone: string,           // Obligatorio
+ *     location?: string
+ *   },
+ *   payment_method: 'transferencia' | 'efectivo',
+ *   payment_reference?: string,  // Solo para transferencia
+ *   message?: string
+ * }
  */
 router.post('/purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { raffle_id, number, captcha_data } = req.body;
+        const { 
+            raffle_id, 
+            numbers, 
+            mode, 
+            buyer_profile, 
+            payment_method, 
+            payment_reference, 
+            message 
+        } = req.body;
 
-        if (!raffle_id || !number || !captcha_data) {
+        // Validaciones básicas
+        if (!raffle_id) {
             return res.status(400).json({
                 success: false,
-                error: 'Datos incompletos para la compra'
+                error: 'ID de rifa requerido'
             });
         }
 
-        const result = await raffleService.purchaseNumber(userId, raffle_id, number, captcha_data);
+        if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Debe seleccionar al menos un número'
+            });
+        }
+
+        // Validar que los números sean integers válidos
+        if (!numbers.every(n => Number.isInteger(n) && n >= 0)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Números inválidos'
+            });
+        }
+
+        // Validaciones específicas por modo
+        if (mode === 'prize') {
+            // Modo premio requiere buyer_profile completo
+            if (!buyer_profile) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Perfil de comprador requerido para modo premio'
+                });
+            }
+
+            const requiredFields = ['full_name', 'id_number', 'phone'];
+            const missingFields = requiredFields.filter(field => !buyer_profile[field]);
+            
+            if (missingFields.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Campos requeridos faltantes: ${missingFields.join(', ')}`
+                });
+            }
+
+            if (!payment_method || !['transferencia', 'efectivo'].includes(payment_method)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Método de pago inválido. Use "transferencia" o "efectivo"'
+                });
+            }
+        }
+
+        // Procesar compra (el service maneja la lógica por modo)
+        const result = await raffleService.purchaseNumbers(userId, {
+            raffleId: raffle_id,
+            numbers,
+            mode,
+            buyerProfile: buyer_profile,
+            paymentMethod: payment_method,
+            paymentReference: payment_reference,
+            message
+        });
         
         res.json({
             success: true,
             data: result,
-            message: 'Número comprado exitosamente'
+            message: mode === 'prize' 
+                ? `Solicitud de compra enviada para ${numbers.length} número(s). Esperando aprobación del anfitrión.`
+                : `¡Compra exitosa! ${numbers.length} número(s) adquirido(s).`
         });
     } catch (error) {
-        console.error('Error purchasing number:', error);
+        console.error('Error en compra de números:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -505,38 +597,6 @@ router.post('/generate-pdf', verifyToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Error generating PDF:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-/**
- * POST /api/raffles/purchase
- * Comprar número de rifa con CAPTCHA matemático
- */
-router.post('/purchase', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { raffle_id, number, captcha_data } = req.body;
-
-        if (!raffle_id || !number || !captcha_data) {
-            return res.status(400).json({
-                success: false,
-                error: 'Datos incompletos para la compra'
-            });
-        }
-
-        const result = await raffleService.purchaseNumber(userId, raffle_id, number, captcha_data);
-        
-        res.json({
-            success: true,
-            data: result,
-            message: 'Número comprado exitosamente'
-        });
-    } catch (error) {
-        console.error('Error purchasing number:', error);
         res.status(500).json({
             success: false,
             error: error.message

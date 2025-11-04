@@ -27,13 +27,19 @@ const RaffleDetails = () => {
 
   const buyNumbersMutation = useMutation({
     mutationFn: async (numbers) => {
+      const normalizedMode = raffle?.mode === 'fire' ? 'fires' : raffle?.mode;
+      
       return axios.post(`/api/raffles/purchase`, { 
         raffle_id: raffle?.id,
-        numbers: Array.from(numbers) 
+        numbers: Array.from(numbers),
+        mode: normalizedMode
+        // No enviamos CAPTCHA para modo fuegos
+        // buyer_profile y payment_method solo para modo premio
       });
     },
-    onSuccess: () => {
-      toast.success('¡Números comprados exitosamente!');
+    onSuccess: (response) => {
+      const message = response.data?.message || '¡Números comprados exitosamente!';
+      toast.success(message);
       setSelectedNumbers(new Set());
       refetch();
       refreshUser();
@@ -41,7 +47,9 @@ const RaffleDetails = () => {
       queryClient.invalidateQueries(['raffles']);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || 'Error al comprar números');
+      const errorMessage = error.response?.data?.error || 'Error al comprar números';
+      toast.error(errorMessage);
+      console.error('Error en compra:', error.response?.data);
     }
   });
 

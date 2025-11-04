@@ -457,7 +457,118 @@ class RaffleService {
     }
 
     /**
-     * Comprar número de rifa
+     * Comprar múltiples números de rifa (NUEVO - soporta modo fuegos y premio)
+     * @param {string} userId - ID del usuario
+     * @param {object} options - Opciones de compra
+     * @param {string} options.raffleId - ID de la rifa
+     * @param {number[]} options.numbers - Array de índices de números
+     * @param {string} options.mode - Modo de rifa ('fires' o 'prize')
+     * @param {object} options.buyerProfile - Perfil del comprador (solo premio)
+     * @param {string} options.paymentMethod - Método de pago (solo premio)
+     * @param {string} options.paymentReference - Referencia de pago (opcional)
+     * @param {string} options.message - Mensaje al host (opcional)
+     */
+    async purchaseNumbers(userId, options) {
+        const { raffleId, numbers, mode, buyerProfile, paymentMethod, paymentReference, message } = options;
+        const client = await this.pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+
+            // Obtener detalles de la rifa
+            const raffleResult = await client.query(`
+                SELECT * FROM raffles WHERE id = $1 AND (status = 'pending' OR status = 'active')
+            `, [raffleId]);
+
+            if (!raffleResult.rows[0]) {
+                throw new Error('La rifa no existe o no está activa');
+            }
+
+            const raffleData = raffleResult.rows[0];
+            const normalizedMode = raffleData.mode === 'fire' ? 'fires' : raffleData.mode;
+            const cost = parseFloat(raffleData.entry_price_fire || raffleData.cost_per_number || 10);
+
+            // Procesar según modo
+            if (normalizedMode === 'fires') {
+                // MODO FUEGOS: compra directa sin CAPTCHA
+                
+                // Verificar balance del usuario
+                const wallet = await client.query(`
+                    SELECT fires_balance FROM wallets WHERE user_id = $1
+                `, [userId]);
+
+                if (!wallet.rows[0]) {
+                    throw new Error('Wallet no encontrado');
+                }
+
+                const totalCost = cost * numbers.length;
+                const currentBalance = parseFloat(wallet.rows[0].fires_balance);
+
+                if (currentBalance < totalCost) {
+                    throw new Error(`Balance insuficiente. Necesitas ${totalCost} fuegos.`);
+                }
+
+                // Procesar cada número
+                for (const numberIdx of numbers) {
+                    await this.processFirePurchase(client, userId, raffleId, numberIdx, cost);
+                }
+
+                logger.info('Compra modo fuegos completada', {
+                    userId,
+                    raffleId,
+                    numbers: numbers.length,
+                    totalCost
+                });
+
+            } else if (normalizedMode === 'prize') {
+                // MODO PREMIO: reserva con aprobación
+                
+                // Validar que buyerProfile esté completo
+                if (!buyerProfile || !buyerProfile.full_name || !buyerProfile.id_number || !buyerProfile.phone) {
+                    throw new Error('Perfil de comprador incompleto');
+                }
+
+                // Procesar cada número (reserva + solicitud)
+                for (const numberIdx of numbers) {
+                    await this.processPrizePurchase(client, userId, raffleId, numberIdx, cost, {
+                        buyerProfile,
+                        paymentMethod,
+                        paymentReference,
+                        message
+                    });
+                }
+
+                logger.info('Reservas modo premio creadas', {
+                    userId,
+                    raffleId,
+                    numbers: numbers.length,
+                    paymentMethod
+                });
+            } else {
+                throw new Error(`Modo de rifa no soportado: ${normalizedMode}`);
+            }
+
+            await client.query('COMMIT');
+
+            // Retornar detalles actualizados de la rifa
+            return await this.getRaffleDetails(raffleId);
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            logger.error('Error en purchaseNumbers', {
+                userId,
+                raffleId,
+                numbers: options.numbers,
+                error: error.message
+            });
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Comprar número de rifa (DEPRECADO - usar purchaseNumbers)
      */
     async purchaseNumber(userId, raffleId, number, captchaData) {
         const client = await this.pool.connect();
@@ -585,8 +696,25 @@ class RaffleService {
 
     /**
      * Procesar compra en modo premio
+     * Reserva el número y crea solicitud de aprobación con buyer_profile completo
      */
-    async processPrizePurchase(client, userId, raffleId, numberIdx, cost, captchaData) {
+    async processPrizePurchase(client, userId, raffleId, numberIdx, cost, purchaseData) {
+        const { buyerProfile, paymentMethod, paymentReference, message } = purchaseData;
+        
+        // Verificar que el número esté disponible
+        const numberCheck = await client.query(`
+            SELECT state FROM raffle_numbers 
+            WHERE raffle_id = $1 AND number_idx = $2
+        `, [raffleId, numberIdx]);
+
+        if (!numberCheck.rows[0]) {
+            throw new Error(`Número ${numberIdx} no existe en esta rifa`);
+        }
+
+        if (numberCheck.rows[0].state !== 'available') {
+            throw new Error(`Número ${numberIdx} no está disponible`);
+        }
+
         // Reservar número
         await client.query(`
             UPDATE raffle_numbers 
@@ -594,18 +722,41 @@ class RaffleService {
             WHERE raffle_id = $2 AND number_idx = $3
         `, [userId, raffleId, numberIdx]);
 
-        // Crear solicitud de aprobación
-        const requestData = {
-            number_idx: numberIdx,
-            payment_reference: captchaData.payment_reference || null,
-            message: captchaData.message || null
-        };
-
+        // Crear solicitud de aprobación con campos estructurados
         await client.query(`
             INSERT INTO raffle_requests (
-                raffle_id, user_id, request_type, status, request_data
-            ) VALUES ($1, $2, 'approval', 'pending', $3)
-        `, [raffleId, userId, JSON.stringify(requestData)]);
+                raffle_id, 
+                user_id, 
+                request_type, 
+                status, 
+                request_data, 
+                buyer_profile, 
+                payment_method, 
+                payment_reference, 
+                message,
+                history
+            ) VALUES ($1, $2, 'approval', 'pending', $3, $4, $5, $6, $7, $8)
+        `, [
+            raffleId, 
+            userId, 
+            JSON.stringify({ number_idx: numberIdx, cost }), 
+            JSON.stringify(buyerProfile),
+            paymentMethod,
+            paymentReference || null,
+            message || null,
+            JSON.stringify([{
+                action: 'created',
+                timestamp: new Date().toISOString(),
+                user_id: userId
+            }])
+        ]);
+
+        logger.info('Solicitud de compra modo premio creada', {
+            userId,
+            raffleId,
+            numberIdx,
+            paymentMethod
+        });
     }
 
     /**
