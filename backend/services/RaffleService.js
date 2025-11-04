@@ -389,22 +389,26 @@ class RaffleService {
         const rangeConfig = this.getNumberRangeConfig(numbersRange);
         const { start, end, format } = rangeConfig;
 
+        logger.info('Generating raffle numbers', {
+            raffleId,
+            numbersRange,
+            start,
+            end,
+            totalNumbers: end - start + 1
+        });
+
         for (let i = start; i <= end; i++) {
-            const formattedNumber = this.formatNumber(i, format);
-            
             await client.query(`
-                INSERT INTO raffle_numbers (raffle_id, number)
-                VALUES ($1, $2)
-                ON CONFLICT (raffle_id, number) DO NOTHING
-            `, [raffleId, formattedNumber]);
+                INSERT INTO raffle_numbers (raffle_id, number_idx, state)
+                VALUES ($1, $2, 'available')
+                ON CONFLICT (raffle_id, number_idx) DO NOTHING
+            `, [raffleId, i]);
         }
 
-        // Actualizar total_numbers en raffles
-        await client.query(`
-            UPDATE raffles 
-            SET total_numbers = $1
-            WHERE id = $2
-        `, [end - start + 1, raffleId]);
+        logger.info('Raffle numbers generated successfully', {
+            raffleId,
+            totalGenerated: end - start + 1
+        });
     }
 
     /**
@@ -428,6 +432,14 @@ class RaffleService {
      */
     formatNumber(number, format) {
         return number.toString().padStart(format.length, '0');
+    }
+
+    /**
+     * Formatear number_idx para display visual
+     */
+    formatNumberForDisplay(numberIdx, numbersRange) {
+        const format = this.getNumberRangeConfig(numbersRange).format;
+        return numberIdx.toString().padStart(format.length, '0');
     }
 
     /**
@@ -456,10 +468,10 @@ class RaffleService {
             const raffleData = raffle.rows[0];
             const cost = parseFloat(raffleData.entry_price_fire);
 
-            // Verificar disponibilidad del número
+            // Verificar disponibilidad del número (number viene del frontend como índice)
             const numberCheck = await client.query(`
                 SELECT * FROM raffle_numbers 
-                WHERE raffle_id = $1 AND number = $2
+                WHERE raffle_id = $1 AND number_idx = $2
             `, [raffleId, number]);
 
             if (!numberCheck.rows[0]) {
@@ -467,7 +479,7 @@ class RaffleService {
             }
 
             const numberData = numberCheck.rows[0];
-            if (numberData.status !== 'available') {
+            if (numberData.state !== 'available') {
                 throw new Error('El número no está disponible');
             }
 
@@ -486,11 +498,12 @@ class RaffleService {
                 // Por ahora, simplificado
             }
 
-            // Procesar compra según modo
-            if (raffleData.mode === 'fire') {
+            // Procesar compra según modo (normalizar fires/fire)
+            const normalizedMode = raffleData.mode === 'fire' ? 'fires' : raffleData.mode;
+            if (normalizedMode === 'fires') {
                 // Modo fuego: descontar directamente
                 await this.processFirePurchase(client, userId, raffleId, number, cost);
-            } else if (raffleData.mode === 'prize') {
+            } else if (normalizedMode === 'prize') {
                 // Modo premio: crear solicitud de aprobación
                 await this.processPrizePurchase(client, userId, raffleId, number, cost, captchaData);
             }
@@ -510,7 +523,7 @@ class RaffleService {
     /**
      * Procesar compra en modo fuego
      */
-    async processFirePurchase(client, userId, raffleId, number, cost) {
+    async processFirePurchase(client, userId, raffleId, numberIdx, cost) {
         // Descontar balance
         await client.query(`
             UPDATE wallets 
@@ -518,29 +531,37 @@ class RaffleService {
             WHERE user_id = $2
         `, [cost, userId]);
 
+        // Obtener el ID del número
+        const numberResult = await client.query(`
+            SELECT id FROM raffle_numbers
+            WHERE raffle_id = $1 AND number_idx = $2
+        `, [raffleId, numberIdx]);
+
+        const numberId = numberResult.rows[0].id;
+
         // Actualizar estado del número
         await client.query(`
             UPDATE raffle_numbers 
-            SET status = 'purchased', purchased_by = $1, purchased_at = CURRENT_TIMESTAMP
-            WHERE raffle_id = $2 AND number = $3
-        `, [userId, raffleId, number]);
+            SET state = 'sold', owner_id = $1, sold_at = CURRENT_TIMESTAMP
+            WHERE raffle_id = $2 AND number_idx = $3
+        `, [userId, raffleId, numberIdx]);
 
         // Registrar compra
         const purchaseResult = await client.query(`
             INSERT INTO raffle_purchases (
-                raffle_id, user_id, number, cost_amount, currency, 
+                raffle_id, user_id, number_id, number, cost_amount, currency, 
                 purchase_type, status
-            ) VALUES ($1, $2, $3, $4, 'fires', 'fire', 'confirmed')
+            ) VALUES ($1, $2, $3, $4, $5, 'fires', 'fire', 'completed')
             RETURNING id
-        `, [raffleId, userId, number, cost]);
+        `, [raffleId, userId, numberId, numberIdx.toString(), cost]);
 
         // Crear ticket digital
-        await this.createDigitalTicket(client, raffleId, userId, number, purchaseResult.rows[0].id);
+        await this.createDigitalTicket(client, raffleId, userId, numberIdx, purchaseResult.rows[0].id);
 
         // Actualizar pozo de la rifa
         await client.query(`
             UPDATE raffles 
-            SET pot_fires = pot_fires + $1, purchased_numbers = purchased_numbers + 1
+            SET pot_fires = pot_fires + $1
             WHERE id = $2
         `, [cost, raffleId]);
 
@@ -551,21 +572,26 @@ class RaffleService {
     /**
      * Procesar compra en modo premio
      */
-    async processPrizePurchase(client, userId, raffleId, number, cost, captchaData) {
+    async processPrizePurchase(client, userId, raffleId, numberIdx, cost, captchaData) {
         // Reservar número
         await client.query(`
             UPDATE raffle_numbers 
-            SET status = 'pending_approval', reserved_by = $1, reserved_at = CURRENT_TIMESTAMP,
-                expires_at = CURRENT_TIMESTAMP + INTERVAL '24 hours'
-            WHERE raffle_id = $2 AND number = $3
-        `, [userId, raffleId, number]);
+            SET state = 'reserved', owner_id = $1, reserved_until = CURRENT_TIMESTAMP + INTERVAL '24 hours'
+            WHERE raffle_id = $2 AND number_idx = $3
+        `, [userId, raffleId, numberIdx]);
 
         // Crear solicitud de aprobación
+        const requestData = {
+            number_idx: numberIdx,
+            payment_reference: captchaData.payment_reference || null,
+            message: captchaData.message || null
+        };
+
         await client.query(`
             INSERT INTO raffle_requests (
-                raffle_id, user_id, number, payment_reference, message, status
-            ) VALUES ($1, $2, $3, $4, $5, 'pending')
-        `, [raffleId, userId, number, captchaData.payment_reference || null, captchaData.message || null]);
+                raffle_id, user_id, request_type, status, request_data
+            ) VALUES ($1, $2, 'approval', 'pending', $3)
+        `, [raffleId, userId, JSON.stringify(requestData)]);
     }
 
     /**
@@ -580,7 +606,7 @@ class RaffleService {
             const request = await client.query(`
                 SELECT rr.*, r.host_id, r.entry_price_fire
                 FROM raffle_requests rr
-                JOIN raffles r ON rr.ripple_id = r.id
+                JOIN raffles r ON rr.raffle_id = r.id
                 WHERE rr.id = $1 AND rr.status = 'pending'
             `, [requestId]);
 
@@ -589,6 +615,8 @@ class RaffleService {
             }
 
             const requestData = request.rows[0];
+            const parsedRequestData = JSON.parse(requestData.request_data || '{}');
+            const numberIdx = parsedRequestData.number_idx;
             
             // Verificar que sea el host
             if (requestData.host_id !== hostId) {
@@ -597,12 +625,20 @@ class RaffleService {
 
             const cost = parseFloat(requestData.entry_price_fire);
 
+            // Obtener ID del número
+            const numberResult = await client.query(`
+                SELECT id FROM raffle_numbers
+                WHERE raffle_id = $1 AND number_idx = $2
+            `, [requestData.raffle_id, numberIdx]);
+
+            const numberId = numberResult.rows[0].id;
+
             // Procesar compra aprobada
             await client.query(`
                 UPDATE raffle_numbers 
-                SET status = 'purchased', purchased_by = $1, purchased_at = CURRENT_TIMESTAMP
-                WHERE raffle_id = $2 AND number = $3
-            `, [requestData.user_id, requestData.raffle_id, requestData.number]);
+                SET state = 'sold', owner_id = $1, sold_at = CURRENT_TIMESTAMP
+                WHERE raffle_id = $2 AND number_idx = $3
+            `, [requestData.user_id, requestData.raffle_id, numberIdx]);
 
             // Actualizar solicitud
             await client.query(`
@@ -614,15 +650,15 @@ class RaffleService {
             // Registrar compra
             const purchaseResult = await client.query(`
                 INSERT INTO raffle_purchases (
-                    raffle_id, user_id, number, cost_amount, currency, 
+                    raffle_id, user_id, number_id, number, cost_amount, currency, 
                     purchase_type, status
-                ) VALUES ($1, $2, $3, $4, 'fires', 'prize', 'confirmed')
+                ) VALUES ($1, $2, $3, $4, $5, 'fires', 'prize', 'completed')
                 RETURNING id
-            `, [requestData.raffle_id, requestData.user_id, requestData.number, cost]);
+            `, [requestData.raffle_id, requestData.user_id, numberId, numberIdx.toString(), cost]);
 
             // Crear ticket
             await this.createDigitalTicket(client, requestData.raffle_id, requestData.user_id, 
-                requestData.number, purchaseResult.rows[0].id);
+                numberIdx, purchaseResult.rows[0].id);
 
             await client.query('COMMIT');
 
@@ -639,17 +675,39 @@ class RaffleService {
     /**
      * Crear ticket digital con QR
      */
-    async createDigitalTicket(client, raffleId, userId, number, purchaseId) {
+    async createDigitalTicket(client, raffleId, userId, numberIdx, purchaseId) {
         const ticketNumber = `TICKET-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        
+        // Obtener number_id
+        const numberResult = await client.query(`
+            SELECT id FROM raffle_numbers
+            WHERE raffle_id = $1 AND number_idx = $2
+        `, [raffleId, numberIdx]);
+
+        if (!numberResult.rows[0]) {
+            throw new Error('Número no encontrado para crear ticket');
+        }
+
+        const numberId = numberResult.rows[0].id;
         
         // Generar QR (simulado por ahora)
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${ticketNumber}`;
 
-        await client.query(`
-            INSERT INTO raffle_tickets (
-                raffle_id, user_id, number, ticket_number, qr_code_url, purchase_id
-            ) VALUES ($1, $2, $3, $4, $5, $6)
-        `, [raffleId, userId, number, ticketNumber, qrCodeUrl, purchaseId]);
+        // Verificar si la tabla raffle_tickets existe, si no, solo retornar
+        try {
+            await client.query(`
+                INSERT INTO raffle_tickets (
+                    raffle_id, user_id, number_id, ticket_number, qr_code_url, purchase_id
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+            `, [raffleId, userId, numberId, ticketNumber, qrCodeUrl, purchaseId]);
+        } catch (error) {
+            // Si la tabla no existe, simplemente logueamos y continuamos
+            logger.warn('raffle_tickets table might not exist, skipping ticket creation', {
+                error: error.message,
+                raffleId,
+                numberIdx
+            });
+        }
     }
 
     /**
@@ -662,7 +720,10 @@ class RaffleService {
 
         const raffleData = raffle.rows[0];
         
-        if (raffleData.mode === 'fire' && raffleData.close_type === 'auto_full') {
+        // Normalizar mode
+        const normalizedMode = raffleData.mode === 'fire' ? 'fires' : raffleData.mode;
+        
+        if (normalizedMode === 'fires' && raffleData.close_type === 'auto_full') {
             // Verificar si todos los números están comprados
             const totalNumbers = await client.query(`
                 SELECT COUNT(*) as total FROM raffle_numbers WHERE raffle_id = $1
@@ -670,7 +731,7 @@ class RaffleService {
 
             const purchasedNumbers = await client.query(`
                 SELECT COUNT(*) as purchased FROM raffle_numbers 
-                WHERE raffle_id = $1 AND status = 'purchased'
+                WHERE raffle_id = $1 AND state = 'sold'
             `, [raffleId]);
 
             if (totalNumbers.rows[0].total === purchasedNumbers.rows[0].purchased) {
@@ -686,42 +747,39 @@ class RaffleService {
     async closeRaffleAndSelectWinner(client, raffleId) {
         // Obtener número ganador aleatorio
         const winnerNumber = await client.query(`
-            SELECT number FROM raffle_numbers 
-            WHERE raffle_id = $1 AND status = 'purchased'
+            SELECT number_idx, owner_id FROM raffle_numbers 
+            WHERE raffle_id = $1 AND state = 'sold'
             ORDER BY RANDOM() LIMIT 1
         `, [raffleId]);
 
         if (winnerNumber.rows[0]) {
-            const winningNumber = winnerNumber.rows[0].number;
-            const purchasedBy = await client.query(`
-                SELECT purchased_by FROM raffle_numbers 
-                WHERE raffle_id = $1 AND number = $2
-            `, [raffleId, winningNumber]);
+            const winningNumberIdx = winnerNumber.rows[0].number_idx;
+            const winnerId = winnerNumber.rows[0].owner_id;
 
             // Actualizar rifa
             await client.query(`
                 UPDATE raffles 
                 SET status = 'finished', winning_number = $1, winner_id = $2, ended_at = CURRENT_TIMESTAMP
                 WHERE id = $3
-            `, [parseInt(winningNumber), purchasedBy.rows[0].purchased_by, raffleId]);
+            `, [winningNumberIdx, winnerId, raffleId]);
 
             // Distribuir premios (70/20/10)
-            await this.distributePrizes(client, raffleId, winningNumber, purchasedBy.rows[0].purchased_by);
+            await this.distributePrizes(client, raffleId, winningNumberIdx, winnerId);
 
             // Registrar ganador
             await client.query(`
-                INSERT INTO raffle_winners (raffle_id, user_id, winning_number, prize_amount, prize_type)
-                VALUES ($1, $2, $3, (SELECT pot_fires * 0.7 FROM raffles WHERE id = $1), 'fire')
-            `, [raffleId, purchasedBy.rows[0].purchased_by, winningNumber]);
+                INSERT INTO raffle_winners (raffle_id, user_id, number, prize_amount, currency)
+                VALUES ($1, $2, $3, (SELECT pot_fires * 0.7 FROM raffles WHERE id = $1), 'fires')
+            `, [raffleId, winnerId, winningNumberIdx]);
 
             // Dar experiencia a todos los participantes (2 puntos)
             await client.query(`
                 UPDATE users 
                 SET experience = experience + 2
                 WHERE id IN (
-                    SELECT DISTINCT purchased_by 
+                    SELECT DISTINCT owner_id 
                     FROM raffle_numbers 
-                    WHERE raffle_id = $1 AND status = 'purchased' AND purchased_by IS NOT NULL
+                    WHERE raffle_id = $1 AND state = 'sold' AND owner_id IS NOT NULL
                 )
             `, [raffleId]);
         }
@@ -786,7 +844,7 @@ class RaffleService {
                     rc.logo_url,
                     rc.primary_color,
                     rc.secondary_color,
-                    COUNT(CASE WHEN rn.status = 'purchased' THEN 1 END) as purchased_count
+                    COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
@@ -798,9 +856,13 @@ class RaffleService {
             if (result.rows[0]) {
                 // Obtener números de la rifa
                 const numbers = await client.query(`
-                    SELECT * FROM raffle_numbers 
-                    WHERE raffle_id = $1 
-                    ORDER BY number
+                    SELECT 
+                        rn.*,
+                        u.username as owner_username
+                    FROM raffle_numbers rn
+                    LEFT JOIN users u ON rn.owner_id = u.id
+                    WHERE rn.raffle_id = $1 
+                    ORDER BY rn.number_idx
                 `, [raffleId]);
 
                 result.rows[0].numbers = numbers.rows;
@@ -949,7 +1011,7 @@ class RaffleService {
                     rc.logo_url,
                     rt.ticket_number,
                     rt.qr_code_url,
-                    rn.number as user_number
+                    rn.number_idx as user_number
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
@@ -980,7 +1042,7 @@ class RaffleService {
                     rc.logo_url,
                     rc.primary_color,
                     rc.secondary_color,
-                    COUNT(CASE WHEN rn.status = 'purchased' THEN 1 END) as purchased_count
+                    COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
@@ -992,9 +1054,13 @@ class RaffleService {
             if (result.rows[0]) {
                 // Obtener números de la rifa
                 const numbers = await client.query(`
-                    SELECT * FROM raffle_numbers 
-                    WHERE raffle_id = $1 
-                    ORDER BY number
+                    SELECT 
+                        rn.*,
+                        u.username as owner_username
+                    FROM raffle_numbers rn
+                    LEFT JOIN users u ON rn.owner_id = u.id
+                    WHERE rn.raffle_id = $1 
+                    ORDER BY rn.number_idx
                 `, [result.rows[0].id]);
 
                 result.rows[0].numbers = numbers.rows;
@@ -1048,12 +1114,16 @@ class RaffleService {
                 throw new Error('No autorizado para rechazar esta solicitud');
             }
 
+            // Obtener number_idx de request_data
+            const parsedRequestData = JSON.parse(requestData.request_data || '{}');
+            const numberIdx = parsedRequestData.number_idx;
+
             // Liberar número reservado
             await client.query(`
                 UPDATE raffle_numbers 
-                SET status = 'available', reserved_by = NULL, reserved_at = NULL, expires_at = NULL
-                WHERE raffle_id = $1 AND number = $2
-            `, [requestData.raffle_id, requestData.number]);
+                SET state = 'available', owner_id = NULL, reserved_by_ext = NULL, reserved_until = NULL
+                WHERE raffle_id = $1 AND number_idx = $2
+            `, [requestData.raffle_id, numberIdx]);
 
             // Actualizar solicitud
             await client.query(`
@@ -1092,11 +1162,11 @@ class RaffleService {
             const numbers = await client.query(`
                 SELECT 
                     rn.*,
-                    u.username as purchased_username
+                    u.username as owner_username
                 FROM raffle_numbers rn
-                LEFT JOIN users u ON rn.purchased_by = u.id
+                LEFT JOIN users u ON rn.owner_id = u.id
                 WHERE rn.raffle_id = $1
-                ORDER BY rn.number
+                ORDER BY rn.number_idx
             `, [raffle.rows[0].id]);
 
             return numbers.rows;
@@ -1171,7 +1241,7 @@ class RaffleService {
                     r.name as raffle_name,
                     r.code as raffle_code,
                     u.username as owner_username,
-                    rn.number as ticket_number
+                    rn.number_idx as ticket_number_idx
                 FROM raffle_tickets rt
                 JOIN raffles r ON rt.raffle_id = r.id
                 JOIN users u ON rt.user_id = u.id
