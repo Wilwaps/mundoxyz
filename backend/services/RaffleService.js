@@ -4,6 +4,7 @@
  */
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const logger = require('../utils/logger');
 
 class RaffleService {
     constructor() {
