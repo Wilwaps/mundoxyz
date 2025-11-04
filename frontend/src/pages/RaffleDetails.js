@@ -4,11 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Ticket, Users, Clock, TrendingUp, Check, FileText, XCircle } from 'lucide-react';
+import { ArrowLeft, Ticket, Users, Clock, TrendingUp, Check, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PurchaseModalPrize from '../components/raffle/PurchaseModalPrize';
 import PendingRequestsModal from '../components/raffle/PendingRequestsModal';
-import CancelRaffleModal from '../components/raffle/CancelRaffleModal';
 
 const RaffleDetails = () => {
   const { code } = useParams();
@@ -18,12 +17,7 @@ const RaffleDetails = () => {
   const [selectedNumbers, setSelectedNumbers] = useState(new Set());
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
-
-  // Verificar si el usuario es admin o tote
-  // El usuario tiene un array 'roles', no una propiedad 'role'
-  const isAdminOrTote = (user?.roles || []).some(r => r === 'admin' || r === 'tote');
 
   const { data: raffleData, isLoading, refetch } = useQuery({
     queryKey: ['raffle', code],
@@ -447,26 +441,6 @@ const RaffleDetails = () => {
         </motion.div>
       )}
 
-      {/* Admin/Tote: Botón Cancelar Rifa */}
-      {isAdminOrTote && raffle && (raffle.status === 'active' || raffle.status === 'pending') && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="fixed top-20 left-4 z-50"
-        >
-          <button
-            onClick={() => setShowCancelModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white p-3 rounded-full shadow-2xl flex items-center gap-2 font-semibold group transition-all"
-            title="Cancelar rifa con reembolso (Admin/Tote)"
-          >
-            <XCircle size={24} />
-            <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
-              Cancelar Rifa
-            </span>
-          </button>
-        </motion.div>
-      )}
-
       {/* Modales */}
       <PurchaseModalPrize
         isOpen={showPrizeModal}
@@ -485,17 +459,6 @@ const RaffleDetails = () => {
         onRequestProcessed={() => {
           refetch();
           queryClient.invalidateQueries(['raffle', code]);
-        }}
-      />
-
-      <CancelRaffleModal
-        isOpen={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        raffle={raffle}
-        onCancelled={() => {
-          refetch();
-          queryClient.invalidateQueries(['raffles']);
-          toast.success('Rifa cancelada exitosamente');
         }}
       />
     </div>

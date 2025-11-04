@@ -10,15 +10,19 @@ import {
   FaClock, FaUsers, FaChartLine, FaSortAmountDown,
   FaSortAmountUp, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa';
-import { useQuery } from '@tanstack/react-query';
+import { XCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import CreateRaffleModal from '../components/raffles/CreateRaffleModal';
+import CancelRaffleModal from '../components/raffle/CancelRaffleModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 
 const RafflesLobby = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, raffle: null });
   const [filters, setFilters] = useState({
     mode: '',
     company_mode: '',
@@ -27,6 +31,9 @@ const RafflesLobby = () => {
     order: 'desc'
   });
   const [page, setPage] = useState(1);
+  
+  // Verificar si el usuario es admin o tote
+  const isAdminOrTote = (user?.roles || []).some(r => r === 'admin' || r === 'tote');
 
   // Consulta para obtener rifas públicas con paginación
   const { 
@@ -107,8 +114,22 @@ const RafflesLobby = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         whileHover={{ y: -5, transition: { duration: 0.2 } }}
-        className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300"
+        className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 relative"
       >
+        {/* Admin/Tote: Botón cancelar */}
+        {isAdminOrTote && (raffle.status === 'active' || raffle.status === 'pending') && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevenir navegación
+              setCancelModal({ isOpen: true, raffle });
+            }}
+            className="absolute top-2 left-2 z-10 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg transition-colors"
+            title="Cancelar rifa (Admin/Tote)"
+          >
+            <XCircle size={18} />
+          </button>
+        )}
+
         {/* Header con branding */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
@@ -486,6 +507,19 @@ const RafflesLobby = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* Modal de cancelar rifa (Admin/Tote) */}
+      <CancelRaffleModal
+        isOpen={cancelModal.isOpen}
+        onClose={() => setCancelModal({ isOpen: false, raffle: null })}
+        raffle={cancelModal.raffle}
+        onCancelled={() => {
+          refetch();
+          queryClient.invalidateQueries(['raffles-public']);
+          queryClient.invalidateQueries(['raffles']);
+          setCancelModal({ isOpen: false, raffle: null });
+        }}
+      />
     </div>
   );
 };

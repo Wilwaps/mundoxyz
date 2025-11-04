@@ -1646,6 +1646,7 @@ class RaffleService {
 
     /**
      * Cancelar rifa con reembolso completo (admin/tote)
+     * Incluye reembolso del creation_cost al host
      */
     async cancelRaffleWithRefund(adminId, raffleId, reason) {
         const client = await this.pool.connect();
@@ -1658,7 +1659,7 @@ class RaffleService {
                 throw new Error('Requiere permisos de administrador o tote');
             }
 
-            // Obtener rifa
+            // Obtener rifa con información completa
             const raffle = await client.query('SELECT * FROM raffles WHERE id = $1', [raffleId]);
             if (!raffle.rows[0]) {
                 throw new Error('Rifa no encontrada');
@@ -1668,6 +1669,13 @@ class RaffleService {
             if (raffleData.status === 'finished') {
                 throw new Error('La rifa ya finalizó');
             }
+            if (raffleData.status === 'cancelled') {
+                throw new Error('La rifa ya está cancelada');
+            }
+
+            // Calcular creation_cost según configuración
+            const isCompanyMode = raffleData.is_company_mode;
+            const creationCost = isCompanyMode ? 3000 : (raffleData.mode === 'fires' ? 300 : 0);
 
             // Obtener todos los números vendidos
             const soldNumbers = await client.query(`
@@ -1675,15 +1683,54 @@ class RaffleService {
                 WHERE raffle_id = $1 AND state = 'sold'
             `, [raffleId]);
 
-            const cost = parseFloat(raffleData.entry_price_fire);
+            const costPerNumber = parseFloat(raffleData.entry_price_fire) || 0;
+            const totalRefundBuyers = costPerNumber * soldNumbers.rows.length;
 
-            // Reembolsar a cada comprador
+            // 1. Reembolsar a cada comprador
             for (const num of soldNumbers.rows) {
                 await client.query(`
                     UPDATE wallets 
                     SET fires_balance = fires_balance + $1 
                     WHERE user_id = $2
-                `, [cost, num.owner_id]);
+                `, [costPerNumber, num.owner_id]);
+                
+                // Registrar transacción de reembolso para cada comprador
+                await client.query(`
+                    INSERT INTO wallet_transactions 
+                    (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                    VALUES (
+                        (SELECT id FROM wallets WHERE user_id = $1),
+                        'raffle_number_refund', 'fires', $2,
+                        (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+                        (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                        $3, $4
+                    )
+                `, [num.owner_id, costPerNumber, raffleData.code, `Reembolso número ${num.number_idx} - Rifa cancelada ${raffleData.code}`]);
+            }
+
+            // 2. Reembolsar creation_cost al host (si corresponde)
+            let refundedHostAmount = 0;
+            if (creationCost > 0 && raffleData.mode === 'fires') {
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance + $1 
+                    WHERE user_id = $2
+                `, [creationCost, raffleData.host_id]);
+                
+                refundedHostAmount = creationCost;
+                
+                // Registrar transacción de reembolso al host
+                await client.query(`
+                    INSERT INTO wallet_transactions 
+                    (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                    VALUES (
+                        (SELECT id FROM wallets WHERE user_id = $1),
+                        'raffle_creation_refund', 'fires', $2,
+                        (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+                        (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                        $3, $4
+                    )
+                `, [raffleData.host_id, creationCost, raffleData.code, `Reembolso creación rifa ${raffleData.code} (cancelada)`]);
             }
 
             // Marcar rifa como cancelada
@@ -1693,25 +1740,36 @@ class RaffleService {
                 WHERE id = $1
             `, [raffleId]);
 
-            // Registrar en audit
+            // Registrar en audit con detalles completos
             await client.query(`
                 INSERT INTO raffle_audit_logs (raffle_id, action, admin_id, details)
                 VALUES ($1, 'cancelled_with_refund', $2, $3)
-            `, [raffleId, adminId, JSON.stringify({ reason, refunded_count: soldNumbers.rows.length })]);
+            `, [raffleId, adminId, JSON.stringify({ 
+                reason, 
+                refunded_buyers: soldNumbers.rows.length,
+                refunded_buyers_amount: totalRefundBuyers,
+                refunded_host_amount: refundedHostAmount,
+                total_refunded: totalRefundBuyers + refundedHostAmount
+            })]);
 
             await client.query('COMMIT');
 
-            logger.info('Rifa cancelada con reembolso', {
+            logger.info('Rifa cancelada con reembolso completo', {
                 raffleId,
                 adminId,
-                refundedUsers: soldNumbers.rows.length,
+                refundedBuyers: soldNumbers.rows.length,
+                refundedBuyersAmount: totalRefundBuyers,
+                refundedHostAmount: refundedHostAmount,
+                totalRefunded: totalRefundBuyers + refundedHostAmount,
                 reason
             });
 
             return { 
                 success: true, 
                 refunded_users: soldNumbers.rows.length,
-                refunded_amount: cost * soldNumbers.rows.length
+                refunded_buyers_amount: totalRefundBuyers,
+                refunded_host_amount: refundedHostAmount,
+                total_refunded: totalRefundBuyers + refundedHostAmount
             };
         } catch (error) {
             await client.query('ROLLBACK');

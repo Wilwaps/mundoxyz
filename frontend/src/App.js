@@ -11,7 +11,6 @@ import ResetPassword from './pages/ResetPassword';
 import Games from './pages/Games';
 import Profile from './pages/Profile';
 import Lobby from './pages/Lobby';
-import Raffles from './pages/Raffles';
 import RafflesLobby from './pages/RafflesLobby';
 import RaffleRoom from './pages/RaffleRoom';
 import Market from './pages/Market';
@@ -115,8 +114,8 @@ function App() {
                 <Route path="games" element={<Games />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="lobby" element={<Lobby />} />
-                <Route path="raffles" element={<Raffles />} />
-                <Route path="raffles/lobby" element={<RafflesLobby />} />
+                <Route path="raffles" element={<RafflesLobby />} />
+                <Route path="raffles/lobby" element={<Navigate to="/raffles" replace />} />
                 <Route path="raffles/:code" element={<RaffleDetails />} />
                 <Route path="raffles/room/:code" element={<RaffleRoom />} />
                 <Route path="market" element={<Market />} />

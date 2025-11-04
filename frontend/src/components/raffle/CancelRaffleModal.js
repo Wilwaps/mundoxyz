@@ -10,15 +10,27 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
   if (!isOpen || !raffle) return null;
 
   const soldNumbers = raffle.numbers?.filter(n => n.state === 'sold') || [];
-  const totalRefund = soldNumbers.length * (raffle.entry_price_fire || 0);
+  const totalRefundBuyers = soldNumbers.length * (raffle.entry_price_fire || 0);
   const uniqueBuyers = new Set(soldNumbers.map(n => n.owner_id)).size;
+  
+  // Calcular creation_cost del host
+  const isCompanyMode = raffle.is_company_mode || false;
+  const creationCost = isCompanyMode ? 3000 : (raffle.mode === 'fires' || raffle.mode === 'fire' ? 300 : 0);
+  
+  const totalRefund = totalRefundBuyers + creationCost;
 
   const handleCancel = async () => {
-    if (!window.confirm(
-      `¿CONFIRMAR CANCELACIÓN?\n\n` +
-      `Esto reembolsará ${totalRefund} 🔥 a ${uniqueBuyers} usuario(s).\n\n` +
-      `Esta acción NO se puede deshacer.`
-    )) {
+    const confirmMsg = creationCost > 0
+      ? `¿CONFIRMAR CANCELACIÓN?\n\n` +
+        `Reembolso compradores: ${totalRefundBuyers} 🔥 (${uniqueBuyers} usuarios)\n` +
+        `Reembolso host (creación): ${creationCost} 🔥\n` +
+        `TOTAL: ${totalRefund} 🔥\n\n` +
+        `Esta acción NO se puede deshacer.`
+      : `¿CONFIRMAR CANCELACIÓN?\n\n` +
+        `Esto reembolsará ${totalRefundBuyers} 🔥 a ${uniqueBuyers} usuario(s).\n\n` +
+        `Esta acción NO se puede deshacer.`;
+    
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -29,7 +41,11 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
         reason: reason.trim() || 'Cancelación administrativa'
       });
 
-      toast.success(`Rifa cancelada. ${uniqueBuyers} usuario(s) reembolsado(s).`);
+      const successMsg = creationCost > 0
+        ? `Rifa cancelada. ${uniqueBuyers} comprador(es) + host reembolsados. Total: ${totalRefund} 🔥`
+        : `Rifa cancelada. ${uniqueBuyers} usuario(s) reembolsado(s).`;
+      
+      toast.success(successMsg);
       onCancelled?.();
       onClose();
     } catch (error) {
@@ -87,16 +103,38 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
               <DollarSign size={20} />
               <span>Reembolso Automático</span>
             </div>
+            
+            {/* Reembolso a compradores */}
             <div className="flex justify-between text-sm">
               <span className="text-gray-300">Números vendidos:</span>
               <span className="text-white font-semibold">{soldNumbers.length}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-300">Usuarios afectados:</span>
+              <span className="text-gray-300">Usuarios compradores:</span>
               <span className="text-white font-semibold">{uniqueBuyers}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-300">Reembolso compradores:</span>
+              <span className="text-white font-semibold">{totalRefundBuyers} 🔥</span>
+            </div>
+            
+            {/* Reembolso al host */}
+            {creationCost > 0 && (
+              <>
+                <div className="border-t border-orange-500/20 my-2"></div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-300">Reembolso host (creación):</span>
+                  <span className="text-white font-semibold">{creationCost} 🔥</span>
+                </div>
+                <div className="text-xs text-gray-400 italic">
+                  {isCompanyMode ? '(Modo Empresa: 3000 🔥)' : '(Modo Fires: 300 🔥)'}
+                </div>
+              </>
+            )}
+            
+            {/* Total */}
             <div className="flex justify-between text-sm pt-2 border-t border-orange-500/20">
-              <span className="text-gray-300">Total a reembolsar:</span>
+              <span className="text-gray-300 font-bold">TOTAL A REEMBOLSAR:</span>
               <span className="text-orange-400 font-bold text-lg">{totalRefund} 🔥</span>
             </div>
           </div>
