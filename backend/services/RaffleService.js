@@ -825,7 +825,32 @@ class RaffleService {
             await this.createDigitalTicket(client, requestData.raffle_id, requestData.user_id, 
                 numberIdx, purchaseResult.rows[0].id);
 
+            // Actualizar métricas del usuario
+            await client.query(`
+                UPDATE users 
+                SET raffles_played = raffles_played + 1 
+                WHERE id = $1
+            `, [requestData.user_id]);
+
+            // Enviar notificación al comprador
+            await client.query(`
+                INSERT INTO messages (user_id, title, message, type, related_id)
+                VALUES ($1, $2, $3, 'raffle_approved', $4)
+            `, [
+                requestData.user_id,
+                '✅ Compra Aprobada',
+                `Tu compra del número ${numberIdx} fue aprobada. ¡Buena suerte!`,
+                requestData.raffle_id
+            ]);
+
             await client.query('COMMIT');
+
+            logger.info('Compra aprobada', {
+                requestId,
+                userId: requestData.user_id,
+                raffleId: requestData.raffle_id,
+                numberIdx
+            });
 
             return { success: true, message: 'Compra aprobada exitosamente' };
 
@@ -947,6 +972,53 @@ class RaffleService {
                     WHERE raffle_id = $1 AND state = 'sold' AND owner_id IS NOT NULL
                 )
             `, [raffleId]);
+
+            // Actualizar métricas del ganador
+            await client.query(`
+                UPDATE users 
+                SET raffles_won = raffles_won + 1 
+                WHERE id = $1
+            `, [winnerId]);
+
+            // Enviar notificaciones masivas
+            const raffle = await client.query('SELECT * FROM raffles WHERE id = $1', [raffleId]);
+            const raffleData = raffle.rows[0];
+
+            // Notificar al ganador
+            await client.query(`
+                INSERT INTO messages (user_id, title, message, type, related_id)
+                VALUES ($1, $2, $3, 'raffle_winner', $4)
+            `, [
+                winnerId,
+                '🎉 ¡GANASTE LA RIFA!',
+                `¡Felicidades! Ganaste la rifa "${raffleData.name}" con el número ${winningNumberIdx}. Premio: ${Math.floor(raffleData.pot_fires * 0.7)} 🔥`,
+                raffleId
+            ]);
+
+            // Notificar a todos los participantes
+            const participants = await client.query(`
+                SELECT DISTINCT owner_id FROM raffle_numbers 
+                WHERE raffle_id = $1 AND state = 'sold' AND owner_id != $2
+            `, [raffleId, winnerId]);
+
+            for (const participant of participants.rows) {
+                await client.query(`
+                    INSERT INTO messages (user_id, title, message, type, related_id)
+                    VALUES ($1, $2, $3, 'raffle_finished', $4)
+                `, [
+                    participant.owner_id,
+                    '🎲 Rifa Finalizada',
+                    `La rifa "${raffleData.name}" finalizó. Número ganador: ${winningNumberIdx}. ¡Gracias por participar!`,
+                    raffleId
+                ]);
+            }
+
+            logger.info('Rifa cerrada con ganador', {
+                raffleId,
+                winnerId,
+                winningNumber: winningNumberIdx,
+                participants: participants.rows.length + 1
+            });
         }
     }
 
@@ -1290,7 +1362,30 @@ class RaffleService {
                 WHERE id = $3
             `, [hostId, reason, requestId]);
 
+            // Enviar notificación al comprador
+            const notificationMsg = reason 
+                ? `Tu solicitud del número ${numberIdx} fue rechazada. Motivo: ${reason}`
+                : `Tu solicitud del número ${numberIdx} fue rechazada por el anfitrión.`;
+
+            await client.query(`
+                INSERT INTO messages (user_id, title, message, type, related_id)
+                VALUES ($1, $2, $3, 'raffle_rejected', $4)
+            `, [
+                requestData.user_id,
+                '❌ Solicitud Rechazada',
+                notificationMsg,
+                requestData.raffle_id
+            ]);
+
             await client.query('COMMIT');
+
+            logger.info('Compra rechazada', {
+                requestId,
+                userId: requestData.user_id,
+                raffleId: requestData.raffle_id,
+                numberIdx,
+                reason
+            });
 
             return { success: true, message: 'Compra rechazada' };
 
