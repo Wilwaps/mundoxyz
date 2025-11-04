@@ -200,13 +200,13 @@ CREATE TABLE gift_analytics (
 );
 
 -- 22. MIGRATIONS
-CREATE TABLE migrations (
+CREATE TABLE IF NOT EXISTS migrations (
   id SERIAL PRIMARY KEY,
   filename VARCHAR(255) UNIQUE NOT NULL,
   executed_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_migrations_filename ON migrations(filename);
+CREATE INDEX IF NOT EXISTS idx_migrations_filename ON migrations(filename);
 
 -- FUNCIONES
 CREATE OR REPLACE FUNCTION generate_room_code() RETURNS VARCHAR(6) AS $$
