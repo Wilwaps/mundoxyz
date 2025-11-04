@@ -22,7 +22,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS total_games_won INTEGER DEFAULT 0;
 -- ============================================
 -- BINGO V2 ROOMS
 -- ============================================
-CREATE TABLE bingo_v2_rooms (
+CREATE TABLE IF NOT EXISTS bingo_v2_rooms (
     id SERIAL PRIMARY KEY,
     code VARCHAR(6) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE bingo_v2_rooms (
 -- ============================================
 -- BINGO V2 ROOM PLAYERS
 -- ============================================
-CREATE TABLE bingo_v2_room_players (
+CREATE TABLE IF NOT EXISTS bingo_v2_room_players (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id),
@@ -89,7 +89,7 @@ CREATE TABLE bingo_v2_room_players (
 -- ============================================
 -- BINGO V2 CARDS
 -- ============================================
-CREATE TABLE bingo_v2_cards (
+CREATE TABLE IF NOT EXISTS bingo_v2_cards (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     player_id INTEGER NOT NULL REFERENCES bingo_v2_room_players(id) ON DELETE CASCADE,
@@ -115,7 +115,7 @@ CREATE TABLE bingo_v2_cards (
 -- ============================================
 -- BINGO V2 DRAWS (History of drawn numbers)
 -- ============================================
-CREATE TABLE bingo_v2_draws (
+CREATE TABLE IF NOT EXISTS bingo_v2_draws (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     number INTEGER NOT NULL,
@@ -131,7 +131,7 @@ CREATE TABLE bingo_v2_draws (
 -- ============================================
 -- BINGO V2 AUDIT LOGS
 -- ============================================
-CREATE TABLE bingo_v2_audit_logs (
+CREATE TABLE IF NOT EXISTS bingo_v2_audit_logs (
     id SERIAL PRIMARY KEY,
     room_id INTEGER REFERENCES bingo_v2_rooms(id) ON DELETE SET NULL,
     user_id UUID REFERENCES users(id),
@@ -144,7 +144,7 @@ CREATE TABLE bingo_v2_audit_logs (
 -- ============================================
 -- BINGO V2 ROOM CHAT MESSAGES
 -- ============================================
-CREATE TABLE bingo_v2_room_chat_messages (
+CREATE TABLE IF NOT EXISTS bingo_v2_room_chat_messages (
     id SERIAL PRIMARY KEY,
     room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id),
@@ -155,7 +155,7 @@ CREATE TABLE bingo_v2_room_chat_messages (
 -- ============================================
 -- BINGO V2 USER MESSAGES (Buzón)
 -- ============================================
-CREATE TABLE bingo_v2_messages (
+CREATE TABLE IF NOT EXISTS bingo_v2_messages (
     id SERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id),
     category VARCHAR(20) NOT NULL CHECK (category IN ('system', 'friends')),
@@ -210,41 +210,41 @@ $$ LANGUAGE plpgsql;
 -- ============================================
 
 -- Rooms indexes
-CREATE INDEX idx_bingo_v2_rooms_code ON bingo_v2_rooms(code);
-CREATE INDEX idx_bingo_v2_rooms_host ON bingo_v2_rooms(host_id);
-CREATE INDEX idx_bingo_v2_rooms_status ON bingo_v2_rooms(status);
-CREATE INDEX idx_bingo_v2_rooms_created ON bingo_v2_rooms(created_at);
-CREATE INDEX idx_bingo_v2_rooms_active ON bingo_v2_rooms(status, created_at DESC) 
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_code ON bingo_v2_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_host ON bingo_v2_rooms(host_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_status ON bingo_v2_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_created ON bingo_v2_rooms(created_at);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_active ON bingo_v2_rooms(status, created_at DESC) 
     WHERE status IN ('waiting', 'in_progress');
 
 -- Room players indexes
-CREATE INDEX idx_bingo_v2_players_room ON bingo_v2_room_players(room_id);
-CREATE INDEX idx_bingo_v2_players_user ON bingo_v2_room_players(user_id);
-CREATE INDEX idx_bingo_v2_players_active ON bingo_v2_room_players(room_id, is_connected) 
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_room ON bingo_v2_room_players(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_user ON bingo_v2_room_players(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_active ON bingo_v2_room_players(room_id, is_connected) 
     WHERE is_connected = true;
 
 -- Cards indexes
-CREATE INDEX idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
-CREATE INDEX idx_bingo_v2_cards_player ON bingo_v2_cards(player_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_cards_player ON bingo_v2_cards(player_id);
 
 -- Draws indexes
-CREATE INDEX idx_bingo_v2_draws_room ON bingo_v2_draws(room_id);
-CREATE INDEX idx_bingo_v2_draws_order ON bingo_v2_draws(draw_order);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_draws_room ON bingo_v2_draws(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_draws_order ON bingo_v2_draws(draw_order);
 
 -- Audit logs indexes
-CREATE INDEX idx_bingo_v2_audit_room ON bingo_v2_audit_logs(room_id);
-CREATE INDEX idx_bingo_v2_audit_user ON bingo_v2_audit_logs(user_id);
-CREATE INDEX idx_bingo_v2_audit_created ON bingo_v2_audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_audit_room ON bingo_v2_audit_logs(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_audit_user ON bingo_v2_audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_audit_created ON bingo_v2_audit_logs(created_at);
 
 -- Chat messages indexes
-CREATE INDEX idx_bingo_v2_chat_room ON bingo_v2_room_chat_messages(room_id);
-CREATE INDEX idx_bingo_v2_chat_created ON bingo_v2_room_chat_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_chat_room ON bingo_v2_room_chat_messages(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_chat_created ON bingo_v2_room_chat_messages(created_at DESC);
 
 -- User messages indexes
-CREATE INDEX idx_bingo_v2_messages_user ON bingo_v2_messages(user_id);
-CREATE INDEX idx_bingo_v2_messages_unread ON bingo_v2_messages(user_id, is_read);
-CREATE INDEX idx_bingo_v2_messages_created ON bingo_v2_messages(created_at DESC);
-CREATE INDEX idx_bingo_v2_messages_recent ON bingo_v2_messages(user_id, created_at DESC) 
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_user ON bingo_v2_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_unread ON bingo_v2_messages(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_created ON bingo_v2_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_recent ON bingo_v2_messages(user_id, created_at DESC) 
     WHERE is_read = false;
 
 -- ============================================
