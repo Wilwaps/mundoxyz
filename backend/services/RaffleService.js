@@ -67,7 +67,26 @@ class RaffleService {
         try {
             await client.query('BEGIN');
 
-            // Verificar límites de experiencia del usuario (simple check)
+            // Normalizar mode: 'fire' → 'fires', 'prize' → 'prize'
+            const modeMap = {
+                'fire': 'fires',
+                'fires': 'fires',
+                'prize': 'prize'
+            };
+            
+            const rawMode = raffleData.mode || 'fire';
+            const normalizedMode = modeMap[rawMode];
+            
+            if (!normalizedMode) {
+                throw new Error(`Modo inválido: ${rawMode}. Modos permitidos: fires, prize`);
+            }
+            
+            logger.info('Mode normalized', {
+                rawMode,
+                normalizedMode
+            });
+            
+            // Verificar experiencia del usuario
             const userCheck = await client.query(
                 'SELECT experience FROM users WHERE id = $1',
                 [hostId]
@@ -79,10 +98,18 @@ class RaffleService {
 
             const userExperience = parseInt(userCheck.rows[0].experience) || 0;
             
-            // Límite simple: necesita al menos 10 de experiencia para crear rifas
-            if (userExperience < 10) {
-                throw new Error(`Necesitas al menos 10 puntos de experiencia para crear rifas. Tienes ${userExperience}.`);
+            // SOLO modo fires requiere 10 de experiencia
+            // Modo prize NO requiere experiencia
+            if (normalizedMode === 'fires' && userExperience < 10) {
+                throw new Error(`Necesitas al menos 10 puntos de experiencia para crear rifas con fuegos. Tienes ${userExperience}.`);
             }
+            
+            logger.info('Experience check passed', {
+                hostId,
+                userExperience,
+                mode: normalizedMode,
+                requiresXP: normalizedMode === 'fires'
+            });
 
             // Generar código único de 6 dígitos numéricos
             let code;
@@ -107,25 +134,42 @@ class RaffleService {
                 throw new Error('No se pudo generar un código único. Intenta nuevamente.');
             }
 
-            // Verificar balance del host
+            // Calcular costos según modo
             let finalCost = parseFloat(raffleData.cost_per_number) || 10;
             let isCompanyMode = raffleData.is_company_mode || false;
             
-            const hostWalletCheck = await client.query(`
-                SELECT w.fires_balance 
-                FROM wallets w 
-                WHERE w.user_id = $1
-            `, [hostId]);
-            
-            if (!hostWalletCheck.rows[0]) {
-                throw new Error('Wallet del host no encontrado');
+            // Modo prize: costo es 0 (gratis)
+            // Modo fires: costo definido por usuario
+            if (normalizedMode === 'prize') {
+                finalCost = 0;
+                logger.info('Prize mode detected - cost set to 0');
             }
             
-            const hostBalance = parseFloat(hostWalletCheck.rows[0].fires_balance);
-            const totalCostForHost = finalCost + (isCompanyMode ? 3000 : 0);
-            
-            if (hostBalance < totalCostForHost) {
-                throw new Error(`Necesitas ${totalCostForHost} fuegos. Tienes ${hostBalance} fuegos.`);
+            // Verificar balance del host (solo si hay costo)
+            if (finalCost > 0 || isCompanyMode) {
+                const hostWalletCheck = await client.query(`
+                    SELECT w.fires_balance 
+                    FROM wallets w 
+                    WHERE w.user_id = $1
+                `, [hostId]);
+                
+                if (!hostWalletCheck.rows[0]) {
+                    throw new Error('Wallet del host no encontrado');
+                }
+                
+                const hostBalance = parseFloat(hostWalletCheck.rows[0].fires_balance);
+                const totalCostForHost = finalCost + (isCompanyMode ? 3000 : 0);
+                
+                if (hostBalance < totalCostForHost) {
+                    throw new Error(`Necesitas ${totalCostForHost} fuegos. Tienes ${hostBalance} fuegos.`);
+                }
+                
+                logger.info('Balance check passed', {
+                    hostId,
+                    hostBalance,
+                    totalCost: totalCostForHost,
+                    normalizedMode
+                });
             }
             
             // Normalizar código a texto para evitar conflictos de tipo en SQL
@@ -206,37 +250,50 @@ class RaffleService {
                 )
             `, [hostId, totalCostForHost, raffleCode, hostDescription]);
 
+            // Calcular entry_price según modo
+            // fires: entry_price_fire > 0, otros en 0
+            // prize: todos en 0
+            const entryPriceFire = normalizedMode === 'fires' ? finalCost : 0;
+            const entryPriceCoin = 0; // No usamos coins
+            const entryPriceFiat = 0; // No usamos fiat
+            
             logger.info('Inserting raffle into database', {
                 raffleCode,
                 name: raffleData.name,
                 hostId,
+                mode: normalizedMode,
                 numbersRange: raffleData.numbers_range || 100,
-                entryPrice: finalCost
+                entryPriceFire,
+                entryPriceCoin,
+                entryPriceFiat
             });
             
             // Insertar rifa principal
             const raffleResult = await client.query(`
                 INSERT INTO raffles (
                     code, name, host_id, description, mode, type,
-                    entry_price_fire, numbers_range, visibility, status,
+                    entry_price_fire, entry_price_coin, entry_price_fiat,
+                    numbers_range, visibility, status,
                     is_company_mode, company_cost, close_type, 
                     scheduled_close_at, terms_conditions,
                     prize_meta, host_meta
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6,
-                    $7, $8, $9, 'pending',
-                    $10, $11, $12,
-                    $13, $14,
-                    $15, $16
+                    $7, $8, $9, $10, $11, 'pending',
+                    $12, $13, $14,
+                    $15, $16,
+                    $17, $18
                 ) RETURNING *
             `, [
                 raffleCode,
                 raffleData.name,
                 hostId,
                 raffleData.description || null,
-                raffleData.mode || 'fire',
+                normalizedMode,
                 raffleData.type || 'public',
-                finalCost,
+                entryPriceFire,
+                entryPriceCoin,
+                entryPriceFiat,
                 raffleData.numbers_range || 100,
                 raffleData.visibility || 'public',
                 isCompanyMode,
