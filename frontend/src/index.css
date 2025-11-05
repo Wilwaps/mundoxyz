@@ -156,3 +156,43 @@
 .safe-right {
   padding-right: env(safe-area-inset-right);
 }
+
+/* Custom checkbox for role management */
+.checkbox-custom {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(var(--accent-rgb), 0.5);
+  border-radius: 0.375rem;
+  background-color: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.checkbox-custom:checked {
+  background-color: rgba(var(--accent-rgb), 0.3);
+  border-color: rgb(var(--accent-rgb));
+}
+
+.checkbox-custom:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgb(var(--accent-rgb));
+  font-size: 0.875rem;
+  font-weight: bold;
+}
+
+.checkbox-custom:hover:not(:disabled) {
+  border-color: rgb(var(--accent-rgb));
+  background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+.checkbox-custom:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

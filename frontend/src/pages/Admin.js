@@ -23,6 +23,7 @@ import {
 import toast from 'react-hot-toast';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
+import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
 
 // Stats Component
 const AdminStats = () => {
@@ -235,19 +236,28 @@ const AdminUsers = () => {
         {users?.users?.map((user) => (
           <div key={user.id} className="card-glass">
             <div className="flex justify-between items-start mb-2">
-              <div>
+              <div className="flex-1">
                 <div className="font-semibold text-text">{user.display_name || user.username}</div>
                 <div className="text-xs text-text/60">@{user.username} • ID: {user.tg_id}</div>
               </div>
-              <div className="text-right">
-                <div className="text-sm text-accent">🪙 {user.coins_balance || 0}</div>
-                <div className="text-sm text-fire-orange">🔥 {user.fires_balance || 0}</div>
+              <div className="flex items-start gap-3">
+                <div className="text-right">
+                  <div className="text-sm text-accent">🪙 {user.coins_balance || 0}</div>
+                  <div className="text-sm text-fire-orange">🔥 {user.fires_balance || 0}</div>
+                </div>
+                <RoleManagementDropdown 
+                  user={user} 
+                  onRolesUpdated={() => {
+                    // Refrescar la lista de usuarios
+                    queryClient.invalidateQueries(['admin-users']);
+                  }}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {user.roles?.map((role) => (
                 <span key={role} className="badge-coins text-xs">
-                  {role}
+                  {role === 'tote' ? '👑' : role === 'admin' ? '⚙️' : '👤'} {role}
                 </span>
               ))}
             </div>

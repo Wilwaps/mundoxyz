@@ -78,6 +78,37 @@ COMMENT ON COLUMN auth_identities.provider IS 'Tipo: email, telegram, google, fa
 COMMENT ON COLUMN auth_identities.password_hash IS 'Hash bcrypt (solo para provider=email)';
 
 -- ============================================
+-- AUDITORÍA DE CAMBIOS DE ROLES
+-- ============================================
+CREATE TABLE IF NOT EXISTS role_change_logs (
+  id SERIAL PRIMARY KEY,
+  target_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  changed_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('add', 'remove')),
+  role_name VARCHAR(50) NOT NULL,
+  previous_roles JSONB DEFAULT '[]',
+  new_roles JSONB DEFAULT '[]',
+  reason TEXT,
+  ip_address INET,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_role_change_logs_target_user ON role_change_logs(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_role_change_logs_changed_by ON role_change_logs(changed_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_role_change_logs_created_at ON role_change_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_role_change_logs_action ON role_change_logs(action);
+CREATE INDEX IF NOT EXISTS idx_role_change_logs_role_name ON role_change_logs(role_name);
+
+COMMENT ON TABLE role_change_logs IS 'Auditoría de cambios de roles realizados por usuarios tote';
+COMMENT ON COLUMN role_change_logs.target_user_id IS 'Usuario al que se le modificaron los roles';
+COMMENT ON COLUMN role_change_logs.changed_by_user_id IS 'Usuario tote que realizó el cambio';
+COMMENT ON COLUMN role_change_logs.action IS 'Acción realizada: add (agregar) o remove (remover)';
+COMMENT ON COLUMN role_change_logs.role_name IS 'Nombre del rol que se agregó o removió';
+COMMENT ON COLUMN role_change_logs.previous_roles IS 'Roles que tenía el usuario antes del cambio';
+COMMENT ON COLUMN role_change_logs.new_roles IS 'Roles que tiene el usuario después del cambio';
+
+-- ============================================
 -- 3. WALLETS
 -- ============================================
 CREATE TABLE IF NOT EXISTS wallets (
@@ -265,6 +296,10 @@ CREATE TABLE IF NOT EXISTS raffles (
   terms_conditions TEXT,
   prize_meta JSONB DEFAULT '{}',
   host_meta JSONB DEFAULT '{}',
+  prize_image TEXT,
+  prize_image_mime VARCHAR(50),
+  company_logo TEXT,
+  company_logo_mime VARCHAR(50),
   
   -- Timing
   starts_at TIMESTAMP,
@@ -299,6 +334,10 @@ COMMENT ON COLUMN raffles.numbers_range IS 'Rango total de números disponibles'
 COMMENT ON COLUMN raffles.is_company_mode IS 'TRUE si es rifa empresarial (3000🔥)';
 COMMENT ON COLUMN raffles.prize_meta IS 'Metadata del premio en formato JSON';
 COMMENT ON COLUMN raffles.host_meta IS 'Metadata del host en formato JSON';
+COMMENT ON COLUMN raffles.prize_image IS 'Imagen del premio en Base64 (modo prize)';
+COMMENT ON COLUMN raffles.prize_image_mime IS 'MIME type de la imagen del premio';
+COMMENT ON COLUMN raffles.company_logo IS 'Logo de empresa en Base64 (modo empresa)';
+COMMENT ON COLUMN raffles.company_logo_mime IS 'MIME type del logo de empresa';
 COMMENT ON COLUMN raffles.starts_at IS 'Fecha/hora programada de inicio de la rifa';
 COMMENT ON COLUMN raffles.ends_at IS 'Fecha/hora programada de cierre de la rifa';
 COMMENT ON COLUMN raffles.drawn_at IS 'Fecha/hora en que se realizó el sorteo';

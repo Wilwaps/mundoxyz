@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { adminAuth } = require('../middleware/auth');
+const { adminAuth, verifyToken, requireTote } = require('../middleware/auth');
+const roleService = require('../services/roleService');
 const logger = require('../utils/logger');
 
 // Welcome events management
@@ -508,6 +509,167 @@ router.get('/users', adminAuth, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// ============================================
+// GESTIÓN DE ROLES (SOLO TOTE)
+// ============================================
+
+/**
+ * GET /api/admin/roles/available
+ * Obtener lista de roles disponibles en el sistema
+ */
+router.get('/roles/available', verifyToken, requireTote, async (req, res) => {
+  try {
+    const roles = await roleService.getAvailableRoles();
+    
+    res.json({
+      success: true,
+      data: roles
+    });
+  } catch (error) {
+    logger.error('Error getting available roles:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error al obtener roles disponibles'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/users/:userId/roles
+ * Obtener roles actuales de un usuario específico
+ */
+router.get('/users/:userId/roles', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const roles = await roleService.getUserRoles(userId);
+    
+    res.json({
+      success: true,
+      data: roles
+    });
+  } catch (error) {
+    logger.error('Error getting user roles:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error al obtener roles del usuario'
+    });
+  }
+});
+
+/**
+ * PATCH /api/admin/users/:userId/roles
+ * Actualizar roles de un usuario (agregar/remover)
+ * Solo accesible por usuarios con rol 'tote'
+ */
+router.patch('/users/:userId/roles', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { roles, reason } = req.body;
+    
+    // Validar que se envíe un array de roles
+    if (!Array.isArray(roles)) {
+      return res.status(400).json({
+        success: false,
+        error: 'El campo "roles" debe ser un array'
+      });
+    }
+
+    // Validar que el usuario objetivo existe
+    const userCheck = await query(
+      'SELECT id, username, display_name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    // Obtener metadata de la solicitud
+    const metadata = {
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent'],
+      reason: reason || null
+    };
+
+    // Actualizar roles
+    const result = await roleService.updateUserRoles(
+      req.user.id,  // tote user ID
+      userId,       // target user ID
+      roles,        // new roles array
+      metadata
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      message: `Roles actualizados: ${result.changes} cambio(s) realizado(s)`
+    });
+
+  } catch (error) {
+    logger.error('Error updating user roles:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error al actualizar roles'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/users/:userId/role-history
+ * Obtener historial de cambios de roles de un usuario
+ */
+router.get('/users/:userId/role-history', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit } = req.query;
+    
+    const history = await roleService.getRoleChangeHistory(
+      userId,
+      limit ? parseInt(limit) : 50
+    );
+    
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    logger.error('Error getting role history:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error al obtener historial'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/role-changes
+ * Obtener todos los cambios de roles recientes (auditoría global)
+ */
+router.get('/role-changes', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { limit } = req.query;
+    
+    const changes = await roleService.getAllRoleChanges(
+      limit ? parseInt(limit) : 100
+    );
+    
+    res.json({
+      success: true,
+      data: changes
+    });
+  } catch (error) {
+    logger.error('Error getting all role changes:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error al obtener cambios de roles'
+    });
   }
 });
 
