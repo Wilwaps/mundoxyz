@@ -1,4 +1,4 @@
--- Migración 010: Sistema de Fidelización Avanzado
+-- Migración 011: Sistema de Fidelización Avanzado
 -- Mejoras a eventos de bienvenida y sistema de regalos directos
 
 -- Mejorar tabla welcome_events con configuración avanzada
@@ -149,6 +149,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_event_claimed_count ON welcome_event_claims;
 CREATE TRIGGER trigger_update_event_claimed_count
 AFTER INSERT ON welcome_event_claims
 FOR EACH ROW
