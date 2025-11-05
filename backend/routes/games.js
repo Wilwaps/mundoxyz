@@ -293,12 +293,11 @@ router.get('/active', async (req, res) => {
           r.pot_coins,
           r.numbers_range,
           r.ends_at,
-          COUNT(rp.id) as participants,
-          COUNT(rn.id) as numbers_sold,
+          COUNT(DISTINCT CASE WHEN rn.state = 'sold' THEN rn.owner_id END) as participants,
+          COUNT(CASE WHEN rn.state = 'sold' THEN rn.id END) as numbers_sold,
           u.username as host_username
         FROM raffles r
-        LEFT JOIN raffle_participants rp ON rp.raffle_id = r.id
-        LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id AND rn.state = 'sold'
+        LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
         JOIN users u ON u.id = r.host_id
         WHERE r.status IN ('pending', 'active') 
           AND r.visibility = 'public'

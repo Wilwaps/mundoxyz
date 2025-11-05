@@ -13,7 +13,6 @@ router.get('/:userId', optionalAuth, async (req, res) => {
     const result = await query(
       `SELECT 
         u.id,
-        u.xyz_id,
         u.tg_id,
         u.username,
         u.display_name,
@@ -217,13 +216,13 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
         COUNT(DISTINCT CASE WHEN r.winner_id = u.id THEN r.id END) as raffles_won,
         COUNT(DISTINCT b.id) as total_bingo_games,
         COUNT(DISTINCT CASE WHEN b.winner_id = u.id THEN b.id END) as bingo_won,
-        COALESCE(SUM(rp.fires_spent), 0) as total_fires_in_raffles,
-        COALESCE(SUM(rp.coins_spent), 0) as total_coins_in_raffles,
+        COALESCE(SUM(CASE WHEN rn.state = 'sold' THEN r.entry_price_fire ELSE 0 END), 0) as total_fires_in_raffles,
+        COALESCE(SUM(CASE WHEN rn.state = 'sold' THEN r.entry_price_coin ELSE 0 END), 0) as total_coins_in_raffles,
         COALESCE(SUM(bp.total_spent), 0) as total_fires_in_bingo,
         COALESCE(SUM(bp.total_spent), 0) as total_coins_in_bingo
       FROM users u
-      LEFT JOIN raffle_participants rp ON rp.user_id = u.id
-      LEFT JOIN raffles r ON r.id = rp.raffle_id
+      LEFT JOIN raffle_numbers rn ON rn.owner_id = u.id
+      LEFT JOIN raffles r ON r.id = rn.raffle_id
       LEFT JOIN bingo_v2_room_players bp ON bp.user_id = u.id
       LEFT JOIN bingo_v2_rooms b ON b.id = bp.room_id
       WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
@@ -322,12 +321,13 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
         r.mode,
         r.visibility,
         r.ends_at,
-        rp.numbers,
-        rp.fires_spent,
-        rp.coins_spent
-      FROM raffle_participants rp
-      JOIN raffles r ON r.id = rp.raffle_id
-      WHERE rp.user_id = $1 AND r.status IN ('pending', 'active')
+        array_agg(rn.number_idx ORDER BY rn.number_idx) FILTER (WHERE rn.number_idx IS NOT NULL) as numbers,
+        COALESCE(SUM(r.entry_price_fire), 0) as fires_spent,
+        COALESCE(SUM(r.entry_price_coin), 0) as coins_spent
+      FROM raffle_numbers rn
+      JOIN raffles r ON r.id = rn.raffle_id
+      WHERE rn.owner_id = $1 AND rn.state = 'sold' AND r.status IN ('pending', 'active')
+      GROUP BY r.id, r.code, r.name, r.status, r.mode, r.visibility, r.ends_at
       ORDER BY r.created_at DESC`,
       [req.user.id]
     );
