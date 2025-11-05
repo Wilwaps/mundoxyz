@@ -6,16 +6,26 @@ const logger = require('../utils/logger');
 const config = require('../config/config');
 const telegramService = require('../services/telegramService');
 
-// Request to redeem 100 fires for fiat
+// Request to redeem fires for fiat (mínimo 100, con comisión 5%)
 router.post('/redeem-100-fire', verifyToken, async (req, res) => {
   try {
-    const { cedula, telefono, bank_code, bank_name, bank_account } = req.body;
+    const { cedula, telefono, bank_code, bank_name, bank_account, fires_amount = 100 } = req.body;
     const userId = req.user.id;
     
     // Validate required fields
     if (!cedula || !telefono) {
       return res.status(400).json({ error: 'Cedula and telefono are required' });
     }
+    
+    // Validar cantidad mínima
+    const requestedAmount = parseFloat(fires_amount);
+    if (requestedAmount < 100) {
+      return res.status(400).json({ error: 'La cantidad mínima para canjear es 100 fuegos' });
+    }
+    
+    // Calcular comisión 5%
+    const commission = requestedAmount * 0.05;
+    const totalRequired = requestedAmount + commission;
     
     const result = await transaction(async (client) => {
       // Get wallet with lock
@@ -31,9 +41,9 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
       const wallet = walletResult.rows[0];
       const firesBalance = parseFloat(wallet.fires_balance);
       
-      // Check balance
-      if (firesBalance < 100) {
-        throw new Error('Insufficient fires balance. You need at least 100 fires');
+      // Check balance (cantidad + comisión 5%)
+      if (firesBalance < totalRequired) {
+        throw new Error(`Balance insuficiente. Necesitas ${totalRequired.toFixed(2)} fuegos (${requestedAmount} + ${commission.toFixed(2)} comisión 5%)`);
       }
       
       // Check for pending redemptions
@@ -46,48 +56,94 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
         throw new Error('You already have a pending redemption request');
       }
       
-      // Deduct fires from wallet
+      // Deduct total amount from wallet (cantidad + comisión)
       await client.query(
         `UPDATE wallets 
-         SET fires_balance = fires_balance - 100,
-             total_fires_spent = total_fires_spent + 100
-         WHERE user_id = $1`,
-        [userId]
+         SET fires_balance = fires_balance - $1,
+             total_fires_spent = total_fires_spent + $1
+         WHERE user_id = $2`,
+        [totalRequired, userId]
       );
       
-      // Create redemption request
+      // Create redemption request con comisión registrada
       const redeemResult = await client.query(
         `INSERT INTO market_redeems 
-         (user_id, fires_amount, cedula, phone, bank_code, bank_name, bank_account, status)
-         VALUES ($1, 100, $2, $3, $4, $5, $6, 'pending')
+         (user_id, fires_amount, commission_amount, total_deducted, cedula, phone, bank_code, bank_name, bank_account, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
          RETURNING id`,
-        [userId, cedula, telefono, bank_code, bank_name, bank_account]
+        [userId, requestedAmount, commission, totalRequired, cedula, telefono, bank_code, bank_name, bank_account]
       );
       
-      // Record wallet transaction
+      // Record wallet transaction del usuario (canje + comisión)
       await client.query(
         `INSERT INTO wallet_transactions 
          (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
          VALUES (
            (SELECT id FROM wallets WHERE user_id = $1),
-           'market_redeem', 'fires', 100, $2, $3, 
-           'Market redemption request', $4
+           'market_redeem', 'fires', $2, $3, $4, 
+           $5, $6
          )`,
-        [userId, firesBalance, firesBalance - 100, redeemResult.rows[0].id]
+        [userId, totalRequired, firesBalance, firesBalance - totalRequired,
+         `Canje de ${requestedAmount} fuegos (comisión: ${commission.toFixed(2)})`,
+         redeemResult.rows[0].id]
       );
       
-      // Update fire supply (burn)
+      // Update fire supply (burn solo la cantidad solicitada, NO la comisión)
       await client.query(
-        'UPDATE fire_supply SET total_burned = total_burned + 100 WHERE id = 1'
+        'UPDATE fire_supply SET total_burned = total_burned + $1 WHERE id = 1',
+        [requestedAmount]
       );
       
-      // Record supply transaction
+      // Record supply transaction (burn)
       await client.query(
         `INSERT INTO supply_txs 
          (type, currency, amount, user_id, description, ip_address)
-         VALUES ('burn_market_redeem', 'fires', 100, $1, 'Market redemption', $2)`,
-        [userId, req.ip]
+         VALUES ('burn_market_redeem', 'fires', $1, $2, $3, $4)`,
+        [requestedAmount, userId, `Canje de mercado: ${requestedAmount} fuegos`, req.ip]
       );
+      
+      // Transferir comisión al usuario admin (tg_id 1417856820)
+      const adminTgId = '1417856820';
+      const adminCheck = await client.query(
+        'SELECT id FROM users WHERE tg_id = $1',
+        [adminTgId]
+      );
+      
+      if (adminCheck.rows.length > 0) {
+        const adminUserId = adminCheck.rows[0].id;
+        
+        // Acreditar comisión al admin
+        await client.query(
+          `UPDATE wallets 
+           SET fires_balance = fires_balance + $1
+           WHERE user_id = $2`,
+          [commission, adminUserId]
+        );
+        
+        // Registrar transacción del admin
+        await client.query(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           VALUES (
+             (SELECT id FROM wallets WHERE user_id = $1),
+             'platform_commission', 'fires', $2,
+             (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+             (SELECT fires_balance FROM wallets WHERE user_id = $1),
+             $3, $4
+           )`,
+          [adminUserId, commission,
+           `Comisión canje mercado (5% de ${requestedAmount})`,
+           redeemResult.rows[0].id]
+        );
+        
+        logger.info('Commission transferred to admin', {
+          adminUserId,
+          commission: commission.toFixed(2),
+          redemptionId: redeemResult.rows[0].id
+        });
+      } else {
+        logger.warn('Admin user not found for commission transfer', { adminTgId });
+      }
       
       return {
         success: true,
@@ -109,7 +165,9 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
         redemption_id: result.redemption_id,
         username: userDetails.rows[0].username,
         email: userDetails.rows[0].email,
-        fires_amount: 100,
+        fires_amount: requestedAmount,
+        commission_amount: commission,
+        total_deducted: totalRequired,
         cedula,
         phone: telefono,
         bank_code,

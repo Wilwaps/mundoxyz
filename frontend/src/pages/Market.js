@@ -15,7 +15,8 @@ const Market = () => {
     telefono: '',
     bank_code: '',
     bank_name: '',
-    bank_account: ''
+    bank_account: '',
+    fires_amount: 100
   });
 
   // Fetch user's redemption history
@@ -40,7 +41,8 @@ const Market = () => {
         telefono: '',
         bank_code: '',
         bank_name: '',
-        bank_account: ''
+        bank_account: '',
+        fires_amount: 100
       });
       refreshUser();
       queryClient.invalidateQueries(['my-redeems']);
@@ -52,8 +54,9 @@ const Market = () => {
   });
 
   const handleRedeem = () => {
-    if (user?.fires_balance < 100) {
-      toast.error('Necesitas al menos 100 🔥 para canjear');
+    const minRequired = 105; // 100 + 5% comisión
+    if (user?.fires_balance < minRequired) {
+      toast.error(`Necesitas al menos ${minRequired} 🔥 para canjear (100 + 5% comisión)`);
       return;
     }
     setShowRedeemModal(true);
@@ -63,6 +66,17 @@ const Market = () => {
     e.preventDefault();
     if (!redeemData.cedula || !redeemData.telefono) {
       toast.error('Cédula y teléfono son requeridos');
+      return;
+    }
+    const amount = parseFloat(redeemData.fires_amount);
+    if (amount < 100) {
+      toast.error('La cantidad mínima es 100 fuegos');
+      return;
+    }
+    const commission = amount * 0.05;
+    const totalRequired = amount + commission;
+    if (user?.fires_balance < totalRequired) {
+      toast.error(`Necesitas ${totalRequired.toFixed(2)} fuegos (${amount} + ${commission.toFixed(2)} comisión)`);
       return;
     }
     redeemMutation.mutate(redeemData);
@@ -123,10 +137,10 @@ const Market = () => {
 
         <button
           onClick={handleRedeem}
-          disabled={user?.fires_balance < 100}
-          className={`w-full ${user?.fires_balance >= 100 ? 'btn-primary' : 'bg-gray-600 text-gray-400 py-3 px-6 rounded-lg cursor-not-allowed'}`}
+          disabled={user?.fires_balance < 105}
+          className={`w-full ${user?.fires_balance >= 105 ? 'btn-primary' : 'bg-gray-600 text-gray-400 py-3 px-6 rounded-lg cursor-not-allowed'}`}
         >
-          {user?.fires_balance >= 100 ? 'Canjear 100 🔥' : 'Saldo insuficiente'}
+          {user?.fires_balance >= 105 ? 'Canjear Fuegos' : 'Saldo insuficiente'}
         </button>
       </motion.div>
 
@@ -187,6 +201,34 @@ const Market = () => {
             
             <form onSubmit={submitRedeem} className="space-y-4">
               <div>
+                <label className="block text-sm text-text/60 mb-1">Cantidad de Fuegos *</label>
+                <input
+                  type="number"
+                  value={redeemData.fires_amount}
+                  onChange={(e) => setRedeemData({...redeemData, fires_amount: e.target.value})}
+                  min="100"
+                  step="1"
+                  className="input-glass w-full"
+                  required
+                />
+                <p className="text-xs text-text/40 mt-1">Mínimo: 100 fuegos</p>
+              </div>
+              
+              <div className="bg-glass/50 rounded-lg p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text/60">Cantidad a canjear:</span>
+                  <span className="text-text font-semibold">{parseFloat(redeemData.fires_amount || 0).toFixed(2)} 🔥</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text/60">Comisión plataforma (5%):</span>
+                  <span className="text-warning font-semibold">{(parseFloat(redeemData.fires_amount || 0) * 0.05).toFixed(2)} 🔥</span>
+                </div>
+                <div className="border-t border-white/10 pt-2 flex justify-between">
+                  <span className="text-text font-bold">Total a deducir:</span>
+                  <span className="text-fire-orange font-bold">{(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥</span>
+                </div>
+              </div>
+              <div>
                 <label className="block text-sm text-text/60 mb-1">Cédula *</label>
                 <input
                   type="text"
@@ -245,7 +287,7 @@ const Market = () => {
               
               <div className="bg-warning/20 border border-warning/30 rounded-lg p-3">
                 <p className="text-warning text-xs">
-                  Se debitarán 100 🔥 de tu cuenta. El proceso de pago puede tardar hasta 48 horas.
+                  Se debitarán {(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥 de tu cuenta ({redeemData.fires_amount} + 5% comisión). El proceso de pago puede tardar hasta 48 horas.
                 </p>
               </div>
               

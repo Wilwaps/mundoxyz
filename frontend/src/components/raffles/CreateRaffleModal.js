@@ -275,7 +275,11 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
             <ul className="space-y-1 text-sm text-white/70">
               <li>• Nombre: {formData.name || 'Sin definir'}</li>
               <li>• Modo: {formData.mode === 'fires' ? '🔥 Fuego' : '🎁 Premio'}</li>
-              <li>• Costo: {formData.mode === 'fires' ? formData.cost_per_number + ' fuegos' : 'Gratis'}</li>
+              <li>
+                • Costo: {formData.mode === 'fires'
+                  ? `${formData.cost_per_number} fuegos`
+                  : `${formData.is_company_mode ? 3000 : 300} fuegos`}
+              </li>
               <li>• Números: 0-{formData.numbers_range - 1}</li>
             </ul>
             {isCompleted.basic && <FaCheck className="text-green-400 mt-2" />}
@@ -505,7 +509,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                             <FaGift className="text-green-400 text-xl" />
                             <div>
                               <div className="text-white font-semibold">Modo Premio</div>
-                              <div className="text-white/60 text-sm">Sin XP requerido - Gratis</div>
+                              <div className="text-white/60 text-sm">Sin XP requerido - 300 fuegos</div>
                             </div>
                           </div>
                         </label>
