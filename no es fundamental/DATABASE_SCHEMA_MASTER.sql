@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
   total_games_won INTEGER DEFAULT 0,
   role VARCHAR(50) DEFAULT 'user',
   roles TEXT[] DEFAULT ARRAY['user'],
+  is_active BOOLEAN DEFAULT true,
   is_verified BOOLEAN DEFAULT false,
   security_answer TEXT,
   last_password_change TIMESTAMP,
