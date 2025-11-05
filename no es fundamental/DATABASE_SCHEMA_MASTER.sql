@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,
   tg_id BIGINT UNIQUE,
   avatar_url TEXT,
+  locale VARCHAR(10) DEFAULT 'es',
   bio TEXT,
   level INTEGER DEFAULT 1,
   experience INTEGER DEFAULT 0,
@@ -134,8 +135,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  assigned_at TIMESTAMP DEFAULT NOW(),
-  assigned_by UUID REFERENCES users(id),
+  granted_at TIMESTAMP DEFAULT NOW(),
+  granted_by UUID REFERENCES users(id),
   UNIQUE(user_id, role_id)
 );
 
@@ -257,6 +258,11 @@ CREATE TABLE IF NOT EXISTS raffles (
   prize_meta JSONB DEFAULT '{}',
   host_meta JSONB DEFAULT '{}',
   
+  -- Timing
+  starts_at TIMESTAMP,
+  ends_at TIMESTAMP,
+  drawn_at TIMESTAMP,
+  
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,
@@ -271,6 +277,10 @@ CREATE INDEX IF NOT EXISTS idx_raffles_visibility ON raffles(visibility);
 CREATE INDEX IF NOT EXISTS idx_raffles_is_company ON raffles(is_company_mode);
 CREATE INDEX IF NOT EXISTS idx_raffles_close_type ON raffles(close_type);
 CREATE INDEX IF NOT EXISTS idx_raffles_pot_fires ON raffles(pot_fires DESC) WHERE pot_fires > 0;
+CREATE INDEX IF NOT EXISTS idx_raffles_ends_at ON raffles(ends_at) WHERE ends_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_raffles_starts_at ON raffles(starts_at) WHERE starts_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_raffles_drawn_at ON raffles(drawn_at) WHERE drawn_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_raffles_timing_status ON raffles(status, starts_at, ends_at) WHERE status IN ('pending', 'active', 'in_progress');
 
 COMMENT ON TABLE raffles IS 'Rifas - modo fires o premio';
 COMMENT ON COLUMN raffles.mode IS 'fires: reparte pot, prize: premio físico';
@@ -281,6 +291,9 @@ COMMENT ON COLUMN raffles.numbers_range IS 'Rango total de números disponibles'
 COMMENT ON COLUMN raffles.is_company_mode IS 'TRUE si es rifa empresarial (3000🔥)';
 COMMENT ON COLUMN raffles.prize_meta IS 'Metadata del premio en formato JSON';
 COMMENT ON COLUMN raffles.host_meta IS 'Metadata del host en formato JSON';
+COMMENT ON COLUMN raffles.starts_at IS 'Fecha/hora programada de inicio de la rifa';
+COMMENT ON COLUMN raffles.ends_at IS 'Fecha/hora programada de cierre de la rifa';
+COMMENT ON COLUMN raffles.drawn_at IS 'Fecha/hora en que se realizó el sorteo';
 
 -- ============================================
 -- 11. RAFFLE_NUMBERS
@@ -550,7 +563,45 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_user ON bingo_v2_messages(user_
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_unread ON bingo_v2_messages(user_id, is_read);
 
 -- ============================================
--- 24. WELCOME EVENTS
+-- 24. MARKET REDEEMS
+-- ============================================
+CREATE TABLE IF NOT EXISTS market_redeems (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  fires_amount DECIMAL(18,2) NOT NULL DEFAULT 100 CHECK (fires_amount > 0),
+  fiat_amount DECIMAL(18,2),
+  currency_code VARCHAR(3) DEFAULT 'USD',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' 
+    CHECK (status IN ('pending', 'processing', 'completed', 'rejected', 'cancelled')),
+  cedula VARCHAR(20),
+  phone VARCHAR(32),
+  bank_code VARCHAR(10),
+  bank_name VARCHAR(128),
+  bank_account VARCHAR(64),
+  payment_method VARCHAR(32),
+  transaction_id VARCHAR(128),
+  proof_url TEXT,
+  notes TEXT,
+  processor_id UUID REFERENCES users(id),
+  processed_at TIMESTAMPTZ,
+  processor_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_redeems_user ON market_redeems(user_id);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_status ON market_redeems(status);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_created ON market_redeems(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_processor ON market_redeems(processor_id) WHERE processor_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_market_redeems_user_status ON market_redeems(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_market_redeems_processed ON market_redeems(processed_at DESC) WHERE processed_at IS NOT NULL;
+
+COMMENT ON TABLE market_redeems IS 'Redenciones de fires por dinero fiat';
+COMMENT ON COLUMN market_redeems.fires_amount IS 'Cantidad de fuegos a redimir (mínimo 100)';
+COMMENT ON COLUMN market_redeems.status IS 'Estado: pending, processing, completed, rejected, cancelled';
+
+-- ============================================
+-- 25. WELCOME EVENTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS welcome_events (
   id SERIAL PRIMARY KEY,
@@ -592,7 +643,7 @@ COMMENT ON COLUMN welcome_events.duration_hours IS 'Duración del evento en hora
 COMMENT ON COLUMN welcome_events.priority IS 'Prioridad del evento (mayor = más prioritario)';
 
 -- ============================================
--- 25. DIRECT GIFTS
+-- 26. DIRECT GIFTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS direct_gifts (
   id SERIAL PRIMARY KEY,
