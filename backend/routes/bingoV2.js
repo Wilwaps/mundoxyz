@@ -467,4 +467,169 @@ router.get('/admin/detect-failures', verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bingo/v2/rooms/:code/update-cards
+ * Update player's card count in waiting room
+ * Allows players to add/remove cards and adjusts wallet accordingly
+ */
+router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { cards_count } = req.body;
+    const userId = req.user.id;
+    
+    // Validate cards_count
+    if (!cards_count || cards_count < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid cards_count. Must be at least 1.'
+      });
+    }
+    
+    // Get room and player info
+    const roomResult = await query(
+      `SELECT r.*, rp.id as player_id, rp.cards_purchased
+       FROM bingo_v2_rooms r
+       JOIN bingo_v2_room_players rp ON r.id = rp.room_id
+       WHERE r.code = $1 AND rp.user_id = $2`,
+      [code, userId]
+    );
+    
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Room not found or you are not in this room'
+      });
+    }
+    
+    const room = roomResult.rows[0];
+    
+    // Solo permitir actualizar en sala de espera
+    if (room.status !== 'waiting') {
+      return res.status(400).json({
+        success: false,
+        error: 'Can only update cards in waiting room'
+      });
+    }
+    
+    // Validate max cards per player
+    if (cards_count > room.max_cards_per_player) {
+      return res.status(400).json({
+        success: false,
+        error: `Max ${room.max_cards_per_player} cards per player`
+      });
+    }
+    
+    const currentCards = room.cards_purchased || 0;
+    const cardsDifference = cards_count - currentCards;
+    const costDifference = Math.abs(cardsDifference) * room.card_cost;
+    
+    // Si aumenta cartones, cobrar diferencia
+    if (cardsDifference > 0) {
+      // Verificar balance
+      const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      const walletResult = await query(
+        `SELECT ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+        [userId]
+      );
+      
+      if (walletResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Wallet not found'
+        });
+      }
+      
+      const balance = parseFloat(walletResult.rows[0].balance);
+      
+      if (balance < costDifference) {
+        return res.status(400).json({
+          success: false,
+          error: `Insufficient ${room.currency_type}. Need ${costDifference}, have ${balance}`
+        });
+      }
+      
+      // Deduct from wallet
+      await query(
+        `UPDATE wallets 
+         SET ${currencyColumn} = ${currencyColumn} - $1
+         WHERE user_id = $2`,
+        [costDifference, userId]
+      );
+      
+      // Add to pot
+      await query(
+        `UPDATE bingo_v2_rooms
+         SET total_pot = total_pot + $1
+         WHERE id = $2`,
+        [costDifference, room.id]
+      );
+      
+      logger.info(`User ${userId} added ${cardsDifference} cards. Charged ${costDifference} ${room.currency_type}`);
+    }
+    
+    // Si disminuye cartones, reembolsar diferencia
+    if (cardsDifference < 0) {
+      const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      
+      // Refund to wallet
+      await query(
+        `UPDATE wallets 
+         SET ${currencyColumn} = ${currencyColumn} + $1
+         WHERE user_id = $2`,
+        [costDifference, userId]
+      );
+      
+      // Subtract from pot
+      await query(
+        `UPDATE bingo_v2_rooms
+         SET total_pot = total_pot - $1
+         WHERE id = $2`,
+        [costDifference, room.id]
+      );
+      
+      logger.info(`User ${userId} removed ${Math.abs(cardsDifference)} cards. Refunded ${costDifference} ${room.currency_type}`);
+    }
+    
+    // Update player cards_purchased and total_spent
+    await query(
+      `UPDATE bingo_v2_room_players
+       SET cards_purchased = $1,
+           total_spent = $2
+       WHERE id = $3`,
+      [cards_count, cards_count * room.card_cost, room.player_id]
+    );
+    
+    // Delete old cards
+    await query(
+      `DELETE FROM bingo_v2_cards WHERE room_id = $1 AND player_id = $2`,
+      [room.id, room.player_id]
+    );
+    
+    // Generate new cards
+    const newCards = await BingoV2Service.generateCards(
+      room.id,
+      room.player_id,
+      cards_count,
+      room.mode
+    );
+    
+    res.json({
+      success: true,
+      message: `Cards updated to ${cards_count}`,
+      cards: newCards,
+      cards_count: cards_count,
+      cost: cards_count * room.card_cost,
+      currency: room.currency_type
+    });
+    
+  } catch (error) {
+    logger.error('Error updating cards:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update cards'
+    });
+  }
+});
+
 module.exports = router;

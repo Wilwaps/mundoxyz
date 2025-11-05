@@ -488,6 +488,55 @@ function handleBingoV2Socket(io) {
       }
     });
 
+    // Request new round (Otra Ronda)
+    socket.on('bingo:request_new_round', async (data) => {
+      try {
+        const { roomCode, userId } = data;
+        
+        logger.info(`🔄 New round requested by user ${userId} in room ${roomCode}`);
+        
+        // Get room
+        const roomResult = await query(
+          `SELECT * FROM bingo_v2_rooms WHERE code = $1`,
+          [roomCode]
+        );
+        
+        if (roomResult.rows.length === 0) {
+          throw new Error('Room not found');
+        }
+        
+        const room = roomResult.rows[0];
+        
+        // Validar que la sala esté en estado 'finished'
+        if (room.status !== 'finished') {
+          throw new Error('Room must be finished to start new round');
+        }
+        
+        // Stop auto-call if it was enabled
+        if (autoCallIntervals.has(roomCode)) {
+          clearInterval(autoCallIntervals.get(roomCode));
+          autoCallIntervals.delete(roomCode);
+        }
+        
+        // Reset sala para nueva ronda
+        const resetResult = await BingoV2Service.resetRoomForNewRound(room.id);
+        
+        // Emitir evento a todos los jugadores conectados
+        io.to(roomCode).emit('bingo:new_round_ready', {
+          room: resetResult.room,
+          newHost: resetResult.newHost,
+          gameNumber: resetResult.gameNumber,
+          message: `Nueva ronda lista. Host: ${resetResult.newHost.username}. Ajusta tus cartones y presiona Listo.`
+        });
+        
+        logger.info(`✅ New round started in room ${roomCode}. New host: ${resetResult.newHost.username}`);
+        
+      } catch (error) {
+        logger.error('Error requesting new round:', error);
+        socket.emit('bingo:error', { message: error.message });
+      }
+    });
+
     // Host disconnection monitoring
     socket.on('disconnect', async () => {
       try {

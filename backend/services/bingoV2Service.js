@@ -1523,6 +1523,160 @@ class BingoV2Service {
       throw error;
     }
   }
+
+  /**
+   * Reset room for a new round (Otra Ronda)
+   * - Select random host from connected players
+   * - Clear pot, drawn numbers, winner
+   * - Keep players but reset ready status and cards
+   * - Increment game number
+   * - Return to 'waiting' status
+   */
+  static async resetRoomForNewRound(roomId, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+    
+    try {
+      logger.info(`🔄 Resetting room ${roomId} for new round...`);
+      
+      // 1. Get all connected players in the room
+      const playersResult = await dbQuery(
+        `SELECT p.id, p.user_id, p.cards_purchased, u.username
+         FROM bingo_v2_room_players p
+         JOIN users u ON p.user_id = u.id
+         WHERE p.room_id = $1 AND p.is_connected = true`,
+        [roomId]
+      );
+      
+      if (playersResult.rows.length === 0) {
+        throw new Error('No connected players to start new round');
+      }
+      
+      // 2. Select random host from connected players
+      const randomIndex = Math.floor(Math.random() * playersResult.rows.length);
+      const newHost = playersResult.rows[randomIndex];
+      
+      logger.info(`🎲 New host selected: ${newHost.username} (${newHost.user_id})`);
+      
+      // 3. Get current game number
+      const currentGameResult = await dbQuery(
+        `SELECT current_game_number FROM bingo_v2_rooms WHERE id = $1`,
+        [roomId]
+      );
+      const nextGameNumber = (currentGameResult.rows[0]?.current_game_number || 0) + 1;
+      
+      // 4. Reset room state
+      await dbQuery(
+        `UPDATE bingo_v2_rooms 
+         SET 
+           status = 'waiting',
+           host_id = $1,
+           winner_id = NULL,
+           drawn_numbers = '[]'::jsonb,
+           total_pot = 0,
+           auto_call_enabled = false,
+           current_game_number = $2,
+           started_at = NULL,
+           finished_at = NULL
+         WHERE id = $3`,
+        [newHost.user_id, nextGameNumber, roomId]
+      );
+      
+      // 5. Reset players ready status
+      await dbQuery(
+        `UPDATE bingo_v2_room_players
+         SET is_ready = false
+         WHERE room_id = $1`,
+        [roomId]
+      );
+      
+      // 6. Delete old cards (jugadores volverán a comprar/ajustar)
+      await dbQuery(
+        `DELETE FROM bingo_v2_cards WHERE room_id = $1`,
+        [roomId]
+      );
+      
+      // 7. Reset cards_purchased to 0
+      await dbQuery(
+        `UPDATE bingo_v2_room_players
+         SET cards_purchased = 0, total_spent = 0
+         WHERE room_id = $1`,
+        [roomId]
+      );
+      
+      // 8. Log the reset
+      await dbQuery(
+        `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
+         VALUES ($1, $2, 'new_round_reset', $3)`,
+        [
+          roomId,
+          newHost.user_id,
+          JSON.stringify({
+            new_host: newHost.username,
+            new_host_id: newHost.user_id,
+            game_number: nextGameNumber,
+            connected_players: playersResult.rows.length
+          })
+        ]
+      );
+      
+      // 9. Get room code
+      const roomCodeResult = await dbQuery(
+        `SELECT code FROM bingo_v2_rooms WHERE id = $1`,
+        [roomId]
+      );
+      const roomCode = roomCodeResult.rows[0]?.code;
+      
+      // 10. Get updated room details
+      const updatedRoom = await this.getRoomDetails(roomCode);
+      
+      logger.info(`✅ Room ${roomCode} reset complete. Game #${nextGameNumber}, Host: ${newHost.username}`);
+      
+      return {
+        success: true,
+        room: updatedRoom,
+        newHost: {
+          userId: newHost.user_id,
+          username: newHost.username
+        },
+        gameNumber: nextGameNumber
+      };
+      
+    } catch (error) {
+      logger.error('Error resetting room for new round:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper: Generate cards for a player
+   */
+  static async generateCards(roomId, playerId, count, mode, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+    const cards = [];
+    
+    try {
+      for (let i = 0; i < count; i++) {
+        const grid = mode === '75' 
+          ? this.generate75BallGrid() 
+          : this.generate90BallGrid();
+        
+        const cardResult = await dbQuery(
+          `INSERT INTO bingo_v2_cards 
+           (room_id, player_id, card_number, grid, marked_numbers, marked_positions)
+           VALUES ($1, $2, $3, $4, '[]'::jsonb, '[]'::jsonb)
+           RETURNING *`,
+          [roomId, playerId, i + 1, JSON.stringify(grid)]
+        );
+        
+        cards.push(cardResult.rows[0]);
+      }
+      
+      return cards;
+    } catch (error) {
+      logger.error('Error generating cards:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = BingoV2Service;

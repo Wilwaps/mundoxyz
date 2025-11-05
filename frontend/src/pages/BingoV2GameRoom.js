@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import BingoV2Card from '../components/bingo/BingoV2Card';
 import BingoV2Chat from '../components/bingo/BingoV2Chat';
+import { Clock, LogOut, Repeat } from 'lucide-react';
 import API_URL from '../config/api';
 import './BingoV2GameRoom.css';
 
@@ -24,6 +25,8 @@ const BingoV2GameRoom = () => {
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isCallingNumber, setIsCallingNumber] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(30);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     // CRITICAL: Validate user authentication
@@ -407,6 +410,58 @@ const BingoV2GameRoom = () => {
     }
   };
 
+  // Timer countdown for winner modal
+  useEffect(() => {
+    if (!showWinnerModal || isRedirecting) return;
+    
+    const interval = setInterval(() => {
+      setRemainingTime(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsRedirecting(true);
+          if (socket) {
+            socket.emit('bingo:leave_room', {
+              roomCode: code,
+              userId: user.id
+            });
+          }
+          navigate('/bingo');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [showWinnerModal, isRedirecting, navigate, socket, code, user]);
+
+  // Handler: Back to Lobby
+  const handleBackToLobby = () => {
+    setIsRedirecting(true);
+    if (socket) {
+      socket.emit('bingo:leave_room', {
+        roomCode: code,
+        userId: user.id
+      });
+    }
+    navigate('/bingo');
+  };
+
+  // Handler: Another Round (Otra Ronda)
+  const handleAnotherRound = () => {
+    setIsRedirecting(true);
+    
+    if (socket) {
+      socket.emit('bingo:request_new_round', {
+        roomCode: code,
+        userId: user.id
+      });
+    }
+    
+    // Navigate immediately to waiting room
+    navigate(`/bingo/v2/room/${code}`);
+  };
+
   const handleExitRoom = () => {
     if (socket) {
       socket.emit('bingo:leave_room', {
@@ -539,9 +594,46 @@ const BingoV2GameRoom = () => {
               <p>Pozo total: {room.total_pot} {room.currency_type}</p>
             </div>
             
-            <button onClick={() => navigate('/bingo')}>
-              Volver al Lobby
-            </button>
+            {/* Timer Countdown */}
+            <div className="timer-container">
+              <div className="timer-text">
+                {remainingTime > 0 ? (
+                  <>
+                    <Clock size={20} />
+                    <span>Redirigiendo al lobby en {remainingTime}s</span>
+                  </>
+                ) : (
+                  <span>Redirigiendo...</span>
+                )}
+              </div>
+              <div className="timer-progress-bar">
+                <div 
+                  className="timer-progress-fill"
+                  style={{ width: `${(remainingTime / 30) * 100}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="modal-actions">
+              <button 
+                onClick={handleBackToLobby}
+                className="btn-secondary-modal"
+                disabled={isRedirecting}
+              >
+                <LogOut size={18} />
+                Volver al Lobby
+              </button>
+              
+              <button 
+                onClick={handleAnotherRound}
+                className="btn-primary-modal"
+                disabled={isRedirecting}
+              >
+                <Repeat size={18} />
+                Otra Ronda
+              </button>
+            </div>
           </div>
         </div>
       )}

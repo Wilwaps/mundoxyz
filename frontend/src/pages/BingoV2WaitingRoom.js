@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
+import { Plus, Minus } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import API_URL from '../config/api';
 import './BingoV2WaitingRoom.css';
 
@@ -19,6 +21,8 @@ const BingoV2WaitingRoom = () => {
   const [cardsToBuy, setCardsToBuy] = useState(1);
   const [canCloseRoom, setCanCloseRoom] = useState(false);
   const [closingRoom, setClosingRoom] = useState(false);
+  const [currentCards, setCurrentCards] = useState(0);
+  const [pendingCards, setPendingCards] = useState(1);
 
   useEffect(() => {
     loadRoomDetails();
@@ -50,6 +54,28 @@ const BingoV2WaitingRoom = () => {
         navigate(`/bingo/v2/play/${code}`);
       });
 
+      socket.on('bingo:new_round_ready', (data) => {
+        console.log('🔄 Nueva ronda lista:', data);
+        
+        // Actualizar room con nueva configuración
+        setRoom(data.room);
+        
+        // Reset estados locales
+        setIsReady(false);
+        
+        // Si el usuario tiene cartones de la ronda anterior, mantener cantidad
+        const myPlayer = data.room.players?.find(p => p.user_id === user.id);
+        const myCards = myPlayer?.cards_purchased || 0;
+        setCurrentCards(myCards);
+        setPendingCards(myCards > 0 ? myCards : 1);
+        
+        // Mostrar notificación
+        toast.success(`Nueva ronda iniciada. Host: ${data.room.host_name}`, {
+          icon: '🔄',
+          duration: 5000
+        });
+      });
+
       socket.on('bingo:error', (data) => {
         setError(data.message);
       });
@@ -60,6 +86,7 @@ const BingoV2WaitingRoom = () => {
         socket.off('bingo:player_left');
         socket.off('bingo:player_ready');
         socket.off('bingo:game_started');
+        socket.off('bingo:new_round_ready');
         socket.off('bingo:error');
       };
     }
@@ -85,10 +112,17 @@ const BingoV2WaitingRoom = () => {
           return;
         }
         
-        // Check if current user is ready
+        // Check if current user is ready and has cards
         const currentPlayer = data.room.players?.find(p => p.user_id === user?.id);
         if (currentPlayer) {
           setIsReady(currentPlayer.is_ready);
+          const myCards = currentPlayer.cards_purchased || 0;
+          setCurrentCards(myCards);
+          if (myCards === 0) {
+            setPendingCards(1); // Default para compra inicial
+          } else {
+            setPendingCards(myCards); // Mantener cantidad actual
+          }
         }
       } else {
         setError(data.error || 'Error loading room');
@@ -121,6 +155,50 @@ const BingoV2WaitingRoom = () => {
       }
     } catch (err) {
       alert('Error buying cards');
+    }
+  };
+
+  // Handler: Modificar cantidad de cartones con botones +/-
+  const handleCardChange = (delta) => {
+    setPendingCards(prev => {
+      const newValue = prev + delta;
+      return Math.max(1, Math.min(room.max_cards_per_player, newValue));
+    });
+  };
+
+  // Handler: Modificar cantidad directamente en input
+  const handleCardChangeInput = (value) => {
+    const numValue = parseInt(value) || 1;
+    setPendingCards(Math.max(1, Math.min(room.max_cards_per_player, numValue)));
+  };
+
+  // Handler: Actualizar cartones (comprar o ajustar)
+  const handleUpdateCards = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/update-cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ cards_count: pendingCards })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setCurrentCards(pendingCards);
+        toast.success(`Cartones actualizados: ${pendingCards}`, {
+          icon: '🎟️',
+          duration: 3000
+        });
+        loadRoomDetails(); // Refresh room data
+      } else {
+        toast.error(data.error || 'Error actualizando cartones');
+      }
+    } catch (err) {
+      toast.error('Error al actualizar cartones');
+      console.error(err);
     }
   };
 
@@ -263,28 +341,66 @@ const BingoV2WaitingRoom = () => {
           </div>
         </div>
 
-        <div className="status-section">
-          <h2>Estado</h2>
-          {!hasCards ? (
-            <div className="no-cards">
-              <p>No has comprado cartones aún</p>
-              <button 
-                className="buy-cards-button"
-                onClick={() => setShowBuyCardsModal(true)}
-              >
-                Comprar Cartones
-              </button>
-            </div>
-          ) : (
-            <div className="cards-info">
-              <h3>Mis Cartones ({currentPlayer?.cards_purchased || 0})</h3>
-              {currentPlayer?.cards?.map((card, idx) => (
-                <div key={card.id} className="card-preview">
-                  Cartón #{idx + 1}
-                </div>
-              ))}
+        {/* Modificador de Cartones Inline */}
+        <div className="cards-manager">
+          <h3>Mis Cartones</h3>
+          
+          {/* Cartones actuales */}
+          {currentCards > 0 && (
+            <div className="current-cards-info">
+              <span className="badge-fire">
+                {currentCards} cartón(es) comprados
+              </span>
             </div>
           )}
+          
+          {/* Modificador para ajustar */}
+          <div className="cards-modifier">
+            <label>Cantidad de cartones:</label>
+            <div className="number-input-group">
+              <button 
+                onClick={() => handleCardChange(-1)}
+                disabled={pendingCards <= 1}
+                className="btn-modifier"
+              >
+                <Minus size={16} />
+              </button>
+              
+              <input 
+                type="number"
+                min="1"
+                max={room.max_cards_per_player}
+                value={pendingCards}
+                onChange={(e) => handleCardChangeInput(e.target.value)}
+                className="cards-input"
+              />
+              
+              <button 
+                onClick={() => handleCardChange(1)}
+                disabled={pendingCards >= room.max_cards_per_player}
+                className="btn-modifier"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            
+            <div className="cost-info">
+              <span>Costo total:</span>
+              <span className="cost-value">
+                {pendingCards * room.card_cost} {room.currency_type}
+              </span>
+            </div>
+            
+            {/* Botón para aplicar cambios */}
+            {pendingCards !== currentCards && (
+              <button 
+                onClick={handleUpdateCards}
+                className="btn-update-cards"
+              >
+                {currentCards > 0 ? 'Actualizar Cartones' : 'Comprar Cartones'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="actions-section">
