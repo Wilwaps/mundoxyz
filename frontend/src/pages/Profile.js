@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -28,6 +28,7 @@ import AdminRoomsManager from '../components/bingo/AdminRoomsManager';
 const Profile = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showMyData, setShowMyData] = useState(false);
@@ -156,7 +157,20 @@ const Profile = () => {
           <div className="mt-4 pt-4 border-t border-glass">
             <div className="flex flex-wrap gap-2">
               {(Array.isArray(user.roles) ? user.roles : []).map((role) => (
-                <span key={role} className="badge-coins">
+                <span 
+                  key={role} 
+                  className={`badge-coins ${
+                    (role === 'tote' || role === 'admin') 
+                      ? 'cursor-pointer hover:scale-105 transition-transform' 
+                      : ''
+                  }`}
+                  onClick={() => {
+                    if (role === 'tote' || role === 'admin') {
+                      navigate('/admin');
+                    }
+                  }}
+                  title={(role === 'tote' || role === 'admin') ? 'Ir al Panel Admin' : ''}
+                >
                   {role === 'tote' ? '👑' : role === 'admin' ? '⚙️' : '👤'} {role}
                 </span>
               ))}
