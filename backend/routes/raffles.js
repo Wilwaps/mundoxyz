@@ -7,15 +7,9 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
 const RaffleService = require('../services/RaffleService');
 const multer = require('multer');
-const AWS = require('aws-sdk');
+const { query } = require('../db');
 
 const raffleService = new RaffleService();
-
-const s3 = new AWS.S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION
-});
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -393,7 +387,7 @@ router.post('/reject-purchase', verifyToken, async (req, res) => {
 
 /**
  * POST /api/raffles/upload-logo
- * Subir logo para modo empresa (AWS S3)
+ * Subir logo para modo empresa (almacena en PostgreSQL)
  */
 router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res) => {
     try {
@@ -404,24 +398,17 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
             });
         }
 
-        const fileName = `raffle-logos/${Date.now()}-${req.file.originalname}`;
-        
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: fileName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
-            ACL: 'public-read'
-        };
-
-        const uploadResult = await s3.upload(params).promise();
+        // Convertir imagen a Base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageData = `data:${req.file.mimetype};base64,${base64Image}`;
         
         res.json({
             success: true,
             data: {
-                logo_url: uploadResult.Location
+                logo_url: imageData,
+                mime_type: req.file.mimetype
             },
-            message: 'Logo subido exitosamente'
+            message: 'Logo procesado exitosamente'
         });
     } catch (error) {
         console.error('Error uploading logo:', error);
@@ -434,7 +421,7 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
 
 /**
  * POST /api/raffles/upload-prize-image
- * Subir imagen del premio (AWS S3)
+ * Subir imagen del premio (almacena en PostgreSQL)
  */
 router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), async (req, res) => {
     try {
@@ -445,24 +432,17 @@ router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), as
             });
         }
 
-        const fileName = `raffle-prizes/${Date.now()}-${req.file.originalname}`;
-        
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: fileName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
-            ACL: 'public-read'
-        };
-
-        const uploadResult = await s3.upload(params).promise();
+        // Convertir imagen a Base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageData = `data:${req.file.mimetype};base64,${base64Image}`;
         
         res.json({
             success: true,
             data: {
-                image_url: uploadResult.Location
+                image_url: imageData,
+                mime_type: req.file.mimetype
             },
-            message: 'Imagen del premio subida exitosamente'
+            message: 'Imagen del premio procesada exitosamente'
         });
     } catch (error) {
         console.error('Error uploading prize image:', error);
@@ -638,7 +618,7 @@ router.post('/reject-purchase', verifyToken, async (req, res) => {
 
 /**
  * POST /api/raffles/upload-logo
- * Subir logo para modo empresa (AWS S3)
+ * Subir logo para modo empresa (almacena en PostgreSQL)
  */
 router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res) => {
     try {
@@ -649,24 +629,17 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
             });
         }
 
-        const fileName = `raffle-logos/${Date.now()}-${req.file.originalname}`;
-        
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: fileName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
-            ACL: 'public-read'
-        };
-
-        const uploadResult = await s3.upload(params).promise();
+        // Convertir imagen a Base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageData = `data:${req.file.mimetype};base64,${base64Image}`;
         
         res.json({
             success: true,
             data: {
-                logo_url: uploadResult.Location
+                logo_url: imageData,
+                mime_type: req.file.mimetype
             },
-            message: 'Logo subido exitosamente'
+            message: 'Logo procesado exitosamente'
         });
     } catch (error) {
         console.error('Error uploading logo:', error);
@@ -679,7 +652,7 @@ router.post('/upload-logo', verifyToken, upload.single('logo'), async (req, res)
 
 /**
  * POST /api/raffles/upload-prize-image
- * Subir imagen del premio (AWS S3)
+ * Subir imagen del premio (almacena en PostgreSQL)
  */
 router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), async (req, res) => {
     try {
@@ -690,24 +663,17 @@ router.post('/upload-prize-image', verifyToken, upload.single('prize_image'), as
             });
         }
 
-        const fileName = `raffle-prizes/${Date.now()}-${req.file.originalname}`;
-        
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: fileName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
-            ACL: 'public-read'
-        };
-
-        const uploadResult = await s3.upload(params).promise();
+        // Convertir imagen a Base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageData = `data:${req.file.mimetype};base64,${base64Image}`;
         
         res.json({
             success: true,
             data: {
-                image_url: uploadResult.Location
+                image_url: imageData,
+                mime_type: req.file.mimetype
             },
-            message: 'Imagen del premio subida exitosamente'
+            message: 'Imagen del premio procesada exitosamente'
         });
     } catch (error) {
         console.error('Error uploading prize image:', error);
