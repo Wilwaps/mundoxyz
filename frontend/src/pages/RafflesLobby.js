@@ -280,22 +280,22 @@ const RafflesLobby = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-md rounded-3xl p-8 mb-6 border border-white/20"
+          className="bg-white/10 backdrop-blur-md rounded-3xl p-6 sm:p-8 mb-6 border border-white/20"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 flex items-center gap-3">
                 <FaTrophy className="text-yellow-400" />
                 Sistema de Rifas
               </h1>
-              <p className="text-white/70 text-lg">
-                Participa en rifas emocionantes y gana amazing premios
+              <p className="text-white/70 text-base sm:text-lg">
+                Participa en rifas emocionantes y gana diferentes premios
               </p>
             </div>
             
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl whitespace-nowrap"
             >
               <FaPlus />
               Crear Rifa
@@ -304,46 +304,46 @@ const RafflesLobby = () => {
 
           {/* Estadísticas rápidas */}
           {stats && (
-            <div className="grid grid-cols-4 gap-3">
-              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Rifas Activas</span>
-                  <FaChartLine className="text-green-400 text-lg" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide truncate">Rifas Activas</span>
+                  <FaChartLine className="text-green-400 text-base sm:text-lg flex-shrink-0" />
                 </div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-xl sm:text-2xl font-bold text-white">
                   {stats.active_raffles || 0}
                 </div>
               </div>
               
-              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">En Juego</span>
-                  <FaFire className="text-orange-400 text-lg" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide truncate">En Juego</span>
+                  <FaFire className="text-orange-400 text-base sm:text-lg flex-shrink-0" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-white">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-white">
                     {parseFloat(stats.total_fires_in_play || 0).toFixed(0)}
                   </span>
-                  <span className="text-xl">🔥</span>
+                  <span className="text-lg sm:text-xl">🔥</span>
                 </div>
               </div>
               
-              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Empresas</span>
-                  <FaBuilding className="text-purple-400 text-lg" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide truncate">Empresas</span>
+                  <FaBuilding className="text-purple-400 text-base sm:text-lg flex-shrink-0" />
                 </div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-xl sm:text-2xl font-bold text-white">
                   {stats.company_raffles || 0}
                 </div>
               </div>
               
-              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Creadas Hoy</span>
-                  <FaStar className="text-yellow-400 text-lg" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide truncate">Creadas Hoy</span>
+                  <FaStar className="text-yellow-400 text-base sm:text-lg flex-shrink-0" />
                 </div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-xl sm:text-2xl font-bold text-white">
                   {stats.created_today || 0}
                 </div>
               </div>
