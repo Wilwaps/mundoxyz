@@ -233,7 +233,6 @@ CREATE TABLE IF NOT EXISTS raffles (
   pot_coins DECIMAL(18,2) DEFAULT 0,
   
   -- Configuración de números
-  total_numbers INTEGER NOT NULL CHECK (total_numbers > 0),
   numbers_range INTEGER DEFAULT 100,
   total_pot DECIMAL(10,2) DEFAULT 0,
   

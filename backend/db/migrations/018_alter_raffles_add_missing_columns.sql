@@ -24,14 +24,9 @@ ADD COLUMN IF NOT EXISTS pot_fires DECIMAL(18,2) DEFAULT 0;
 ALTER TABLE raffles 
 ADD COLUMN IF NOT EXISTS pot_coins DECIMAL(18,2) DEFAULT 0;
 
--- numbers_range: Rango de números (alias de total_numbers para compatibilidad)
+-- numbers_range: Rango de números disponibles en la rifa
 ALTER TABLE raffles 
 ADD COLUMN IF NOT EXISTS numbers_range INTEGER DEFAULT 100;
-
--- Migrar datos existentes de total_numbers a numbers_range
-UPDATE raffles 
-SET numbers_range = total_numbers 
-WHERE numbers_range IS NULL OR numbers_range = 100;
 
 -- ============================================
 -- AÑADIR COLUMNAS DE CONFIGURACIÓN
