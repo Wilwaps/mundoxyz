@@ -180,35 +180,35 @@ const RafflesLobby = () => {
         )}
 
         {/* Métricas principales */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-black/20 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-white/60 text-xs">PREMIO ACTUAL</span>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Premio Actual</span>
               {raffle.mode === 'fire' ? (
-                <FaFire className="text-orange-400 text-sm" />
+                <FaFire className="text-orange-400 text-base" />
               ) : (
-                <FaCoins className="text-yellow-400 text-sm" />
+                <FaCoins className="text-yellow-400 text-base" />
               )}
             </div>
-            <div className="text-lg font-bold text-white">
-              {raffle.mode === 'fire' 
-                ? `${parseFloat(raffle.pot_fires || 0).toFixed(2)} 🔥`
-                : `${parseFloat(raffle.pot_coins || 0).toFixed(2)} 🪙`
-              }
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-white">
+                {parseFloat(raffle.mode === 'fire' ? raffle.pot_fires || 0 : raffle.pot_coins || 0).toFixed(2)}
+              </span>
+              <span className="text-lg">{raffle.mode === 'fire' ? '🔥' : '🪙'}</span>
             </div>
           </div>
           
-          <div className="bg-black/20 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-white/60 text-xs">NÚMEROS</span>
-              <FaChartLine className="text-blue-400 text-sm" />
+          <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Números</span>
+              <FaChartLine className="text-blue-400 text-base" />
             </div>
-            <div className="text-lg font-bold text-white">
+            <div className="text-xl font-bold text-white mb-2">
               {raffle.purchased_count}/{raffle.total_numbers}
             </div>
-            <div className="w-full bg-white/10 rounded-full h-1.5 mt-2">
+            <div className="w-full bg-white/10 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-blue-400 to-purple-400 h-1.5 rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -216,29 +216,33 @@ const RafflesLobby = () => {
         </div>
 
         {/* Precios y participación */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <div>
-              <span className="text-white/60 text-xs block">Costo por número</span>
-              <span className="text-white font-semibold flex items-center gap-1">
-                {raffle.mode === 'fire' ? (
-                  <>
-                    <FaFire className="text-orange-400 text-sm" />
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-black/20 rounded-lg p-2.5 border border-white/5">
+            <span className="text-white/60 text-xs block mb-1.5 font-medium">Costo por número</span>
+            <div className="flex items-center gap-2">
+              {raffle.mode === 'fire' ? (
+                <>
+                  <FaFire className="text-orange-400 text-base" />
+                  <span className="text-white font-bold text-base">
                     {parseFloat(raffle.cost_per_number || 10).toFixed(2)}
-                  </>
-                ) : (
-                  <>
-                    <FaCoins className="text-yellow-400 text-sm" />
+                  </span>
+                </>
+              ) : (
+                <>
+                  <FaCoins className="text-yellow-400 text-base" />
+                  <span className="text-white font-bold text-base">
                     {parseFloat(raffle.cost_per_number || 100).toFixed(2)}
-                  </>
-                )}
-              </span>
+                  </span>
+                </>
+              )}
             </div>
-            
-            <div>
-              <span className="text-white/60 text-xs block">Participantes</span>
-              <span className="text-white font-semibold flex items-center gap-1">
-                <FaUsers className="text-blue-400 text-sm" />
+          </div>
+          
+          <div className="bg-black/20 rounded-lg p-2.5 border border-white/5">
+            <span className="text-white/60 text-xs block mb-1.5 font-medium">Participantes</span>
+            <div className="flex items-center gap-2">
+              <FaUsers className="text-blue-400 text-base" />
+              <span className="text-white font-bold text-base">
                 {raffle.participant_count || 0}
               </span>
             </div>
@@ -300,41 +304,44 @@ const RafflesLobby = () => {
 
           {/* Estadísticas rápidas */}
           {stats && (
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-black/20 rounded-xl p-4">
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/60 text-sm">Rifas Activas</span>
-                  <FaChartLine className="text-green-400" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Rifas Activas</span>
+                  <FaChartLine className="text-green-400 text-lg" />
                 </div>
                 <div className="text-2xl font-bold text-white">
                   {stats.active_raffles || 0}
                 </div>
               </div>
               
-              <div className="bg-black/20 rounded-xl p-4">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/60 text-sm">En Juego</span>
-                  <FaFire className="text-orange-400" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">En Juego</span>
+                  <FaFire className="text-orange-400 text-lg" />
                 </div>
-                <div className="text-2xl font-bold text-white">
-                  {parseFloat(stats.total_fires_in_play || 0).toFixed(0)} 🔥
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-white">
+                    {parseFloat(stats.total_fires_in_play || 0).toFixed(0)}
+                  </span>
+                  <span className="text-xl">🔥</span>
                 </div>
               </div>
               
-              <div className="bg-black/20 rounded-xl p-4">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/60 text-sm">Empresas</span>
-                  <FaBuilding className="text-purple-400" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Empresas</span>
+                  <FaBuilding className="text-purple-400 text-lg" />
                 </div>
                 <div className="text-2xl font-bold text-white">
                   {stats.company_raffles || 0}
                 </div>
               </div>
               
-              <div className="bg-black/20 rounded-xl p-4">
+              <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/60 text-sm">Creadas Hoy</span>
-                  <FaStar className="text-yellow-400" />
+                  <span className="text-white/70 text-xs font-medium uppercase tracking-wide">Creadas Hoy</span>
+                  <FaStar className="text-yellow-400 text-lg" />
                 </div>
                 <div className="text-2xl font-bold text-white">
                   {stats.created_today || 0}

@@ -48,6 +48,9 @@ const Layout = () => {
   const displayFires = parseFloat(balanceData?.fires_balance ?? user?.fires_balance ?? 0);
   const displayExperience = user?.experience || 0;
 
+  // Verificar si el usuario es tote (admin mayor)
+  const isTote = user?.roles?.includes('tote');
+
   const navItems = [
     { path: '/profile', icon: User, label: 'Perfil' },
     { path: '/lobby', icon: DoorOpen, label: 'Lobby' },
@@ -58,7 +61,8 @@ const Layout = () => {
     { path: '/upcoming', icon: Clock, label: 'Próximo' }
   ];
 
-  if (isAdmin()) {
+  // Añadir panel Admin para admins o para usuarios tote
+  if (isAdmin() || isTote) {
     navItems.push({ path: '/admin', icon: Settings, label: 'Admin' });
   }
 
@@ -67,30 +71,40 @@ const Layout = () => {
       {/* Header */}
       <header className="bg-card border-b border-glass px-4 py-3 safe-top">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gradient-accent">MUNDOXYZ</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo.ico" 
+              alt="MundoXYZ Logo" 
+              className="w-8 h-8 object-contain"
+            />
+            <h1 className="text-2xl font-bold text-gradient-accent">MUNDOXYZ</h1>
+          </div>
+          <div className="flex items-center gap-2">
             {/* Balance Display - Clickeable */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div 
-                className="badge-experience cursor-pointer hover:scale-110 transition-transform"
+                className="badge-experience cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => setShowExperienceModal(true)}
                 title="Ver detalles de experiencia"
               >
-                <span className="text-sm">⭐ {displayExperience} XP</span>
+                <span className="text-xs font-medium">⭐</span>
+                <span className="text-xs font-semibold">{displayExperience} XP</span>
               </div>
               <div 
-                className="badge-coins cursor-pointer hover:scale-110 transition-transform"
+                className="badge-coins cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => navigate('/profile?tab=coins')}
                 title="Ver historial de coins"
               >
-                <span className="text-sm">🪙 {displayCoins.toFixed(2)}</span>
+                <span className="text-sm">🪙</span>
+                <span className="text-xs font-semibold">{displayCoins.toFixed(2)}</span>
               </div>
               <div 
-                className="badge-fire cursor-pointer hover:scale-110 transition-transform"
+                className="badge-fire cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => navigate('/profile?tab=fires')}
                 title="Ver historial de fuegos"
               >
-                <span className="text-sm">🔥 {displayFires.toFixed(2)}</span>
+                <span className="text-sm">🔥</span>
+                <span className="text-xs font-semibold">{displayFires.toFixed(2)}</span>
               </div>
               
               {/* Message Inbox Button */}

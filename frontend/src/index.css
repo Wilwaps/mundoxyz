@@ -28,12 +28,16 @@
     @apply bg-glass border border-glass rounded-lg px-4 py-2 text-text placeholder-text/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all duration-200;
   }
 
+  .badge-experience {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-500/20 to-amber-400/20 text-yellow-300 border border-yellow-400/30 min-w-[80px];
+  }
+
   .badge-fire {
-    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500/20 to-yellow-400/20 text-yellow-400 border border-yellow-400/30;
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500/20 to-yellow-400/20 text-yellow-400 border border-yellow-400/30 min-w-[90px];
   }
 
   .badge-coins {
-    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-primary/20 to-accent/20 text-accent border border-accent/30;
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-primary/20 to-accent/20 text-accent border border-accent/30 min-w-[90px];
   }
 
   .glow-text {
