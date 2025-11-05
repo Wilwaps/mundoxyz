@@ -223,13 +223,42 @@ CREATE TABLE IF NOT EXISTS raffles (
   description TEXT,
   mode VARCHAR(20) NOT NULL CHECK (mode IN ('fires', 'prize')),
   type VARCHAR(20) DEFAULT 'public',
+  
+  -- Precios y economía
   entry_price_fire DECIMAL(10,2) DEFAULT 0,
   entry_price_coin DECIMAL(10,2) DEFAULT 0,
+  entry_price_fiat DECIMAL(10,2) DEFAULT 0,
+  cost_per_number DECIMAL(10,2) DEFAULT 10,
+  pot_fires DECIMAL(18,2) DEFAULT 0,
+  pot_coins DECIMAL(18,2) DEFAULT 0,
+  
+  -- Configuración de números
   total_numbers INTEGER NOT NULL CHECK (total_numbers > 0),
+  numbers_range INTEGER DEFAULT 100,
   total_pot DECIMAL(10,2) DEFAULT 0,
+  
+  -- Ganador
   winner_number INTEGER,
   winner_id UUID REFERENCES users(id),
-  status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'finished', 'cancelled')),
+  
+  -- Estados y visibilidad
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'open', 'in_progress', 'drawing', 'finished', 'cancelled')),
+  visibility VARCHAR(20) DEFAULT 'public' CHECK (visibility IN ('public', 'private', 'friends')),
+  
+  -- Modo empresa
+  is_company_mode BOOLEAN DEFAULT FALSE,
+  company_cost DECIMAL(10,2) DEFAULT 0,
+  
+  -- Configuración de cierre
+  close_type VARCHAR(20) DEFAULT 'auto_full' CHECK (close_type IN ('auto_full', 'manual', 'scheduled')),
+  scheduled_close_at TIMESTAMP,
+  
+  -- Metadata
+  terms_conditions TEXT,
+  prize_meta JSONB DEFAULT '{}',
+  host_meta JSONB DEFAULT '{}',
+  
+  -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,
   ended_at TIMESTAMP,
@@ -239,9 +268,20 @@ CREATE TABLE IF NOT EXISTS raffles (
 CREATE INDEX IF NOT EXISTS idx_raffles_code ON raffles(code);
 CREATE INDEX IF NOT EXISTS idx_raffles_host ON raffles(host_id);
 CREATE INDEX IF NOT EXISTS idx_raffles_status ON raffles(status);
+CREATE INDEX IF NOT EXISTS idx_raffles_visibility ON raffles(visibility);
+CREATE INDEX IF NOT EXISTS idx_raffles_is_company ON raffles(is_company_mode);
+CREATE INDEX IF NOT EXISTS idx_raffles_close_type ON raffles(close_type);
+CREATE INDEX IF NOT EXISTS idx_raffles_pot_fires ON raffles(pot_fires DESC) WHERE pot_fires > 0;
 
 COMMENT ON TABLE raffles IS 'Rifas - modo fires o premio';
 COMMENT ON COLUMN raffles.mode IS 'fires: reparte pot, prize: premio físico';
+COMMENT ON COLUMN raffles.cost_per_number IS 'Costo base por número en modo fires';
+COMMENT ON COLUMN raffles.pot_fires IS 'Acumulador de fuegos en el pote';
+COMMENT ON COLUMN raffles.pot_coins IS 'Acumulador de monedas en el pote';
+COMMENT ON COLUMN raffles.numbers_range IS 'Rango total de números disponibles';
+COMMENT ON COLUMN raffles.is_company_mode IS 'TRUE si es rifa empresarial (3000🔥)';
+COMMENT ON COLUMN raffles.prize_meta IS 'Metadata del premio en formato JSON';
+COMMENT ON COLUMN raffles.host_meta IS 'Metadata del host en formato JSON';
 
 -- ============================================
 -- 11. RAFFLE_NUMBERS
