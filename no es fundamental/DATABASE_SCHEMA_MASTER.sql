@@ -708,7 +708,143 @@ CREATE INDEX IF NOT EXISTS idx_gift_analytics_event ON gift_analytics(event_id);
 CREATE INDEX IF NOT EXISTS idx_gift_analytics_user ON gift_analytics(user_id);
 
 -- ============================================
--- 28. MIGRATIONS
+-- 28. FIRE SUPPLY
+-- ============================================
+CREATE TABLE IF NOT EXISTS fire_supply (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  total_max DECIMAL(20, 2) NOT NULL DEFAULT 1000000000,
+  total_emitted DECIMAL(20, 2) NOT NULL DEFAULT 0,
+  total_burned DECIMAL(20, 2) NOT NULL DEFAULT 0,
+  total_circulating DECIMAL(20, 2) NOT NULL DEFAULT 0,
+  total_reserved DECIMAL(20, 2) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT single_row CHECK (id = 1)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fire_supply_updated ON fire_supply(updated_at);
+
+COMMENT ON TABLE fire_supply IS 'Control de suministro total de fuegos (tabla singleton)';
+COMMENT ON COLUMN fire_supply.total_max IS 'Máximo suministro de fuegos: 1,000,000,000';
+
+-- ============================================
+-- 29. SUPPLY TRANSACTIONS
+-- ============================================
+CREATE TABLE IF NOT EXISTS supply_txs (
+  id BIGSERIAL PRIMARY KEY,
+  transaction_hash UUID DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
+  type VARCHAR(32) NOT NULL,
+  currency VARCHAR(10) NOT NULL CHECK (currency IN ('fires', 'coins')),
+  amount DECIMAL(18,2) NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  user_ext VARCHAR(128),
+  event_id INTEGER,
+  reference VARCHAR(255),
+  description TEXT,
+  metadata JSONB DEFAULT '{}',
+  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(128),
+  ip_address INET,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_supply_txs_type ON supply_txs(type);
+CREATE INDEX IF NOT EXISTS idx_supply_txs_user_id ON supply_txs(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_supply_txs_created_at ON supply_txs(created_at);
+CREATE INDEX IF NOT EXISTS idx_supply_txs_hash ON supply_txs(transaction_hash);
+
+COMMENT ON TABLE supply_txs IS 'Registro de transacciones de suministro (audit log)';
+COMMENT ON COLUMN supply_txs.type IS 'Tipos: emission, burn, welcome_bonus, game_reward, market_redeem, admin_grant';
+
+-- ============================================
+-- 30. WELCOME EVENT CLAIMS
+-- ============================================
+CREATE TABLE IF NOT EXISTS welcome_event_claims (
+  event_id INTEGER NOT NULL REFERENCES welcome_events(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_ext VARCHAR(128) NOT NULL,
+  coins_claimed DECIMAL(18,2) NOT NULL DEFAULT 0,
+  fires_claimed DECIMAL(18,2) NOT NULL DEFAULT 0,
+  claimed_at TIMESTAMPTZ DEFAULT NOW(),
+  ip_address INET,
+  PRIMARY KEY(event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_welcome_claims_user ON welcome_event_claims(user_id);
+CREATE INDEX IF NOT EXISTS idx_welcome_claims_claimed_at ON welcome_event_claims(claimed_at);
+
+COMMENT ON TABLE welcome_event_claims IS 'Tracking de claims de eventos de bienvenida';
+
+-- ============================================
+-- 31. WELCOME EVENT HISTORY
+-- ============================================
+CREATE TABLE IF NOT EXISTS welcome_event_history (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES welcome_events(id) ON DELETE CASCADE,
+  action VARCHAR(32) NOT NULL,
+  actor_id UUID REFERENCES users(id),
+  actor_name VARCHAR(128),
+  payload JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_welcome_history_event ON welcome_event_history(event_id);
+CREATE INDEX IF NOT EXISTS idx_welcome_history_action ON welcome_event_history(action);
+
+COMMENT ON TABLE welcome_event_history IS 'Historial de auditoría de eventos de bienvenida';
+COMMENT ON COLUMN welcome_event_history.action IS 'Acciones: created, updated, activated, deactivated, claimed';
+
+-- ============================================
+-- 32. FIRE REQUESTS
+-- ============================================
+CREATE TABLE IF NOT EXISTS fire_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount DECIMAL(18,2) NOT NULL CHECK (amount > 0),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  reference VARCHAR(255),
+  proof_url TEXT,
+  notes TEXT,
+  reviewer_id UUID REFERENCES users(id),
+  reviewed_at TIMESTAMPTZ,
+  review_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fire_requests_user ON fire_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_status ON fire_requests(status);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_created ON fire_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_fire_requests_reviewer ON fire_requests(reviewer_id);
+
+COMMENT ON TABLE fire_requests IS 'Solicitudes de fuegos de usuarios hacia administradores';
+COMMENT ON COLUMN fire_requests.status IS 'Estados: pending, approved, rejected, cancelled';
+COMMENT ON COLUMN fire_requests.reference IS 'Referencia bancaria o comprobante de pago';
+
+-- ============================================
+-- 33. BINGO V2 REFUNDS
+-- ============================================
+CREATE TABLE IF NOT EXISTS bingo_v2_refunds (
+  id SERIAL PRIMARY KEY,
+  room_id INTEGER NOT NULL REFERENCES bingo_v2_rooms(id) ON DELETE CASCADE,
+  player_id INTEGER REFERENCES bingo_v2_room_players(id) ON DELETE SET NULL,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount DECIMAL(10, 2) NOT NULL,
+  currency_type VARCHAR(10) NOT NULL CHECK (currency_type IN ('coins', 'fires')),
+  reason VARCHAR(50) NOT NULL CHECK (reason IN ('host_closed', 'system_failure', 'admin_forced', 'timeout')),
+  refunded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  refunded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_refunds_room ON bingo_v2_refunds(room_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_refunds_user ON bingo_v2_refunds(user_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_v2_refunds_date ON bingo_v2_refunds(refunded_at DESC);
+
+COMMENT ON TABLE bingo_v2_refunds IS 'Registro de reembolsos de salas de Bingo';
+COMMENT ON COLUMN bingo_v2_refunds.reason IS 'Razones: host_closed, system_failure, admin_forced, timeout';
+
+-- ============================================
+-- 34. MIGRATIONS
 -- ============================================
 CREATE TABLE IF NOT EXISTS migrations (
   id SERIAL PRIMARY KEY,
