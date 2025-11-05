@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS users (
   tg_id BIGINT UNIQUE,
   avatar_url TEXT,
   locale VARCHAR(10) DEFAULT 'es',
-  bio TEXT,
   level INTEGER DEFAULT 1,
   experience INTEGER DEFAULT 0,
   total_games_played INTEGER DEFAULT 0,
@@ -36,6 +35,8 @@ CREATE TABLE IF NOT EXISTS users (
   roles TEXT[] DEFAULT ARRAY['user'],
   is_active BOOLEAN DEFAULT true,
   is_verified BOOLEAN DEFAULT false,
+  nickname VARCHAR(20) UNIQUE,
+  bio VARCHAR(500),
   security_answer TEXT,
   last_password_change TIMESTAMP,
   first_seen_at TIMESTAMP DEFAULT NOW(),
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_tg_id ON users(tg_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname) WHERE nickname IS NOT NULL;
 
 COMMENT ON TABLE users IS 'Usuarios del sistema - información principal';
 COMMENT ON COLUMN users.experience IS 'Puntos de experiencia acumulados';
@@ -109,10 +111,13 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   description TEXT,
   reference VARCHAR(255),
   metadata JSONB DEFAULT '{}',
+  related_user_id UUID REFERENCES users(id),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_wallet_txns_wallet ON wallet_transactions(wallet_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_txns_related_user ON wallet_transactions(related_user_id) WHERE related_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wallet_txns_wallet_related ON wallet_transactions(wallet_id, related_user_id) WHERE related_user_id IS NOT NULL;
 
 COMMENT ON TABLE wallet_transactions IS 'Historial de transacciones de wallets';
 
