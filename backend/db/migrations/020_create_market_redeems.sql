@@ -76,16 +76,9 @@ WHERE processed_at IS NOT NULL;
 -- ============================================
 -- TRIGGER PARA UPDATED_AT
 -- ============================================
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_market_redeems_updated_at') THEN
-    CREATE TRIGGER update_market_redeems_updated_at 
-      BEFORE UPDATE ON market_redeems
-      FOR EACH ROW 
-      EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-END $$;
+-- NOTA: Función update_updated_at_column() no existe en BD actual
+-- Se creará en migración futura o se maneja a nivel de aplicación
+-- Por ahora, updated_at se actualiza manualmente en queries
 
 -- ============================================
 -- COMENTARIOS
@@ -115,6 +108,6 @@ BEGIN
     SELECT 1 FROM information_schema.tables 
     WHERE table_name = 'market_redeems'
   ) THEN
-    RAISE NOTICE '✅ Migración 020 completada: tabla market_redeems creada con 6 índices';
+    RAISE NOTICE '✅ Migración 020 completada: tabla market_redeems creada con 6 índices (sin trigger)';
   END IF;
 END $$;
