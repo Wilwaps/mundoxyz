@@ -30,6 +30,7 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         u.total_games_played,
         u.total_games_won,
         w.id as wallet_id,
+        w.wallet_address,
         w.coins_balance,
         w.fires_balance,
         w.total_coins_earned,
@@ -42,7 +43,7 @@ router.get('/:userId', optionalAuth, async (req, res) => {
       LEFT JOIN user_roles ur ON ur.user_id = u.id
       LEFT JOIN roles r ON r.id = ur.role_id
       WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
-      GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, w.total_coins_earned, 
+      GROUP BY u.id, w.id, w.wallet_address, w.coins_balance, w.fires_balance, w.total_coins_earned, 
                w.total_fires_earned, w.total_coins_spent, w.total_fires_spent`,
       [userId]
     );
@@ -91,6 +92,7 @@ router.get('/:userId', optionalAuth, async (req, res) => {
     // Add private data if authorized
     if (isOwnProfile || isAdmin) {
       profile.wallet_id = user.wallet_id;
+      profile.wallet_address = user.wallet_address;
       profile.tg_id = user.tg_id;
       profile.email = user.email;
       profile.locale = user.locale;

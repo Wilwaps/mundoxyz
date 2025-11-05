@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const ReceiveFiresModal = ({ isOpen, onClose, walletId }) => {
+const ReceiveFiresModal = ({ isOpen, onClose, walletAddress }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(walletId);
+      await navigator.clipboard.writeText(walletAddress);
       setCopied(true);
       toast.success('Dirección copiada al portapapeles');
       setTimeout(() => setCopied(false), 2000);
@@ -68,7 +68,7 @@ const ReceiveFiresModal = ({ isOpen, onClose, walletId }) => {
                   Tu Dirección de Billetera
                 </label>
                 <div className="bg-background-dark/50 rounded-lg p-3 break-all font-mono text-sm text-accent">
-                  {walletId}
+                  {walletAddress}
                 </div>
               </div>
 

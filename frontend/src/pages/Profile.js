@@ -35,7 +35,7 @@ const Profile = () => {
   const [showSendFires, setShowSendFires] = useState(false);
   const [showBuyFires, setShowBuyFires] = useState(false);
   const [showReceiveFires, setShowReceiveFires] = useState(false);
-  const [walletId, setWalletId] = useState(user?.wallet_id || null);
+  const [walletAddress, setWalletAddress] = useState(user?.wallet_address || null);
 
   // Detectar query param para abrir modal de historial
   useEffect(() => {
@@ -46,12 +46,12 @@ const Profile = () => {
     }
   }, [location.search]);
 
-  // Sync walletId when user changes
+  // Sync walletAddress when user changes
   React.useEffect(() => {
-    if (user?.wallet_id) {
-      setWalletId(user.wallet_id);
+    if (user?.wallet_address) {
+      setWalletAddress(user.wallet_address);
     }
-  }, [user?.wallet_id]);
+  }, [user?.wallet_address]);
 
   // Fetch user stats
   const { data: stats } = useQuery({
@@ -65,12 +65,12 @@ const Profile = () => {
     refetchIntervalInBackground: false
   });
 
-  // Fetch wallet ID
+  // Fetch wallet address
   const { data: walletData } = useQuery({
     queryKey: ['user-wallet', user?.id],
     queryFn: async () => {
       const response = await axios.get(`/api/profile/${user.id}`);
-      setWalletId(response.data.wallet_id);
+      setWalletAddress(response.data.wallet_address);
       return response.data;
     },
     enabled: !!user?.id,
@@ -381,7 +381,7 @@ const Profile = () => {
       <ReceiveFiresModal 
         isOpen={showReceiveFires} 
         onClose={() => setShowReceiveFires(false)}
-        walletId={user?.wallet_id || walletId}
+        walletAddress={user?.wallet_address || walletAddress}
       />
 
       <MyDataModal

@@ -269,6 +269,7 @@ export const AuthProvider = ({ children }) => {
         roles: Array.isArray(profileData.roles) ? profileData.roles : 
                Array.isArray(user.roles) ? user.roles : [],
         wallet_id: profileData.wallet_id,
+        wallet_address: profileData.wallet_address,
         // Seguridad
         security_answer: profileData.security_answer || false,
         // Balances del stats

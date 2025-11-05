@@ -83,6 +83,7 @@ COMMENT ON COLUMN auth_identities.password_hash IS 'Hash bcrypt (solo para provi
 CREATE TABLE IF NOT EXISTS wallets (
   id SERIAL PRIMARY KEY,
   user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  wallet_address UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
   coins_balance DECIMAL(20,2) DEFAULT 0 CHECK (coins_balance >= 0),
   fires_balance DECIMAL(20,2) DEFAULT 0 CHECK (fires_balance >= 0),
   total_coins_earned DECIMAL(20,2) DEFAULT 0,
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS wallets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wallets_address ON wallets(wallet_address);
 
 COMMENT ON TABLE wallets IS 'Billeteras virtuales - coins y fires';
 
