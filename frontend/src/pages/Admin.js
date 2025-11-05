@@ -184,6 +184,7 @@ const AdminStats = () => {
 const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const queryClient = useQueryClient();
   
   const { data: users } = useQuery({
     queryKey: ['admin-users', search, selectedRole],
