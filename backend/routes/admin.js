@@ -331,7 +331,7 @@ router.get('/stats', adminAuth, async (req, res) => {
       await query(`
         CREATE TABLE IF NOT EXISTS fire_supply (
           id INTEGER PRIMARY KEY DEFAULT 1,
-          total_max DECIMAL(20, 2) NOT NULL DEFAULT 10000,
+          total_max DECIMAL(20, 2) NOT NULL DEFAULT 1000000000,
           total_emitted DECIMAL(20, 2) NOT NULL DEFAULT 0,
           total_burned DECIMAL(20, 2) NOT NULL DEFAULT 0,
           total_circulating DECIMAL(20, 2) NOT NULL DEFAULT 0,
@@ -344,7 +344,7 @@ router.get('/stats', adminAuth, async (req, res) => {
       // Insertar registro inicial si no existe
       await query(`
         INSERT INTO fire_supply (id, total_max, total_emitted, total_burned, total_circulating, total_reserved)
-        VALUES (1, 10000, 0, 0, 0, 0)
+        VALUES (1, 1000000000, 0, 0, 0, 0)
         ON CONFLICT (id) DO NOTHING
       `);
       
@@ -363,7 +363,7 @@ router.get('/stats', adminAuth, async (req, res) => {
     
     const supplyStats = await query('SELECT * FROM fire_supply WHERE id = 1');
     stats.supply = supplyStats.rows[0] || {
-      total_max: 10000,
+      total_max: 1000000000,
       total_emitted: 0,
       total_burned: 0,
       total_circulating: 0,

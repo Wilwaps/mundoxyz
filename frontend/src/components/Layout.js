@@ -70,18 +70,18 @@ const Layout = () => {
     <div className="flex flex-col min-h-screen bg-background-dark">
       {/* Header */}
       <header className="bg-card border-b border-glass px-4 py-3 safe-top">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-y-3">
+          <div className="flex items-center gap-3 min-w-0">
             <img 
               src="/logo.ico" 
-              alt="MundoXYZ Logo" 
-              className="w-8 h-8 object-contain"
+              alt="XYZ Logo" 
+              className="w-8 h-8 md:w-10 md:h-10 object-contain flex-shrink-0"
             />
-            <h1 className="text-2xl font-bold text-gradient-accent">MUNDOXYZ</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gradient-accent truncate">XYZ</h1>
           </div>
           <div className="flex items-center gap-2">
             {/* Balance Display - Clickeable */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <div 
                 className="badge-experience cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => setShowExperienceModal(true)}

@@ -29,15 +29,15 @@
   }
 
   .badge-experience {
-    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-500/20 to-amber-400/20 text-yellow-300 border border-yellow-400/30 min-w-[80px];
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-500/20 to-amber-400/20 text-yellow-300 border border-yellow-400/30 min-w-[80px] whitespace-nowrap;
   }
 
   .badge-fire {
-    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500/20 to-yellow-400/20 text-yellow-400 border border-yellow-400/30 min-w-[90px];
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500/20 to-yellow-400/20 text-yellow-400 border border-yellow-400/30 min-w-[90px] whitespace-nowrap;
   }
 
   .badge-coins {
-    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-primary/20 to-accent/20 text-accent border border-accent/30 min-w-[90px];
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-primary/20 to-accent/20 text-accent border border-accent/30 min-w-[90px] whitespace-nowrap;
   }
 
   .glow-text {
