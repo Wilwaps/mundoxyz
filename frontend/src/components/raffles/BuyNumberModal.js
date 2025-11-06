@@ -20,42 +20,35 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
 
   useEffect(() => {
     // Al abrir el modal, reservar el número inmediatamente
-    reserveNumber();
+    const reserve = async () => {
+      try {
+        const response = await axios.post(
+          `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/reserve-number`,
+          { number_idx: numberIdx },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+        
+        if (response.data.success) {
+          console.log(`✅ Número ${numberIdx} reservado temporalmente`);
+        }
+      } catch (err) {
+        console.error('Error reservando número:', err);
+        if (err.response?.data?.error) {
+          setError(err.response.data.error);
+        }
+      }
+    };
+
+    reserve();
     loadPaymentDetails();
 
     // Al cerrar el modal, liberar la reserva
     return () => {
-      releaseNumber();
-    };
-  }, [raffle.id, numberIdx]);
-
-  const reserveNumber = async () => {
-    try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/reserve-number`,
-        { number_idx: numberIdx },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        console.log(`✅ Número ${numberIdx} reservado temporalmente`);
-      }
-    } catch (err) {
-      console.error('Error reservando número:', err);
-      // Si el número ya está reservado/vendido, mostrar error
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      }
-    }
-  };
-
-  const releaseNumber = async () => {
-    try {
-      await axios.post(
+      axios.post(
         `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/release-number`,
         { number_idx: numberIdx },
         {
@@ -63,12 +56,14 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
             Authorization: `Bearer ${localStorage.getItem('token')}`
           }
         }
-      );
-      console.log(`✅ Número ${numberIdx} liberado`);
-    } catch (err) {
-      console.error('Error liberando número:', err);
-    }
-  };
+      ).then(() => {
+        console.log(`✅ Número ${numberIdx} liberado`);
+      }).catch(err => {
+        console.error('Error liberando número:', err);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raffle.id, numberIdx]);
 
   const loadPaymentDetails = async () => {
     try {
