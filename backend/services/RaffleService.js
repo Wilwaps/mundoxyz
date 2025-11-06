@@ -1755,6 +1755,299 @@ class RaffleService {
             client.release();
         }
     }
+
+    /**
+     * Actualizar datos de pago de una rifa (Premio/Empresa)
+     * Solo el anfitrión puede actualizar sus datos de pago
+     */
+    async updatePaymentDetails(raffleId, hostId, paymentData) {
+        const client = await this.pool.connect();
+        
+        try {
+            // Verificar que el usuario sea el anfitrión
+            const raffleResult = await client.query(
+                'SELECT host_id, mode FROM raffles WHERE id = $1',
+                [raffleId]
+            );
+
+            if (raffleResult.rows.length === 0) {
+                throw new Error('Rifa no encontrada');
+            }
+
+            const raffle = raffleResult.rows[0];
+
+            if (raffle.host_id !== hostId) {
+                throw new Error('Solo el anfitrión puede actualizar los datos de pago');
+            }
+
+            if (raffle.mode !== 'prize' && raffle.mode !== 'company') {
+                throw new Error('Esta rifa no acepta pagos externos');
+            }
+
+            // Validar datos según método de pago
+            const {
+                payment_cost_amount,
+                payment_cost_currency = 'USD',
+                payment_method,
+                payment_bank_code,
+                payment_phone,
+                payment_id_number,
+                payment_instructions
+            } = paymentData;
+
+            if (!payment_cost_amount || payment_cost_amount <= 0) {
+                throw new Error('El costo de la rifa es requerido');
+            }
+
+            if (!payment_method || !['cash', 'bank'].includes(payment_method)) {
+                throw new Error('Método de pago inválido');
+            }
+
+            // Validar instrucciones (máx 300 caracteres)
+            if (payment_instructions && payment_instructions.length > 300) {
+                throw new Error('Las instrucciones no pueden exceder 300 caracteres');
+            }
+
+            // Si es banco, validar campos obligatorios
+            if (payment_method === 'bank') {
+                if (!payment_bank_code || !payment_phone || !payment_id_number) {
+                    throw new Error('Para pago móvil se requieren: banco, teléfono y cédula');
+                }
+            }
+
+            // Actualizar datos
+            const updateResult = await client.query(`
+                UPDATE raffles 
+                SET 
+                    payment_cost_amount = $1,
+                    payment_cost_currency = $2,
+                    payment_method = $3,
+                    payment_bank_code = $4,
+                    payment_phone = $5,
+                    payment_id_number = $6,
+                    payment_instructions = $7,
+                    updated_at = NOW()
+                WHERE id = $8
+                RETURNING 
+                    payment_cost_amount,
+                    payment_cost_currency,
+                    payment_method,
+                    payment_bank_code,
+                    payment_phone,
+                    payment_id_number,
+                    payment_instructions
+            `, [
+                payment_cost_amount,
+                payment_cost_currency,
+                payment_method,
+                payment_method === 'bank' ? payment_bank_code : null,
+                payment_method === 'bank' ? payment_phone : null,
+                payment_method === 'bank' ? payment_id_number : null,
+                payment_instructions || null,
+                raffleId
+            ]);
+
+            logger.info('Datos de pago actualizados', {
+                raffleId,
+                hostId,
+                payment_method
+            });
+
+            return updateResult.rows[0];
+
+        } catch (error) {
+            logger.error('Error actualizando datos de pago:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Obtener datos de pago de una rifa
+     * Datos sensibles solo visibles para host y compradores
+     */
+    async getPaymentDetails(raffleId, userId = null) {
+        const client = await this.pool.connect();
+        
+        try {
+            const result = await client.query(`
+                SELECT 
+                    id,
+                    host_id,
+                    mode,
+                    payment_cost_amount,
+                    payment_cost_currency,
+                    payment_method,
+                    payment_bank_code,
+                    payment_phone,
+                    payment_id_number,
+                    payment_instructions
+                FROM raffles 
+                WHERE id = $1
+            `, [raffleId]);
+
+            if (result.rows.length === 0) {
+                throw new Error('Rifa no encontrada');
+            }
+
+            const raffle = result.rows[0];
+
+            // Si no hay método de pago configurado
+            if (!raffle.payment_method) {
+                return null;
+            }
+
+            // Datos públicos (siempre visibles)
+            const publicData = {
+                payment_cost_amount: raffle.payment_cost_amount,
+                payment_cost_currency: raffle.payment_cost_currency,
+                payment_method: raffle.payment_method,
+                payment_instructions: raffle.payment_instructions
+            };
+
+            // Datos sensibles (solo para host y compradores autenticados)
+            if (raffle.payment_method === 'bank') {
+                publicData.payment_bank_code = raffle.payment_bank_code;
+                publicData.payment_phone = raffle.payment_phone;
+                publicData.payment_id_number = raffle.payment_id_number;
+            }
+
+            return publicData;
+
+        } catch (error) {
+            logger.error('Error obteniendo datos de pago:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Obtener lista de participantes con nombres públicos
+     * Solo muestra display_name y números comprados
+     */
+    async getParticipants(raffleId) {
+        const client = await this.pool.connect();
+        
+        try {
+            const result = await client.query(`
+                SELECT 
+                    rr.id,
+                    rr.request_data,
+                    rr.buyer_profile,
+                    rr.status,
+                    rr.created_at
+                FROM raffle_requests rr
+                WHERE rr.raffle_id = $1 
+                  AND rr.status = 'approved'
+                ORDER BY rr.created_at ASC
+            `, [raffleId]);
+
+            // Agrupar por nombre y números
+            const participants = {};
+
+            result.rows.forEach(row => {
+                const buyerProfile = row.buyer_profile || {};
+                const displayName = buyerProfile.display_name || 'Anónimo';
+                const numberIdx = row.request_data?.number_idx;
+
+                if (!participants[displayName]) {
+                    participants[displayName] = {
+                        display_name: displayName,
+                        numbers: []
+                    };
+                }
+
+                if (numberIdx !== undefined) {
+                    participants[displayName].numbers.push(numberIdx);
+                }
+            });
+
+            // Convertir a array y ordenar números
+            return Object.values(participants).map(p => ({
+                ...p,
+                numbers: p.numbers.sort((a, b) => a - b)
+            }));
+
+        } catch (error) {
+            logger.error('Error obteniendo participantes:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Obtener datos completos de un participante
+     * Solo accesible por: Admin, Tote, o Host (solo para el ganador)
+     */
+    async getParticipantFullData(raffleId, participantRequestId, requesterId) {
+        const client = await this.pool.connect();
+        
+        try {
+            // Obtener información de la rifa
+            const raffleResult = await client.query(`
+                SELECT host_id, winner_id FROM raffles WHERE id = $1
+            `, [raffleId]);
+
+            if (raffleResult.rows.length === 0) {
+                throw new Error('Rifa no encontrada');
+            }
+
+            const raffle = raffleResult.rows[0];
+
+            // Obtener roles del solicitante
+            const rolesResult = await client.query(`
+                SELECT r.name
+                FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = $1
+            `, [requesterId]);
+
+            const roles = rolesResult.rows.map(r => r.name);
+            const isAdmin = roles.includes('admin') || roles.includes('tote');
+            const isHost = raffle.host_id === requesterId;
+
+            // Obtener solicitud del participante
+            const requestResult = await client.query(`
+                SELECT 
+                    rr.id,
+                    rr.user_id,
+                    rr.buyer_profile,
+                    rr.request_data,
+                    rr.payment_reference
+                FROM raffle_requests rr
+                WHERE rr.id = $1 AND rr.raffle_id = $2
+            `, [participantRequestId, raffleId]);
+
+            if (requestResult.rows.length === 0) {
+                throw new Error('Solicitud no encontrada');
+            }
+
+            const request = requestResult.rows[0];
+
+            // Verificar permisos
+            const isWinner = request.user_id === raffle.winner_id;
+
+            if (!isAdmin && !(isHost && isWinner)) {
+                throw new Error('Acceso denegado: solo puedes ver datos completos del ganador');
+            }
+
+            // Retornar datos completos
+            return {
+                ...request.buyer_profile,
+                payment_reference: request.payment_reference,
+                number_idx: request.request_data?.number_idx
+            };
+
+        } catch (error) {
+            logger.error('Error obteniendo datos completos de participante:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = RaffleService;

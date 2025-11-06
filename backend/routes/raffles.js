@@ -879,4 +879,202 @@ router.post('/admin/cancel-raffle', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * PUT /api/raffles/:id/payment-details
+ * Actualizar datos de pago de una rifa (Premio/Empresa)
+ * Solo el anfitrión puede actualizar
+ */
+router.put('/:id/payment-details', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const paymentData = req.body;
+
+        const result = await raffleService.updatePaymentDetails(id, userId, paymentData);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Datos de pago actualizados correctamente'
+        });
+    } catch (error) {
+        console.error('Error actualizando datos de pago:', error);
+        res.status(400).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:id/payment-details
+ * Obtener datos de pago de una rifa
+ * Público para rifas Premio/Empresa
+ */
+router.get('/:id/payment-details', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.id || null;
+
+        const paymentDetails = await raffleService.getPaymentDetails(id, userId);
+        
+        if (!paymentDetails) {
+            return res.json({
+                success: true,
+                data: null,
+                message: 'Esta rifa no tiene datos de pago configurados'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: paymentDetails
+        });
+    } catch (error) {
+        console.error('Error obteniendo datos de pago:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:id/participants
+ * Obtener lista pública de participantes
+ * Solo muestra nombres públicos y números
+ */
+router.get('/:id/participants', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const participants = await raffleService.getParticipants(id);
+        
+        res.json({
+            success: true,
+            data: participants
+        });
+    } catch (error) {
+        console.error('Error obteniendo participantes:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/:raffleId/participant/:requestId/full-data
+ * Obtener datos completos de un participante
+ * Solo accesible por Admin/Tote o Host (para ganador)
+ */
+router.get('/:raffleId/participant/:requestId/full-data', verifyToken, async (req, res) => {
+    try {
+        const { raffleId, requestId } = req.params;
+        const userId = req.user.id;
+
+        const fullData = await raffleService.getParticipantFullData(raffleId, requestId, userId);
+        
+        res.json({
+            success: true,
+            data: fullData
+        });
+    } catch (error) {
+        console.error('Error obteniendo datos completos:', error);
+        res.status(403).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/raffles/public/:code
+ * Landing público para rifas modo Empresa
+ * Sin autenticación requerida
+ */
+router.get('/public/:code', async (req, res) => {
+    try {
+        const { code } = req.params;
+
+        // Buscar rifa por código
+        const raffleResult = await query(`
+            SELECT 
+                r.id,
+                r.code,
+                r.name,
+                r.description,
+                r.mode,
+                r.total_numbers,
+                r.status,
+                r.branding_logo_url,
+                r.branding_colors,
+                r.payment_cost_amount,
+                r.payment_cost_currency,
+                r.created_at
+            FROM raffles r
+            WHERE r.code = $1
+        `, [code]);
+
+        if (raffleResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Rifa no encontrada'
+            });
+        }
+
+        const raffle = raffleResult.rows[0];
+
+        // Validar que sea modo empresa
+        if (raffle.mode !== 'company') {
+            return res.status(403).json({
+                success: false,
+                error: 'Esta rifa no tiene landing público'
+            });
+        }
+
+        // Obtener números
+        const numbersResult = await query(`
+            SELECT number_idx, state, owner_id
+            FROM raffle_numbers
+            WHERE raffle_id = $1
+            ORDER BY number_idx
+        `, [raffle.id]);
+
+        // Obtener participantes (nombres públicos)
+        const participants = await raffleService.getParticipants(raffle.id);
+
+        res.json({
+            success: true,
+            data: {
+                raffle: {
+                    id: raffle.id,
+                    code: raffle.code,
+                    name: raffle.name,
+                    description: raffle.description,
+                    total_numbers: raffle.total_numbers,
+                    status: raffle.status,
+                    branding_logo_url: raffle.branding_logo_url,
+                    branding_colors: raffle.branding_colors,
+                    payment_cost_amount: raffle.payment_cost_amount,
+                    payment_cost_currency: raffle.payment_cost_currency,
+                    created_at: raffle.created_at
+                },
+                numbers: numbersResult.rows.map(n => ({
+                    number_idx: n.number_idx,
+                    state: n.state,
+                    is_available: n.state === 'available'
+                })),
+                participants
+            }
+        });
+    } catch (error) {
+        console.error('Error cargando landing público:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 module.exports = router;
