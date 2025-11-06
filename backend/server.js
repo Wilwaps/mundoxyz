@@ -220,6 +220,7 @@ app.use('/api/economy', economyRoutes);
 app.use('/api/welcome', welcomeRoutes);
 app.use('/api/gifts', require('./routes/gifts'));
 app.use('/api/admin', adminRoutes);
+app.use('/api/audit', require('./routes/audit')); // TEMPORAL - Auditoría exploit reembolsos
 app.use('/api/roles', rolesRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tictactoe', (req, res, next) => {
