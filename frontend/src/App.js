@@ -23,6 +23,7 @@ import RaffleDetails from './pages/RaffleDetails';
 import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
 import TicTacToeRoom from './pages/TicTacToeRoom';
+import RafflePublicLanding from './pages/RafflePublicLanding';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -104,6 +105,9 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              
+              {/* Ruta pública para landing de rifas empresa (sin login) */}
+              <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
               
               <Route path="/" element={
                 <ProtectedRoute>

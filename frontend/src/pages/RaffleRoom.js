@@ -8,7 +8,8 @@ import {
   FaTimes, FaFire, FaGift, FaBuilding, FaTrophy, FaUsers,
   FaClock, FaEye, FaChartLine, FaCheck, FaShoppingCart,
   FaTicketAlt, FaQrcode, FaShieldAlt, FaCoins, FaTag,
-  FaLock, FaUnlock, FaHourglassHalf, FaStar, FaHistory
+  FaLock, FaUnlock, FaHourglassHalf, FaStar, FaHistory,
+  FaDollarSign, FaShareAlt, FaCopy
 } from 'react-icons/fa';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -17,6 +18,9 @@ import MathCaptcha from '../components/MathCaptcha';
 import NumberGrid from '../components/raffles/NumberGrid';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
+import PaymentDetailsModal from '../components/raffles/PaymentDetailsModal';
+import BuyNumberModal from '../components/raffles/BuyNumberModal';
+import ParticipantsModal from '../components/raffles/ParticipantsModal';
 
 const RaffleRoom = () => {
   const { code } = useParams();
@@ -28,6 +32,12 @@ const RaffleRoom = () => {
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Estados para modales de sistema de pagos
+  const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState(false);
+  const [showBuyNumberModal, setShowBuyNumberModal] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
 
   // Consulta principal de la rifa
   const { 
@@ -132,6 +142,43 @@ const RaffleRoom = () => {
 
   const captchaData = MathCaptcha.generateCaptcha();
 
+  // Función para copiar enlace público (modo empresa)
+  const handleCopyPublicLink = () => {
+    const publicUrl = `${window.location.origin}/raffles/public/${raffle.code}`;
+    navigator.clipboard.writeText(publicUrl).then(() => {
+      toast.success('¡Enlace copiado al portapapeles!');
+    }).catch(() => {
+      toast.error('Error al copiar enlace');
+    });
+  };
+
+  // Abrir modal de compra según modo
+  const handleNumberClick = (numberIdx) => {
+    setSelectedNumber(numberIdx);
+    
+    // Si es modo Premio o Empresa, usar nuevo modal
+    if (raffle.mode === 'prize' || raffle.mode === 'company') {
+      setShowBuyNumberModal(true);
+    } else {
+      // Modo normal (free/coins/fires)
+      setShowBuyModal(true);
+    }
+  };
+
+  // Guardar datos de pago actualizados
+  const handlePaymentDetailsSaved = (updatedData) => {
+    setPaymentDetails(updatedData);
+    toast.success('Datos de pago actualizados correctamente');
+    refetch();
+  };
+
+  // Compra exitosa en modo Premio/Empresa
+  const handleBuyNumberSuccess = () => {
+    toast.success('¡Solicitud enviada! Espera la aprobación del anfitrión');
+    refetch();
+    queryClient.invalidateQueries(['raffle-numbers', code]);
+  };
+
   useEffect(() => {
     if (error) {
       toast.error('Error al cargar la rifa');
@@ -189,11 +236,43 @@ const RaffleRoom = () => {
               <span className="text-white/60 text-sm">
                 Código: <span className="text-white font-semibold">{raffle.code}</span>
               </span>
+              
+              {/* Botón Participantes */}
+              <button
+                onClick={() => setShowParticipantsModal(true)}
+                className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
+                title="Ver participantes"
+              >
+                <FaUsers /> Participantes
+              </button>
+              
+              {/* Botón Mis datos de pago (solo host y modo premio/empresa) */}
+              {raffle.host_id === user?.id && (raffle.mode === 'prize' || raffle.mode === 'company') && (
+                <button
+                  onClick={() => setShowPaymentDetailsModal(true)}
+                  className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
+                  title="Configurar datos de pago"
+                >
+                  <FaDollarSign /> Mis datos de pago
+                </button>
+              )}
+              
+              {/* Botón Copiar enlace público (solo modo empresa) */}
+              {raffle.mode === 'company' && (
+                <button
+                  onClick={handleCopyPublicLink}
+                  className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
+                  title="Copiar enlace público"
+                >
+                  <FaCopy /> Enlace público
+                </button>
+              )}
+              
               <button
                 onClick={() => window.open(`/raffles/${code}/share`, '_blank')}
-                className="text-white/60 hover:text-white transition-colors"
+                className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
               >
-                Compartir
+                <FaShareAlt /> Compartir
               </button>
             </div>
           </div>
@@ -614,6 +693,35 @@ const RaffleRoom = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Modales del sistema de pagos */}
+      {showPaymentDetailsModal && (
+        <PaymentDetailsModal
+          raffleId={raffle.id}
+          currentData={paymentDetails}
+          onClose={() => setShowPaymentDetailsModal(false)}
+          onSave={handlePaymentDetailsSaved}
+        />
+      )}
+      
+      {showBuyNumberModal && selectedNumber && (
+        <BuyNumberModal
+          raffle={raffle}
+          numberIdx={selectedNumber}
+          onClose={() => {
+            setShowBuyNumberModal(false);
+            setSelectedNumber(null);
+          }}
+          onSuccess={handleBuyNumberSuccess}
+        />
+      )}
+      
+      {showParticipantsModal && (
+        <ParticipantsModal
+          raffleId={raffle.id}
+          onClose={() => setShowParticipantsModal(false)}
+        />
+      )}
     </div>
   );
 };
