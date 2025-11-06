@@ -854,6 +854,59 @@ router.get('/:raffleId/payment-methods', async (req, res) => {
 });
 
 /**
+ * POST /api/raffles/:raffleId/request-number
+ * Solicitar compra de un número (modo premio con aprobación)
+ * Body: { number_idx, buyer_profile, payment_method }
+ */
+router.post('/:raffleId/request-number', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffleId = parseInt(req.params.raffleId);
+        const { number_idx, buyer_profile, payment_method } = req.body;
+
+        // Validar datos requeridos
+        if (number_idx === undefined || number_idx === null) {
+            return res.status(400).json({
+                success: false,
+                error: 'Número de rifa requerido'
+            });
+        }
+
+        if (!payment_method) {
+            return res.status(400).json({
+                success: false,
+                error: 'Método de pago requerido'
+            });
+        }
+
+        // Usar el servicio de compra con modo prize
+        const result = await raffleService.purchaseNumbers(userId, {
+            raffleId,
+            numbers: [number_idx],  // Convertir a array
+            mode: 'prize',  // Siempre es modo premio con aprobación
+            buyerProfile: buyer_profile,
+            paymentMethod: payment_method,
+            paymentReference: buyer_profile?.payment_reference || '',
+            message: buyer_profile?.message || ''
+        });
+
+        res.json({
+            success: true,
+            data: result,
+            message: payment_method === 'fire' 
+                ? 'Solicitud enviada. Tus fuegos se descontarán al ser aprobada.'
+                : 'Solicitud enviada. Espera la aprobación del anfitrión.'
+        });
+    } catch (error) {
+        console.error('Error en request-number:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
  * GET /api/raffles/:raffleId/pending-requests
  * Obtener solicitudes de compra pendientes - Solo host
  */
