@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 
 // Import modales existentes
-import TicTacToeCreateRoomModal from '../components/tictactoe/CreateRoomModal';
 import BingoCreateRoomModal from '../components/bingo/CreateRoomModal';
 import CreateRaffleModal from '../components/raffles/CreateRaffleModal';
 
@@ -15,7 +14,6 @@ const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showSelectorModal, setShowSelectorModal] = useState(false);
-  const [showTTTModal, setShowTTTModal] = useState(false);
   const [showBingoModal, setShowBingoModal] = useState(false);
   const [showRaffleModal, setShowRaffleModal] = useState(false);
   const [quickJoinCode, setQuickJoinCode] = useState('');
@@ -46,7 +44,8 @@ const Lobby = () => {
     setShowSelectorModal(false);
     switch (type) {
       case 'tictactoe':
-        setShowTTTModal(true);
+        // Redirigir al lobby de TicTacToe (tiene su propio modal inline)
+        navigate('/tictactoe');
         break;
       case 'bingo':
         setShowBingoModal(true);
@@ -338,16 +337,6 @@ const Lobby = () => {
       </AnimatePresence>
 
       {/* Modales de Creación */}
-      {showTTTModal && (
-        <TicTacToeCreateRoomModal
-          onClose={() => setShowTTTModal(false)}
-          onRoomCreated={(room) => {
-            setShowTTTModal(false);
-            navigate(`/tictactoe/room/${room.code}`);
-          }}
-        />
-      )}
-
       {showBingoModal && (
         <BingoCreateRoomModal
           isOpen={showBingoModal}
