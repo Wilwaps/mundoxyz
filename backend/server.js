@@ -78,6 +78,15 @@ io.on('connection', (socket) => {
   const { initTicTacToeSocket } = require('./socket/tictactoe');
   initTicTacToeSocket(io, socket);
   
+  // Initialize Unified Chat socket handlers
+  const globalChatHandler = require('./socket/globalChat');
+  const anonymousChatHandler = require('./socket/anonymousChat');
+  const roomChatHandler = require('./socket/roomChat');
+  
+  globalChatHandler(io, socket);
+  anonymousChatHandler(io, socket);
+  roomChatHandler(io, socket);
+  
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
   });

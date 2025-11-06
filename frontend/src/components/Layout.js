@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import MessageInbox from './MessageInbox';
+import UnifiedChat from './chat/UnifiedChat';
 import {
   User,
   DoorOpen,
@@ -146,6 +147,9 @@ const Layout = () => {
         onClose={() => setShowExperienceModal(false)}
         user={user}
       />
+
+      {/* Unified Chat System */}
+      <UnifiedChat />
     </div>
   );
 };
