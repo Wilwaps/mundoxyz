@@ -212,9 +212,10 @@ router.get('/:code', async (req, res) => {
 router.post('/purchase', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { 
+        let { 
             raffle_id, 
-            numbers, 
+            number,      // ← Soporte legacy para number singular
+            numbers,     // ← Soporte nuevo para numbers array
             mode, 
             buyer_profile, 
             payment_method, 
@@ -228,6 +229,11 @@ router.post('/purchase', verifyToken, async (req, res) => {
                 success: false,
                 error: 'ID de rifa requerido'
             });
+        }
+
+        // CONVERTIR number singular a array (compatibilidad)
+        if (!numbers && number !== undefined) {
+            numbers = [number];
         }
 
         if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {

@@ -615,12 +615,26 @@ class RaffleService {
      * Procesar compra en modo fuego
      */
     async processFirePurchase(client, userId, raffleId, numberIdx, cost) {
+        logger.info('🔥 processFirePurchase INICIADO', {
+            userId,
+            raffleId,
+            numberIdx,
+            cost,
+            timestamp: new Date().toISOString()
+        });
+        
         // Descontar balance
         await client.query(`
             UPDATE wallets 
             SET fires_balance = fires_balance - $1 
             WHERE user_id = $2
         `, [cost, userId]);
+        
+        logger.info('💰 BALANCE DESCONTADO', {
+            userId,
+            amount: cost,
+            timestamp: new Date().toISOString()
+        });
 
         // Obtener el ID del número
         const numberResult = await client.query(`
