@@ -25,16 +25,37 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   const loadPaymentDetails = async () => {
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/payment-details`
+        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/payment-details`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
       );
 
       if (response.data.success && response.data.data) {
         setPaymentDetails(response.data.data);
       } else {
-        setError('Esta rifa no tiene datos de pago configurados');
+        // Si no hay payment details, configurar modo fuego por defecto
+        setPaymentDetails({
+          payment_method: 'fire',
+          allow_fire_payments: true,
+          payment_cost_amount: raffle.cost_per_number || 10,
+          payment_cost_currency: 'fires'
+        });
+        // Auto-seleccionar fuego
+        setBuyerData(prev => ({ ...prev, payment_method: 'fire' }));
       }
     } catch (err) {
-      setError('Error al cargar datos de pago');
+      console.error('Error cargando payment details:', err);
+      // Fallback: permitir pago en fuegos
+      setPaymentDetails({
+        payment_method: 'fire',
+        allow_fire_payments: true,
+        payment_cost_amount: raffle.cost_per_number || 10,
+        payment_cost_currency: 'fires'
+      });
+      setBuyerData(prev => ({ ...prev, payment_method: 'fire' }));
     } finally {
       setLoadingPayment(false);
     }
