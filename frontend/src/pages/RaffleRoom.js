@@ -28,9 +28,7 @@ const RaffleRoom = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [showBuyModal, setShowBuyModal] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Estados para modales de sistema de pagos
@@ -70,91 +68,6 @@ const RaffleRoom = () => {
     enabled: !!raffle,
     refetchInterval: 10000 // Actualizar cada 10 segundos
   });
-
-  // Mutación para comprar número
-  const purchaseMutation = useMutation({
-    mutationFn: async ({ number, captcha_data }) => {
-      const response = await fetch('/api/raffles/purchase', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          raffle_id: raffle.id,
-          number,
-          captcha_data
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al comprar número');
-      }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast.success('¡Número comprado exitosamente!');
-      setShowBuyModal(false);
-      setSelectedNumber(null);
-      setCaptchaAnswer('');
-      // Refrescar datos
-      queryClient.invalidateQueries(['raffle', code]);
-      queryClient.invalidateQueries(['raffle-numbers', code]);
-      setRefreshTrigger(prev => prev + 1);
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Error al comprar el número');
-    }
-  });
-
-  // Generar captcha data para modo normal (fires/coins)
-  const generateCaptchaData = () => {
-    const operators = ['+', '-', '*'];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    
-    let num1, num2;
-    if (operator === '*') {
-      num1 = Math.floor(Math.random() * 10) + 1;
-      num2 = Math.floor(Math.random() * 10) + 1;
-    } else if (operator === '-') {
-      num1 = Math.floor(Math.random() * 20) + 10;
-      num2 = Math.floor(Math.random() * num1) + 1;
-    } else {
-      num1 = Math.floor(Math.random() * 20) + 1;
-      num2 = Math.floor(Math.random() * 20) + 1;
-    }
-    
-    return {
-      question: `${num1} ${operator} ${num2}`,
-      answer: operator === '+' ? num1 + num2 : operator === '-' ? num1 - num2 : num1 * num2
-    };
-  };
-
-  const [captchaData, setCaptchaData] = useState(generateCaptchaData());
-
-  // Generar nuevo CAPTCHA
-  const generateCaptcha = () => {
-    setCaptchaData(generateCaptchaData());
-    setCaptchaAnswer('');
-  };
-
-  // Comprar número
-  const handlePurchase = () => {
-    if (!selectedNumber || !captchaAnswer) {
-      toast.error('Completa todos los campos');
-      return;
-    }
-
-    purchaseMutation.mutate({
-      number: selectedNumber,
-      captcha_data: {
-        question: captchaData?.question,
-        answer: captchaAnswer
-      }
-    });
-  };
 
   // Verificar si un número está disponible
   const isNumberAvailable = (num) => {
@@ -525,7 +438,7 @@ const RaffleRoom = () => {
             onNumberClick={(num) => {
               if (raffle.status === 'pending' && isNumberAvailable(num)) {
                 setSelectedNumber(num);
-                setShowBuyModal(true);
+                setShowBuyNumberModal(true);  // ← CORRECCIÓN: Usar modal completo
               }
             }}
             userPurchases={numbers?.filter(n => n.purchased_by === user?.id) || []}
@@ -608,115 +521,7 @@ const RaffleRoom = () => {
         </motion.div>
       </div>
 
-      {/* Modal de compra */}
-      <AnimatePresence>
-        {showBuyModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowBuyModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-gradient-to-br from-purple-900/90 to-pink-900/90 rounded-3xl max-w-md w-full border border-white/20"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-6 border-b border-white/20">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <FaShoppingCart className="text-green-400" />
-                  Comprar Número #{selectedNumber}
-                </h3>
-                <button
-                  onClick={() => setShowBuyModal(false)}
-                  className="text-white/60 hover:text-white transition-colors"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-
-              <div className="p-6">
-                <div className="space-y-4">
-                  {/* Detalles de compra */}
-                  <div className="p-4 bg-white/10 rounded-xl">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-white/80">Número seleccionado:</span>
-                      <span className="text-white font-bold">#{selectedNumber}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80">Costo:</span>
-                      <span className="text-green-400 font-bold">
-                        {raffle.cost_per_number} fuegos
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* CAPTCHA */}
-                  <div>
-                    <label className="block text-white font-semibold mb-2">
-                      Verificación de Seguridad
-                    </label>
-                    <div className="bg-white/10 rounded-xl p-4">
-                      <div className="text-center mb-4">
-                        <div className="text-2xl font-bold text-white mb-2">
-                          {captchaData.question}
-                        </div>
-                        <div className="text-white/60 text-sm">
-                          Resuelve la operación para continuar
-                        </div>
-                      </div>
-                      <input
-                        type="text"
-                        value={captchaAnswer}
-                        onChange={(e) => setCaptchaAnswer(e.target.value)}
-                        placeholder="Tu respuesta"
-                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 text-center"
-                      />
-                      <button
-                        type="button"
-                        onClick={generateCaptcha}
-                        className="w-full mt-2 text-purple-400 hover:text-purple-300 text-sm transition-colors"
-                      >
-                        Generar nueva operación
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botones de acción */}
-                <div className="flex space-x-3 mt-6">
-                  <button
-                    onClick={() => setShowBuyModal(false)}
-                    className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handlePurchase}
-                    disabled={purchaseMutation.isLoading || !captchaAnswer}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity/50 text-white rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2"
-                  >
-                    {purchaseMutation.isLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        Comprando...
-                      </>
-                    ) : (
-                      <>
-                        <FaShoppingCart />
-                        Comprar Ahora
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Modal de compra - Usando BuyNumberModal completo */}
       
       {/* Modales del sistema de pagos */}
       {showPaymentDetailsModal && (
