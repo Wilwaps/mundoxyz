@@ -415,7 +415,38 @@ CREATE INDEX IF NOT EXISTS idx_raffle_audit_raffle ON raffle_audit_logs(raffle_i
 CREATE INDEX IF NOT EXISTS idx_raffle_audit_created ON raffle_audit_logs(created_at DESC);
 
 -- ============================================
--- 15. TICTACTOE_ROOMS
+-- 15. RAFFLE_REQUESTS
+-- ============================================
+CREATE TABLE IF NOT EXISTS raffle_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  raffle_id INTEGER NOT NULL REFERENCES raffles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  request_type VARCHAR(20) NOT NULL DEFAULT 'approval' CHECK (request_type IN ('approval', 'refund', 'cancel')),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  request_data JSONB DEFAULT '{}',
+  buyer_profile JSONB DEFAULT '{}',
+  payment_method VARCHAR(50),
+  payment_reference VARCHAR(255),
+  message TEXT,
+  history JSONB DEFAULT '[]',
+  reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_raffle ON raffle_requests(raffle_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_user ON raffle_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_status ON raffle_requests(status);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_type ON raffle_requests(request_type);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_reviewed_by ON raffle_requests(reviewed_by) WHERE reviewed_by IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_created ON raffle_requests(created_at);
+
+COMMENT ON TABLE raffle_requests IS 'Solicitudes de aprobación para rifas premio (modo pago)';
+
+-- ============================================
+-- 16. TICTACTOE_ROOMS
 -- ============================================
 CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -452,7 +483,7 @@ CREATE INDEX IF NOT EXISTS idx_tictactoe_status ON tictactoe_rooms(status);
 COMMENT ON TABLE tictactoe_rooms IS 'Salas de TicTacToe con sistema de revancha';
 
 -- ============================================
--- 16. TICTACTOE_MOVES
+-- 17. TICTACTOE_MOVES
 -- ============================================
 CREATE TABLE IF NOT EXISTS tictactoe_moves (
   id SERIAL PRIMARY KEY,
@@ -468,7 +499,7 @@ CREATE TABLE IF NOT EXISTS tictactoe_moves (
 CREATE INDEX IF NOT EXISTS idx_tictactoe_moves_room ON tictactoe_moves(room_id, move_number);
 
 -- ============================================
--- 17. BINGO V2 - ROOMS
+-- 18. BINGO V2 - ROOMS
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_rooms (
   id SERIAL PRIMARY KEY,
@@ -506,7 +537,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_rooms_active ON bingo_v2_rooms(status, c
 COMMENT ON TABLE bingo_v2_rooms IS 'Salas de Bingo V2 - sistema completo reescrito';
 
 -- ============================================
--- 18. BINGO V2 - ROOM PLAYERS
+-- 19. BINGO V2 - ROOM PLAYERS
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_room_players (
   id SERIAL PRIMARY KEY,
@@ -527,7 +558,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_room ON bingo_v2_room_players(ro
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_players_user ON bingo_v2_room_players(user_id);
 
 -- ============================================
--- 19. BINGO V2 - CARDS
+-- 20. BINGO V2 - CARDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_cards (
   id SERIAL PRIMARY KEY,
@@ -548,7 +579,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_cards_room ON bingo_v2_cards(room_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_cards_player ON bingo_v2_cards(player_id);
 
 -- ============================================
--- 20. BINGO V2 - DRAWS
+-- 21. BINGO V2 - DRAWS
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_draws (
   id SERIAL PRIMARY KEY,
@@ -564,7 +595,7 @@ CREATE TABLE IF NOT EXISTS bingo_v2_draws (
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_draws_room ON bingo_v2_draws(room_id);
 
 -- ============================================
--- 21. BINGO V2 - AUDIT LOGS
+-- 22. BINGO V2 - AUDIT LOGS
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_audit_logs (
   id SERIAL PRIMARY KEY,
@@ -580,7 +611,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_audit_room ON bingo_v2_audit_logs(room_i
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_audit_user ON bingo_v2_audit_logs(user_id);
 
 -- ============================================
--- 22. BINGO V2 - ROOM CHAT
+-- 23. BINGO V2 - ROOM CHAT
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_room_chat_messages (
   id SERIAL PRIMARY KEY,
@@ -593,7 +624,7 @@ CREATE TABLE IF NOT EXISTS bingo_v2_room_chat_messages (
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_chat_room ON bingo_v2_room_chat_messages(room_id);
 
 -- ============================================
--- 23. BINGO V2 - USER MESSAGES (BUZÓN)
+-- 24. BINGO V2 - USER MESSAGES (BUZÓN)
 -- ============================================
 CREATE TABLE IF NOT EXISTS bingo_v2_messages (
   id SERIAL PRIMARY KEY,
@@ -610,7 +641,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_user ON bingo_v2_messages(user_
 CREATE INDEX IF NOT EXISTS idx_bingo_v2_messages_unread ON bingo_v2_messages(user_id, is_read);
 
 -- ============================================
--- 24. MARKET REDEEMS
+-- 25. MARKET REDEEMS
 -- ============================================
 CREATE TABLE IF NOT EXISTS market_redeems (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -648,7 +679,7 @@ COMMENT ON COLUMN market_redeems.fires_amount IS 'Cantidad de fuegos a redimir (
 COMMENT ON COLUMN market_redeems.status IS 'Estado: pending, processing, completed, rejected, cancelled';
 
 -- ============================================
--- 25. WELCOME EVENTS
+-- 26. WELCOME EVENTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS welcome_events (
   id SERIAL PRIMARY KEY,
@@ -690,7 +721,7 @@ COMMENT ON COLUMN welcome_events.duration_hours IS 'Duración del evento en hora
 COMMENT ON COLUMN welcome_events.priority IS 'Prioridad del evento (mayor = más prioritario)';
 
 -- ============================================
--- 26. DIRECT GIFTS
+-- 27. DIRECT GIFTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS direct_gifts (
   id SERIAL PRIMARY KEY,
@@ -714,7 +745,7 @@ CREATE INDEX IF NOT EXISTS idx_direct_gifts_target_user ON direct_gifts(target_u
 CREATE INDEX IF NOT EXISTS idx_direct_gifts_sender ON direct_gifts(sender_id);
 
 -- ============================================
--- 26. DIRECT GIFT CLAIMS
+-- 28. DIRECT GIFT CLAIMS
 -- ============================================
 CREATE TABLE IF NOT EXISTS direct_gift_claims (
   id SERIAL PRIMARY KEY,
@@ -730,7 +761,7 @@ CREATE TABLE IF NOT EXISTS direct_gift_claims (
 CREATE INDEX IF NOT EXISTS idx_direct_gift_claims_user ON direct_gift_claims(user_id);
 
 -- ============================================
--- 27. GIFT ANALYTICS
+-- 29. GIFT ANALYTICS
 -- ============================================
 CREATE TABLE IF NOT EXISTS gift_analytics (
   id SERIAL PRIMARY KEY,
@@ -747,7 +778,7 @@ CREATE INDEX IF NOT EXISTS idx_gift_analytics_event ON gift_analytics(event_id);
 CREATE INDEX IF NOT EXISTS idx_gift_analytics_user ON gift_analytics(user_id);
 
 -- ============================================
--- 28. FIRE SUPPLY
+-- 30. FIRE SUPPLY
 -- ============================================
 CREATE TABLE IF NOT EXISTS fire_supply (
   id INTEGER PRIMARY KEY DEFAULT 1,
@@ -766,7 +797,7 @@ COMMENT ON TABLE fire_supply IS 'Control de suministro total de fuegos (tabla si
 COMMENT ON COLUMN fire_supply.total_max IS 'Máximo suministro de fuegos: 1,000,000,000';
 
 -- ============================================
--- 29. SUPPLY TRANSACTIONS
+-- 31. SUPPLY TRANSACTIONS
 -- ============================================
 CREATE TABLE IF NOT EXISTS supply_txs (
   id BIGSERIAL PRIMARY KEY,
