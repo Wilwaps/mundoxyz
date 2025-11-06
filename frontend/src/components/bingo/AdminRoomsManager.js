@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import './AdminRoomsManager.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://mundoxyz-production.up.railway.app';
+// Detectar producción por hostname en runtime
+const isProduction = typeof window !== 'undefined' && 
+  (window.location.hostname === 'mundoxyz-production.up.railway.app' ||
+   window.location.hostname.includes('railway.app'));
+
+const API_URL = isProduction 
+  ? 'https://mundoxyz-production.up.railway.app'
+  : (process.env.REACT_APP_API_URL || '');
 
 const AdminRoomsManager = () => {
   const { user } = useAuth();

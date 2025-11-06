@@ -1,11 +1,19 @@
 // API URL configuration for fetch requests
-// In production, REACT_APP_API_URL should be the backend URL
-// In development, empty string uses relative paths (handled by proxy)
+// HARDCODED para Railway ya que process.env no funciona correctamente en build
 
-const apiUrl = process.env.REACT_APP_API_URL;
+// Detectar si estamos en producción por la URL actual
+const isProduction = typeof window !== 'undefined' && 
+  (window.location.hostname === 'mundoxyz-production.up.railway.app' ||
+   window.location.hostname.includes('railway.app'));
 
-const API_URL = apiUrl && apiUrl !== '' 
-  ? (apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl)
-  : '';
+// En producción: usar URL hardcoded
+// En desarrollo: usar variable de entorno o string vacío (proxy)
+const API_URL = isProduction 
+  ? 'https://mundoxyz-production.up.railway.app'
+  : (process.env.REACT_APP_API_URL || '');
+
+console.log('🌍 API_URL configurado:', API_URL);
+console.log('🏠 Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'SSR');
+console.log('🔧 isProduction:', isProduction);
 
 export default API_URL;

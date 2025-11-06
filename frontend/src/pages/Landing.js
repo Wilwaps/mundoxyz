@@ -25,7 +25,7 @@ const Landing = () => {
 
   const fetchPublicStats = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/public/stats`);
+      const response = await axios.get('/api/public/stats');
       if (response.data.success) {
         setStats(response.data.data);
       }

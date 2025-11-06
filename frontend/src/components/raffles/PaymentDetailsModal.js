@@ -101,7 +101,7 @@ const PaymentDetailsModal = ({ raffleId, currentData, onClose, onSave }) => {
 
     try {
       const response = await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffleId}/payment-details`,
+        `/api/raffles/${raffleId}/payment-details`,
         formData,
         {
           headers: {

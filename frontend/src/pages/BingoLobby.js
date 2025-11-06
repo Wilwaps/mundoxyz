@@ -140,7 +140,12 @@ const BingoLobby = () => {
   const handleCloseRoom = async (roomCode) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://mundoxyz-production.up.railway.app'}/api/bingo/v2/rooms/${roomCode}`, {
+      // Detectar producción por hostname
+      const isProduction = window.location.hostname === 'mundoxyz-production.up.railway.app' ||
+                          window.location.hostname.includes('railway.app');
+      const apiUrl = isProduction ? 'https://mundoxyz-production.up.railway.app' : '';
+      
+      const response = await fetch(`${apiUrl}/api/bingo/v2/rooms/${roomCode}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

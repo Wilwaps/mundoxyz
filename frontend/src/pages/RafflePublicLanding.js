@@ -19,7 +19,7 @@ const RafflePublicLanding = () => {
   const loadPublicData = async () => {
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/raffles/public/${code}`
+        `/api/raffles/public/${code}`
       );
 
       if (response.data.success) {

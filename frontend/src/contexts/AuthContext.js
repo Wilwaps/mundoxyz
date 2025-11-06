@@ -13,18 +13,24 @@ export const useAuth = () => {
 };
 
 // Configure axios defaults
-// In production, REACT_APP_API_URL should be the backend URL (e.g., https://backend.railway.app)
-// In development, proxy in package.json handles routing to backend
-const apiUrl = process.env.REACT_APP_API_URL;
+// HARDCODED para Railway - detectar producción por hostname
+const isProduction = typeof window !== 'undefined' && 
+  (window.location.hostname === 'mundoxyz-production.up.railway.app' ||
+   window.location.hostname.includes('railway.app'));
 
-// Only set baseURL if we have a valid URL (for production)
+const apiUrl = isProduction 
+  ? 'https://mundoxyz-production.up.railway.app'
+  : (process.env.REACT_APP_API_URL || '');
+
+// Set baseURL if we have a URL (production or explicit env var)
 if (apiUrl && apiUrl !== '') {
-  // Remove trailing slash if present
   const cleanUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-  console.log('Setting axios baseURL to:', cleanUrl);
+  console.log('🔧 axios baseURL configurado:', cleanUrl);
+  console.log('🌍 Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'SSR');
+  console.log('🏭 isProduction:', isProduction);
   axios.defaults.baseURL = cleanUrl;
 } else {
-  console.log('No API URL set, using relative paths (development mode)');
+  console.log('⚠️  No API URL set, usando rutas relativas (development)');
 }
 
 axios.defaults.withCredentials = true;

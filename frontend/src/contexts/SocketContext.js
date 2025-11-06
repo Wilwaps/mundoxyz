@@ -28,20 +28,24 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Create socket connection
-    // Use REACT_APP_API_URL in production (backend URL) or window.location.origin in dev
-    const apiUrl = process.env.REACT_APP_API_URL || '';
+    // HARDCODED para Railway - detectar producción por hostname
+    const isProduction = window.location.hostname === 'mundoxyz-production.up.railway.app' ||
+                        window.location.hostname.includes('railway.app');
     
     // Determine the socket URL
     let socketUrl;
-    if (apiUrl && apiUrl !== '') {
-      // Production: use the backend URL
-      socketUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-      console.log('Socket connecting to backend:', socketUrl);
+    if (isProduction) {
+      // Production: use hardcoded backend URL
+      socketUrl = 'https://mundoxyz-production.up.railway.app';
+      console.log('🔌 Socket conectando a producción:', socketUrl);
     } else {
       // Development: use current origin (proxied)
       socketUrl = window.location.origin;
-      console.log('Socket connecting to origin:', socketUrl);
+      console.log('🔌 Socket conectando a desarrollo:', socketUrl);
     }
+    
+    console.log('🌍 Hostname actual:', window.location.hostname);
+    console.log('🔧 isProduction:', isProduction);
     
     const newSocket = io(socketUrl, {
       auth: {

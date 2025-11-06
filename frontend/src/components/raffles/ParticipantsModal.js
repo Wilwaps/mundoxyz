@@ -15,7 +15,7 @@ const ParticipantsModal = ({ raffleId, onClose }) => {
   const loadParticipants = async () => {
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffleId}/participants`
+        `/api/raffles/${raffleId}/participants`
       );
 
       if (response.data.success) {
