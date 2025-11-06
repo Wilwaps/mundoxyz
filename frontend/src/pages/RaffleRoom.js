@@ -89,17 +89,10 @@ const RaffleRoom = () => {
     });
   };
 
-  // Abrir modal de compra según modo
+  // Abrir modal de compra (siempre usar BuyNumberModal completo)
   const handleNumberClick = (numberIdx) => {
     setSelectedNumber(numberIdx);
-    
-    // Si es modo Premio o Empresa, usar nuevo modal
-    if (raffle.mode === 'prize' || raffle.mode === 'company') {
-      setShowBuyNumberModal(true);
-    } else {
-      // Modo normal (free/coins/fires)
-      setShowBuyModal(true);
-    }
+    setShowBuyNumberModal(true);
   };
 
   // Guardar datos de pago actualizados

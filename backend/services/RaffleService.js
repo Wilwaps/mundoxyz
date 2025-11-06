@@ -1800,8 +1800,52 @@ class RaffleService {
 
             const costPerNumber = parseFloat(raffleData.entry_price_fire) || 0;
             const totalRefundBuyers = costPerNumber * soldNumbers.rows.length;
+            
+            logger.info('🔄 Iniciando reembolso por cancelación', {
+                raffleId,
+                raffleCode: raffleData.code,
+                totalBuyers: soldNumbers.rows.length,
+                costPerNumber,
+                totalRefundBuyers,
+                potFires: raffleData.pot_fires,
+                hostId: raffleData.host_id
+            });
 
-            // 1. Reembolsar a cada comprador
+            // 1. DESCONTAR del HOST (que recibió el pot_fires)
+            // Los fuegos de compras van al pot_fires, que el host recibe al finalizar
+            // Al cancelar, el HOST debe devolver esos fuegos
+            if (totalRefundBuyers > 0) {
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance - $1 
+                    WHERE user_id = $2
+                `, [totalRefundBuyers, raffleData.host_id]);
+                
+                // Registrar transacción del host (devuelve lo recibido)
+                await client.query(`
+                    INSERT INTO wallet_transactions 
+                    (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                    VALUES (
+                        (SELECT id FROM wallets WHERE user_id = $1),
+                        'raffle_refund_from_pot', 'fires', $2,
+                        (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
+                        (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                        $3, $4
+                    )
+                `, [
+                    raffleData.host_id, 
+                    totalRefundBuyers, 
+                    raffleData.code, 
+                    `Devolución pot rifa cancelada ${raffleData.code} (${soldNumbers.rows.length} números)`
+                ]);
+                
+                logger.info('💸 Host devuelve pot_fires para reembolso', {
+                    hostId: raffleData.host_id,
+                    amount: totalRefundBuyers
+                });
+            }
+
+            // 2. Reembolsar a cada comprador
             for (const num of soldNumbers.rows) {
                 await client.query(`
                     UPDATE wallets 
@@ -1823,10 +1867,10 @@ class RaffleService {
                 `, [num.owner_id, costPerNumber, raffleData.code, `Reembolso número ${num.number_idx} - Rifa cancelada ${raffleData.code}`]);
             }
 
-            // 2. Reembolsar platform_fee al host Y descontar del admin
+            // 3. Reembolsar platform_fee al host Y descontar del admin
             let refundedHostAmount = 0;
             if (platformFee > 0) {
-                // 2.1. Buscar admin de plataforma
+                // 3.1. Buscar admin de plataforma
                 const adminTgId = '1417856820';
                 const adminUserCheck = await client.query(`
                     SELECT id FROM users WHERE tg_id = $1
@@ -1837,14 +1881,14 @@ class RaffleService {
                 } else {
                     const adminUserId = adminUserCheck.rows[0].id;
                     
-                    // 2.2. Descontar del admin (devolver los fuegos que recibió al crear la rifa)
+                    // 3.2. Descontar del admin (devolver los fuegos que recibió al crear la rifa)
                     await client.query(`
                         UPDATE wallets 
                         SET fires_balance = fires_balance - $1 
                         WHERE user_id = $2
                     `, [platformFee, adminUserId]);
                     
-                    // 2.3. Registrar transacción del admin (devuelve comisión)
+                    // 3.3. Registrar transacción del admin (devuelve comisión)
                     await client.query(`
                         INSERT INTO wallet_transactions 
                         (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
@@ -1862,14 +1906,14 @@ class RaffleService {
                         `Devolución comisión rifa cancelada ${raffleData.code}`
                     ]);
                     
-                    logger.info('Platform fee descontado del admin', {
+                    logger.info('💰 Platform fee descontado del admin', {
                         adminUserId,
                         platformFee,
                         raffleCode: raffleData.code
                     });
                 }
                 
-                // 2.4. Acreditar al host (reembolso)
+                // 3.4. Acreditar al host (reembolso platform fee)
                 await client.query(`
                     UPDATE wallets 
                     SET fires_balance = fires_balance + $1 
@@ -1878,7 +1922,7 @@ class RaffleService {
 
                 refundedHostAmount = platformFee;
                 
-                // 2.5. Registrar transacción de reembolso al host
+                // 3.5. Registrar transacción de reembolso al host
                 const refundDescription = raffleData.mode === 'fires'
                     ? `Reembolso creación rifa fuegos ${raffleData.code} (cancelada)`
                     : isCompanyMode

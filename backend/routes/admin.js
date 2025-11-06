@@ -377,8 +377,8 @@ router.get('/stats', adminAuth, async (req, res) => {
         SELECT 
           (SELECT COUNT(*) FROM raffles WHERE status = 'active') as active_raffles,
           (SELECT COUNT(*) FROM bingo_v2_rooms) as total_bingo_rooms,
-          (SELECT COUNT(*) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as active_bingo_rooms,
-          (SELECT COALESCE(SUM(pot_fires), 0) FROM bingo_v2_rooms WHERE status IN ('waiting', 'playing')) as total_bingo_pot_fires
+          (SELECT COUNT(*) FROM bingo_v2_rooms WHERE status IN ('waiting', 'in_progress')) as active_bingo_rooms,
+          (SELECT COALESCE(SUM(total_pot), 0) FROM bingo_v2_rooms WHERE status IN ('waiting', 'in_progress')) as total_bingo_pot_fires
       `);
       stats.games = gameStats.rows[0];
     } catch (gameStatsError) {
