@@ -1620,8 +1620,14 @@ class RaffleService {
             await client.query('BEGIN');
 
             // Verificar que sea admin o tote
-            const admin = await client.query('SELECT role FROM users WHERE id = $1', [adminId]);
-            if (!admin.rows[0] || !['admin', 'tote'].includes(admin.rows[0].role)) {
+            const adminCheck = await client.query(`
+                SELECT r.name as role_name
+                FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = $1 AND r.name IN ('admin', 'tote')
+            `, [adminId]);
+            
+            if (adminCheck.rows.length === 0) {
                 throw new Error('Requiere permisos de administrador o tote');
             }
 

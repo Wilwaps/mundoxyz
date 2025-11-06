@@ -111,6 +111,7 @@ const RaffleRoom = () => {
 
   // Generar nuevo CAPTCHA
   const generateCaptcha = () => {
+    setCaptchaData(generateCaptchaData());
     setCaptchaAnswer('');
   };
 
