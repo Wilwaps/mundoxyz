@@ -19,8 +19,56 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Al abrir el modal, reservar el número inmediatamente
+    reserveNumber();
     loadPaymentDetails();
-  }, [raffle.id]);
+
+    // Al cerrar el modal, liberar la reserva
+    return () => {
+      releaseNumber();
+    };
+  }, [raffle.id, numberIdx]);
+
+  const reserveNumber = async () => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/reserve-number`,
+        { number_idx: numberIdx },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        console.log(`✅ Número ${numberIdx} reservado temporalmente`);
+      }
+    } catch (err) {
+      console.error('Error reservando número:', err);
+      // Si el número ya está reservado/vendido, mostrar error
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      }
+    }
+  };
+
+  const releaseNumber = async () => {
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/release-number`,
+        { number_idx: numberIdx },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      console.log(`✅ Número ${numberIdx} liberado`);
+    } catch (err) {
+      console.error('Error liberando número:', err);
+    }
+  };
 
   const loadPaymentDetails = async () => {
     try {

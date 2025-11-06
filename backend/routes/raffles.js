@@ -854,6 +854,94 @@ router.get('/:raffleId/payment-methods', async (req, res) => {
 });
 
 /**
+ * POST /api/raffles/:raffleId/reserve-number
+ * Reservar temporalmente un número (5 minutos)
+ * Body: { number_idx }
+ */
+router.post('/:raffleId/reserve-number', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffleId = parseInt(req.params.raffleId);
+        const { number_idx } = req.body;
+
+        if (number_idx === undefined || number_idx === null) {
+            return res.status(400).json({
+                success: false,
+                error: 'Número requerido'
+            });
+        }
+
+        // Reservar número (5 minutos)
+        const result = await raffleService.reserveNumber(raffleId, number_idx, userId);
+
+        // Emitir evento WebSocket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`raffle-${raffleId}`).emit('number:reserved', {
+                number_idx,
+                user_id: userId,
+                expires_at: result.expires_at
+            });
+        }
+
+        res.json({
+            success: true,
+            data: result,
+            message: 'Número reservado por 5 minutos'
+        });
+    } catch (error) {
+        console.error('Error reservando número:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/raffles/:raffleId/release-number
+ * Liberar una reserva de número
+ * Body: { number_idx }
+ */
+router.post('/:raffleId/release-number', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const raffleId = parseInt(req.params.raffleId);
+        const { number_idx } = req.body;
+
+        if (number_idx === undefined || number_idx === null) {
+            return res.status(400).json({
+                success: false,
+                error: 'Número requerido'
+            });
+        }
+
+        // Liberar reserva
+        await raffleService.releaseNumberReservation(raffleId, number_idx, userId);
+
+        // Emitir evento WebSocket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`raffle-${raffleId}`).emit('number:released', {
+                number_idx,
+                user_id: userId
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Reserva liberada'
+        });
+    } catch (error) {
+        console.error('Error liberando reserva:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
  * POST /api/raffles/:raffleId/request-number
  * Solicitar compra de un número (modo premio con aprobación)
  * Body: { number_idx, buyer_profile, payment_method }

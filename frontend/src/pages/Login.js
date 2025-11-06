@@ -148,8 +148,7 @@ const Login = () => {
 
               <div className="text-center">
                 <button
-                  onClick={handleTelegramLogin}
-                  disabled={loading}
+                  onClick={() => window.open('https://t.me/mundoxyz_bot', '_blank')}
                   className="text-accent hover:underline text-sm"
                 >
                   Intentar con Telegram de todas formas

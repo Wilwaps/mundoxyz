@@ -317,6 +317,28 @@ async function startServer() {
           }
         }, 3600000); // Run every hour
         logger.info('✅ Gift Expiration Job started - runs every hour');
+
+        // Start Raffle Reservation Cleanup Job
+        const RaffleService = require('./services/RaffleService');
+        const raffleService = new RaffleService(pool);
+        setInterval(async () => {
+          try {
+            const expiredByRaffle = await raffleService.cleanExpiredReservations();
+            
+            // Emitir eventos WebSocket para números liberados
+            Object.keys(expiredByRaffle).forEach(raffleId => {
+              expiredByRaffle[raffleId].forEach(numberIdx => {
+                io.to(`raffle-${raffleId}`).emit('number:released', {
+                  number_idx: numberIdx,
+                  expired: true
+                });
+              });
+            });
+          } catch (error) {
+            logger.error('Error in raffle reservation cleanup job:', error);
+          }
+        }, 60000); // Run every minute
+        logger.info('✅ Raffle Reservation Cleanup Job started - runs every minute');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }

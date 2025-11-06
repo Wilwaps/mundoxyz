@@ -2286,6 +2286,156 @@ class RaffleService {
             client.release();
         }
     }
+
+    /**
+     * Reservar temporalmente un número (5 minutos)
+     * Impide que otros usuarios lo seleccionen
+     */
+    async reserveNumber(raffleId, numberIdx, userId) {
+        const client = await this.pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+
+            // Verificar que el número existe y está disponible
+            const numberResult = await client.query(`
+                SELECT id, state, reserved_by, reserved_until
+                FROM raffle_numbers
+                WHERE raffle_id = $1 AND number_idx = $2
+                FOR UPDATE
+            `, [raffleId, numberIdx]);
+
+            if (numberResult.rows.length === 0) {
+                throw new Error('Número no encontrado');
+            }
+
+            const number = numberResult.rows[0];
+
+            // Si ya está vendido, no se puede reservar
+            if (number.state === 'sold') {
+                throw new Error('Este número ya fue comprado');
+            }
+
+            // Si está reservado por otro usuario y aún no expiró
+            if (number.state === 'reserved' && 
+                number.reserved_by !== userId && 
+                number.reserved_until && 
+                new Date(number.reserved_until) > new Date()) {
+                throw new Error('Este número está siendo procesado por otro usuario');
+            }
+
+            // Reservar número por 5 minutos
+            const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+            await client.query(`
+                UPDATE raffle_numbers
+                SET 
+                    state = 'reserved',
+                    reserved_by = $1,
+                    reserved_until = $2,
+                    updated_at = NOW()
+                WHERE id = $3
+            `, [userId, expiresAt, number.id]);
+
+            await client.query('COMMIT');
+
+            logger.info(`Número ${numberIdx} de rifa ${raffleId} reservado por usuario ${userId} hasta ${expiresAt}`);
+
+            return {
+                number_idx: numberIdx,
+                reserved_until: expiresAt,
+                expires_at: expiresAt
+            };
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            logger.error('Error reservando número:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Liberar una reserva de número
+     * Cuando el usuario cierra el modal sin completar
+     */
+    async releaseNumberReservation(raffleId, numberIdx, userId) {
+        const client = await this.pool.connect();
+        
+        try {
+            // Solo el usuario que reservó puede liberar su propia reserva
+            const result = await client.query(`
+                UPDATE raffle_numbers
+                SET 
+                    state = 'available',
+                    reserved_by = NULL,
+                    reserved_until = NULL,
+                    updated_at = NOW()
+                WHERE raffle_id = $1 
+                  AND number_idx = $2
+                  AND reserved_by = $3
+                  AND state = 'reserved'
+                RETURNING id
+            `, [raffleId, numberIdx, userId]);
+
+            if (result.rows.length > 0) {
+                logger.info(`Reserva del número ${numberIdx} de rifa ${raffleId} liberada por usuario ${userId}`);
+            }
+
+            return { success: true };
+
+        } catch (error) {
+            logger.error('Error liberando reserva:', error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Limpiar reservas expiradas automáticamente
+     * Debe ejecutarse periódicamente (cada minuto)
+     */
+    async cleanExpiredReservations() {
+        const client = await this.pool.connect();
+        
+        try {
+            const result = await client.query(`
+                UPDATE raffle_numbers
+                SET 
+                    state = 'available',
+                    reserved_by = NULL,
+                    reserved_until = NULL,
+                    updated_at = NOW()
+                WHERE state = 'reserved'
+                  AND reserved_until IS NOT NULL
+                  AND reserved_until < NOW()
+                RETURNING raffle_id, number_idx
+            `);
+
+            if (result.rows.length > 0) {
+                logger.info(`${result.rows.length} reservas expiradas limpiadas`);
+                
+                // Agrupar por raffle_id para emitir eventos WebSocket
+                const byRaffle = result.rows.reduce((acc, row) => {
+                    if (!acc[row.raffle_id]) acc[row.raffle_id] = [];
+                    acc[row.raffle_id].push(row.number_idx);
+                    return acc;
+                }, {});
+
+                return byRaffle;
+            }
+
+            return {};
+
+        } catch (error) {
+            logger.error('Error limpiando reservas expiradas:', error);
+            return {};
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = RaffleService;
