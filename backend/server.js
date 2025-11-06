@@ -302,31 +302,6 @@ async function startServer() {
         dbReady = true;
         logger.info('✅ Database connected');
 
-        // Ejecutar migración de columnas de reserva para rifas
-        try {
-          logger.info('🔧 Ejecutando migración: columnas de reserva para rifas...');
-          
-          await pool.query(`
-            ALTER TABLE raffle_numbers 
-            ADD COLUMN IF NOT EXISTS reserved_by INTEGER REFERENCES users(id)
-          `);
-          
-          await pool.query(`
-            ALTER TABLE raffle_numbers 
-            ADD COLUMN IF NOT EXISTS reserved_until TIMESTAMP WITH TIME ZONE
-          `);
-          
-          await pool.query(`
-            CREATE INDEX IF NOT EXISTS idx_raffle_numbers_reserved 
-            ON raffle_numbers(reserved_until) 
-            WHERE reserved_until IS NOT NULL
-          `);
-          
-          logger.info('✅ Migración de reservas completada');
-        } catch (migrationError) {
-          logger.error('⚠️ Error en migración (puede ser normal si ya existe):', migrationError.message);
-        }
-        
         // Start Bingo V2 failure detection job
         const bingoV2FailureDetection = require('./jobs/bingoV2FailureDetection');
         bingoV2FailureDetection.start();
