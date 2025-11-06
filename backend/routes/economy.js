@@ -763,7 +763,7 @@ router.put('/fire-requests/:id/approve', adminAuth, async (req, res) => {
 
       // Actualizar supply
       await client.query(
-        'UPDATE fire_supply SET total_emitted = total_emitted + $1, last_updated_at = NOW() WHERE id = 1',
+        'UPDATE fire_supply SET total_emitted = total_emitted + $1, updated_at = NOW() WHERE id = 1',
         [request.amount]
       );
 
