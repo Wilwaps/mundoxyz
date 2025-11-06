@@ -79,7 +79,7 @@ const RaffleDetails = () => {
     // Modo PREMIO: abrir modal con formulario
     if (normalizedMode === 'prize') {
       try {
-        const { data } = await axios.get(`/api/raffles/${raffle.id}/payment-methods`);
+        const { data } = await axios.get(`/api/raffles/${raffle.id}/payment-details`);
         setPaymentMethods(data.data || []);
         setShowPrizeModal(true);
       } catch (error) {
