@@ -341,6 +341,13 @@ COMMENT ON COLUMN raffles.company_logo_mime IS 'MIME type del logo de empresa';
 COMMENT ON COLUMN raffles.starts_at IS 'Fecha/hora programada de inicio de la rifa';
 COMMENT ON COLUMN raffles.ends_at IS 'Fecha/hora programada de cierre de la rifa';
 COMMENT ON COLUMN raffles.drawn_at IS 'Fecha/hora en que se realizó el sorteo';
+COMMENT ON COLUMN raffles.payment_cost_amount IS 'Costo en moneda fiat para rifas Premio/Empresa (migración 034)';
+COMMENT ON COLUMN raffles.payment_cost_currency IS 'Moneda del costo: USD, VES, EUR, etc. (migración 034)';
+COMMENT ON COLUMN raffles.payment_method IS 'Método de pago: cash (efectivo) o bank (pago móvil/banco) (migración 034)';
+COMMENT ON COLUMN raffles.payment_bank_code IS 'Código del banco venezolano para pago móvil, ej: 0102, 0134 (migración 034)';
+COMMENT ON COLUMN raffles.payment_phone IS 'Número de teléfono del anfitrión para pago móvil (migración 034)';
+COMMENT ON COLUMN raffles.payment_id_number IS 'Cédula/ID del anfitrión para pago móvil (migración 034)';
+COMMENT ON COLUMN raffles.payment_instructions IS 'Instrucciones/comentarios adicionales del anfitrión, máx 300 caracteres (migración 034)';
 
 -- ============================================
 -- 11. RAFFLE_NUMBERS
