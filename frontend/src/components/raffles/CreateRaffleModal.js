@@ -8,10 +8,11 @@ import {
   FaTimes, FaFire, FaGift, FaBuilding, FaUpload,
   FaPalette, FaInfoCircle, FaCheck, FaStar,
   FaDollarSign, FaUsers, FaClock, FaTrophy,
-  FaShieldAlt, FaFileContract, FaTags
+  FaShieldAlt, FaFileContract, FaTags, FaCreditCard
 } from 'react-icons/fa';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { VENEZUELA_BANKS, getBankName } from '../../utils/bankCodes';
 
 const CreateRaffleModal = ({ onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState('basic');
@@ -46,7 +47,17 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
       estimated_value: '',
       delivery_info: '',
       prize_image_url: ''
-    }
+    },
+    
+    // Datos de pago (solo para modo premio)
+    payment_cost_amount: '',
+    payment_cost_currency: 'USD',
+    payment_method: '',
+    payment_bank_code: '',
+    payment_phone: '',
+    payment_id_number: '',
+    payment_instructions: '',
+    allow_fire_payments: false
   });
 
   const [errors, setErrors] = useState({});
@@ -423,6 +434,12 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
               label="Modo Premio"
               icon={<FaGift />}
               completed={formData.mode !== 'prize' || formData.prize_meta.description}
+            />
+            <TabButton
+              id="payments"
+              label="Datos Pagos"
+              icon={<FaCreditCard />}
+              completed={formData.mode !== 'prize' || formData.payment_method}
             />
             <TabButton
               id="summary"
@@ -971,6 +988,165 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                 </div>
               )}
 
+              {activeTab === 'payments' && formData.mode === 'prize' && (
+                <div className="space-y-6">
+                  <div className="p-4 bg-blue-500/20 rounded-xl border border-blue-500/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaCreditCard className="text-blue-400" />
+                      <h3 className="text-lg font-bold text-white">Configurar Métodos de Pago</h3>
+                    </div>
+                    <p className="text-white/70 text-sm">
+                      Define cómo los participantes pagarán por los números de tu rifa.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Costo por número */}
+                    <div>
+                      <label className="block text-white font-semibold mb-2">
+                        <FaDollarSign className="inline mr-2" />
+                        Costo por Número
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="number"
+                          value={formData.payment_cost_amount}
+                          onChange={(e) => setFormData(prev => ({ ...prev, payment_cost_amount: e.target.value }))}
+                          placeholder="Ej: 5"
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                          min="0"
+                          step="0.01"
+                        />
+                        <select
+                          value={formData.payment_cost_currency}
+                          onChange={(e) => setFormData(prev => ({ ...prev, payment_cost_currency: e.target.value }))}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-400"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="VES">VES (Bs)</option>
+                          <option value="EUR">EUR (€)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Método de pago */}
+                    <div>
+                      <label className="block text-white font-semibold mb-2">
+                        <FaCreditCard className="inline mr-2" />
+                        Método de Pago Principal
+                      </label>
+                      <select
+                        value={formData.payment_method}
+                        onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-400"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="cash">Efectivo</option>
+                        <option value="bank">Pago Móvil / Banco</option>
+                      </select>
+                    </div>
+
+                    {/* Campos de banco (solo si bank) */}
+                    {formData.payment_method === 'bank' && (
+                      <>
+                        <div>
+                          <label className="block text-white font-semibold mb-2">Banco</label>
+                          <select
+                            value={formData.payment_bank_code}
+                            onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_code: e.target.value }))}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-400"
+                          >
+                            <option value="">Seleccionar banco...</option>
+                            {VENEZUELA_BANKS.map(bank => (
+                              <option key={bank.code} value={bank.code}>
+                                {bank.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-white font-semibold mb-2">Teléfono</label>
+                            <input
+                              type="text"
+                              value={formData.payment_phone}
+                              onChange={(e) => setFormData(prev => ({ ...prev, payment_phone: e.target.value }))}
+                              placeholder="0414-1234567"
+                              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                              maxLength={20}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-white font-semibold mb-2">Cédula/RIF</label>
+                            <input
+                              type="text"
+                              value={formData.payment_id_number}
+                              onChange={(e) => setFormData(prev => ({ ...prev, payment_id_number: e.target.value }))}
+                              placeholder="V-12345678"
+                              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-purple-400"
+                              maxLength={30}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Habilitar pago en fuegos */}
+                    <div className="p-4 bg-orange-500/20 rounded-xl border border-orange-500/30">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.allow_fire_payments}
+                          onChange={(e) => setFormData(prev => ({ ...prev, allow_fire_payments: e.target.checked }))}
+                          className="mt-1 w-5 h-5 rounded"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-white font-semibold mb-1">
+                            <FaFire className="text-orange-400" />
+                            Aceptar pago en fuegos (🔥)
+                          </div>
+                          <p className="text-white/70 text-sm">
+                            Los participantes podrán pagar con fuegos además del método principal. Los fuegos se transferirán directamente a ti tras aprobar la compra.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Instrucciones adicionales */}
+                    <div>
+                      <label className="block text-white font-semibold mb-2">
+                        <FaInfoCircle className="inline mr-2" />
+                        Instrucciones Adicionales (opcional)
+                      </label>
+                      <textarea
+                        value={formData.payment_instructions}
+                        onChange={(e) => setFormData(prev => ({ ...prev, payment_instructions: e.target.value }))}
+                        placeholder="Agrega cualquier instrucción especial para los compradores..."
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-purple-400 resize-none"
+                        rows={4}
+                        maxLength={300}
+                      />
+                      <small className="text-white/50 text-xs">
+                        {formData.payment_instructions.length}/300 caracteres
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'payments' && formData.mode !== 'prize' && (
+                <div className="text-center py-8">
+                  <FaCreditCard className="text-6xl text-white/20 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    Datos de pago no disponibles
+                  </h3>
+                  <p className="text-white/60">
+                    Los datos de pago solo se configuran para rifas en "Modo Premio".
+                  </p>
+                </div>
+              )}
+
               {activeTab === 'summary' && <ConfigSummary />}
             </form>
           </div>
@@ -997,7 +1173,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                   )}
                 </button>
                 <button
-                  onClick={() => setActiveTab('prize')}
+                  onClick={() => setActiveTab('payments')}
                   className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
                 >
                   Anterior
@@ -1007,7 +1183,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => {
-                    const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
+                    const tabs = ['basic', 'config', 'company', 'prize', 'payments', 'summary'];
                     const currentIndex = tabs.indexOf(activeTab);
                     if (currentIndex > 0) {
                       setActiveTab(tabs[currentIndex - 1]);
@@ -1021,7 +1197,7 @@ const CreateRaffleModal = ({ onClose, onSuccess }) => {
                 
                 <button
                   onClick={() => {
-                    const tabs = ['basic', 'config', 'company', 'prize', 'summary'];
+                    const tabs = ['basic', 'config', 'company', 'prize', 'payments', 'summary'];
                     const currentIndex = tabs.indexOf(activeTab);
                     if (currentIndex < tabs.length - 1) {
                       setActiveTab(tabs[currentIndex + 1]);
