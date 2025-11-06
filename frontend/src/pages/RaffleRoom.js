@@ -109,6 +109,31 @@ const RaffleRoom = () => {
     }
   });
 
+  // Generar captcha data para modo normal (fires/coins)
+  const generateCaptchaData = () => {
+    const operators = ['+', '-', '*'];
+    const operator = operators[Math.floor(Math.random() * operators.length)];
+    
+    let num1, num2;
+    if (operator === '*') {
+      num1 = Math.floor(Math.random() * 10) + 1;
+      num2 = Math.floor(Math.random() * 10) + 1;
+    } else if (operator === '-') {
+      num1 = Math.floor(Math.random() * 20) + 10;
+      num2 = Math.floor(Math.random() * num1) + 1;
+    } else {
+      num1 = Math.floor(Math.random() * 20) + 1;
+      num2 = Math.floor(Math.random() * 20) + 1;
+    }
+    
+    return {
+      question: `${num1} ${operator} ${num2}`,
+      answer: operator === '+' ? num1 + num2 : operator === '-' ? num1 - num2 : num1 * num2
+    };
+  };
+
+  const [captchaData, setCaptchaData] = useState(generateCaptchaData());
+
   // Generar nuevo CAPTCHA
   const generateCaptcha = () => {
     setCaptchaData(generateCaptchaData());
@@ -140,8 +165,6 @@ const RaffleRoom = () => {
   const userOwnsNumber = (num) => {
     return numbers?.find(n => n.number === num)?.purchased_by === user?.id;
   };
-
-  const captchaData = MathCaptcha.generateCaptcha();
 
   // Función para copiar enlace público (modo empresa)
   const handleCopyPublicLink = () => {
