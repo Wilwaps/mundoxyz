@@ -24,6 +24,7 @@ import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
 import TicTacToeRoom from './pages/TicTacToeRoom';
 import RafflePublicLanding from './pages/RafflePublicLanding';
+import Landing from './pages/Landing';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -102,6 +103,9 @@ function App() {
             />
             
             <Routes>
+              {/* Landing Page Principal (sin login) */}
+              <Route path="/landing" element={<Landing />} />
+              
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
