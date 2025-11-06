@@ -175,13 +175,13 @@ const Lobby = () => {
         <p className="text-sm text-text/60 mb-3">
           Ingresa el código de 6 dígitos de cualquier sala para unirte directamente
         </p>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3">
           <input
             type="text"
             placeholder="000000"
             value={quickJoinCode}
             onChange={(e) => setQuickJoinCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="input-glass flex-1 text-center text-xl tracking-wider font-mono"
+            className="input-glass w-full text-center text-xl tracking-wider font-mono"
             maxLength={6}
             disabled={isJoining}
             onKeyPress={(e) => e.key === 'Enter' && handleQuickJoin()}
@@ -189,7 +189,7 @@ const Lobby = () => {
           <button
             onClick={handleQuickJoin}
             disabled={isJoining || quickJoinCode.length !== 6}
-            className="btn-accent px-6 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-accent w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isJoining ? (
               <>
