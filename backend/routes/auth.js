@@ -432,9 +432,9 @@ router.post('/register', async (req, res) => {
 
       // Crear wallet del usuario
       await client.query(
-        `INSERT INTO wallets (id, user_id, fires_balance, coins_balance)
-         VALUES ($1, $2, 0, 0)`,
-        [uuidv4(), userId]
+        `INSERT INTO wallets (user_id, fires_balance, coins_balance)
+         VALUES ($1, 0, 0)`,
+        [userId]
       );
 
       // Asignar rol de usuario regular
