@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import './AdminRoomsManager.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://confident-bravery-production-ce7b.up.railway.app';
+const API_URL = process.env.REACT_APP_API_URL || 'https://mundoxyz-production.up.railway.app';
 
 const AdminRoomsManager = () => {
   const { user } = useAuth();

@@ -140,7 +140,7 @@ const BingoLobby = () => {
   const handleCloseRoom = async (roomCode) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://confident-bravery-production-ce7b.up.railway.app'}/api/bingo/v2/rooms/${roomCode}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://mundoxyz-production.up.railway.app'}/api/bingo/v2/rooms/${roomCode}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
