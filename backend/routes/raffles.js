@@ -861,7 +861,7 @@ router.get('/:raffleId/payment-methods', async (req, res) => {
 router.post('/:raffleId/reserve-number', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const raffleId = parseInt(req.params.raffleId);
+        const raffleId = req.params.raffleId;
         const { number_idx } = req.body;
 
         if (number_idx === undefined || number_idx === null) {
@@ -906,7 +906,7 @@ router.post('/:raffleId/reserve-number', verifyToken, async (req, res) => {
 router.post('/:raffleId/release-number', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const raffleId = parseInt(req.params.raffleId);
+        const raffleId = req.params.raffleId;
         const { number_idx } = req.body;
 
         if (number_idx === undefined || number_idx === null) {

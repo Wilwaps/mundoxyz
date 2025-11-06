@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, CreditCard, Phone, Hash, FileText, User, Mail, Send, Flame } from 'lucide-react';
 import axios from 'axios';
+import API_URL from '../../config/api';
 import { getBankName } from '../../utils/bankCodes';
 import './BuyNumberModal.css';
 
@@ -18,12 +19,15 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   const [loadingPayment, setLoadingPayment] = useState(true);
   const [error, setError] = useState('');
 
+  const BASE_URL = API_URL || '';
+  const buildUrl = (path) => `${BASE_URL}${path}`;
+
   useEffect(() => {
     // Al abrir el modal, reservar el número inmediatamente
     const reserve = async () => {
       try {
         const response = await axios.post(
-          `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/reserve-number`,
+          buildUrl(`/api/raffles/${raffle.id}/reserve-number`),
           { number_idx: numberIdx },
           {
             headers: {
@@ -49,7 +53,7 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
     // Al cerrar el modal, liberar la reserva
     return () => {
       axios.post(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/release-number`,
+        buildUrl(`/api/raffles/${raffle.id}/release-number`),
         { number_idx: numberIdx },
         {
           headers: {
@@ -68,7 +72,7 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   const loadPaymentDetails = async () => {
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/payment-details`,
+        buildUrl(`/api/raffles/${raffle.id}/payment-details`),
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -119,7 +123,7 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/request-number`,
+        buildUrl(`/api/raffles/${raffle.id}/request-number`),
         {
           number_idx: numberIdx,
           buyer_profile: buyerData,

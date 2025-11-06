@@ -18,6 +18,7 @@ import MathCaptcha from '../components/MathCaptcha';
 import NumberGrid from '../components/raffles/NumberGrid';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import PaymentDetailsModal from '../components/raffles/PaymentDetailsModal';
 import BuyNumberModal from '../components/raffles/BuyNumberModal';
 import ParticipantsModal from '../components/raffles/ParticipantsModal';
@@ -26,6 +27,7 @@ const RaffleRoom = () => {
   const { code } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket } = useSocket();
   const queryClient = useQueryClient();
 
   const [selectedNumber, setSelectedNumber] = useState(null);
@@ -35,6 +37,7 @@ const RaffleRoom = () => {
   const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState(false);
   const [showBuyNumberModal, setShowBuyNumberModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
 
   // Consulta principal de la rifa
@@ -114,6 +117,39 @@ const RaffleRoom = () => {
       toast.error('Error al cargar la rifa');
     }
   }, [error]);
+
+  // WebSocket: Escuchar eventos de reserva/liberación de números
+  useEffect(() => {
+    if (!socket || !raffle) return;
+
+    const raffleRoom = `raffle-${raffle.id}`;
+    
+    // Unirse a la sala de la rifa
+    socket.emit('join-raffle', raffle.id);
+
+    // Escuchar cuando un número es reservado
+    const handleNumberReserved = (data) => {
+      console.log('🔒 Número reservado:', data);
+      // Invalidar query para actualizar grid
+      queryClient.invalidateQueries(['raffle-numbers', code]);
+    };
+
+    // Escuchar cuando un número es liberado
+    const handleNumberReleased = (data) => {
+      console.log('🔓 Número liberado:', data);
+      // Invalidar query para actualizar grid
+      queryClient.invalidateQueries(['raffle-numbers', code]);
+    };
+
+    socket.on('number:reserved', handleNumberReserved);
+    socket.on('number:released', handleNumberReleased);
+
+    return () => {
+      socket.off('number:reserved', handleNumberReserved);
+      socket.off('number:released', handleNumberReleased);
+      socket.emit('leave-raffle', raffle.id);
+    };
+  }, [socket, raffle, code, queryClient]);
 
   if (isLoading) {
     return (
@@ -545,11 +581,119 @@ const RaffleRoom = () => {
           onClose={() => setShowParticipantsModal(false)}
         />
       )}
+
+      {/* Modal simple de solicitudes pendientes */}
+      {showRequestsModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowRequestsModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-white/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                <FaShoppingCart className="text-yellow-400" />
+                Solicitudes Pendientes
+              </h2>
+              <button
+                onClick={() => setShowRequestsModal(false)}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
+
+            {raffle.pending_requests && raffle.pending_requests.length > 0 ? (
+              <div className="space-y-4">
+                {raffle.pending_requests.map((request) => (
+                  <div 
+                    key={request.id}
+                    className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-white font-bold text-lg">
+                            Usuario: {request.user_username || 'Anónimo'}
+                          </span>
+                          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded-full text-sm">
+                            Pendiente
+                          </span>
+                        </div>
+                        <div className="text-white/80 space-y-1">
+                          <p>📞 Teléfono: {request.buyer_profile?.phone || 'No especificado'}</p>
+                          <p>💳 Método: {request.buyer_profile?.payment_method || 'No especificado'}</p>
+                          <p>📅 Fecha: {new Date(request.created_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await fetch(`/api/raffles/approve-purchase`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                },
+                                body: JSON.stringify({ request_id: request.id })
+                              });
+                              toast.success('Solicitud aprobada');
+                              refetch();
+                              setShowRequestsModal(false);
+                            } catch (error) {
+                              toast.error('Error al aprobar solicitud');
+                            }
+                          }}
+                          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                        >
+                          ✅ Aprobar
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await fetch(`/api/raffles/reject-purchase`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                },
+                                body: JSON.stringify({ request_id: request.id })
+                              });
+                              toast.success('Solicitud rechazada');
+                              refetch();
+                              setShowRequestsModal(false);
+                            } catch (error) {
+                              toast.error('Error al rechazar solicitud');
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        >
+                          ❌ Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <FaShoppingCart className="text-6xl text-white/20 mx-auto mb-4" />
+                <p className="text-white/60 text-lg">No hay solicitudes pendientes</p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
 
     {/* Botones flotantes - FUERA del scroll container */}
     <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-50">
-      {/* Botón flotante Participantes */}
+      {/* Botón flotante Participantes - TODOS */}
       <motion.button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
@@ -562,12 +706,33 @@ const RaffleRoom = () => {
         <FaUsers size={24} />
       </motion.button>
 
+      {/* Botón flotante Ver Solicitudes (solo host en modo premio) */}
+      {raffle.host_id === user?.id && raffle.mode === 'prize' && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowRequestsModal(true)}
+          className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:shadow-yellow-500/50 transition-all duration-300 relative"
+          title="Ver solicitudes pendientes"
+        >
+          <FaShoppingCart size={24} />
+          {raffle.pending_requests?.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+              {raffle.pending_requests.length}
+            </span>
+          )}
+        </motion.button>
+      )}
+
       {/* Botón flotante Datos de pago (solo host en modo premio/empresa) */}
       {raffle.host_id === user?.id && (raffle.mode === 'prize' || raffle.mode === 'company') && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.2 }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setShowPaymentDetailsModal(true)}

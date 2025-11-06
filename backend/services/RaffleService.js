@@ -1519,9 +1519,11 @@ class RaffleService {
             const numbers = await client.query(`
                 SELECT 
                     rn.*,
-                    u.username as owner_username
+                    u.username as owner_username,
+                    reserved_user.username as reserved_by_username
                 FROM raffle_numbers rn
                 LEFT JOIN users u ON rn.owner_id = u.id
+                LEFT JOIN users reserved_user ON rn.reserved_by = reserved_user.id
                 WHERE rn.raffle_id = $1
                 ORDER BY rn.number_idx
             `, [raffle.rows[0].id]);
