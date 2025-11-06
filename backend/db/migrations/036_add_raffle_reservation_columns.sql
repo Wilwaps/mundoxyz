@@ -15,8 +15,9 @@
  */
 
 -- Add reserved_by column (references users table)
+-- IMPORTANTE: users.id es UUID, no INTEGER
 ALTER TABLE raffle_numbers 
-ADD COLUMN IF NOT EXISTS reserved_by INTEGER REFERENCES users(id);
+ADD COLUMN IF NOT EXISTS reserved_by UUID REFERENCES users(id);
 
 -- Add reserved_until column (timestamp for reservation expiration)
 ALTER TABLE raffle_numbers 
