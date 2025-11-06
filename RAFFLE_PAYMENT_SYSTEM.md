@@ -636,6 +636,243 @@ if (!isAdmin && !(isHost && isWinner)) {
 
 ---
 
+## 🔥 MÉTODO DE PAGO EN FUEGOS (Migración 035)
+
+### Descripción
+
+A partir de la **migración 035**, las rifas en modo Premio pueden aceptar **pagos en fuegos** además de efectivo y pago móvil. Los fuegos se transfieren directamente del comprador al anfitrión tras la aprobación manual.
+
+### Base de Datos
+
+**Nueva columna en `raffles`:**
+```sql
+ALTER TABLE raffles ADD COLUMN allow_fire_payments BOOLEAN DEFAULT FALSE;
+```
+
+**Nuevas columnas en `raffle_requests`:**
+```sql
+ALTER TABLE raffle_requests ADD COLUMN payment_method VARCHAR(20);
+ALTER TABLE raffle_requests ADD COLUMN fire_amount DECIMAL(18,2) DEFAULT 0;
+```
+
+### Configuración Host
+
+El anfitrión puede habilitar pago en fuegos desde **"Mis datos de pago"**:
+
+```javascript
+// Frontend: PaymentDetailsModal.js
+{
+  payment_cost_amount: 150,
+  payment_cost_currency: 'USD',
+  payment_method: 'cash',  // o 'bank'
+  allow_fire_payments: true  // ✅ Habilita fuegos
+}
+```
+
+**UI del checkbox:**
+```jsx
+<label>
+  <input type="checkbox" name="allow_fire_payments" checked={formData.allow_fire_payments} />
+  <Flame size={18} />
+  Aceptar pago en fuegos (🔥)
+  <small>Los fuegos se transferirán directamente a ti tras aprobar la compra</small>
+</label>
+```
+
+### Compra con Fuegos
+
+**Modal de compra (BuyNumberModal):**
+
+El comprador ve los métodos habilitados y selecciona uno:
+
+```jsx
+{/* Opción efectivo/banco */}
+<label>
+  <input type="radio" value="cash" />
+  Efectivo
+</label>
+
+{/* Opción fuego (solo si allow_fire_payments = true) */}
+<label>
+  <input type="radio" value="fire" />
+  <Flame size={18} />
+  Pago en fuegos (🔥 150)
+  <small>Se descuentan al aprobar</small>
+</label>
+```
+
+**Flujo de solicitud:**
+
+1. Comprador selecciona método "fire"
+2. Frontend valida que tenga balance suficiente
+3. Se envía solicitud con `payment_method: 'fire'`
+4. Backend valida:
+   - Método habilitado (`allow_fire_payments = true`)
+   - Balance actual del comprador
+5. Reserva número y crea solicitud
+
+**Backend validación (`processPrizePurchase`):**
+
+```javascript
+// Validar método habilitado
+if (paymentMethod === 'fire' && !allow_fire_payments) {
+  throw new Error('El pago con fuegos no está habilitado para esta rifa');
+}
+
+// Verificar balance
+const buyerBalance = await query('SELECT fires_balance FROM wallets WHERE user_id = $1');
+if (buyerBalance < cost) {
+  throw new Error('Balance insuficiente');
+}
+
+// Crear solicitud
+INSERT INTO raffle_requests (
+  raffle_id, user_id, payment_method, fire_amount, status
+) VALUES ($1, $2, 'fire', $3, 'pending');
+```
+
+### Aprobación y Transferencia
+
+Cuando el host aprueba una solicitud con método "fire":
+
+**Backend (`approvePurchase`):**
+
+```javascript
+// 1. Verificar balance actual del comprador
+const buyerBalance = await query('SELECT fires_balance FROM wallets WHERE user_id = $1');
+if (buyerBalance < fireAmount) {
+  throw new Error('El comprador ya no tiene suficientes fuegos');
+}
+
+// 2. Descontar del comprador
+UPDATE wallets SET fires_balance = fires_balance - $1 WHERE user_id = $2;
+
+// 3. Acreditar al host
+UPDATE wallets SET fires_balance = fires_balance + $1 WHERE user_id = $2;
+
+// 4. Registrar transacciones (comprador y host)
+INSERT INTO wallet_transactions (...);
+
+// 5. Marcar número como vendido
+UPDATE raffle_numbers SET state = 'sold', owner_id = $1;
+```
+
+**Transacciones registradas:**
+
+| Usuario | Tipo | Monto | Descripción |
+|---------|------|-------|-------------|
+| Comprador | `raffle_fire_payment` | -150 🔥 | Pago rifa #123 - Número 42 |
+| Host | `raffle_fire_received` | +150 🔥 | Recibido de venta Número 42 - Rifa #123 |
+
+### Economía del Sistema
+
+**Ejemplo: Rifa con 10 números a 150 🔥**
+
+```
+Configuración Host:
+- Costo creación: 300 🔥 (a admin)
+- Método: efectivo + fuegos habilitados
+
+Ventas:
+- 5 números en efectivo ($5 USD c/u)
+- 5 números en fuegos (150 🔥 c/u)
+
+Resultado Final:
+- Host recibe:
+  * $25 USD (efectivo)
+  * 750 🔥 (de ventas con fuegos)
+  * -300 🔥 (costo creación)
+  * = $25 USD + 450 🔥 neto
+
+- Plataforma (admin):
+  * +300 🔥 (comisión creación)
+```
+
+### Ventajas
+
+✅ **Flexibilidad:** Host acepta múltiples métodos  
+✅ **Economía interna:** Circulación de fuegos entre usuarios  
+✅ **Sin comisión extra:** Transferencia directa host ↔ comprador  
+✅ **Aprobación manual:** Host controla cada venta  
+✅ **Transparencia:** Comprador ve costo exacto antes de solicitar  
+✅ **Historial completo:** Wallet transactions registran todo  
+
+### Validaciones Críticas
+
+1. **Método habilitado:** `allow_fire_payments = true`
+2. **Balance al solicitar:** Comprador tiene fuegos suficientes
+3. **Balance al aprobar:** Comprador aún tiene fuegos (no los gastó)
+4. **Atomicidad:** Transacción completa o rollback
+5. **Permisos:** Solo host puede aprobar
+6. **Registro:** Wallet transactions de ambas partes
+
+### API Endpoints Afectados
+
+**PUT `/api/raffles/:id/payment-details`**
+```json
+{
+  "payment_cost_amount": 150,
+  "payment_cost_currency": "USD",
+  "payment_method": "cash",
+  "allow_fire_payments": true  // ← NUEVO
+}
+```
+
+**GET `/api/raffles/:id/payment-details`**
+```json
+{
+  "payment_cost_amount": 150,
+  "payment_method": "cash",
+  "allow_fire_payments": true,  // ← NUEVO
+  "payment_instructions": "..."
+}
+```
+
+**POST `/api/raffles/:id/request-number`**
+```json
+{
+  "number_idx": 42,
+  "buyer_profile": { ... },
+  "payment_method": "fire"  // ← Nuevo valor posible
+}
+```
+
+### Testing
+
+**Caso 1: Solicitud con fuegos**
+```bash
+# Comprador con 200 🔥
+POST /api/raffles/123/request-number
+{
+  "number_idx": 5,
+  "payment_method": "fire"
+}
+
+# Resultado: Solicitud creada, número reservado
+```
+
+**Caso 2: Aprobación exitosa**
+```bash
+# Host aprueba
+POST /api/raffles/approve-purchase
+{ "request_id": "abc123" }
+
+# Resultado:
+# - Comprador: -150 🔥
+# - Host: +150 🔥
+# - Número vendido
+```
+
+**Caso 3: Balance insuficiente al aprobar**
+```bash
+# Comprador gastó sus fuegos mientras esperaba
+# Host intenta aprobar
+
+# Resultado: Error "El comprador ya no tiene suficientes fuegos"
+```
+
+---
+
 ## 🚀 PRÓXIMAS MEJORAS
 
 ### Fase 1 (Actual) ✅
@@ -672,6 +909,6 @@ Para reportar bugs o solicitar features:
 ---
 
 **Última actualización:** 2025-11-06  
-**Versión:** 1.0.0  
+**Versión:** 1.1 (Migración 035: Método de pago en fuegos + Fix reembolsos)  
 **Autor:** Sistema MundoXYZ  
 **Licencia:** Privada

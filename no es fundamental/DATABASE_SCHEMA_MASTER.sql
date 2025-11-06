@@ -348,6 +348,7 @@ COMMENT ON COLUMN raffles.payment_bank_code IS 'Código del banco venezolano par
 COMMENT ON COLUMN raffles.payment_phone IS 'Número de teléfono del anfitrión para pago móvil (migración 034)';
 COMMENT ON COLUMN raffles.payment_id_number IS 'Cédula/ID del anfitrión para pago móvil (migración 034)';
 COMMENT ON COLUMN raffles.payment_instructions IS 'Instrucciones/comentarios adicionales del anfitrión, máx 300 caracteres (migración 034)';
+COMMENT ON COLUMN raffles.allow_fire_payments IS 'Habilita pago con fuegos en rifas premio, los fuegos se transfieren al host tras aprobación (migración 035)';
 
 -- ============================================
 -- 11. RAFFLE_NUMBERS
@@ -435,6 +436,7 @@ CREATE TABLE IF NOT EXISTS raffle_requests (
   payment_method VARCHAR(50),
   payment_reference VARCHAR(255),
   message TEXT,
+  fire_amount DECIMAL(18,2) DEFAULT 0,
   history JSONB DEFAULT '[]',
   reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMPTZ,
@@ -451,6 +453,8 @@ CREATE INDEX IF NOT EXISTS idx_raffle_requests_reviewed_by ON raffle_requests(re
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_created ON raffle_requests(created_at);
 
 COMMENT ON TABLE raffle_requests IS 'Solicitudes de aprobación para rifas premio (modo pago)';
+COMMENT ON COLUMN raffle_requests.payment_method IS 'Método de pago elegido por comprador: cash, bank, fire (migración 035)';
+COMMENT ON COLUMN raffle_requests.fire_amount IS 'Cantidad de fuegos a transferir si payment_method = fire (migración 035)';
 
 -- ============================================
 -- 16. TICTACTOE_ROOMS

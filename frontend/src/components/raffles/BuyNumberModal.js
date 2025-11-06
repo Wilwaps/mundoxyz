@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, CreditCard, Phone, Hash, FileText, User, Mail, Send } from 'lucide-react';
+import { X, DollarSign, CreditCard, Phone, Hash, FileText, User, Mail, Send, Flame } from 'lucide-react';
 import axios from 'axios';
 import { getBankName } from '../../utils/bankCodes';
 import './BuyNumberModal.css';
@@ -11,7 +11,8 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
     full_name: '',
     phone: '',
     email: '',
-    payment_reference: ''
+    payment_reference: '',
+    payment_method: ''
   });
   const [loading, setLoading] = useState(false);
   const [loadingPayment, setLoadingPayment] = useState(true);
@@ -46,6 +47,13 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
 
   const handleSubmit = async () => {
     setError('');
+    
+    // Validar que se haya seleccionado un método de pago
+    if (!buyerData.payment_method) {
+      setError('Debes seleccionar un método de pago');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -53,7 +61,8 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
         `${process.env.REACT_APP_API_URL}/api/raffles/${raffle.id}/request-number`,
         {
           number_idx: numberIdx,
-          buyer_profile: buyerData
+          buyer_profile: buyerData,
+          payment_method: buyerData.payment_method
         },
         {
           headers: {
@@ -105,7 +114,73 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
 
           {paymentDetails && (
             <>
-              {/* Información de pago del anfitrión */}
+              {/* Selección de método de pago */}
+              <div className="payment-method-selector" style={{ marginBottom: '20px' }}>
+                <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CreditCard size={20} />
+                  Selecciona tu método de pago
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Opción efectivo/banco */}
+                  {(paymentDetails.payment_method === 'cash' || paymentDetails.payment_method === 'bank') && (
+                    <label 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        padding: '12px', 
+                        border: '2px solid ' + (buyerData.payment_method === paymentDetails.payment_method ? '#8B5CF6' : '#333'),
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: buyerData.payment_method === paymentDetails.payment_method ? 'rgba(139, 92, 246, 0.1)' : 'transparent'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value={paymentDetails.payment_method}
+                        checked={buyerData.payment_method === paymentDetails.payment_method}
+                        onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
+                        style={{ width: '18px', height: '18px' }}
+                      />
+                      <DollarSign size={18} />
+                      <span>{paymentDetails.payment_method === 'cash' ? 'Efectivo' : 'Pago móvil / Banco'}</span>
+                    </label>
+                  )}
+                  
+                  {/* Opción fuego */}
+                  {paymentDetails.allow_fire_payments && (
+                    <label 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        padding: '12px', 
+                        border: '2px solid ' + (buyerData.payment_method === 'fire' ? '#ff6b35' : '#333'),
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: buyerData.payment_method === 'fire' ? 'rgba(255, 107, 53, 0.1)' : 'transparent'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="fire"
+                        checked={buyerData.payment_method === 'fire'}
+                        onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
+                        style={{ width: '18px', height: '18px' }}
+                      />
+                      <Flame size={18} style={{ color: '#ff6b35' }} />
+                      <span>Pago en fuegos (🔥 {paymentDetails.payment_cost_amount})</span>
+                      <small style={{ marginLeft: 'auto', color: '#888' }}>Se descuentan al aprobar</small>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Información de pago del anfitrión (solo si NO es fire) */}
+              {buyerData.payment_method && buyerData.payment_method !== 'fire' && (
               <div className="payment-info-box">
                 <h3>
                   <DollarSign size={20} />
@@ -154,6 +229,7 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Formulario datos del comprador */}
               <div className="buyer-form">

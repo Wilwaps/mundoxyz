@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, CreditCard, Phone, Hash, FileText } from 'lucide-react';
+import { X, DollarSign, CreditCard, Phone, Hash, FileText, Flame } from 'lucide-react';
 import axios from 'axios';
 import { VENEZUELA_BANKS, getBankName } from '../../utils/bankCodes';
 import './PaymentDetailsModal.css';
@@ -12,7 +12,8 @@ const PaymentDetailsModal = ({ raffleId, currentData, onClose, onSave }) => {
     payment_bank_code: '',
     payment_phone: '',
     payment_id_number: '',
-    payment_instructions: ''
+    payment_instructions: '',
+    allow_fire_payments: false
   });
 
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,8 @@ const PaymentDetailsModal = ({ raffleId, currentData, onClose, onSave }) => {
         payment_bank_code: currentData.payment_bank_code || '',
         payment_phone: currentData.payment_phone || '',
         payment_id_number: currentData.payment_id_number || '',
-        payment_instructions: currentData.payment_instructions || ''
+        payment_instructions: currentData.payment_instructions || '',
+        allow_fire_payments: currentData.allow_fire_payments || false
       });
       setInstructionsLength(currentData.payment_instructions?.length || 0);
     }
@@ -240,6 +242,24 @@ const PaymentDetailsModal = ({ raffleId, currentData, onClose, onSave }) => {
               </div>
             </>
           )}
+
+          {/* Habilitar pago en fuegos */}
+          <div className="form-group">
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                name="allow_fire_payments"
+                checked={formData.allow_fire_payments}
+                onChange={(e) => setFormData(prev => ({ ...prev, allow_fire_payments: e.target.checked }))}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <Flame size={18} style={{ color: '#ff6b35' }} />
+              <span>Aceptar pago en fuegos (🔥)</span>
+            </label>
+            <small style={{ color: '#888', marginLeft: '30px', display: 'block', marginTop: '5px' }}>
+              Los fuegos se transferirán directamente a ti tras aprobar la compra
+            </small>
+          </div>
 
           {/* Comentario/instrucción */}
           <div className="form-group">

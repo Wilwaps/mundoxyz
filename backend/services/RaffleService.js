@@ -667,6 +667,49 @@ class RaffleService {
     async processPrizePurchase(client, userId, raffleId, numberIdx, cost, purchaseData) {
         const { buyerProfile, paymentMethod, paymentReference, message } = purchaseData;
         
+        // Validar que paymentMethod esté presente y sea válido
+        if (!paymentMethod || !['cash', 'bank', 'fire'].includes(paymentMethod)) {
+            throw new Error('Método de pago inválido o no especificado');
+        }
+        
+        // Obtener configuración de la rifa para validar métodos habilitados
+        const raffleConfig = await client.query(`
+            SELECT payment_method, allow_fire_payments 
+            FROM raffles 
+            WHERE id = $1
+        `, [raffleId]);
+        
+        if (!raffleConfig.rows[0]) {
+            throw new Error('Rifa no encontrada');
+        }
+        
+        const { payment_method: hostMethod, allow_fire_payments } = raffleConfig.rows[0];
+        
+        // Validar que el método elegido esté habilitado
+        if (paymentMethod === 'fire' && !allow_fire_payments) {
+            throw new Error('El pago con fuegos no está habilitado para esta rifa');
+        }
+        
+        if ((paymentMethod === 'cash' || paymentMethod === 'bank') && paymentMethod !== hostMethod) {
+            throw new Error(`Método de pago ${paymentMethod} no está configurado por el anfitrion`);
+        }
+        
+        // Si es método fire, verificar balance del comprador
+        if (paymentMethod === 'fire') {
+            const walletCheck = await client.query(`
+                SELECT fires_balance FROM wallets WHERE user_id = $1
+            `, [userId]);
+            
+            if (!walletCheck.rows[0]) {
+                throw new Error('Wallet no encontrada');
+            }
+            
+            const currentBalance = parseFloat(walletCheck.rows[0].fires_balance);
+            if (currentBalance < cost) {
+                throw new Error(`Balance insuficiente. Necesitas ${cost} fuegos, tienes ${currentBalance}`);
+            }
+        }
+        
         // Verificar que el número esté disponible
         const numberCheck = await client.query(`
             SELECT state FROM raffle_numbers 
@@ -700,8 +743,9 @@ class RaffleService {
                 payment_method, 
                 payment_reference, 
                 message,
+                fire_amount,
                 history
-            ) VALUES ($1, $2, 'approval', 'pending', $3, $4, $5, $6, $7, $8)
+            ) VALUES ($1, $2, 'approval', 'pending', $3, $4, $5, $6, $7, $8, $9)
         `, [
             raffleId, 
             userId, 
@@ -710,10 +754,12 @@ class RaffleService {
             paymentMethod,
             paymentReference || null,
             message || null,
+            paymentMethod === 'fire' ? cost : 0,
             JSON.stringify([{
                 action: 'created',
                 timestamp: new Date().toISOString(),
-                user_id: userId
+                user_id: userId,
+                payment_method: paymentMethod
             }])
         ]);
 
@@ -735,7 +781,7 @@ class RaffleService {
 
             // Obtener solicitud
             const request = await client.query(`
-                SELECT rr.*, r.host_id, r.entry_price_fire
+                SELECT rr.*, r.host_id, r.entry_price_fire, r.mode
                 FROM raffle_requests rr
                 JOIN raffles r ON rr.raffle_id = r.id
                 WHERE rr.id = $1 AND rr.status = 'pending'
@@ -755,6 +801,84 @@ class RaffleService {
             }
 
             const cost = parseFloat(requestData.entry_price_fire);
+            const paymentMethod = requestData.payment_method;
+            const fireAmount = parseFloat(requestData.fire_amount || 0);
+
+            // Si el método es fire, procesar transferencia de fuegos
+            if (paymentMethod === 'fire') {
+                // 1. Verificar balance actual del comprador
+                const buyerWallet = await client.query(`
+                    SELECT fires_balance FROM wallets WHERE user_id = $1
+                `, [requestData.user_id]);
+                
+                if (!buyerWallet.rows[0]) {
+                    throw new Error('Wallet del comprador no encontrada');
+                }
+                
+                const buyerBalance = parseFloat(buyerWallet.rows[0].fires_balance);
+                if (buyerBalance < fireAmount) {
+                    throw new Error(`El comprador ya no tiene suficientes fuegos. Necesita ${fireAmount}, tiene ${buyerBalance}`);
+                }
+                
+                // 2. Descontar fuegos del comprador
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance - $1,
+                        total_fires_spent = total_fires_spent + $1
+                    WHERE user_id = $2
+                `, [fireAmount, requestData.user_id]);
+                
+                // 3. Acreditar fuegos al host
+                await client.query(`
+                    UPDATE wallets 
+                    SET fires_balance = fires_balance + $1
+                    WHERE user_id = $2
+                `, [fireAmount, requestData.host_id]);
+                
+                // 4. Registrar transacción del comprador
+                await client.query(`
+                    INSERT INTO wallet_transactions 
+                    (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                    VALUES (
+                        (SELECT id FROM wallets WHERE user_id = $1),
+                        'raffle_fire_payment', 'fires', $2,
+                        (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
+                        (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                        $3, $4
+                    )
+                `, [
+                    requestData.user_id,
+                    fireAmount,
+                    requestData.raffle_id,
+                    `Pago rifa ${requestData.raffle_id} - Número ${numberIdx}`
+                ]);
+                
+                // 5. Registrar transacción del host
+                await client.query(`
+                    INSERT INTO wallet_transactions 
+                    (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                    VALUES (
+                        (SELECT id FROM wallets WHERE user_id = $1),
+                        'raffle_fire_received', 'fires', $2,
+                        (SELECT fires_balance - $2 FROM wallets WHERE user_id = $1),
+                        (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                        $3, $4
+                    )
+                `, [
+                    requestData.host_id,
+                    fireAmount,
+                    requestData.raffle_id,
+                    `Recibido de venta Número ${numberIdx} - Rifa ${requestData.raffle_id}`
+                ]);
+                
+                logger.info('Transferencia de fuegos completada', {
+                    from: requestData.user_id,
+                    to: requestData.host_id,
+                    amount: fireAmount,
+                    raffleId: requestData.raffle_id,
+                    numberIdx
+                });
+            }
 
             // Obtener ID del número
             const numberResult = await client.query(`
@@ -1685,9 +1809,53 @@ class RaffleService {
                 `, [num.owner_id, costPerNumber, raffleData.code, `Reembolso número ${num.number_idx} - Rifa cancelada ${raffleData.code}`]);
             }
 
-            // 2. Reembolsar platform_fee al host
+            // 2. Reembolsar platform_fee al host Y descontar del admin
             let refundedHostAmount = 0;
             if (platformFee > 0) {
+                // 2.1. Buscar admin de plataforma
+                const adminTgId = '1417856820';
+                const adminUserCheck = await client.query(`
+                    SELECT id FROM users WHERE tg_id = $1
+                `, [adminTgId]);
+                
+                if (adminUserCheck.rows.length === 0) {
+                    logger.warn('Admin de plataforma no encontrado - reembolso parcial sin descuento admin');
+                } else {
+                    const adminUserId = adminUserCheck.rows[0].id;
+                    
+                    // 2.2. Descontar del admin (devolver los fuegos que recibió al crear la rifa)
+                    await client.query(`
+                        UPDATE wallets 
+                        SET fires_balance = fires_balance - $1 
+                        WHERE user_id = $2
+                    `, [platformFee, adminUserId]);
+                    
+                    // 2.3. Registrar transacción del admin (devuelve comisión)
+                    await client.query(`
+                        INSERT INTO wallet_transactions 
+                        (wallet_id, type, currency, amount, balance_before, balance_after, reference, description)
+                        VALUES (
+                            (SELECT id FROM wallets WHERE user_id = $1),
+                            'raffle_refund_platform_fee', 'fires', $2,
+                            (SELECT fires_balance + $2 FROM wallets WHERE user_id = $1),
+                            (SELECT fires_balance FROM wallets WHERE user_id = $1),
+                            $3, $4
+                        )
+                    `, [
+                        adminUserId, 
+                        platformFee, 
+                        raffleData.code, 
+                        `Devolución comisión rifa cancelada ${raffleData.code}`
+                    ]);
+                    
+                    logger.info('Platform fee descontado del admin', {
+                        adminUserId,
+                        platformFee,
+                        raffleCode: raffleData.code
+                    });
+                }
+                
+                // 2.4. Acreditar al host (reembolso)
                 await client.query(`
                     UPDATE wallets 
                     SET fires_balance = fires_balance + $1 
@@ -1696,7 +1864,7 @@ class RaffleService {
 
                 refundedHostAmount = platformFee;
                 
-                // Registrar transacción de reembolso al host
+                // 2.5. Registrar transacción de reembolso al host
                 const refundDescription = raffleData.mode === 'fires'
                     ? `Reembolso creación rifa fuegos ${raffleData.code} (cancelada)`
                     : isCompanyMode
@@ -1798,7 +1966,8 @@ class RaffleService {
                 payment_bank_code,
                 payment_phone,
                 payment_id_number,
-                payment_instructions
+                payment_instructions,
+                allow_fire_payments = false
             } = paymentData;
 
             if (!payment_cost_amount || payment_cost_amount <= 0) {
@@ -1832,8 +2001,9 @@ class RaffleService {
                     payment_phone = $5,
                     payment_id_number = $6,
                     payment_instructions = $7,
+                    allow_fire_payments = $8,
                     updated_at = NOW()
-                WHERE id = $8
+                WHERE id = $9
                 RETURNING 
                     payment_cost_amount,
                     payment_cost_currency,
@@ -1841,7 +2011,8 @@ class RaffleService {
                     payment_bank_code,
                     payment_phone,
                     payment_id_number,
-                    payment_instructions
+                    payment_instructions,
+                    allow_fire_payments
             `, [
                 payment_cost_amount,
                 payment_cost_currency,
@@ -1850,6 +2021,7 @@ class RaffleService {
                 payment_method === 'bank' ? payment_phone : null,
                 payment_method === 'bank' ? payment_id_number : null,
                 payment_instructions || null,
+                allow_fire_payments,
                 raffleId
             ]);
 
@@ -1888,7 +2060,8 @@ class RaffleService {
                     payment_bank_code,
                     payment_phone,
                     payment_id_number,
-                    payment_instructions
+                    payment_instructions,
+                    allow_fire_payments
                 FROM raffles 
                 WHERE id = $1
             `, [raffleId]);
@@ -1909,7 +2082,8 @@ class RaffleService {
                 payment_cost_amount: raffle.payment_cost_amount,
                 payment_cost_currency: raffle.payment_cost_currency,
                 payment_method: raffle.payment_method,
-                payment_instructions: raffle.payment_instructions
+                payment_instructions: raffle.payment_instructions,
+                allow_fire_payments: raffle.allow_fire_payments || false
             };
 
             // Datos sensibles (solo para host y compradores autenticados)
