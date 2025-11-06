@@ -1,9 +1,11 @@
 const { query, getClient } = require('../db');
 const logger = require('../utils/logger');
+const RoomCodeService = require('./roomCodeService');
 
 class BingoV2Service {
   /**
    * Generate a unique room code
+   * @deprecated Use RoomCodeService.reserveCode() instead
    */
   static async generateRoomCode() {
     const result = await query('SELECT generate_room_code() as code');
@@ -72,20 +74,18 @@ class BingoV2Service {
         throw new Error(limits.reason);
       }
 
-      const roomCode = await this.generateRoomCode();
-      
       // Determine if auto-call should be enabled based on XP
       const autoCallEnabled = limits.userXP >= 500;
       
+      // Crear sala primero con código temporal
       const result = await dbQuery(
         `INSERT INTO bingo_v2_rooms (
           code, name, host_id, mode, pattern_type, is_public,
           max_players, max_cards_per_player, currency_type, card_cost,
           auto_call_enabled, auto_call_interval
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ) VALUES ('TEMP', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
-          roomCode,
           config.name || `Sala de ${config.host_name}`,
           hostId,
           config.mode || '75',
@@ -101,13 +101,30 @@ class BingoV2Service {
       );
 
       const room = result.rows[0];
+      
+      // Generar código único usando sistema unificado
+      const roomCode = await RoomCodeService.reserveCode('bingo', room.id, client);
+      
+      // Actualizar sala con código real
+      await dbQuery(
+        'UPDATE bingo_v2_rooms SET code = $1 WHERE id = $2',
+        [roomCode, room.id]
+      );
+      
+      room.code = roomCode;
 
       // Log the creation
       await dbQuery(
         `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
          VALUES ($1, $2, $3, $4)`,
-        [room.id, hostId, 'room_created', { config, autoCallEnabled, userXP: limits.userXP }]
+        [room.id, hostId, 'room_created', { config, autoCallEnabled, userXP: limits.userXP, code: roomCode }]
       );
+      
+      logger.info('🎰 Bingo sala creada con código unificado', {
+        roomId: room.id,
+        code: roomCode,
+        hostId
+      });
 
       return room;
     } catch (error) {

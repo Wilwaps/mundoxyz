@@ -27,6 +27,7 @@ const bingoV2Routes = require('./routes/bingoV2');
 const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
+const roomsRoutes = require('./routes/rooms');
 const diagnosticRoutes = require('./routes/diagnostic');
 const debugXpRoutes = require('./routes/debug-xp');
 const telegramWebhookRoutes = require('./routes/telegram-webhook');
@@ -222,6 +223,7 @@ app.use('/api/bingo/v2', (req, res, next) => {
 }, bingoV2Routes);
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/rooms', roomsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
 app.use('/api/debug-xp', debugXpRoutes);

@@ -5,6 +5,7 @@
 const { Pool } = require('pg');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const RoomCodeService = require('./roomCodeService');
 
 class RaffleService {
     constructor() {
@@ -112,29 +113,6 @@ class RaffleService {
                 requiresXP: normalizedMode === 'fires'
             });
 
-            // Generar código único de 6 dígitos numéricos
-            let code;
-            let isUnique = false;
-            let attempts = 0;
-            
-            while (!isUnique && attempts < 10) {
-                code = Math.floor(100000 + Math.random() * 900000).toString();
-                
-                const existingCode = await client.query(
-                    'SELECT id FROM raffles WHERE code = $1',
-                    [code]
-                );
-                
-                if (existingCode.rows.length === 0) {
-                    isUnique = true;
-                }
-                attempts++;
-            }
-            
-            if (!isUnique) {
-                throw new Error('No se pudo generar un código único. Intenta nuevamente.');
-            }
-
             // REGLAS DE COBRO:
             // 1. FIRES: Host paga cost_per_number al admin (NO permite empresa)
             // 2. PRIZE normal: Host paga 300🔥 al admin
@@ -186,15 +164,67 @@ class RaffleService {
                 isCompanyMode
             });
             
-            // Normalizar código a texto para evitar conflictos de tipo en SQL
-            const raffleCode = String(code);
-            
             logger.info('Creating raffle - deducting platform fee from host', {
                 hostId,
                 platformFee,
-                raffleCode,
                 mode: normalizedMode,
                 isCompanyMode
+            });
+            
+            // Insertar rifa primero con código temporal para obtener ID
+            const raffleResult = await client.query(`
+                INSERT INTO raffles (
+                    code, name, host_id, description, mode, type,
+                    entry_price_fire, entry_price_coin, entry_price_fiat,
+                    numbers_range, visibility, status,
+                    is_company_mode, company_cost, close_type, 
+                    scheduled_close_at, terms_conditions,
+                    prize_meta, host_meta
+                ) VALUES (
+                    'TEMP', $1, $2, $3, $4, $5,
+                    $6, $7, $8, $9, $10, 'pending',
+                    $11, $12, $13,
+                    $14, $15,
+                    $16, $17
+                ) RETURNING *
+            `, [
+                raffleData.name,
+                hostId,
+                raffleData.description || null,
+                normalizedMode,
+                raffleData.type || 'public',
+                normalizedMode === 'fires' ? costPerNumber : 0,  // entryPriceFire
+                0,  // entryPriceCoin
+                0,  // entryPriceFiat
+                raffleData.numbers_range || 100,
+                raffleData.visibility || 'public',
+                isCompanyMode,
+                isCompanyMode ? 3000 : 0,
+                raffleData.close_type || 'auto_full',
+                raffleData.scheduled_close_at || null,
+                raffleData.terms_conditions || null,
+                JSON.stringify(raffleData.prize_meta || {}),
+                JSON.stringify(raffleData.host_meta || {})
+            ]);
+
+            const raffle = raffleResult.rows[0];
+            
+            // Generar código único usando sistema unificado
+            const raffleCode = await RoomCodeService.reserveCode('raffle', raffle.id, client);
+            
+            // Actualizar rifa con código real
+            await client.query(
+                'UPDATE raffles SET code = $1 WHERE id = $2',
+                [raffleCode, raffle.id]
+            );
+            
+            raffle.code = raffleCode;
+            
+            logger.info('🎟️ Rifa creada con código unificado', {
+                raffleId: raffle.id,
+                code: raffleCode,
+                hostId,
+                mode: normalizedMode
             });
             
             // 1. Descontar del host
@@ -266,69 +296,6 @@ class RaffleService {
                     $3, $4
                 )
             `, [hostId, platformFee, raffleCode, hostDescription]);
-
-            // Calcular entry_price según modo
-            // fires: entry_price_fire = cost_per_number (lo que cobra el host a cada comprador)
-            // prize: entry_price_fire = 0 (gratis para compradores)
-            const entryPriceFire = normalizedMode === 'fires' ? costPerNumber : 0;
-            const entryPriceCoin = 0; // No usamos coins
-            const entryPriceFiat = 0; // No usamos fiat
-            
-            logger.info('Inserting raffle into database', {
-                raffleCode,
-                name: raffleData.name,
-                hostId,
-                mode: normalizedMode,
-                numbersRange: raffleData.numbers_range || 100,
-                entryPriceFire,
-                entryPriceCoin,
-                entryPriceFiat
-            });
-            
-            // Insertar rifa principal
-            const raffleResult = await client.query(`
-                INSERT INTO raffles (
-                    code, name, host_id, description, mode, type,
-                    entry_price_fire, entry_price_coin, entry_price_fiat,
-                    numbers_range, visibility, status,
-                    is_company_mode, company_cost, close_type, 
-                    scheduled_close_at, terms_conditions,
-                    prize_meta, host_meta
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6,
-                    $7, $8, $9, $10, $11, 'pending',
-                    $12, $13, $14,
-                    $15, $16,
-                    $17, $18
-                ) RETURNING *
-            `, [
-                raffleCode,
-                raffleData.name,
-                hostId,
-                raffleData.description || null,
-                normalizedMode,
-                raffleData.type || 'public',
-                entryPriceFire,
-                entryPriceCoin,
-                entryPriceFiat,
-                raffleData.numbers_range || 100,
-                raffleData.visibility || 'public',
-                isCompanyMode,
-                isCompanyMode ? 3000 : 0,
-                raffleData.close_type || 'auto_full',
-                raffleData.scheduled_close_at || null,
-                raffleData.terms_conditions || null,
-                JSON.stringify(raffleData.prize_meta || {}),
-                JSON.stringify(raffleData.host_meta || {})
-            ]);
-
-            const raffle = raffleResult.rows[0];
-            
-            logger.info('Raffle created successfully', {
-                raffleId: raffle.id,
-                raffleCode: raffle.code,
-                hostId
-            });
 
             // Si es modo empresa, crear configuración de empresa
             if (isCompanyMode && raffleData.company_config) {

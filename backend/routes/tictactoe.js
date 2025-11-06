@@ -5,7 +5,6 @@ const { verifyToken, optionalAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const { 
-  generateRoomCode, 
   isValidMove, 
   checkWinner, 
   distributePrizes,
@@ -16,6 +15,7 @@ const {
   cleanupOrphanedRooms,
   cleanupOldFinishedRooms 
 } = require('../utils/tictactoe-cleanup');
+const RoomCodeService = require('../services/roomCodeService');
 
 // Socket IO will be accessed through req.io
 
@@ -97,33 +97,17 @@ router.post('/create', verifyToken, async (req, res) => {
       // Cerrar salas anteriores del usuario
       await closeUserPreviousRooms(userId, client);
       
-      // Generar código único
-      let code;
-      let attempts = 0;
-      do {
-        code = generateRoomCode();
-        const existing = await client.query(
-          'SELECT 1 FROM tictactoe_rooms WHERE code = $1',
-          [code]
-        );
-        if (existing.rows.length === 0) break;
-        attempts++;
-      } while (attempts < 10);
+      // Crear sala primero para obtener ID
+      const roomId = uuidv4();
       
-      if (attempts >= 10) {
-        throw new Error('No se pudo generar código único');
-      }
-      
-      // Crear sala - host automáticamente marcado como ready
       const roomResult = await client.query(
         `INSERT INTO tictactoe_rooms 
          (id, code, host_id, mode, bet_amount, visibility, player_x_id, 
           pot_coins, pot_fires, status, current_turn, player_x_ready)
-         VALUES ($1, $2, $3, $4, $5, $6, $3, $7, $8, 'waiting', 'X', TRUE)
+         VALUES ($1, 'TEMP', $2, $3, $4, $5, $2, $6, $7, 'waiting', 'X', TRUE)
          RETURNING *`,
         [
-          uuidv4(),
-          code,
+          roomId,
           userId,
           mode,
           betAmount,
@@ -135,7 +119,18 @@ router.post('/create', verifyToken, async (req, res) => {
       
       const room = roomResult.rows[0];
       
-      logger.info('Tictactoe room created', { 
+      // Generar código único usando sistema unificado
+      const code = await RoomCodeService.reserveCode('tictactoe', roomId, client);
+      
+      // Actualizar sala con código real
+      await client.query(
+        'UPDATE tictactoe_rooms SET code = $1 WHERE id = $2',
+        [code, roomId]
+      );
+      
+      room.code = code;
+      
+      logger.info('🎮 TicTacToe sala creada con código unificado', { 
         roomId: room.id, 
         code: room.code,
         host: req.user.username,
