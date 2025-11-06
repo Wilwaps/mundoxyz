@@ -70,6 +70,8 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   }, [raffle.id, numberIdx]);
 
   const loadPaymentDetails = async () => {
+    console.log('📥 Cargando payment details para rifa:', raffle.id);
+    
     try {
       const response = await axios.get(
         buildUrl(`/api/raffles/${raffle.id}/payment-details`),
@@ -80,28 +82,37 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
         }
       );
 
+      console.log('✅ Response payment-details:', response.data);
+
       if (response.data.success && response.data.data) {
+        console.log('💳 Payment details recibidos:', response.data.data);
         setPaymentDetails(response.data.data);
       } else {
+        console.log('⚠️ No hay payment details, usando valores por defecto');
         // Si no hay payment details, configurar datos por defecto
-        setPaymentDetails({
+        const defaultDetails = {
           payment_cost_amount: raffle.cost_per_number || 10,
           payment_cost_currency: 'fires',
           allow_fire_payments: true
-        });
-        // NO auto-seleccionar, dejar que el usuario elija
+        };
+        console.log('📝 Default payment details:', defaultDetails);
+        setPaymentDetails(defaultDetails);
       }
     } catch (err) {
-      console.error('Error cargando payment details:', err);
-      // Fallback: configurar datos por defecto
-      setPaymentDetails({
+      console.error('❌ Error cargando payment details:', err);
+      console.error('Error response:', err.response?.data);
+      
+      // Fallback: configurar datos por defecto SIEMPRE
+      const fallbackDetails = {
         payment_cost_amount: raffle.cost_per_number || 10,
         payment_cost_currency: 'fires',
         allow_fire_payments: true
-      });
-      // NO auto-seleccionar, dejar que el usuario elija
+      };
+      console.log('🔄 Fallback payment details:', fallbackDetails);
+      setPaymentDetails(fallbackDetails);
     } finally {
       setLoadingPayment(false);
+      console.log('🏁 loadPaymentDetails finalizado');
     }
   };
 
@@ -148,6 +159,7 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
   };
 
   if (loadingPayment) {
+    console.log('⏳ Modal en estado loading...');
     return (
       <div className="buy-number-modal-overlay" onClick={onClose}>
         <div className="buy-number-modal-content loading" onClick={(e) => e.stopPropagation()}>
@@ -156,6 +168,9 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
       </div>
     );
   }
+
+  console.log('🎨 Renderizando modal con paymentDetails:', paymentDetails);
+  console.log('📊 Estado actual buyerData:', buyerData);
 
   return (
     <div className="buy-number-modal-overlay" onClick={onClose}>

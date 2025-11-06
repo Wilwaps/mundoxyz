@@ -64,9 +64,9 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-xl max-w-lg w-full border-2 border-red-500/50">
+      <div className="bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] border-2 border-red-500/50 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-red-500/10">
+        <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-red-500/10 flex-shrink-0">
           <div className="flex items-center gap-3">
             <AlertTriangle className="text-red-500" size={28} />
             <h3 className="text-xl font-bold text-white">Cancelar Rifa</h3>
@@ -80,8 +80,8 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
+        {/* Content - CON SCROLL */}
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {/* Información de la rifa */}
           <div className="bg-gray-700/50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between">
@@ -175,8 +175,8 @@ const CancelRaffleModal = ({ isOpen, onClose, raffle, onCancelled }) => {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-700 flex gap-3">
+        {/* Footer - FIJO */}
+        <div className="p-6 border-t border-gray-700 flex gap-3 flex-shrink-0">
           <button
             onClick={onClose}
             disabled={loading}
