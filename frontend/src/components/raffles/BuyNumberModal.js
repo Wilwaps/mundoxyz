@@ -36,26 +36,23 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
       if (response.data.success && response.data.data) {
         setPaymentDetails(response.data.data);
       } else {
-        // Si no hay payment details, configurar modo fuego por defecto
+        // Si no hay payment details, configurar datos por defecto
         setPaymentDetails({
-          payment_method: 'fire',
-          allow_fire_payments: true,
           payment_cost_amount: raffle.cost_per_number || 10,
-          payment_cost_currency: 'fires'
+          payment_cost_currency: 'fires',
+          allow_fire_payments: true
         });
-        // Auto-seleccionar fuego
-        setBuyerData(prev => ({ ...prev, payment_method: 'fire' }));
+        // NO auto-seleccionar, dejar que el usuario elija
       }
     } catch (err) {
       console.error('Error cargando payment details:', err);
-      // Fallback: permitir pago en fuegos
+      // Fallback: configurar datos por defecto
       setPaymentDetails({
-        payment_method: 'fire',
-        allow_fire_payments: true,
         payment_cost_amount: raffle.cost_per_number || 10,
-        payment_cost_currency: 'fires'
+        payment_cost_currency: 'fires',
+        allow_fire_payments: true
       });
-      setBuyerData(prev => ({ ...prev, payment_method: 'fire' }));
+      // NO auto-seleccionar, dejar que el usuario elija
     } finally {
       setLoadingPayment(false);
     }
@@ -143,60 +140,81 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
                 </h3>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {/* Opción efectivo/banco */}
-                  {(paymentDetails.payment_method === 'cash' || paymentDetails.payment_method === 'bank') && (
-                    <label 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px', 
-                        padding: '12px', 
-                        border: '2px solid ' + (buyerData.payment_method === paymentDetails.payment_method ? '#8B5CF6' : '#333'),
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: buyerData.payment_method === paymentDetails.payment_method ? 'rgba(139, 92, 246, 0.1)' : 'transparent'
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value={paymentDetails.payment_method}
-                        checked={buyerData.payment_method === paymentDetails.payment_method}
-                        onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
-                        style={{ width: '18px', height: '18px' }}
-                      />
-                      <DollarSign size={18} />
-                      <span>{paymentDetails.payment_method === 'cash' ? 'Efectivo' : 'Pago móvil / Banco'}</span>
-                    </label>
-                  )}
+                  {/* Opción efectivo - SIEMPRE visible */}
+                  <label 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      padding: '12px', 
+                      border: '2px solid ' + (buyerData.payment_method === 'cash' ? '#8B5CF6' : '#333'),
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: buyerData.payment_method === 'cash' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="cash"
+                      checked={buyerData.payment_method === 'cash'}
+                      onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <DollarSign size={18} />
+                    <span>Efectivo</span>
+                  </label>
                   
-                  {/* Opción fuego */}
-                  {paymentDetails.allow_fire_payments && (
-                    <label 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px', 
-                        padding: '12px', 
-                        border: '2px solid ' + (buyerData.payment_method === 'fire' ? '#ff6b35' : '#333'),
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: buyerData.payment_method === 'fire' ? 'rgba(255, 107, 53, 0.1)' : 'transparent'
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value="fire"
-                        checked={buyerData.payment_method === 'fire'}
-                        onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
-                        style={{ width: '18px', height: '18px' }}
-                      />
-                      <Flame size={18} style={{ color: '#ff6b35' }} />
-                      <span>Pago en fuegos (🔥 {paymentDetails.payment_cost_amount})</span>
-                      <small style={{ marginLeft: 'auto', color: '#888' }}>Se descuentan al aprobar</small>
-                    </label>
-                  )}
+                  {/* Opción pago móvil/banco - SIEMPRE visible */}
+                  <label 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      padding: '12px', 
+                      border: '2px solid ' + (buyerData.payment_method === 'bank' ? '#8B5CF6' : '#333'),
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: buyerData.payment_method === 'bank' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="bank"
+                      checked={buyerData.payment_method === 'bank'}
+                      onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <Phone size={18} />
+                    <span>Pago móvil / Banco</span>
+                  </label>
+                  
+                  {/* Opción fuego - SIEMPRE visible */}
+                  <label 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      padding: '12px', 
+                      border: '2px solid ' + (buyerData.payment_method === 'fire' ? '#ff6b35' : '#333'),
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: buyerData.payment_method === 'fire' ? 'rgba(255, 107, 53, 0.1)' : 'transparent'
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="fire"
+                      checked={buyerData.payment_method === 'fire'}
+                      onChange={(e) => setBuyerData(prev => ({ ...prev, payment_method: e.target.value }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <Flame size={18} style={{ color: '#ff6b35' }} />
+                    <span>Pago en fuegos (🔥 {paymentDetails.payment_cost_amount})</span>
+                    <small style={{ marginLeft: 'auto', color: '#888' }}>Se descuentan al aprobar</small>
+                  </label>
                 </div>
               </div>
 
@@ -205,24 +223,24 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
               <div className="payment-info-box">
                 <h3>
                   <DollarSign size={20} />
-                  Información de pago
+                  Información de pago del anfitrión
                 </h3>
                 
                 <div className="payment-detail">
                   <span className="label">Costo:</span>
                   <span className="value">
-                    {paymentDetails.payment_cost_amount} {paymentDetails.payment_cost_currency}
+                    {paymentDetails.payment_cost_amount || raffle.cost_per_number || 10} {paymentDetails.payment_cost_currency || 'Bs'}
                   </span>
                 </div>
 
                 <div className="payment-detail">
-                  <span className="label">Método:</span>
+                  <span className="label">Método seleccionado:</span>
                   <span className="value">
-                    {paymentDetails.payment_method === 'cash' ? 'Efectivo' : 'Pago móvil / Banco'}
+                    {buyerData.payment_method === 'cash' ? 'Efectivo' : 'Pago móvil / Banco'}
                   </span>
                 </div>
 
-                {paymentDetails.payment_method === 'bank' && (
+                {buyerData.payment_method === 'bank' && paymentDetails.payment_bank_code && (
                   <>
                     <div className="payment-detail">
                       <span className="label">Banco:</span>
@@ -241,6 +259,20 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
                       <span className="value">{paymentDetails.payment_id_number}</span>
                     </div>
                   </>
+                )}
+
+                {buyerData.payment_method === 'cash' && (
+                  <div className="payment-instructions">
+                    <FileText size={16} />
+                    <p>Coordina la entrega del efectivo directamente con el anfitrión.</p>
+                  </div>
+                )}
+
+                {buyerData.payment_method === 'bank' && !paymentDetails.payment_bank_code && (
+                  <div className="payment-instructions">
+                    <FileText size={16} />
+                    <p>El anfitrión te proporcionará los datos bancarios una vez apruebe tu solicitud.</p>
+                  </div>
                 )}
 
                 {paymentDetails.payment_instructions && (
