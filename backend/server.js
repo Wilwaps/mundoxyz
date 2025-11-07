@@ -320,7 +320,8 @@ async function startServer() {
 
         // Start Raffle Reservation Cleanup Job
         const RaffleService = require('./services/RaffleService');
-        const raffleService = new RaffleService(pool);
+        const db = require('./db');
+        const raffleService = new RaffleService(db.pool);
         setInterval(async () => {
           try {
             const expiredByRaffle = await raffleService.cleanExpiredReservations();

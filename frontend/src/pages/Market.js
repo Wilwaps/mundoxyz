@@ -195,11 +195,12 @@ const Market = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="card-glass w-full max-w-md"
+            className="card-glass w-full max-w-md max-h-[90vh] flex flex-col"
           >
-            <h3 className="text-xl font-bold mb-4">Solicitar Canje</h3>
+            <h3 className="text-xl font-bold mb-4 flex-shrink-0">Solicitar Canje</h3>
             
-            <form onSubmit={submitRedeem} className="space-y-4">
+            <form onSubmit={submitRedeem} className="flex flex-col flex-1 min-h-0">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               <div>
                 <label className="block text-sm text-text/60 mb-1">Cantidad de Fuegos *</label>
                 <input
@@ -290,8 +291,9 @@ const Market = () => {
                   Se debitarán {(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥 de tu cuenta ({redeemData.fires_amount} + 5% comisión). El proceso de pago puede tardar hasta 48 horas.
                 </p>
               </div>
+              </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-4 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowRedeemModal(false)}
