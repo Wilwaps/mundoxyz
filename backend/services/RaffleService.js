@@ -1378,13 +1378,16 @@ class RaffleService {
                     r.*,
                     u.username as host_username,
                     rc.company_name,
+                    rc.rif_number,
+                    rc.brand_color,
+                    rc.logo_url,
                     COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
                 FROM raffles r
                 JOIN users u ON r.host_id = u.id
                 LEFT JOIN raffle_companies rc ON r.id = rc.raffle_id
                 LEFT JOIN raffle_numbers rn ON r.id = rn.raffle_id
                 WHERE r.code = $1
-                GROUP BY r.id, u.username, rc.company_name
+                GROUP BY r.id, u.username, rc.company_name, rc.rif_number, rc.brand_color, rc.logo_url
             `, [code]);
 
             if (result.rows[0]) {
@@ -1415,33 +1418,46 @@ class RaffleService {
                     result.rows[0].pending_requests = requests.rows;
                 }
 
-                // HOTFIX: Sanitizar datos para prevenir InvalidCharacterError en frontend bundle viejo
-                // El bundle viejo no tiene validaciones, así que removemos campos null/undefined
+                // FIX COMPLETO: Mapear TODOS los campos que el frontend espera
                 const raffle = result.rows[0];
                 
-                // Si primary_color es null/undefined, eliminarlo completamente
-                if (!raffle.primary_color) {
-                    delete raffle.primary_color;
-                }
-                if (!raffle.secondary_color) {
-                    delete raffle.secondary_color;
-                }
-                if (!raffle.logo_url) {
-                    delete raffle.logo_url;
+                // Campos faltantes con defaults seguros
+                raffle.total_numbers = raffle.numbers_range || 100;
+                raffle.cost_per_number = raffle.entry_price_fire || 10;
+                raffle.pot_fires = 0; // TODO: calcular suma real
+                raffle.pot_coins = 0; // TODO: calcular suma real
+                raffle.view_count = 0; // TODO: implementar tracking de views
+                
+                // Mapear datos de raffle_companies si existen
+                if (raffle.company_name) {
+                    raffle.logo_url = raffle.logo_url || '';
+                    raffle.primary_color = raffle.brand_color || '';
+                    raffle.secondary_color = ''; // No existe en DB
                 }
                 
-                // company_config debe ser objeto con campos seguros
-                if (!raffle.company_config) {
-                    raffle.company_config = {};
+                // company_config para modo empresa
+                raffle.company_config = raffle.company_config || {};
+                if (raffle.is_company_mode && raffle.company_name) {
+                    raffle.company_config = {
+                        company_name: raffle.company_name || '',
+                        company_rif: raffle.rif_number || '',
+                        primary_color: raffle.brand_color || '',
+                        secondary_color: ''
+                    };
                 }
                 
-                // Eliminar colores null de company_config
-                if (raffle.company_config && !raffle.company_config.primary_color) {
-                    delete raffle.company_config.primary_color;
+                // prize_meta debe ser objeto válido
+                if (typeof raffle.prize_meta === 'string') {
+                    try {
+                        raffle.prize_meta = JSON.parse(raffle.prize_meta);
+                    } catch (e) {
+                        raffle.prize_meta = {};
+                    }
                 }
-                if (raffle.company_config && !raffle.company_config.secondary_color) {
-                    delete raffle.company_config.secondary_color;
-                }
+                raffle.prize_meta = raffle.prize_meta || {};
+                
+                // pending_requests debe ser array
+                raffle.pending_requests = raffle.pending_requests || [];
             }
 
             return result.rows[0];
