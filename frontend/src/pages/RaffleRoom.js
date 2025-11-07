@@ -335,7 +335,7 @@ const RaffleRoom = () => {
                   src={raffle.logo_url} 
                   alt={raffle.company_name}
                   className="w-16 h-16 rounded-xl object-cover border-2 border-white/20"
-                  style={{ borderColor: raffle.primary_color }}
+                  style={raffle.primary_color ? { borderColor: raffle.primary_color } : {}}
                 />
               )}
               <div>
@@ -377,7 +377,7 @@ const RaffleRoom = () => {
               </span>
               {raffle.is_company_mode && (
                 <div className="flex items-center gap-2 text-white/80 text-sm">
-                  <FaBuilding style={{ color: raffle.primary_color }} />
+                  <FaBuilding style={raffle.primary_color ? { color: raffle.primary_color } : {}} />
                   {raffle.company_name}
                 </div>
               )}
@@ -494,22 +494,28 @@ const RaffleRoom = () => {
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="text-white/80">
-                    <strong>Nombre:</strong> {raffle.company_config.company_name}
+                    <strong>Nombre:</strong> {raffle.company_config.company_name || 'No especificado'}
                   </div>
                   <div className="text-white/80">
-                    <strong>RIF:</strong> {raffle.company_config.company_rif}
+                    <strong>RIF:</strong> {raffle.company_config.company_rif || 'No especificado'}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div 
-                      className="w-6 h-6 rounded-full border border-white/20"
-                      style={{ backgroundColor: raffle.company_config.primary_color }}
-                    />
-                    <div 
-                      className="w-6 h-6 rounded-full border border-white/20"
-                      style={{ backgroundColor: raffle.company_config.secondary_color }}
-                    />
-                    <span className="text-white/60 text-xs">Colores de marca</span>
-                  </div>
+                  {(raffle.company_config.primary_color || raffle.company_config.secondary_color) && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {raffle.company_config.primary_color && (
+                        <div 
+                          className="w-6 h-6 rounded-full border border-white/20"
+                          style={{ backgroundColor: raffle.company_config.primary_color }}
+                        />
+                      )}
+                      {raffle.company_config.secondary_color && (
+                        <div 
+                          className="w-6 h-6 rounded-full border border-white/20"
+                          style={{ backgroundColor: raffle.company_config.secondary_color }}
+                        />
+                      )}
+                      <span className="text-white/60 text-xs">Colores de marca</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
