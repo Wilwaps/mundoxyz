@@ -1414,6 +1414,34 @@ class RaffleService {
 
                     result.rows[0].pending_requests = requests.rows;
                 }
+
+                // HOTFIX: Sanitizar datos para prevenir InvalidCharacterError en frontend bundle viejo
+                // El bundle viejo no tiene validaciones, así que removemos campos null/undefined
+                const raffle = result.rows[0];
+                
+                // Si primary_color es null/undefined, eliminarlo completamente
+                if (!raffle.primary_color) {
+                    delete raffle.primary_color;
+                }
+                if (!raffle.secondary_color) {
+                    delete raffle.secondary_color;
+                }
+                if (!raffle.logo_url) {
+                    delete raffle.logo_url;
+                }
+                
+                // company_config debe ser objeto con campos seguros
+                if (!raffle.company_config) {
+                    raffle.company_config = {};
+                }
+                
+                // Eliminar colores null de company_config
+                if (raffle.company_config && !raffle.company_config.primary_color) {
+                    delete raffle.company_config.primary_color;
+                }
+                if (raffle.company_config && !raffle.company_config.secondary_color) {
+                    delete raffle.company_config.secondary_color;
+                }
             }
 
             return result.rows[0];
