@@ -175,31 +175,70 @@ const PurchaseModalPrize = ({ isOpen, onClose, onSubmit, selectedNumbers, raffle
                 Método de Pago *
               </label>
               <div className="grid grid-cols-2 gap-3">
-                {paymentMethods.map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setFormData({ ...formData, payment_method: method.method_type })}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      formData.payment_method === method.method_type
-                        ? 'border-yellow-500 bg-yellow-500/20'
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {method.method_type === 'transferencia' ? (
-                        <CreditCard className="text-yellow-400" size={24} />
-                      ) : (
+                {/* Métodos por defecto si no hay configurados */}
+                {(!paymentMethods || paymentMethods.length === 0) ? (
+                  <>
+                    <button
+                      onClick={() => setFormData({ ...formData, payment_method: 'efectivo' })}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        formData.payment_method === 'efectivo'
+                          ? 'border-yellow-500 bg-yellow-500/20'
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
                         <DollarSign className="text-green-400" size={24} />
-                      )}
-                      <div className="text-left">
-                        <p className="text-white font-semibold capitalize">{method.method_type}</p>
-                        <p className="text-gray-400 text-xs">
-                          {method.method_type === 'transferencia' ? 'Banco' : 'Efectivo'}
-                        </p>
+                        <div className="text-left">
+                          <p className="text-white font-semibold">Efectivo</p>
+                          <p className="text-gray-400 text-xs">Pago en persona</p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+
+                    <button
+                      onClick={() => setFormData({ ...formData, payment_method: 'transferencia' })}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        formData.payment_method === 'transferencia'
+                          ? 'border-yellow-500 bg-yellow-500/20'
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CreditCard className="text-yellow-400" size={24} />
+                        <div className="text-left">
+                          <p className="text-white font-semibold">Transferencia</p>
+                          <p className="text-gray-400 text-xs">Pago móvil / Banco</p>
+                        </div>
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  paymentMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => setFormData({ ...formData, payment_method: method.method_type })}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        formData.payment_method === method.method_type
+                          ? 'border-yellow-500 bg-yellow-500/20'
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {method.method_type === 'transferencia' ? (
+                          <CreditCard className="text-yellow-400" size={24} />
+                        ) : (
+                          <DollarSign className="text-green-400" size={24} />
+                        )}
+                        <div className="text-left">
+                          <p className="text-white font-semibold capitalize">{method.method_type}</p>
+                          <p className="text-gray-400 text-xs">
+                            {method.method_type === 'transferencia' ? 'Banco' : 'Efectivo'}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
               {errors.payment_method && <p className="text-red-400 text-sm mt-2">{errors.payment_method}</p>}
             </div>
