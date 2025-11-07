@@ -52,7 +52,7 @@ const RaffleRoom = () => {
   } = useQuery({
     queryKey: ['raffle', code, refreshTrigger],
     queryFn: async () => {
-      const response = await fetch(`/api/raffles/${code}`);
+      const response = await fetch(`${API_URL}/api/raffles/${code}`);
       if (!response.ok) {
         throw new Error('Rifa no encontrada');
       }
@@ -66,7 +66,7 @@ const RaffleRoom = () => {
   const { data: numbers } = useQuery({
     queryKey: ['raffle-numbers', code],
     queryFn: async () => {
-      const response = await fetch(`/api/raffles/${code}/numbers`);
+      const response = await fetch(`${API_URL}/api/raffles/${code}/numbers`);
       if (!response.ok) throw new Error('Error al cargar números');
       const result = await response.json();
       return result.data;
@@ -715,7 +715,7 @@ const RaffleRoom = () => {
                         <button
                           onClick={async () => {
                             try {
-                              await fetch(`/api/raffles/approve-purchase`, {
+                              await fetch(`${API_URL}/api/raffles/approve-purchase`, {
                                 method: 'POST',
                                 headers: {
                                   'Content-Type': 'application/json',
@@ -737,7 +737,7 @@ const RaffleRoom = () => {
                         <button
                           onClick={async () => {
                             try {
-                              await fetch(`/api/raffles/reject-purchase`, {
+                              await fetch(`${API_URL}/api/raffles/reject-purchase`, {
                                 method: 'POST',
                                 headers: {
                                   'Content-Type': 'application/json',
