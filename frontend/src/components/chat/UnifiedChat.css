@@ -287,6 +287,92 @@
   background: #555;
 }
 
+/* Ron Chat Específico */
+.ron-chat .tab-info {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ron-chat .clear-btn {
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #dc3545;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.ron-chat .clear-btn:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: rgba(220, 53, 69, 0.5);
+}
+
+.ron-chat .clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bot-typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 10px;
+  color: #667eea;
+  font-style: italic;
+  margin-bottom: 12px;
+  animation: fadeIn 0.3s ease;
+}
+
+.chat-message.bot-message {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-left: 3px solid #ffd700;
+  margin-right: 30px;
+}
+
+.chat-message.bot-message .message-username {
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chat-message.bot-message .message-username::before {
+  content: "🤖";
+  font-size: 14px;
+}
+
+.chat-message.error-message {
+  background: rgba(220, 53, 69, 0.1);
+  border-left: 3px solid #dc3545;
+  color: #dc3545;
+}
+
+.ron-chat .empty-messages {
+  text-align: center;
+}
+
+.ron-chat .empty-messages ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px auto;
+  max-width: 250px;
+}
+
+.ron-chat .empty-messages li {
+  padding: 5px 0;
+  color: #6c757d;
+}
+
 @media (max-width: 768px) {
   .unified-chat {
     right: 10px;

@@ -89,10 +89,12 @@ io.on('connection', (socket) => {
   const globalChatHandler = require('./socket/globalChat');
   const anonymousChatHandler = require('./socket/anonymousChat');
   const roomChatHandler = require('./socket/roomChat');
+  const ronChatHandler = require('./socket/ronChat');
   
   globalChatHandler(io, socket);
   anonymousChatHandler(io, socket);
   roomChatHandler(io, socket);
+  ronChatHandler(io, socket);
   
   // Initialize Raffle socket handlers
   raffleSocketHandler.setupListeners(socket);

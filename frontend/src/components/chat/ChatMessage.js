@@ -6,7 +6,9 @@ const ChatMessage = ({
   timestamp, 
   isOwn = false, 
   showUsername = true,
-  isAnonymous = false
+  isAnonymous = false,
+  isBot = false,
+  isError = false
 }) => {
   const formatTime = (ts) => {
     return new Date(ts).toLocaleTimeString('es-ES', {
@@ -16,7 +18,7 @@ const ChatMessage = ({
   };
 
   return (
-    <div className={`chat-message ${isOwn ? 'own' : ''} ${isAnonymous ? 'anonymous' : ''}`}>
+    <div className={`chat-message ${isOwn ? 'own' : ''} ${isAnonymous ? 'anonymous' : ''} ${isBot ? 'bot-message' : ''} ${isError ? 'error-message' : ''}`}>
       {showUsername && !isAnonymous && (
         <span className="message-username">{username}</span>
       )}

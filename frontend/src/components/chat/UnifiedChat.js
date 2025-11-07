@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 import GlobalChatTab from './GlobalChatTab';
 import AnonymousChatTab from './AnonymousChatTab';
 import RoomChatTab from './RoomChatTab';
+import RonChatTab from './RonChatTab';
 import './UnifiedChat.css';
 
 const UnifiedChat = () => {
@@ -106,6 +107,14 @@ const UnifiedChat = () => {
                 👤
               </button>
               
+              <button
+                className={`tab ${activeTab === 'ron' ? 'active' : ''}`}
+                onClick={() => setActiveTab('ron')}
+                title="Chat con Ron (IA)"
+              >
+                🤖
+              </button>
+              
               {showRoomTab && (
                 <button
                   className={`tab ${activeTab === 'room' ? 'active' : ''}`}
@@ -128,6 +137,7 @@ const UnifiedChat = () => {
           <div className="chat-content">
             {activeTab === 'global' && <GlobalChatTab />}
             {activeTab === 'anonymous' && <AnonymousChatTab />}
+            {activeTab === 'ron' && <RonChatTab />}
             {activeTab === 'room' && currentRoom && (
               <RoomChatTab 
                 roomType={currentRoom.type}
