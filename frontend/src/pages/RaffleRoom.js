@@ -548,13 +548,13 @@ const RaffleRoom = () => {
           <NumberGrid
             numbers={numbers}
             onNumberClick={(num) => {
-              if (raffle.status === 'pending' && isNumberAvailable(num)) {
+              if (raffle?.status === 'pending' && isNumberAvailable(num)) {
                 setSelectedNumber(num);
                 setShowBuyNumberModal(true);  // ← CORRECCIÓN: Usar modal completo
               }
             }}
             userPurchases={numbers?.filter(n => n.purchased_by === user?.id) || []}
-            disabled={raffle.status !== 'pending'}
+            disabled={raffle?.status !== 'pending'}
             user={user}
           />
         </motion.div>
@@ -839,7 +839,7 @@ const RaffleRoom = () => {
             if (window.confirm('¿Cerrar la rifa y proceder al sorteo?')) {
               try {
                 await axios.post(
-                  `${API_URL}/api/raffles/${raffle.id}/close`,
+                  `${API_URL}/api/raffles/${raffle?.id}/close`,
                   {},
                   {
                     headers: {
@@ -862,7 +862,7 @@ const RaffleRoom = () => {
       )}
 
       {/* Botón flotante Cancelar Rifa (solo host, si está en pending) */}
-      {raffle.host_id === user?.id && raffle.status === 'pending' && (
+      {raffle?.host_id === user?.id && raffle?.status === 'pending' && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -873,7 +873,7 @@ const RaffleRoom = () => {
             if (window.confirm('¿Cancelar la rifa? Se reembolsarán los fuegos a los compradores.')) {
               try {
                 await axios.post(
-                  `${API_URL}/api/raffles/${raffle.id}/cancel`,
+                  `${API_URL}/api/raffles/${raffle?.id}/cancel`,
                   {},
                   {
                     headers: {
