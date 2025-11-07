@@ -22,11 +22,12 @@ router.get('/stats', async (req, res) => {
       FROM wallets
     `);
 
-    // Contar usuarios activos (que han hecho login en últimos 7 días)
+    // Contar usuarios activos (con transacciones en últimos 7 días)
     const activeUsers = await query(`
-      SELECT COUNT(DISTINCT user_id) as active_users_7d
-      FROM wallet_transactions
-      WHERE created_at > NOW() - INTERVAL '7 days'
+      SELECT COUNT(DISTINCT w.user_id) as active_users_7d
+      FROM wallet_transactions wt
+      INNER JOIN wallets w ON w.id = wt.wallet_id
+      WHERE wt.created_at > NOW() - INTERVAL '7 days'
     `);
 
     // Contar total de usuarios
