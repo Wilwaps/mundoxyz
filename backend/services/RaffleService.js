@@ -2408,8 +2408,7 @@ class RaffleService {
                 SET 
                     state = 'available',
                     reserved_by = NULL,
-                    reserved_until = NULL,
-                    updated_at = NOW()
+                    reserved_until = NULL
                 WHERE state = 'reserved'
                   AND reserved_until IS NOT NULL
                   AND reserved_until < NOW()
