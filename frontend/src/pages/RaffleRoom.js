@@ -253,8 +253,8 @@ const RaffleRoom = () => {
     );
   }
 
-  const progress = raffle.total_numbers > 0 
-    ? (raffle.purchased_count / raffle.total_numbers) * 100 
+  const progress = (raffle?.total_numbers || 0) > 0 
+    ? ((raffle?.purchased_count || 0) / (raffle?.total_numbers || 1)) * 100 
     : 0;
 
   return (
@@ -335,7 +335,7 @@ const RaffleRoom = () => {
               {raffle.is_company_mode && raffle.logo_url && (
                 <img 
                   src={raffle.logo_url} 
-                  alt={raffle.company_name}
+                  alt={raffle.company_name || 'Logo'}
                   className="w-16 h-16 rounded-xl object-cover border-2 border-white/20"
                   style={raffle.primary_color ? { borderColor: raffle.primary_color } : {}}
                 />
@@ -380,7 +380,7 @@ const RaffleRoom = () => {
               {raffle.is_company_mode && (
                 <div className="flex items-center gap-2 text-white/80 text-sm">
                   <FaBuilding style={raffle.primary_color ? { color: raffle.primary_color } : {}} />
-                  {raffle.company_name}
+                  {raffle.company_name || 'Empresa'}
                 </div>
               )}
             </div>
@@ -406,8 +406,8 @@ const RaffleRoom = () => {
               </div>
               <div className="text-2xl font-bold text-white">
                 {raffle.mode === 'fire' 
-                  ? `${parseFloat(raffle.pot_fires || 0).toFixed(2)} 🔥`
-                  : `${parseFloat(raffle.pot_coins || 0).toFixed(2)} 🪙`
+                  ? `${parseFloat(raffle?.pot_fires || 0).toFixed(2)} 🔥`
+                  : `${parseFloat(raffle?.pot_coins || 0).toFixed(2)} 🪙`
                 }
               </div>
               <div className="text-white/60 text-xs mt-1">
@@ -421,7 +421,7 @@ const RaffleRoom = () => {
                 <FaChartLine className="text-blue-400" />
               </div>
               <div className="text-2xl font-bold text-white">
-                {raffle.purchased_count}/{raffle.total_numbers}
+                {raffle?.purchased_count || 0}/{raffle?.total_numbers || 100}
               </div>
               <div className="w-full bg-white/10 rounded-full h-2 mt-2">
                 <div 
@@ -468,14 +468,14 @@ const RaffleRoom = () => {
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="text-white/80">
-                    <strong>Descripción:</strong> {raffle.prize_meta.description}
+                    <strong>Descripción:</strong> {raffle.prize_meta?.description || 'No especificada'}
                   </div>
-                  {raffle.prize_meta.estimated_value && (
+                  {raffle.prize_meta?.estimated_value && (
                     <div className="text-white/80">
                       <strong>Valor Estimado:</strong> {raffle.prize_meta.estimated_value}
                     </div>
                   )}
-                  {raffle.prize_meta.delivery_info && (
+                  {raffle.prize_meta?.delivery_info && (
                     <div className="text-white/80">
                       <strong>Entrega:</strong> {raffle.prize_meta.delivery_info}
                     </div>
@@ -496,20 +496,20 @@ const RaffleRoom = () => {
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="text-white/80">
-                    <strong>Nombre:</strong> {raffle.company_config.company_name || 'No especificado'}
+                    <strong>Nombre:</strong> {raffle.company_config?.company_name || 'No especificado'}
                   </div>
                   <div className="text-white/80">
-                    <strong>RIF:</strong> {raffle.company_config.company_rif || 'No especificado'}
+                    <strong>RIF:</strong> {raffle.company_config?.company_rif || 'No especificado'}
                   </div>
-                  {(raffle.company_config.primary_color || raffle.company_config.secondary_color) && (
+                  {(raffle.company_config?.primary_color || raffle.company_config?.secondary_color) && (
                     <div className="flex items-center gap-2 mt-2">
-                      {raffle.company_config.primary_color && (
+                      {raffle.company_config?.primary_color && (
                         <div 
                           className="w-6 h-6 rounded-full border border-white/20"
                           style={{ backgroundColor: raffle.company_config.primary_color }}
                         />
                       )}
-                      {raffle.company_config.secondary_color && (
+                      {raffle.company_config?.secondary_color && (
                         <div 
                           className="w-6 h-6 rounded-full border border-white/20"
                           style={{ backgroundColor: raffle.company_config.secondary_color }}
