@@ -88,7 +88,7 @@ const RaffleRoom = () => {
 
   // Función para copiar enlace público (modo empresa)
   const handleCopyPublicLink = () => {
-    const publicUrl = `${window.location.origin}/raffles/public/${raffle.code}`;
+    const publicUrl = `${window.location.origin}/raffles/public/${raffle?.code || code}`;
     navigator.clipboard.writeText(publicUrl).then(() => {
       toast.success('¡Enlace copiado al portapapeles!');
     }).catch(() => {
@@ -290,7 +290,7 @@ const RaffleRoom = () => {
               </button>
               
               {/* Botón Mis datos de pago (solo host y modo premio/empresa) */}
-              {raffle.host_id === user?.id && (raffle.mode === 'prize' || raffle.mode === 'company') && (
+              {raffle?.host_id === user?.id && (raffle?.mode === 'prize' || raffle?.mode === 'company') && (
                 <button
                   onClick={() => setShowPaymentDetailsModal(true)}
                   className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
@@ -301,7 +301,7 @@ const RaffleRoom = () => {
               )}
               
               {/* Botón Copiar enlace público (solo modo empresa) */}
-              {raffle.mode === 'company' && (
+              {raffle?.mode === 'company' && (
                 <button
                   onClick={handleCopyPublicLink}
                   className="text-white/60 hover:text-white transition-colors flex items-center gap-2"
@@ -791,7 +791,7 @@ const RaffleRoom = () => {
       </motion.button>
 
       {/* Botón flotante Ver Solicitudes (solo host en modo premio) */}
-      {raffle.host_id === user?.id && raffle.mode === 'prize' && (
+      {raffle?.host_id === user?.id && raffle?.mode === 'prize' && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -805,14 +805,14 @@ const RaffleRoom = () => {
           <FaShoppingCart size={24} />
           {raffle.pending_requests?.length > 0 && (
             <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-              {raffle.pending_requests.length}
+              {raffle.pending_requests?.length || 0}
             </span>
           )}
         </motion.button>
       )}
 
       {/* Botón flotante Datos de pago (solo host en modo premio/empresa) */}
-      {raffle.host_id === user?.id && (raffle.mode === 'prize' || raffle.mode === 'company') && (
+      {raffle?.host_id === user?.id && (raffle?.mode === 'prize' || raffle?.mode === 'company') && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -828,7 +828,7 @@ const RaffleRoom = () => {
       )}
 
       {/* Botón flotante Cerrar Rifa (solo host, si está en pending) */}
-      {raffle.host_id === user?.id && raffle.status === 'pending' && (
+      {raffle?.host_id === user?.id && raffle?.status === 'pending' && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
