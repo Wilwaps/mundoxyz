@@ -153,27 +153,53 @@ const RaffleRoom = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20 flex items-center justify-center">
-        <LoadingSpinner size="large" />
-      </div>
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20 flex items-center justify-center">
+          <LoadingSpinner size="large" />
+        </div>
+        
+        {/* Botón flotante mientras carga */}
+        <div className="fixed bottom-32 right-24 md:bottom-8 md:right-8 flex flex-col gap-4 z-[12000] pointer-events-auto">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-2xl flex items-center justify-center opacity-50">
+            <FaUsers size={24} className="text-white" />
+          </div>
+        </div>
+      </>
     );
   }
 
   if (!raffle) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20 flex items-center justify-center">
-        <div className="text-center">
-          <FaTrophy className="text-6xl text-white/20 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Rifa no encontrada</h2>
-          <p className="text-white/60 mb-6">La rifa que buscas no existe o fue eliminada</p>
-          <button
-            onClick={() => navigate('/raffles/lobby')}
-            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-300"
-          >
-            Volver al Lobby
-          </button>
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20 flex items-center justify-center">
+          <div className="text-center">
+            <FaTrophy className="text-6xl text-white/20 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Rifa no encontrada</h2>
+            <p className="text-white/60 mb-6">La rifa que buscas no existe o fue eliminada</p>
+            <button
+              onClick={() => navigate('/raffles/lobby')}
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-300"
+            >
+              Volver al Lobby
+            </button>
+          </div>
         </div>
-      </div>
+        
+        {/* Botón flotante Participantes - SIEMPRE VISIBLE incluso sin rifa */}
+        <div className="fixed bottom-32 right-24 md:bottom-8 md:right-8 flex flex-col gap-4 z-[12000] pointer-events-auto">
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowParticipantsModal(true)}
+            className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:shadow-blue-500/50 transition-all duration-300"
+            title="Ver participantes"
+          >
+            <FaUsers size={24} />
+          </motion.button>
+        </div>
+      </>
     );
   }
 
