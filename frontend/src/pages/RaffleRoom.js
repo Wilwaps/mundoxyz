@@ -28,6 +28,7 @@ import ParticipantsModal from '../components/raffles/ParticipantsModal';
 const RaffleRoom = () => {
   const { code } = useParams();
   const navigate = useNavigate();
+  // Fix InvalidCharacterError - validación de props undefined en style
   const { user } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
