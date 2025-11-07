@@ -345,6 +345,21 @@ router.post('/approve-purchase', verifyToken, async (req, res) => {
 
         const result = await raffleService.approvePurchase(userId, request_id);
         
+        // Emitir evento de número comprado (sincronización en tiempo real)
+        if (global.raffleSocket && result.raffleId) {
+            global.raffleSocket.emitNumberPurchased(result.raffleId, {
+                numberIdx: result.numberIdx,
+                buyerId: result.buyerId,
+                buyerUsername: result.buyerUsername
+            });
+            
+            // También emitir actualización general de la rifa
+            global.raffleSocket.emitRaffleUpdated(result.raffleId, {
+                status: 'updated',
+                progress: result.progress
+            });
+        }
+        
         res.json({
             success: true,
             data: result,
@@ -874,13 +889,11 @@ router.post('/:raffleId/reserve-number', verifyToken, async (req, res) => {
         // Reservar número (5 minutos)
         const result = await raffleService.reserveNumber(raffleId, number_idx, userId);
 
-        // Emitir evento WebSocket
-        const io = req.app.get('io');
-        if (io) {
-            io.to(`raffle-${raffleId}`).emit('number:reserved', {
-                number_idx,
-                user_id: userId,
-                expires_at: result.expires_at
+        // Emitir evento WebSocket (sincronización en tiempo real)
+        if (global.raffleSocket) {
+            global.raffleSocket.emitNumberReserved(raffleId, {
+                numberIdx: number_idx,
+                userId: userId
             });
         }
 
@@ -919,12 +932,10 @@ router.post('/:raffleId/release-number', verifyToken, async (req, res) => {
         // Liberar reserva
         await raffleService.releaseNumberReservation(raffleId, number_idx, userId);
 
-        // Emitir evento WebSocket
-        const io = req.app.get('io');
-        if (io) {
-            io.to(`raffle-${raffleId}`).emit('number:released', {
-                number_idx,
-                user_id: userId
+        // Emitir evento WebSocket (sincronización en tiempo real)
+        if (global.raffleSocket) {
+            global.raffleSocket.emitNumberReleased(raffleId, {
+                numberIdx: number_idx
             });
         }
 
@@ -977,6 +988,15 @@ router.post('/:raffleId/request-number', verifyToken, async (req, res) => {
             paymentReference: buyer_profile?.payment_reference || '',
             message: buyer_profile?.message || ''
         });
+
+        // Emitir evento de nueva solicitud pendiente (sincronización en tiempo real)
+        if (global.raffleSocket) {
+            global.raffleSocket.emitNewRequest(raffleId, {
+                requestId: result.requestId,
+                numberIdx: number_idx,
+                buyerUsername: req.user.username || 'Anónimo'
+            });
+        }
 
         res.json({
             success: true,

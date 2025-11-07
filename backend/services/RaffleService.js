@@ -704,8 +704,10 @@ class RaffleService {
             throw new Error('El pago con fuegos no está habilitado para esta rifa');
         }
         
-        if ((paymentMethod === 'cash' || paymentMethod === 'bank') && paymentMethod !== hostMethod) {
-            throw new Error(`Método de pago ${paymentMethod} no está configurado por el anfitrion`);
+        // Si hostMethod es NULL/undefined, el host acepta CUALQUIER método (cash/bank)
+        // Solo validar si el host configuró un método específico
+        if ((paymentMethod === 'cash' || paymentMethod === 'bank') && hostMethod && paymentMethod !== hostMethod) {
+            throw new Error(`Método de pago ${paymentMethod} no está configurado por el anfitrión`);
         }
         
         // Si es método fire, verificar balance del comprador

@@ -70,6 +70,13 @@ const io = new Server(server, {
 const handleBingoV2Socket = require('./socket/bingoV2');
 handleBingoV2Socket(io);
 
+// Initialize Raffle Socket Handler
+const RaffleSocketHandler = require('./socket/raffles');
+const raffleSocketHandler = new RaffleSocketHandler(io);
+// Make it globally available
+global.raffleSocket = raffleSocketHandler;
+logger.info('✅ RaffleSocketHandler initialized');
+
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
@@ -86,6 +93,9 @@ io.on('connection', (socket) => {
   globalChatHandler(io, socket);
   anonymousChatHandler(io, socket);
   roomChatHandler(io, socket);
+  
+  // Initialize Raffle socket handlers
+  raffleSocketHandler.setupListeners(socket);
   
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);

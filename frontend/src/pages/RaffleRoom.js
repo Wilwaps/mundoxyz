@@ -118,7 +118,7 @@ const RaffleRoom = () => {
     }
   }, [error]);
 
-  // WebSocket: Escuchar eventos de reserva/liberación de números
+  // WebSocket: Sincronización en tiempo real de rifas
   useEffect(() => {
     if (!socket || !raffle) return;
 
@@ -126,30 +126,76 @@ const RaffleRoom = () => {
     
     // Unirse a la sala de la rifa
     socket.emit('join-raffle', raffle.id);
+    console.log('🔌 Socket conectado a rifa:', raffle.id);
 
-    // Escuchar cuando un número es reservado
+    // 1. Número reservado (alguien abrió el modal)
     const handleNumberReserved = (data) => {
       console.log('🔒 Número reservado:', data);
-      // Invalidar query para actualizar grid
       queryClient.invalidateQueries(['raffle-numbers', code]);
+      toast.info(`Número ${data.numberIdx} reservado temporalmente`);
     };
 
-    // Escuchar cuando un número es liberado
+    // 2. Número liberado (cerró modal sin comprar)
     const handleNumberReleased = (data) => {
       console.log('🔓 Número liberado:', data);
-      // Invalidar query para actualizar grid
       queryClient.invalidateQueries(['raffle-numbers', code]);
     };
 
-    socket.on('number:reserved', handleNumberReserved);
-    socket.on('number:released', handleNumberReleased);
+    // 3. Número comprado (solicitud aprobada)
+    const handleNumberPurchased = (data) => {
+      console.log('💰 Número comprado:', data);
+      queryClient.invalidateQueries(['raffle-numbers', code]);
+      queryClient.invalidateQueries(['raffle', code]);
+      toast.success(`¡Número ${data.numberIdx} vendido!`);
+    };
 
+    // 4. Nueva solicitud pendiente (solo para host)
+    const handleNewRequest = (data) => {
+      console.log('📩 Nueva solicitud:', data);
+      if (raffle.host_id === user?.id) {
+        queryClient.invalidateQueries(['raffle', code]);
+        toast.info('Nueva solicitud de compra pendiente', {
+          icon: '🔔'
+        });
+      }
+    };
+
+    // 5. Rifa actualizada (cambio de estado, progreso, etc)
+    const handleRaffleUpdated = (data) => {
+      console.log('🔄 Rifa actualizada:', data);
+      queryClient.invalidateQueries(['raffle', code]);
+      queryClient.invalidateQueries(['raffle-numbers', code]);
+    };
+
+    // 6. Rifa completada/sorteada
+    const handleRaffleCompleted = (data) => {
+      console.log('🎉 Rifa completada:', data);
+      queryClient.invalidateQueries(['raffle', code]);
+      toast.success('¡Rifa completada! Revisando ganadores...', {
+        duration: 5000
+      });
+    };
+
+    // Registrar todos los listeners
+    socket.on('raffle:number-reserved', handleNumberReserved);
+    socket.on('raffle:number-released', handleNumberReleased);
+    socket.on('raffle:number-purchased', handleNumberPurchased);
+    socket.on('raffle:new-request', handleNewRequest);
+    socket.on('raffle:updated', handleRaffleUpdated);
+    socket.on('raffle:completed', handleRaffleCompleted);
+
+    // Cleanup al desmontar
     return () => {
-      socket.off('number:reserved', handleNumberReserved);
-      socket.off('number:released', handleNumberReleased);
+      console.log('🔌 Desconectando de rifa:', raffle.id);
+      socket.off('raffle:number-reserved', handleNumberReserved);
+      socket.off('raffle:number-released', handleNumberReleased);
+      socket.off('raffle:number-purchased', handleNumberPurchased);
+      socket.off('raffle:new-request', handleNewRequest);
+      socket.off('raffle:updated', handleRaffleUpdated);
+      socket.off('raffle:completed', handleRaffleCompleted);
       socket.emit('leave-raffle', raffle.id);
     };
-  }, [socket, raffle, code, queryClient]);
+  }, [socket, raffle, code, queryClient, user]);
 
   if (isLoading) {
     return (
@@ -768,6 +814,74 @@ const RaffleRoom = () => {
           title="Configurar datos de pago"
         >
           <FaDollarSign size={24} />
+        </motion.button>
+      )}
+
+      {/* Botón flotante Cerrar Rifa (solo host, si está en pending) */}
+      {raffle.host_id === user?.id && raffle.status === 'pending' && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.3 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={async () => {
+            if (window.confirm('¿Cerrar la rifa y proceder al sorteo?')) {
+              try {
+                await axios.post(
+                  `${API_URL}/api/raffles/${raffle.id}/close`,
+                  {},
+                  {
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                  }
+                );
+                toast.success('Rifa cerrada. Procediendo al sorteo...');
+                refetch();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Error al cerrar rifa');
+              }
+            }
+          }}
+          className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:shadow-purple-500/50 transition-all duration-300"
+          title="Cerrar rifa y sortear"
+        >
+          <FaTrophy size={24} />
+        </motion.button>
+      )}
+
+      {/* Botón flotante Cancelar Rifa (solo host, si está en pending) */}
+      {raffle.host_id === user?.id && raffle.status === 'pending' && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.4 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={async () => {
+            if (window.confirm('¿Cancelar la rifa? Se reembolsarán los fuegos a los compradores.')) {
+              try {
+                await axios.post(
+                  `${API_URL}/api/raffles/${raffle.id}/cancel`,
+                  {},
+                  {
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                  }
+                );
+                toast.success('Rifa cancelada. Reembolsos procesados.');
+                navigate('/raffles/lobby');
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Error al cancelar rifa');
+              }
+            }
+          }}
+          className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:shadow-red-500/50 transition-all duration-300"
+          title="Cancelar rifa"
+        >
+          <FaTimes size={24} />
         </motion.button>
       )}
     </div>
