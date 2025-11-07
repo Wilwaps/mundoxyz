@@ -332,21 +332,21 @@ const RaffleRoom = () => {
           {/* Header con branding */}
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
-              {raffle.is_company_mode && raffle.logo_url && (
+              {raffle?.is_company_mode && raffle?.logo_url && (
                 <img 
                   src={raffle.logo_url} 
                   alt={raffle.company_name || 'Logo'}
                   className="w-16 h-16 rounded-xl object-cover border-2 border-white/20"
-                  style={raffle.primary_color ? { borderColor: raffle.primary_color } : {}}
+                  style={raffle?.primary_color ? { borderColor: raffle.primary_color } : {}}
                 />
               )}
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
                   {raffle.name}
-                  {raffle.is_company_mode && (
+                  {raffle?.is_company_mode && (
                     <FaBuilding className="text-purple-400" title="Modo Empresa" />
                   )}
-                  {raffle.mode === 'prize' && (
+                  {raffle?.mode === 'prize' && (
                     <FaGift className="text-green-400" title="Modo Premio" />
                   )}
                 </h1>
@@ -368,18 +368,18 @@ const RaffleRoom = () => {
             
             <div className="flex flex-col items-end space-y-2">
               <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                raffle.status === 'pending' 
+                raffle?.status === 'pending' 
                   ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                  : raffle.status === 'active'
+                  : raffle?.status === 'active'
                   ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                   : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
               }`}>
-                {raffle.status === 'pending' ? '🟢 Activa' : 
-                 raffle.status === 'active' ? '🟡 En Curso' : '⚪ Finalizada'}
+                {raffle?.status === 'pending' ? '🟢 Activa' : 
+                 raffle?.status === 'active' ? '🟡 En Curso' : '⚪ Finalizada'}
               </span>
-              {raffle.is_company_mode && (
+              {raffle?.is_company_mode && (
                 <div className="flex items-center gap-2 text-white/80 text-sm">
-                  <FaBuilding style={raffle.primary_color ? { color: raffle.primary_color } : {}} />
+                  <FaBuilding style={raffle?.primary_color ? { color: raffle.primary_color } : {}} />
                   {raffle.company_name || 'Empresa'}
                 </div>
               )}
@@ -387,7 +387,7 @@ const RaffleRoom = () => {
           </div>
 
           {/* Descripción */}
-          {raffle.description && (
+          {raffle?.description && (
             <div className="mb-6 p-4 bg-white/5 rounded-xl">
               <p className="text-white/90">{raffle.description}</p>
             </div>
@@ -398,14 +398,14 @@ const RaffleRoom = () => {
             <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl p-4 border border-orange-500/30">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-white/80 text-sm">PREMIO ACTUAL</span>
-                {raffle.mode === 'fire' ? (
+                {raffle?.mode === 'fire' ? (
                   <FaFire className="text-orange-400" />
                 ) : (
                   <FaCoins className="text-yellow-400" />
                 )}
               </div>
               <div className="text-2xl font-bold text-white">
-                {raffle.mode === 'fire' 
+                {raffle?.mode === 'fire' 
                   ? `${parseFloat(raffle?.pot_fires || 0).toFixed(2)} 🔥`
                   : `${parseFloat(raffle?.pot_coins || 0).toFixed(2)} 🪙`
                 }
@@ -453,14 +453,14 @@ const RaffleRoom = () => {
                 {parseFloat(raffle.cost_per_number || 10).toFixed(2)}
               </div>
               <div className="text-white/60 text-xs mt-1">
-                {raffle.mode === 'fire' ? 'fuegos por número' : 'fuegos por número'}
+                {raffle?.mode === 'fire' ? 'fuegos por número' : 'fuegos por número'}
               </div>
             </div>
           </div>
 
           {/* Configuración especial */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {raffle.mode === 'prize' && raffle.prize_meta && (
+            {raffle?.mode === 'prize' && raffle?.prize_meta && (
               <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/20">
                 <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
                   <FaGift className="text-green-400" />
@@ -611,7 +611,7 @@ const RaffleRoom = () => {
                 <FaCheck className="text-green-400 mt-1" />
                 <span>El host recibe el 20% como comisión</span>
               </div>
-              {raffle.mode === 'prize' && (
+              {raffle?.mode === 'prize' && (
                 <div className="flex items-start gap-2">
                   <FaHourglassHalf className="text-yellow-400 mt-1" />
                   <span>Las compras requieren aprobación manual del host</span>
