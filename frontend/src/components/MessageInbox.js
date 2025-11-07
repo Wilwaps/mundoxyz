@@ -15,27 +15,39 @@ const MessageInbox = () => {
     if (user) {
       loadMessages();
       
-      // Poll for new messages every 30 seconds
-      const interval = setInterval(loadMessages, 30000);
-      return () => clearInterval(interval);
+      // TEMPORALMENTE DESACTIVADO - Estaba causando interferencia con rifas
+      // El polling a /api/bingo/v2/messages estaba ejecutándose en todas las páginas
+      // TODO: Crear endpoint genérico de mensajes o activar solo en páginas de bingo
+      // const interval = setInterval(loadMessages, 30000);
+      // return () => clearInterval(interval);
     }
   }, [user]);
 
   const loadMessages = async () => {
     try {
+      // Solo cargar mensajes si estamos en una página de bingo
+      // Para evitar errores 404 y llamadas innecesarias
+      const isInBingoPage = window.location.pathname.includes('/bingo');
+      if (!isInBingoPage) {
+        return; // No cargar mensajes fuera de bingo
+      }
+      
       const response = await fetch(`${API_URL}/api/bingo/v2/messages`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
-      const data = await response.json();
-      if (data.success) {
-        setMessages(data.messages);
-        setUnreadCount(data.unread_count);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMessages(data.messages || []);
+          setUnreadCount(data.unread_count || 0);
+        }
       }
     } catch (err) {
-      console.error('Error loading messages:', err);
+      // Silenciar errores para no contaminar la consola
+      // console.error('Error loading messages:', err);
     }
   };
 
