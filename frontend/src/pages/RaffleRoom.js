@@ -692,7 +692,9 @@ const RaffleRoom = () => {
     </div>
 
     {/* Botones flotantes - FUERA del scroll container */}
-    <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-50">
+    <div
+      className="fixed bottom-32 right-24 md:bottom-8 md:right-8 flex flex-col gap-4 z-[12000] pointer-events-auto"
+    >
       {/* Botón flotante Participantes - TODOS */}
       <motion.button
         initial={{ scale: 0 }}
