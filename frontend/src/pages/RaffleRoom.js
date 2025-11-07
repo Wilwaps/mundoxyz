@@ -1,6 +1,7 @@
 /**
  * RaffleRoom.js - Página principal de una rifa
  * Detalles completos, compra de números, grid interactivo
+ * BUILD: v1.3.4 FORCE NUCLEAR REBUILD - 7 NOV 2025 12:45PM
  */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
