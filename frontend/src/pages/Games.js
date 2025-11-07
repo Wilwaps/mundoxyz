@@ -242,7 +242,7 @@ const Games = () => {
                     key={raffle.id}
                     whileHover={{ x: 5 }}
                     className="glass-panel p-4 cursor-pointer"
-                    onClick={() => navigate(`/raffles/${raffle.code}`)}
+                    onClick={() => navigate(`/raffles/room/${raffle.code}`)}
                   >
                     <div className="flex justify-between items-center">
                       <div>

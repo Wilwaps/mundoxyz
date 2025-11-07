@@ -19,7 +19,6 @@ import Upcoming from './pages/Upcoming';
 import BingoLobby from './pages/BingoLobby';
 import BingoV2WaitingRoom from './pages/BingoV2WaitingRoom';
 import BingoV2GameRoom from './pages/BingoV2GameRoom';
-import RaffleDetails from './pages/RaffleDetails';
 import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
 import TicTacToeRoom from './pages/TicTacToeRoom';
@@ -124,7 +123,7 @@ function App() {
                 <Route path="lobby" element={<Lobby />} />
                 <Route path="raffles" element={<RafflesLobby />} />
                 <Route path="raffles/lobby" element={<Navigate to="/raffles" replace />} />
-                <Route path="raffles/:code" element={<RaffleDetails />} />
+                <Route path="raffles/:code" element={<RaffleRoom />} />
                 <Route path="raffles/room/:code" element={<RaffleRoom />} />
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />
