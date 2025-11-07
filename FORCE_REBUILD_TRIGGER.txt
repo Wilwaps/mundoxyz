@@ -1,0 +1,3 @@
+FORCE REBUILD - 7 NOV 2025 17:21
+Commit e582330 no se desplegó
+Forzando nuevo deploy con este archivo dummy
