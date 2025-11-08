@@ -1,9 +1,11 @@
 /**
  * RaffleRoom.js - Página principal de una rifa
  * Detalles completos, compra de números, grid interactivo
- * BUILD: v1.3.6 BACKEND+FRONTEND FIX - 7 NOV 2025 20:00
- * Backend mapea: total_numbers, cost_per_number, pot_fires, company_config completo
- * Frontend: optional chaining exhaustivo en TODOS los accesos
+ * BUILD: v1.3.7 NUCLEAR BUILD - 7 NOV 2025 22:16
+ * railway.json: buildCommand nuclear con GENERATE_SOURCEMAP=false
+ * Backend: getRaffleByCode mapea TODOS los campos (total_numbers, cost_per_number, pot_fires, pot_coins, view_count, company_config)
+ * Frontend: optional chaining exhaustivo en TODOS los accesos a raffle properties
+ * TIMESTAMP: 20251107-2216 - DEBE generar NUEVO bundle hash
  */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
