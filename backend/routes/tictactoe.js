@@ -16,6 +16,7 @@ const {
   cleanupOldFinishedRooms 
 } = require('../utils/tictactoe-cleanup');
 const RoomCodeService = require('../services/roomCodeService');
+const { cleanupRoom } = require('../socket/tictactoe');
 
 // Socket IO will be accessed through req.io
 
@@ -984,11 +985,17 @@ router.post('/room/:code/leave', verifyToken, async (req, res) => {
           roomCode: code
         });
         
-        return { cancelled: true };
+        return { cancelled: true, roomCode: code };
       }
       
       return { cancelled: false };
     });
+    
+    // Si la sala fue cancelada (ambos jugadores salieron), limpiar conexiones del socket
+    if (result.cancelled && result.roomCode) {
+      cleanupRoom(result.roomCode);
+      logger.info('Room connections cleaned after manual leave', { roomCode: result.roomCode });
+    }
     
     res.json({
       success: true,

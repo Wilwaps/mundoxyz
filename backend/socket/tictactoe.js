@@ -213,14 +213,38 @@ async function markDisconnected(io, roomCode, userId, role) {
   connections[key].connected = false;
   connections[key].lastSeen = Date.now();
   
-  // Iniciar timeout de 30 segundos
+  logger.info('Player marked as disconnected', { 
+    roomCode, 
+    userId, 
+    role
+  });
+  
+  // Verificar si AMBOS jugadores están desconectados
+  const playerXConnected = connections.playerX?.connected !== false;
+  const playerOConnected = connections.playerO?.connected !== false;
+  const hasPlayerO = connections.playerO !== undefined;
+  
+  // Si AMBOS están desconectados, cancelar inmediatamente (sin timeout)
+  if (!playerXConnected && !playerOConnected && hasPlayerO) {
+    logger.info('Both players disconnected - cancelling room immediately', { roomCode });
+    
+    // Cancelar timeouts existentes
+    if (connections.playerX?.timeout) clearTimeout(connections.playerX.timeout);
+    if (connections.playerO?.timeout) clearTimeout(connections.playerO.timeout);
+    
+    // Cancelar sala inmediatamente
+    await handleAbandonedRoom(io, roomCode);
+    return;
+  }
+  
+  // Si solo uno está desconectado, iniciar timeout de 30 segundos
   const timeout = setTimeout(async () => {
     await handleAbandonedRoom(io, roomCode);
   }, ABANDONMENT_TIMEOUT);
   
   connections[key].timeout = timeout;
   
-  logger.info('Player marked as disconnected, timeout started', { 
+  logger.info('Single player disconnected, timeout started', { 
     roomCode, 
     userId, 
     role,
@@ -379,11 +403,30 @@ function emitToRoom(io, roomCode, event, data) {
   io.to(`tictactoe:${roomCode}`).emit(event, data);
 }
 
+/**
+ * Limpiar conexiones de una sala (llamado cuando se cancela manualmente)
+ */
+function cleanupRoom(roomCode) {
+  if (!roomConnections.has(roomCode)) return;
+  
+  const connections = roomConnections.get(roomCode);
+  
+  // Cancelar timeouts existentes
+  if (connections.playerX?.timeout) clearTimeout(connections.playerX.timeout);
+  if (connections.playerO?.timeout) clearTimeout(connections.playerO.timeout);
+  
+  // Eliminar del tracking
+  roomConnections.delete(roomCode);
+  
+  logger.info('Room connections cleaned up', { roomCode });
+}
+
 module.exports = {
   initTicTacToeSocket,
   emitToRoom,
   handleDisconnect,
   registerConnection,
   markDisconnected,
-  isPlayerReconnecting
+  isPlayerReconnecting,
+  cleanupRoom
 };
