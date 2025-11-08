@@ -73,6 +73,9 @@ COMMENT ON COLUMN tictactoe_rooms.board IS 'Tablero 3x3 como array JSONB: [[null
 COMMENT ON COLUMN tictactoe_rooms.winner_id IS 'UUID del jugador ganador (ya existía desde inicio)';
 COMMENT ON COLUMN tictactoe_rooms.winner_symbol IS 'Símbolo del ganador: X o O (ya existía desde inicio)';
 
-RAISE NOTICE '✅ Migración 037 completada: board convertido a JSONB';
+-- Log final
+DO $$ BEGIN
+  RAISE NOTICE '✅ Migración 037 completada: board convertido a JSONB';
+END $$;
 
 COMMIT;
