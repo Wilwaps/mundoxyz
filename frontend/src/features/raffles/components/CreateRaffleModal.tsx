@@ -46,8 +46,8 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     visibility: RaffleVisibility.PUBLIC,
     numbersRange: 100,
     entryPrice: 10,
-    startsAt: null,
-    endsAt: null,
+    startsAt: undefined,
+    endsAt: undefined,
     termsConditions: '',
     prizeMeta: {
       prizeType: 'product',
@@ -55,7 +55,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       prizeValue: 0,
       prizeImages: []
     },
-    companyConfig: null
+    companyConfig: undefined
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});

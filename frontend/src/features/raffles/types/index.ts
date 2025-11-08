@@ -106,10 +106,10 @@ export interface CompanyConfig {
 
 // Información del premio
 export interface PrizeMeta {
-  name: string;
-  description: string;
-  imageUrl?: string;
-  estimatedValue?: number;
+  prizeType?: string;
+  prizeDescription: string;
+  prizeValue?: number;
+  prizeImages?: string[];
   category?: string;
 }
 
