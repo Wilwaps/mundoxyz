@@ -433,6 +433,16 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
       
       const room = roomResult.rows[0];
       
+      // Parsear board si es string (CRÍTICO para isValidMove)
+      if (typeof room.board === 'string') {
+        try {
+          room.board = JSON.parse(room.board);
+        } catch (e) {
+          logger.error('Error parsing board JSON in move:', e);
+          throw new Error('Error al procesar el tablero');
+        }
+      }
+      
       // Validar estado
       if (room.status !== 'playing') {
         throw new Error('El juego no está en curso');
@@ -613,6 +623,104 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
   } catch (error) {
     logger.error('Error making move:', error);
     res.status(400).json({ error: error.message || 'Failed to make move' });
+  }
+});
+
+// POST /api/tictactoe/room/:code/timeout - Procesar timeout automáticamente
+router.post('/room/:code/timeout', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const userId = req.user.id;
+    
+    const result = await transaction(async (client) => {
+      const roomResult = await client.query(
+        'SELECT * FROM tictactoe_rooms WHERE code = $1 FOR UPDATE',
+        [code]
+      );
+      
+      if (roomResult.rows.length === 0) {
+        throw new Error('Sala no encontrada');
+      }
+      
+      const room = roomResult.rows[0];
+      
+      // Parsear board
+      if (typeof room.board === 'string') {
+        try {
+          room.board = JSON.parse(room.board);
+        } catch (e) {
+          logger.error('Error parsing board JSON:', e);
+        }
+      }
+      
+      // Validar estado
+      if (room.status !== 'playing') {
+        return { alreadyFinished: true, status: room.status };
+      }
+      
+      // Verificar si es participante
+      const isPlayerX = userId === room.player_x_id;
+      const isPlayerO = userId === room.player_o_id;
+      
+      if (!isPlayerX && !isPlayerO) {
+        throw new Error('No eres parte de esta sala');
+      }
+      
+      // Verificar si pasaron 15 segundos desde el último movimiento
+      const timeSinceLastMove = Date.now() - new Date(room.last_move_at).getTime();
+      
+      if (timeSinceLastMove < 15000) {
+        return { timeout: false, timeLeft: Math.ceil((15000 - timeSinceLastMove) / 1000) };
+      }
+      
+      // Timeout confirmado - el jugador del turno actual pierde
+      const currentTurnPlayerX = room.current_turn === 'X';
+      const winnerId = currentTurnPlayerX ? room.player_o_id : room.player_x_id;
+      const winnerSymbol = currentTurnPlayerX ? 'O' : 'X';
+      
+      await client.query(
+        `UPDATE tictactoe_rooms 
+         SET status = 'finished',
+             winner_id = $1,
+             winner_symbol = $2,
+             finished_at = NOW()
+         WHERE id = $3`,
+        [winnerId, winnerSymbol, room.id]
+      );
+      
+      // Distribuir premios y XP
+      const finishedRoom = (await client.query('SELECT * FROM tictactoe_rooms WHERE id = $1', [room.id])).rows[0];
+      await distributePrizes(finishedRoom, client.query.bind(client));
+      
+      // Otorgar XP
+      const { awardXpBatch } = require('../utils/xp');
+      await awardGameXP(finishedRoom, awardXpBatch);
+      
+      await client.query(
+        'UPDATE tictactoe_rooms SET xp_awarded = TRUE WHERE id = $1',
+        [room.id]
+      );
+      
+      logger.info('Game ended by timeout', {
+        roomCode: code,
+        winnerId,
+        winnerSymbol,
+        loserTurn: room.current_turn
+      });
+      
+      return {
+        timeout: true,
+        gameOver: true,
+        winner: winnerSymbol,
+        winnerId
+      };
+    });
+    
+    res.json(result);
+    
+  } catch (error) {
+    logger.error('Error processing timeout:', error);
+    res.status(400).json({ error: error.message || 'Failed to process timeout' });
   }
 });
 

@@ -218,8 +218,22 @@ const TicTacToeRoom = () => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          // Time's up - will be handled by backend on next move attempt
+          // Time's up - procesar timeout en backend
           toast.error('¡Se acabó el tiempo!');
+          
+          // Llamar endpoint de timeout para finalizar juego
+          setTimeout(async () => {
+            try {
+              await axios.post(`/api/tictactoe/room/${code}/timeout`);
+              // Refrescar sala para mostrar resultado
+              refetchRoom();
+            } catch (error) {
+              console.error('Error processing timeout:', error);
+              // Refrescar de todas formas por si el otro jugador ya procesó el timeout
+              refetchRoom();
+            }
+          }, 100);
+          
           return 0;
         }
         return prev - 1;
@@ -227,7 +241,7 @@ const TicTacToeRoom = () => {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [room, isMyTurn]);
+  }, [room, isMyTurn, refetchRoom, code]);
   
   // Reset timer when turn changes
   useEffect(() => {
