@@ -494,53 +494,98 @@ COMMENT ON COLUMN raffle_requests.payment_method IS 'Método de pago elegido por
 COMMENT ON COLUMN raffle_requests.fire_amount IS 'Cantidad de fuegos a transferir si payment_method = fire (migración 035)';
 
 -- ============================================
--- 16. TICTACTOE_ROOMS
+-- 16. TICTACTOE_ROOMS (Estado real en producción)
 -- ============================================
+-- Nota: Creada con MIGRACION_LA_VIEJA.sql + migración 012
 CREATE TABLE IF NOT EXISTS tictactoe_rooms (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(6) UNIQUE NOT NULL,
-  host_id UUID NOT NULL REFERENCES users(id),
-  player_x_id UUID REFERENCES users(id),
-  player_o_id UUID REFERENCES users(id),
-  mode VARCHAR(10) NOT NULL CHECK (mode IN ('coins', 'fires')),
-  bet_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-  visibility VARCHAR(10) DEFAULT 'public',
-  board JSONB NOT NULL DEFAULT '[[null,null,null],[null,null,null],[null,null,null]]'::jsonb,
-  current_turn CHAR(1) CHECK (current_turn IN ('X', 'O')),
-  winner CHAR(1) CHECK (winner IN ('X', 'O', 'D')),
-  winner_id UUID REFERENCES users(id),
-  winner_symbol CHAR(1) CHECK (winner_symbol IN ('X', 'O')),
-  status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready', 'playing', 'finished', 'cancelled')),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(10) NOT NULL UNIQUE,
+  
+  -- Host y configuración
+  host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mode VARCHAR(20) NOT NULL CHECK (mode IN ('coins', 'fires')),
+  bet_amount NUMERIC(10,2) NOT NULL DEFAULT 1 CHECK (bet_amount >= 1),
+  visibility VARCHAR(20) NOT NULL CHECK (visibility IN ('public', 'private')) DEFAULT 'public',
+  
+  -- Estado
+  status VARCHAR(20) NOT NULL CHECK (status IN ('waiting', 'ready', 'playing', 'finished', 'cancelled')) DEFAULT 'waiting',
+  
+  -- Jugadores
+  player_x_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  player_o_id UUID REFERENCES users(id) ON DELETE SET NULL,
   player_x_ready BOOLEAN DEFAULT FALSE,
   player_o_ready BOOLEAN DEFAULT FALSE,
-  player_x_left BOOLEAN DEFAULT FALSE,
-  player_o_left BOOLEAN DEFAULT FALSE,
-  rematch_requested_by CHAR(1) CHECK (rematch_requested_by IN ('X', 'O')),
-  rematch_accepted BOOLEAN DEFAULT FALSE,
-  round_number INTEGER DEFAULT 1,
-  player_x_score INTEGER DEFAULT 0,
-  player_o_score INTEGER DEFAULT 0,
+  player_x_left BOOLEAN DEFAULT FALSE,  -- Agregado en migración 012
+  player_o_left BOOLEAN DEFAULT FALSE,   -- Agregado en migración 012
+  
+  -- Juego
+  current_turn VARCHAR(1) CHECK (current_turn IN ('X', 'O', NULL)),
+  board JSONB DEFAULT '[[null,null,null],[null,null,null],[null,null,null]]',  -- Migración 037: TEXT → JSONB
+  moves_history JSONB DEFAULT '[]',
+  
+  -- Timer (15 segundos por turno)
+  time_left_seconds INTEGER DEFAULT 15 CHECK (time_left_seconds >= 0 AND time_left_seconds <= 15),
+  last_move_at TIMESTAMP,
+  
+  -- Resultado
+  winner_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  winner_symbol VARCHAR(1) CHECK (winner_symbol IN ('X', 'O', NULL)),
+  winning_line JSONB,
+  is_draw BOOLEAN DEFAULT FALSE,
+  
+  -- Economía
+  pot_coins NUMERIC(10,2) DEFAULT 0,
+  pot_fires NUMERIC(10,2) DEFAULT 0,
+  prize_coins NUMERIC(10,2) DEFAULT 0,
+  prize_fires NUMERIC(10,2) DEFAULT 0,
+  
+  -- Experiencia
   xp_awarded BOOLEAN DEFAULT FALSE,
-  archived_at TIMESTAMP,
+  
+  -- Sistema de Revancha
+  rematch_requested_by_x BOOLEAN DEFAULT FALSE,
+  rematch_requested_by_o BOOLEAN DEFAULT FALSE,
+  rematch_count INTEGER DEFAULT 0,
+  is_rematch BOOLEAN DEFAULT FALSE,
+  original_room_id UUID REFERENCES tictactoe_rooms(id) ON DELETE SET NULL,
+  
+  -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,
   finished_at TIMESTAMP,
-  last_move_at TIMESTAMP
+  expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '30 minutes'),
+  archived_at TIMESTAMP,  -- Agregado en migración 012
+  
+  -- Constraints
+  CONSTRAINT valid_players CHECK (player_x_id IS NOT NULL OR player_o_id IS NOT NULL),
+  CONSTRAINT valid_bet CHECK (
+    (mode = 'coins' AND bet_amount >= 1 AND bet_amount <= 1000) OR
+    (mode = 'fires' AND bet_amount = 1)
+  )
 );
 
-CREATE INDEX IF NOT EXISTS idx_tictactoe_code ON tictactoe_rooms(code);
-CREATE INDEX IF NOT EXISTS idx_tictactoe_status ON tictactoe_rooms(status);
+-- Índices
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_code ON tictactoe_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_status ON tictactoe_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_host ON tictactoe_rooms(host_id);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_mode ON tictactoe_rooms(mode);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_visibility 
+  ON tictactoe_rooms(visibility, status) 
+  WHERE status = 'waiting' AND player_o_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_created ON tictactoe_rooms(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_expires ON tictactoe_rooms(expires_at) WHERE status IN ('waiting', 'ready');
 CREATE INDEX IF NOT EXISTS idx_tictactoe_winner_id ON tictactoe_rooms(winner_id) WHERE winner_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tictactoe_status_playing ON tictactoe_rooms(status) WHERE status = 'playing';
 CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_archived ON tictactoe_rooms(archived_at) WHERE archived_at IS NOT NULL;
 
-COMMENT ON TABLE tictactoe_rooms IS 'Salas de TicTacToe con sistema de revancha';
+-- Comentarios
+COMMENT ON TABLE tictactoe_rooms IS 'Salas de TicTacToe con sistema de revancha (MIGRACION_LA_VIEJA.sql + migración 012)';
 COMMENT ON COLUMN tictactoe_rooms.board IS 'Tablero 3x3 como array JSONB: [[null,X,O],[null,null,X],[O,null,null]]';
 COMMENT ON COLUMN tictactoe_rooms.winner_id IS 'UUID del jugador ganador';
 COMMENT ON COLUMN tictactoe_rooms.winner_symbol IS 'Símbolo del ganador: X o O';
-COMMENT ON COLUMN tictactoe_rooms.player_x_left IS 'Indica si el jugador X abandonó la sala después de terminar';
-COMMENT ON COLUMN tictactoe_rooms.player_o_left IS 'Indica si el jugador O abandonó la sala después de terminar';
-COMMENT ON COLUMN tictactoe_rooms.archived_at IS 'Timestamp cuando ambos jugadores abandonaron y la sala se archivó';
+COMMENT ON COLUMN tictactoe_rooms.player_x_left IS 'Indica si el jugador X abandonó la sala (migración 012)';
+COMMENT ON COLUMN tictactoe_rooms.player_o_left IS 'Indica si el jugador O abandonó la sala (migración 012)';
+COMMENT ON COLUMN tictactoe_rooms.archived_at IS 'Timestamp cuando ambos jugadores abandonaron (migración 012)';
 
 -- ============================================
 -- 17. TICTACTOE_MOVES
