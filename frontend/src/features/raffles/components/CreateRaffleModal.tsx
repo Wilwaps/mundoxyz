@@ -89,10 +89,17 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       case 'entryPrice':
         const price = parseFloat(value);
         if (formData.mode !== RaffleMode.PRIZE) {
-          if (price < RAFFLE_LIMITS.MIN_PRICE) {
-            newErrors.entryPrice = `Precio mínimo ${RAFFLE_LIMITS.MIN_PRICE}`;
-          } else if (price > RAFFLE_LIMITS.MAX_PRICE) {
-            newErrors.entryPrice = `Precio máximo ${RAFFLE_LIMITS.MAX_PRICE}`;
+          const minPrice = formData.mode === RaffleMode.FIRES 
+            ? RAFFLE_LIMITS.MIN_PRICE_FIRES 
+            : RAFFLE_LIMITS.MIN_PRICE_COINS;
+          const maxPrice = formData.mode === RaffleMode.FIRES 
+            ? RAFFLE_LIMITS.MAX_PRICE_FIRES 
+            : RAFFLE_LIMITS.MAX_PRICE_COINS;
+          
+          if (price < minPrice) {
+            newErrors.entryPrice = `Precio mínimo ${minPrice}`;
+          } else if (price > maxPrice) {
+            newErrors.entryPrice = `Precio máximo ${maxPrice}`;
           } else {
             delete newErrors.entryPrice;
           }
@@ -129,8 +136,11 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             return false;
           }
         } else {
-          if (formData.entryPrice < RAFFLE_LIMITS.MIN_PRICE) {
-            toast.error(`El precio mínimo es ${RAFFLE_LIMITS.MIN_PRICE}`);
+          const minPrice = formData.mode === RaffleMode.FIRES 
+            ? RAFFLE_LIMITS.MIN_PRICE_FIRES 
+            : RAFFLE_LIMITS.MIN_PRICE_COINS;
+          if (formData.entryPrice < minPrice) {
+            toast.error(`El precio mínimo es ${minPrice}`);
             return false;
           }
         }
@@ -295,8 +305,8 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     type="number"
                     value={formData.entryPrice}
                     onChange={(e) => updateField('entryPrice', parseFloat(e.target.value))}
-                    min={RAFFLE_LIMITS.MIN_PRICE}
-                    max={RAFFLE_LIMITS.MAX_PRICE}
+                    min={formData.mode === RaffleMode.FIRES ? RAFFLE_LIMITS.MIN_PRICE_FIRES : RAFFLE_LIMITS.MIN_PRICE_COINS}
+                    max={formData.mode === RaffleMode.FIRES ? RAFFLE_LIMITS.MAX_PRICE_FIRES : RAFFLE_LIMITS.MAX_PRICE_COINS}
                     step="0.01"
                     className={`w-full pl-10 pr-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent ${
                       errors.entryPrice ? 'ring-2 ring-red-500' : ''
@@ -661,10 +671,10 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleSubmit}
-                    disabled={createRaffle.isLoading}
+                    disabled={createRaffle.isPending}
                     className="flex-1 py-2.5 btn-primary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {createRaffle.isLoading ? (
+                    {createRaffle.isPending ? (
                       <span className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-dark/30 border-t-dark rounded-full animate-spin" />
                         Creando...
