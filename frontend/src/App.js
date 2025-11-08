@@ -20,6 +20,9 @@ import BingoV2GameRoom from './pages/BingoV2GameRoom';
 import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
 import TicTacToeRoom from './pages/TicTacToeRoom';
+import RafflesLobby from './features/raffles/pages/RafflesLobby';
+import RaffleRoom from './features/raffles/pages/RaffleRoom';
+import MyRaffles from './features/raffles/pages/MyRaffles';
 import Landing from './pages/Landing';
 
 // Create a client
@@ -124,6 +127,9 @@ function App() {
                 <Route path="bingo/v2/play/:code" element={<BingoV2GameRoom />} />
                 <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
                 <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
+                <Route path="raffles" element={<RafflesLobby />} />
+                <Route path="raffles/my" element={<MyRaffles />} />
+                <Route path="raffles/:code" element={<RaffleRoom />} />
                 <Route path="admin/*" element={<Admin />} />
               </Route>
             </Routes>

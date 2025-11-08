@@ -1,0 +1,217 @@
+/**
+ * Sistema de Rifas V2 - Definiciones de Tipos
+ * Arquitectura limpia con TypeScript
+ */
+
+// Estados de rifa
+export type RaffleStatus = 'draft' | 'pending' | 'active' | 'finished' | 'cancelled';
+
+// Modos de rifa
+export type RaffleMode = 'fires' | 'coins' | 'prize';
+
+// Tipos de visibilidad
+export type RaffleVisibility = 'public' | 'private' | 'company';
+
+// Estados de número
+export type NumberState = 'available' | 'reserved' | 'sold' | 'locked';
+
+// Estados de pago
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+// Métodos de pago
+export type PaymentMethod = 'cash' | 'mobile' | 'bank' | 'fires';
+
+// Interfaz principal de Rifa
+export interface Raffle {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  status: RaffleStatus;
+  mode: RaffleMode;
+  visibility: RaffleVisibility;
+  
+  // Host
+  hostId: string;
+  hostUsername: string;
+  
+  // Números
+  numbersRange: number;
+  numbersSold: number;
+  numbersReserved: number;
+  
+  // Precios
+  entryPriceFire?: number;
+  entryPriceCoin?: number;
+  
+  // Potes
+  potFires: number;
+  potCoins: number;
+  
+  // Timestamps
+  createdAt: Date;
+  startsAt?: Date;
+  endsAt?: Date;
+  finishedAt?: Date;
+  
+  // Configuración empresa
+  companyConfig?: CompanyConfig;
+  
+  // Premio
+  prizeMeta?: PrizeMeta;
+  
+  // Términos
+  termsConditions?: string;
+}
+
+// Configuración de empresa
+export interface CompanyConfig {
+  companyName: string;
+  rifNumber: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  logoUrl?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+// Información del premio
+export interface PrizeMeta {
+  name: string;
+  description: string;
+  imageUrl?: string;
+  estimatedValue?: number;
+  category?: string;
+}
+
+// Número de rifa
+export interface RaffleNumber {
+  idx: number;
+  state: NumberState;
+  ownerId?: string;
+  ownerUsername?: string;
+  reservedAt?: Date;
+  purchasedAt?: Date;
+  paymentReference?: string;
+}
+
+// Solicitud de compra
+export interface PurchaseRequest {
+  id: number;
+  raffleId: number;
+  userId: string;
+  numberIdx: number;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  paymentReference?: string;
+  status: PaymentStatus;
+  createdAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+}
+
+// Participante
+export interface RaffleParticipant {
+  userId: string;
+  username: string;
+  email?: string;
+  numbersCount: number;
+  numbers: number[];
+  totalSpentFires: number;
+  totalSpentCoins: number;
+  joinedAt: Date;
+}
+
+// Ganador
+export interface RaffleWinner {
+  userId: string;
+  username: string;
+  winningNumber: number;
+  prizeAmount: number;
+  claimedAt?: Date;
+}
+
+// Estadísticas
+export interface RaffleStats {
+  totalParticipants: number;
+  totalNumbersSold: number;
+  totalRevenueFires: number;
+  totalRevenueCoins: number;
+  averageNumbersPerUser: number;
+  completionRate: number;
+  popularNumbers: number[];
+}
+
+// Filtros de búsqueda
+export interface RaffleFilters {
+  status?: RaffleStatus[];
+  mode?: RaffleMode[];
+  visibility?: RaffleVisibility[];
+  hostId?: string;
+  minPot?: number;
+  maxPot?: number;
+  search?: string;
+  sortBy?: 'created' | 'ending' | 'pot' | 'sold';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+// Respuestas de API
+export interface RaffleListResponse {
+  raffles: Raffle[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface RaffleDetailResponse {
+  raffle: Raffle;
+  numbers: RaffleNumber[];
+  userNumbers?: number[];
+  stats?: RaffleStats;
+}
+
+export interface PurchaseResponse {
+  success: boolean;
+  message: string;
+  transaction?: {
+    id: string;
+    amount: number;
+    currency: 'fires' | 'coins';
+    numberIdx: number;
+  };
+}
+
+// WebSocket Events
+export interface RaffleSocketEvents {
+  'raffle:updated': (data: { raffleId: number; changes: Partial<Raffle> }) => void;
+  'number:reserved': (data: { raffleId: number; numberIdx: number; userId: string }) => void;
+  'number:released': (data: { raffleId: number; numberIdx: number }) => void;
+  'number:purchased': (data: { raffleId: number; numberIdx: number; userId: string }) => void;
+  'raffle:completed': (data: { raffleId: number; winner: RaffleWinner }) => void;
+}
+
+// Form Types
+export interface CreateRaffleForm {
+  name: string;
+  description: string;
+  mode: RaffleMode;
+  visibility: RaffleVisibility;
+  numbersRange: number;
+  entryPrice: number;
+  startsAt?: string;
+  endsAt?: string;
+  termsConditions?: string;
+  prizeMeta?: PrizeMeta;
+  companyConfig?: CompanyConfig;
+}
+
+export interface BuyNumberForm {
+  paymentMethod: PaymentMethod;
+  paymentReference?: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  buyerPhone?: string;
+  buyerDocument?: string;
+}

@@ -30,6 +30,7 @@ const roomsRoutes = require('./routes/rooms');
 const diagnosticRoutes = require('./routes/diagnostic');
 const debugXpRoutes = require('./routes/debug-xp');
 const telegramWebhookRoutes = require('./routes/telegram-webhook');
+const rafflesV2Routes = require('./modules/raffles/routes');
 
 // Create Express app
 const app = express();
@@ -240,6 +241,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
 app.use('/api/debug-xp', debugXpRoutes);
 app.use('/api/telegram', telegramWebhookRoutes);
+app.use('/api/raffles/v2', rafflesV2Routes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
