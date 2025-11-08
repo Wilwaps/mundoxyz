@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, CreditCard, Phone, Hash, FileText, User, Mail, Send, Flame } from 'lucide-react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
 import API_URL from '../../config/api';
 import { getBankName } from '../../utils/bankCodes';
 import './BuyNumberModal.css';
 
 const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
+  const queryClient = useQueryClient();
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [buyerData, setBuyerData] = useState({
     display_name: '',
@@ -38,6 +40,8 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
         
         if (response.data.success) {
           console.log(`✅ Número ${numberIdx} reservado temporalmente`);
+          // SYNC: Invalidar queries para actualizar tablero inmediatamente
+          await queryClient.invalidateQueries(['raffle-numbers', raffle.code]);
         }
       } catch (err) {
         console.error('Error reservando número:', err);
@@ -60,14 +64,16 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
             Authorization: `Bearer ${localStorage.getItem('token')}`
           }
         }
-      ).then(() => {
+      ).then(async () => {
         console.log(`✅ Número ${numberIdx} liberado`);
+        // SYNC: Invalidar queries para actualizar tablero inmediatamente
+        await queryClient.invalidateQueries(['raffle-numbers', raffle.code]);
       }).catch(err => {
         console.error('Error liberando número:', err);
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raffle.id, numberIdx]);
+  }, [raffle.id, numberIdx, queryClient]);
 
   const loadPaymentDetails = async () => {
     console.log('📥 Cargando payment details para rifa:', raffle.id);
@@ -148,6 +154,9 @@ const BuyNumberModal = ({ raffle, numberIdx, onClose, onSuccess }) => {
       );
 
       if (response.data.success) {
+        // SYNC: Invalidar queries antes de cerrar para actualizar tablero
+        await queryClient.invalidateQueries(['raffle-numbers', raffle.code]);
+        await queryClient.invalidateQueries(['raffle', raffle.code]);
         onSuccess();
         onClose();
       }

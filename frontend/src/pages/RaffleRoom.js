@@ -7,7 +7,7 @@
  * Frontend: optional chaining exhaustivo en TODOS los accesos a raffle properties
  * TIMESTAMP: 20251107-2216 - DEBE generar NUEVO bundle hash
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaTimes, FaFire, FaGift, FaBuilding, FaTrophy, FaUsers,
@@ -69,7 +69,7 @@ const RaffleRoom = () => {
 
   // Consulta de números de la rifa
   const { data: numbers } = useQuery({
-    queryKey: ['raffle-numbers', code],
+    queryKey: ['raffle-numbers', code, refreshTrigger], // SYNC con raffle
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/raffles/${code}/numbers`);
       if (!response.ok) throw new Error('Error al cargar números');
@@ -77,7 +77,7 @@ const RaffleRoom = () => {
       return result.data;
     },
     enabled: !!raffle,
-    refetchInterval: 10000 // Actualizar cada 10 segundos
+    refetchInterval: 5000 // SYNC: Misma frecuencia que raffle (5s)
   });
 
   // Verificar si un número está disponible
@@ -114,11 +114,21 @@ const RaffleRoom = () => {
   };
 
   // Compra exitosa en modo Premio/Empresa
-  const handleBuyNumberSuccess = () => {
+  const handleBuyNumberSuccess = async () => {
     toast.success('¡Solicitud enviada! Espera la aprobación del anfitrión');
-    refetch();
-    queryClient.invalidateQueries(['raffle-numbers', code]);
+    // SYNC: Forzar actualización inmediata de ambas queries
+    setRefreshTrigger(prev => prev + 1);
+    await queryClient.invalidateQueries(['raffle-numbers', code]);
+    await queryClient.invalidateQueries(['raffle', code]);
   };
+
+  // SYNC: Key único para forzar re-render de NumberGrid cuando cambien los datos
+  const numbersKey = useMemo(() => {
+    if (!numbers) return 'loading';
+    // Generar hash simple basado en estados de números
+    const statesHash = numbers.map(n => `${n.number_idx}:${n.state}`).join('|');
+    return `numbers-${statesHash.length}-${refreshTrigger}`;
+  }, [numbers, refreshTrigger]);
 
   useEffect(() => {
     if (error) {
@@ -137,31 +147,32 @@ const RaffleRoom = () => {
     console.log('🔌 Socket conectado a rifa:', raffle.id);
 
     // 1. Número reservado (alguien abrió el modal)
-    const handleNumberReserved = (data) => {
+    const handleNumberReserved = async (data) => {
       console.log('🔒 Número reservado:', data);
-      queryClient.invalidateQueries(['raffle-numbers', code]);
+      await queryClient.invalidateQueries(['raffle-numbers', code]);
       toast.info(`Número ${data.numberIdx} reservado temporalmente`);
     };
 
     // 2. Número liberado (cerró modal sin comprar)
-    const handleNumberReleased = (data) => {
+    const handleNumberReleased = async (data) => {
       console.log('🔓 Número liberado:', data);
-      queryClient.invalidateQueries(['raffle-numbers', code]);
+      await queryClient.invalidateQueries(['raffle-numbers', code]);
     };
 
     // 3. Número comprado (solicitud aprobada)
-    const handleNumberPurchased = (data) => {
+    const handleNumberPurchased = async (data) => {
       console.log('💰 Número comprado:', data);
-      queryClient.invalidateQueries(['raffle-numbers', code]);
-      queryClient.invalidateQueries(['raffle', code]);
+      // SYNC: Invalidar en orden secuencial
+      await queryClient.invalidateQueries(['raffle-numbers', code]);
+      await queryClient.invalidateQueries(['raffle', code]);
       toast.success(`¡Número ${data.numberIdx} vendido!`);
     };
 
     // 4. Nueva solicitud pendiente (solo para host)
-    const handleNewRequest = (data) => {
+    const handleNewRequest = async (data) => {
       console.log('📩 Nueva solicitud:', data);
       if (raffle.host_id === user?.id) {
-        queryClient.invalidateQueries(['raffle', code]);
+        await queryClient.invalidateQueries(['raffle', code]);
         toast.info('Nueva solicitud de compra pendiente', {
           icon: '🔔'
         });
@@ -169,16 +180,17 @@ const RaffleRoom = () => {
     };
 
     // 5. Rifa actualizada (cambio de estado, progreso, etc)
-    const handleRaffleUpdated = (data) => {
+    const handleRaffleUpdated = async (data) => {
       console.log('🔄 Rifa actualizada:', data);
-      queryClient.invalidateQueries(['raffle', code]);
-      queryClient.invalidateQueries(['raffle-numbers', code]);
+      // SYNC: Invalidar en orden secuencial
+      await queryClient.invalidateQueries(['raffle', code]);
+      await queryClient.invalidateQueries(['raffle-numbers', code]);
     };
 
     // 6. Rifa completada/sorteada
-    const handleRaffleCompleted = (data) => {
+    const handleRaffleCompleted = async (data) => {
       console.log('🎉 Rifa completada:', data);
-      queryClient.invalidateQueries(['raffle', code]);
+      await queryClient.invalidateQueries(['raffle', code]);
       toast.success('¡Rifa completada! Revisando ganadores...', {
         duration: 5000
       });
@@ -550,6 +562,7 @@ const RaffleRoom = () => {
           </div>
 
           <NumberGrid
+            key={numbersKey} // SYNC: Forzar re-render completo cuando cambien datos
             numbers={numbers}
             onNumberClick={(num) => {
               if (raffle?.status === 'pending' && isNumberAvailable(num)) {

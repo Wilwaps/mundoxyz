@@ -62,7 +62,7 @@ const RafflesLobby = () => {
       const result = await response.json();
       return result.data;
     },
-    refetchInterval: 10000, // Actualizar cada 10 segundos
+    refetchInterval: 5000, // SYNC: Actualizar cada 5 segundos (igual que RaffleRoom)
     keepPreviousData: true
   });
 
