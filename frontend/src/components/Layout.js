@@ -16,6 +16,7 @@ import {
   Trophy
 } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
+import BuyExperienceModal from './BuyExperienceModal';
 
 const Layout = () => {
   const { user, isAdmin, updateUser } = useAuth();
@@ -23,6 +24,7 @@ const Layout = () => {
   const navigate = useNavigate();
   const [showBalanceTooltip, setShowBalanceTooltip] = useState(false);
   const [showExperienceModal, setShowExperienceModal] = useState(false);
+  const [showBuyExperienceModal, setShowBuyExperienceModal] = useState(false);
 
   // Fetch balance en tiempo real
   const { data: balanceData } = useQuery({
@@ -93,8 +95,8 @@ const Layout = () => {
               </div>
               <div 
                 className="badge-coins cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => navigate('/profile?tab=coins')}
-                title="Ver historial de coins"
+                onClick={() => setShowBuyExperienceModal(true)}
+                title="Comprar experiencia"
               >
                 <span className="text-sm">🪙</span>
                 <span className="text-xs font-semibold">{displayCoins.toFixed(2)}</span>
@@ -145,6 +147,13 @@ const Layout = () => {
       <ExperienceModal 
         isOpen={showExperienceModal}
         onClose={() => setShowExperienceModal(false)}
+        user={user}
+      />
+
+      {/* Buy Experience Modal */}
+      <BuyExperienceModal 
+        isOpen={showBuyExperienceModal}
+        onClose={() => setShowBuyExperienceModal(false)}
         user={user}
       />
 

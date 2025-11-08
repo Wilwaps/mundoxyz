@@ -154,6 +154,41 @@ CREATE INDEX IF NOT EXISTS idx_wallet_txns_wallet_related ON wallet_transactions
 
 COMMENT ON TABLE wallet_transactions IS 'Historial de transacciones de wallets';
 
+/*
+ * TIPOS DE TRANSACCIÓN SOPORTADOS (type):
+ * 
+ * JUEGOS:
+ * - game_bet: Apuesta en juego (TicTacToe, Bingo)
+ * - game_win: Premio de juego ganado
+ * - game_refund: Reembolso por abandono/error
+ * 
+ * RIFAS:
+ * - raffle_cost: Costo de número(s) de rifa
+ * - raffle_win: Premio de rifa ganada
+ * - raffle_creation_cost: Costo de crear rifa (host)
+ * - raffle_creation_refund: Reembolso al cancelar rifa
+ * - raffle_number_refund: Reembolso de números comprados
+ * 
+ * EXPERIENCIA:
+ * - buy_experience: Compra de XP (usuario paga coins+fires)
+ * - experience_sale: Venta de XP (admin recibe coins+fires)
+ * 
+ * TRANSFERENCIAS:
+ * - transfer_in: Recepción de transferencia
+ * - transfer_out: Envío de transferencia
+ * - transfer_refund: Reembolso de transferencia
+ * 
+ * SISTEMA:
+ * - welcome_event: Regalo de bienvenida
+ * - admin_grant: Grant manual por admin
+ * - admin_deduct: Deducción manual por admin
+ * - supply_emission: Emisión desde supply
+ * - commission: Comisión de plataforma
+ * 
+ * MERCADO:
+ * - market_redemption: Canje en mercado (quema fires)
+ */
+
 -- ============================================
 -- 5. ROLES
 -- ============================================
