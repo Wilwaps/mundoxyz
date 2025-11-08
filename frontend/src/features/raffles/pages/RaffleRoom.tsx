@@ -30,7 +30,7 @@ import { useSocket } from '../../../contexts/SocketContext';
 import { useRaffle, useReserveNumber, usePurchaseNumber } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
-import { RaffleStatus, RaffleMode } from '../types';
+import { RaffleStatus, RaffleMode, NumberState } from '../types';
 import { formatDate, formatCurrency } from '../../../utils/format';
 
 interface RaffleRoomProps {}
@@ -128,9 +128,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       return;
     }
     
-    const numberData = numbers?.find((n: any) => n.number === number);
+    const numberData = numbers?.find((n: any) => n.idx === number);
     
-    if (numberData?.status === 'sold') {
+    if (numberData?.state === NumberState.SOLD) {
       if (numberData.ownerId === user.id) {
         toast('Ya compraste este número', { icon: '✅' });
       } else {
@@ -139,7 +139,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       return;
     }
     
-    if (numberData?.status === 'reserved' && numberData.reservedBy !== user.id) {
+    if (numberData?.state === NumberState.RESERVED && numberData.ownerId !== user.id) {
       toast.error('Este número está reservado por otro usuario');
       return;
     }
@@ -446,18 +446,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           >
             Información
           </button>
-          {raffle.winners && raffle.winners.length > 0 && (
-            <button
-              onClick={() => setActiveTab('winners')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'winners'
-                  ? 'bg-accent text-dark'
-                  : 'bg-glass text-text/60 hover:text-text'
-              }`}
-            >
-              Ganadores
-            </button>
-          )}
+          {/* Winners tab - TODO: implement when backend provides winner data */}
         </div>
         
         {/* Content */}
@@ -473,11 +462,11 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               {/* Grilla de números */}
               <div className="bg-glass rounded-xl p-6">
                 <NumberGrid
-                  numbers={raffle.numbers || []}
+                  numbers={numbers || []}
                   totalNumbers={raffle.numbersRange}
                   selectedNumbers={selectedNumbers}
                   onNumberClick={handleNumberClick}
-                  disabled={raffle.status !== 'active'}
+                  disabled={raffle.status !== RaffleStatus.ACTIVE}
                 />
               </div>
               
@@ -605,52 +594,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             </motion.div>
           )}
           
-          {activeTab === 'winners' && raffle.winners && (
-            <motion.div
-              key="winners"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-glass rounded-xl p-6"
-            >
-              <h3 className="text-xl font-bold text-text mb-4 flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-accent" />
-                Ganadores
-              </h3>
-              
-              <div className="space-y-3">
-                {raffle.winners.map((winner: any, index: number) => (
-                  <div key={winner.id} className="bg-glass/50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          index === 0 ? 'bg-yellow-500/20' :
-                          index === 1 ? 'bg-gray-400/20' :
-                          'bg-orange-500/20'
-                        }`}>
-                          <Trophy className={`w-5 h-5 ${
-                            index === 0 ? 'text-yellow-500' :
-                            index === 1 ? 'text-gray-400' :
-                            'text-orange-500'
-                          }`} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-text">{winner.userName}</p>
-                          <p className="text-sm text-text/60">Número ganador: {winner.winningNumber}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-text">
-                          {raffle.mode === 'fires' ? '🔥' : '🪙'} {winner.prizeAmount}
-                        </p>
-                        <p className="text-xs text-text/60">{formatDate(winner.drawnAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+          {/* Winners section - TODO: implement when backend provides winner data */}
         </AnimatePresence>
         
         {/* Modal de compra */}
