@@ -80,6 +80,36 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
     return parseFloat(amount) >= 0 ? 'text-green-400' : 'text-red-400';
   };
 
+  // Determinar si una transacción es un débito (debe mostrar signo negativo)
+  const isDebitTransaction = (type) => {
+    const debitTypes = [
+      'transfer_out',
+      'game_bet',
+      'tictactoe_bet',
+      'commission',
+      'raffle_cost',
+      'raffle_number_purchase',
+      'market_redeem',
+      'fire_burn'
+    ];
+    
+    // Verificar si el tipo contiene palabras clave de débito
+    const typeStr = type.toLowerCase();
+    if (debitTypes.includes(typeStr)) return true;
+    if (typeStr.includes('cost') || typeStr.includes('bet') || 
+        typeStr.includes('burn') || typeStr.includes('spend')) return true;
+    
+    return false;
+  };
+
+  // Formatear el monto con el signo correcto
+  const formatAmount = (amount, type) => {
+    const value = Math.abs(parseFloat(amount));
+    const isDebit = isDebitTransaction(type);
+    const sign = isDebit ? '-' : '+';
+    return `${sign}${value.toFixed(2)}`;
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 
@@ -187,7 +217,7 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
                     <div className="flex items-center gap-3">
                       {/* Icon */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        parseFloat(tx.amount) >= 0 ? 'bg-green-400/20' : 'bg-red-400/20'
+                        isDebitTransaction(tx.type) ? 'bg-red-400/20' : 'bg-green-400/20'
                       }`}>
                         {getTransactionIcon(tx.type)}
                       </div>
@@ -196,8 +226,8 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium">{getTransactionLabel(tx.type)}</span>
-                          <span className={`font-bold ${getTransactionColor(tx.amount)}`}>
-                            {parseFloat(tx.amount) >= 0 ? '+' : ''}{parseFloat(tx.amount).toFixed(2)} 🔥
+                          <span className={`font-bold ${isDebitTransaction(tx.type) ? 'text-red-400' : 'text-green-400'}`}>
+                            {formatAmount(tx.amount, tx.type)} 🔥
                           </span>
                         </div>
                         {tx.description && (

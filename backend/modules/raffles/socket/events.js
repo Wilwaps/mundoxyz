@@ -3,7 +3,7 @@
  * Manejo de eventos en tiempo real para rifas
  */
 
-const { query } = require('../../../db/db');
+const { query } = require('../../../db');
 const logger = require('../../../config/logger');
 
 class RaffleSocketHandler {
