@@ -1,0 +1,5 @@
+Deploy #8 - Force Frontend Rebuild
+Timestamp: 2025-11-07 20:00:00
+Reason: Railway cache persistente ignorando package.json changes
+Fix: Backend mapea todos los campos + Frontend optional chaining
+Target Bundle: Nuevo hash diferente a main.6951777f.js

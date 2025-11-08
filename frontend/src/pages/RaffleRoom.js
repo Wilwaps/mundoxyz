@@ -1,7 +1,9 @@
 /**
  * RaffleRoom.js - Página principal de una rifa
  * Detalles completos, compra de números, grid interactivo
- * BUILD: v1.3.4 FORCE NUCLEAR REBUILD - 7 NOV 2025 12:45PM
+ * BUILD: v1.3.6 BACKEND+FRONTEND FIX - 7 NOV 2025 20:00
+ * Backend mapea: total_numbers, cost_per_number, pot_fires, company_config completo
+ * Frontend: optional chaining exhaustivo en TODOS los accesos
  */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
