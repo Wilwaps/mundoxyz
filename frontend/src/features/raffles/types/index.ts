@@ -4,22 +4,51 @@
  */
 
 // Estados de rifa
-export type RaffleStatus = 'draft' | 'pending' | 'active' | 'finished' | 'cancelled';
+export enum RaffleStatus {
+  DRAFT = 'draft',
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  FINISHED = 'finished',
+  CANCELLED = 'cancelled'
+}
 
 // Modos de rifa
-export type RaffleMode = 'fires' | 'coins' | 'prize';
+export enum RaffleMode {
+  FIRES = 'fires',
+  COINS = 'coins',
+  PRIZE = 'prize'
+}
 
 // Tipos de visibilidad
-export type RaffleVisibility = 'public' | 'private' | 'company';
+export enum RaffleVisibility {
+  PUBLIC = 'public',
+  PRIVATE = 'private',
+  COMPANY = 'company'
+}
 
 // Estados de número
-export type NumberState = 'available' | 'reserved' | 'sold' | 'locked';
+export enum NumberState {
+  AVAILABLE = 'available',
+  RESERVED = 'reserved',
+  SOLD = 'sold',
+  LOCKED = 'locked'
+}
 
 // Estados de pago
-export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+export enum PaymentStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  EXPIRED = 'expired'
+}
 
 // Métodos de pago
-export type PaymentMethod = 'cash' | 'mobile' | 'bank' | 'fires';
+export enum PaymentMethod {
+  CASH = 'cash',
+  MOBILE = 'mobile',
+  BANK = 'bank',
+  FIRES = 'fires'
+}
 
 // Interfaz principal de Rifa
 export interface Raffle {
