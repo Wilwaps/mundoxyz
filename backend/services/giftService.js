@@ -559,6 +559,25 @@ class GiftService {
               [event.id, userId, coinsAmount, firesAmount]
             );
 
+            // Crear mensaje informativo en buzón
+            await client.query(
+              `INSERT INTO bingo_v2_messages 
+               (user_id, category, title, message, metadata, is_read)
+               VALUES ($1, 'system', $2, $3, $4, false)`,
+              [
+                userId,
+                `🎁 ${event.name}`,
+                event.message,
+                JSON.stringify({
+                  type: 'welcome_event_notification',
+                  event_id: event.id,
+                  coins_amount: coinsAmount,
+                  fires_amount: firesAmount,
+                  auto_credited: true
+                })
+              ]
+            );
+
             logger.info('Welcome event auto-credited', {
               eventId: event.id,
               eventName: event.name,
