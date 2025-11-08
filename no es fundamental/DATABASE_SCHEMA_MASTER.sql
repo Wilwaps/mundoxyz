@@ -1,5 +1,6 @@
 -- ============================================
 -- MUNDOXYZ - SCHEMA MAESTRO COMPLETO
+-- Última actualización: 2025-11-08
 -- ============================================
 -- Fecha: 2025-11-08
 -- PostgreSQL 14+
@@ -504,10 +505,12 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   mode VARCHAR(10) NOT NULL CHECK (mode IN ('coins', 'fires')),
   bet_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
   visibility VARCHAR(10) DEFAULT 'public',
-  board TEXT DEFAULT '         ',
+  board JSONB NOT NULL DEFAULT '[[null,null,null],[null,null,null],[null,null,null]]'::jsonb,
   current_turn CHAR(1) CHECK (current_turn IN ('X', 'O')),
   winner CHAR(1) CHECK (winner IN ('X', 'O', 'D')),
-  status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished', 'cancelled')),
+  winner_id UUID REFERENCES users(id),
+  winner_symbol CHAR(1) CHECK (winner_symbol IN ('X', 'O')),
+  status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready', 'playing', 'finished', 'cancelled')),
   player_x_ready BOOLEAN DEFAULT FALSE,
   player_o_ready BOOLEAN DEFAULT FALSE,
   player_x_left BOOLEAN DEFAULT FALSE,
@@ -518,6 +521,7 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   player_x_score INTEGER DEFAULT 0,
   player_o_score INTEGER DEFAULT 0,
   xp_awarded BOOLEAN DEFAULT FALSE,
+  archived_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,
   finished_at TIMESTAMP,
@@ -526,8 +530,17 @@ CREATE TABLE IF NOT EXISTS tictactoe_rooms (
 
 CREATE INDEX IF NOT EXISTS idx_tictactoe_code ON tictactoe_rooms(code);
 CREATE INDEX IF NOT EXISTS idx_tictactoe_status ON tictactoe_rooms(status);
+CREATE INDEX IF NOT EXISTS idx_tictactoe_winner_id ON tictactoe_rooms(winner_id) WHERE winner_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tictactoe_status_playing ON tictactoe_rooms(status) WHERE status = 'playing';
+CREATE INDEX IF NOT EXISTS idx_tictactoe_rooms_archived ON tictactoe_rooms(archived_at) WHERE archived_at IS NOT NULL;
 
 COMMENT ON TABLE tictactoe_rooms IS 'Salas de TicTacToe con sistema de revancha';
+COMMENT ON COLUMN tictactoe_rooms.board IS 'Tablero 3x3 como array JSONB: [[null,X,O],[null,null,X],[O,null,null]]';
+COMMENT ON COLUMN tictactoe_rooms.winner_id IS 'UUID del jugador ganador';
+COMMENT ON COLUMN tictactoe_rooms.winner_symbol IS 'Símbolo del ganador: X o O';
+COMMENT ON COLUMN tictactoe_rooms.player_x_left IS 'Indica si el jugador X abandonó la sala después de terminar';
+COMMENT ON COLUMN tictactoe_rooms.player_o_left IS 'Indica si el jugador O abandonó la sala después de terminar';
+COMMENT ON COLUMN tictactoe_rooms.archived_at IS 'Timestamp cuando ambos jugadores abandonaron y la sala se archivó';
 
 -- ============================================
 -- 17. TICTACTOE_MOVES

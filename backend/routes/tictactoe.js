@@ -651,7 +651,14 @@ router.post('/room/:code/timeout', verifyToken, async (req, res) => {
           room.board = JSON.parse(room.board);
         } catch (e) {
           logger.error('Error parsing board JSON:', e);
+          // Fallback: tablero vacío 3x3
+          room.board = [[null,null,null],[null,null,null],[null,null,null]];
         }
+      }
+      
+      // Asegurar que board sea array (por si viene como JSONB desde migración)
+      if (!Array.isArray(room.board)) {
+        room.board = [[null,null,null],[null,null,null],[null,null,null]];
       }
       
       // Validar estado
@@ -1288,6 +1295,11 @@ router.get('/room/:code', optionalAuth, async (req, res) => {
         logger.error('Error parsing board JSON:', e);
         room.board = [[null,null,null],[null,null,null],[null,null,null]];
       }
+    }
+    
+    // Asegurar que board sea array (por si viene como JSONB desde migración)
+    if (!Array.isArray(room.board)) {
+      room.board = [[null,null,null],[null,null,null],[null,null,null]];
     }
     
     // Parsear moves_history si es string
