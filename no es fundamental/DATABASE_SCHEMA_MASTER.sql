@@ -1,10 +1,11 @@
 -- ============================================
 -- MUNDOXYZ - SCHEMA MAESTRO COMPLETO
 -- ============================================
--- Fecha: 2025-11-04
+-- Fecha: 2025-11-08
 -- PostgreSQL 14+
 -- Descripción: Schema completo de todas las tablas en producción
 -- Este archivo representa el estado ACTUAL de la base de datos
+-- IMPORTANTE: Balances de monedas están en tabla WALLETS, NO en users
 -- ============================================
 
 BEGIN;

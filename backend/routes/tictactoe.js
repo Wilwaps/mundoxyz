@@ -924,9 +924,30 @@ router.get('/rooms/public', optionalAuth, async (req, res) => {
     
     const result = await query(queryStr, params);
     
+    // Parsear JSONB fields en cada sala
+    const rooms = result.rows.map(room => {
+      // Parsear board si es string
+      if (typeof room.board === 'string') {
+        try {
+          room.board = JSON.parse(room.board);
+        } catch (e) {
+          room.board = [[null,null,null],[null,null,null],[null,null,null]];
+        }
+      }
+      // Parsear moves_history si es string
+      if (typeof room.moves_history === 'string') {
+        try {
+          room.moves_history = JSON.parse(room.moves_history);
+        } catch (e) {
+          room.moves_history = [];
+        }
+      }
+      return room;
+    });
+    
     res.json({
-      rooms: result.rows,
-      total: result.rows.length
+      rooms,
+      total: rooms.length
     });
     
   } catch (error) {
@@ -962,6 +983,26 @@ router.get('/room/:code', optionalAuth, async (req, res) => {
     }
     
     const room = result.rows[0];
+    
+    // Parsear board si es string (garantizar que sea array)
+    if (typeof room.board === 'string') {
+      try {
+        room.board = JSON.parse(room.board);
+      } catch (e) {
+        logger.error('Error parsing board JSON:', e);
+        room.board = [[null,null,null],[null,null,null],[null,null,null]];
+      }
+    }
+    
+    // Parsear moves_history si es string
+    if (typeof room.moves_history === 'string') {
+      try {
+        room.moves_history = JSON.parse(room.moves_history);
+      } catch (e) {
+        logger.error('Error parsing moves_history JSON:', e);
+        room.moves_history = [];
+      }
+    }
     
     // Verificar si el usuario es parte de la sala (para reconexión)
     if (userId) {
