@@ -4,7 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as api from '../api';
 import {
@@ -371,9 +371,6 @@ export const useRaffleFilters = (initialFilters?: RaffleFilters) => {
     applyFilters
   };
 };
-
-// Importar useState que faltaba
-import { useState } from 'react';
 
 export default {
   useRaffleList,
