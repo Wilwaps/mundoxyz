@@ -68,10 +68,34 @@ CREATE INDEX IF NOT EXISTS idx_tictactoe_winner_id
 CREATE INDEX IF NOT EXISTS idx_tictactoe_status_playing 
   ON tictactoe_rooms(status) WHERE status = 'playing';
 
--- 4. Comentarios para documentación
+-- 4. Crear columnas winner_id y winner_symbol si no existen
+DO $$
+BEGIN
+  -- Agregar winner_id si no existe
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_rooms' AND column_name = 'winner_id'
+  ) THEN
+    ALTER TABLE tictactoe_rooms 
+    ADD COLUMN winner_id UUID REFERENCES users(id) ON DELETE SET NULL;
+    RAISE NOTICE 'Columna winner_id creada';
+  END IF;
+  
+  -- Agregar winner_symbol si no existe
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_rooms' AND column_name = 'winner_symbol'
+  ) THEN
+    ALTER TABLE tictactoe_rooms 
+    ADD COLUMN winner_symbol VARCHAR(1) CHECK (winner_symbol IN ('X', 'O', NULL));
+    RAISE NOTICE 'Columna winner_symbol creada';
+  END IF;
+END $$;
+
+-- 5. Comentarios para documentación
 COMMENT ON COLUMN tictactoe_rooms.board IS 'Tablero 3x3 como array JSONB: [[null,X,O],[null,null,X],[O,null,null]]';
-COMMENT ON COLUMN tictactoe_rooms.winner_id IS 'UUID del jugador ganador (ya existía desde inicio)';
-COMMENT ON COLUMN tictactoe_rooms.winner_symbol IS 'Símbolo del ganador: X o O (ya existía desde inicio)';
+COMMENT ON COLUMN tictactoe_rooms.winner_id IS 'UUID del jugador ganador';
+COMMENT ON COLUMN tictactoe_rooms.winner_symbol IS 'Símbolo del ganador: X o O';
 
 -- Log final
 DO $$ BEGIN
