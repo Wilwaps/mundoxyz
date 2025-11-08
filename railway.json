@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "rm -rf frontend/node_modules frontend/build && npm install && cd frontend && npm install && npm run build -- --reset-cache && cd .."
+    "buildCommand": "rm -rf frontend/node_modules frontend/build frontend/.cache && npm cache clean --force && npm install && cd frontend && npm cache clean --force && rm -rf node_modules/.cache && npm install && GENERATE_SOURCEMAP=false npm run build && cd .."
   },
   "deploy": {
     "startCommand": "npm run migrate && npm start",
@@ -12,7 +12,7 @@
   "environments": {
     "production": {
       "build": {
-        "buildCommand": "rm -rf frontend/node_modules frontend/build && npm install && cd frontend && npm install && npm run build -- --reset-cache && cd .."
+        "buildCommand": "rm -rf frontend/node_modules frontend/build frontend/.cache && npm cache clean --force && npm install && cd frontend && npm cache clean --force && rm -rf node_modules/.cache && npm install && GENERATE_SOURCEMAP=false npm run build && cd .."
       }
     }
   }
