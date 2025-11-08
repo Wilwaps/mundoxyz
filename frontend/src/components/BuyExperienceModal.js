@@ -11,26 +11,7 @@ const BuyExperienceModal = ({ isOpen, onClose, user }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const queryClient = useQueryClient();
 
-  if (!isOpen) return null;
-
-  const currentCoins = parseFloat(user?.coins_balance || 0);
-  const currentFires = parseFloat(user?.fires_balance || 0);
-  const currentXP = user?.experience || 0;
-
-  // Constantes de precio
-  const COINS_PER_XP = 50;
-  const FIRES_PER_XP = 1;
-
-  // Calcular costos totales
-  const totalCoins = amount * COINS_PER_XP;
-  const totalFires = amount * FIRES_PER_XP;
-
-  // Verificar si tiene suficiente balance
-  const hasEnoughCoins = currentCoins >= totalCoins;
-  const hasEnoughFires = currentFires >= totalFires;
-  const canBuy = hasEnoughCoins && hasEnoughFires && amount > 0;
-
-  // Mutation para comprar experiencia
+  // Mutation para comprar experiencia (debe estar antes del early return)
   const buyMutation = useMutation({
     mutationFn: async (data) => {
       const response = await axios.post('/api/experience/buy', data);
@@ -93,6 +74,27 @@ const BuyExperienceModal = ({ isOpen, onClose, user }) => {
       });
     }
   });
+
+  // Early return después de todos los hooks
+  if (!isOpen) return null;
+
+  // Calcular valores después del early return
+  const currentCoins = parseFloat(user?.coins_balance || 0);
+  const currentFires = parseFloat(user?.fires_balance || 0);
+  const currentXP = user?.experience || 0;
+
+  // Constantes de precio
+  const COINS_PER_XP = 50;
+  const FIRES_PER_XP = 1;
+
+  // Calcular costos totales
+  const totalCoins = amount * COINS_PER_XP;
+  const totalFires = amount * FIRES_PER_XP;
+
+  // Verificar si tiene suficiente balance
+  const hasEnoughCoins = currentCoins >= totalCoins;
+  const hasEnoughFires = currentFires >= totalFires;
+  const canBuy = hasEnoughCoins && hasEnoughFires && amount > 0;
 
   const handleIncrement = () => {
     setAmount(prev => prev + 1);
