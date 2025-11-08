@@ -1,6 +1,6 @@
 {
   "name": "mundoxyz-frontend-v5-20251107",
-  "version": "1.3.5-hotfix",
+  "version": "1.3.6-backend-fix",
   "private": true,
   "dependencies": {
     "@headlessui/react": "^1.7.17",
