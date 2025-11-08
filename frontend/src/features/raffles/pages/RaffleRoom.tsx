@@ -49,6 +49,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   // Query de la sala
   const raffleData = useRaffle(code || '');
   const raffle = raffleData.raffle;
+  const numbers = raffleData.numbers;
   const isLoading = raffleData.isLoading;
   const error = raffleData.error;
   const refetch = () => { window.location.reload(); }; // Temporal
@@ -127,7 +128,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       return;
     }
     
-    const numberData = raffle?.numbers?.find((n: any) => n.number === number);
+    const numberData = numbers?.find((n: any) => n.number === number);
     
     if (numberData?.status === 'sold') {
       if (numberData.ownerId === user.id) {
@@ -182,7 +183,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   // Compartir rifa
   const shareRaffle = (platform: 'whatsapp' | 'telegram' | 'copy') => {
     const shareUrl = `${window.location.origin}/raffles/${code}`;
-    const shareText = `¡Participa en la rifa "${raffle?.name}"! 🎉\n\nPremio: ${raffle?.prizeMeta?.prizeDescription || 'Increíble premio'}\nNúmeros disponibles: ${raffle?.availableNumbers || 0}\n\nÚnete aquí:`;
+    const shareText = `¡Participa en la rifa "${raffle?.name}"! 🎉\n\nPremio: ${raffle?.prizeMeta?.prizeDescription || 'Increíble premio'}\nNúmeros disponibles: ${availableNumbers}\n\nÚnete aquí:`;
     
     switch (platform) {
       case 'whatsapp':
@@ -200,15 +201,21 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     setShowShareMenu(false);
   };
   
-  // Calcular estadísticas
+  // Calcular estadísticas desde los datos del hook
+  const soldNumbers = numbers?.filter((n: any) => n.state === 'sold').length || 0;
+  const reservedNumbers = numbers?.filter((n: any) => n.state === 'reserved').length || 0;
+  const totalNumbers = raffle?.numbersRange || 0;
+  const availableNumbers = totalNumbers - soldNumbers - reservedNumbers;
+  const progress = totalNumbers > 0 ? Math.round((soldNumbers / totalNumbers) * 100) : 0;
+  
   const stats = {
-    totalNumbers: raffle?.numbersRange || 0,
-    soldNumbers: raffle?.numbers?.filter((n: any) => n.status === 'sold').length || 0,
-    reservedNumbers: raffle?.numbers?.filter((n: any) => n.status === 'reserved').length || 0,
-    availableNumbers: raffle?.availableNumbers || 0,
-    progress: raffle?.progress || 0,
-    totalPot: raffle?.totalCollected || 0,
-    myNumbers: raffle?.numbers?.filter((n: any) => n.ownerId === user?.id).length || 0
+    totalNumbers,
+    soldNumbers,
+    reservedNumbers,
+    availableNumbers,
+    progress,
+    totalPot: raffle?.potFires || raffle?.potCoins || 0,
+    myNumbers: raffleData.userNumbers?.length || 0
   };
   
   if (isLoading) {
@@ -293,7 +300,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <Users className="w-4 h-4" />
-                    <span>{raffle.participants || 0} participantes</span>
+                    <span>{soldNumbers} participantes</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Trophy className="w-4 h-4" />
@@ -492,8 +499,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                     <div className="text-text">
                       <span className="text-sm text-text/60">Total:</span>
                       <span className="ml-2 font-bold text-fire-orange">
-                        {raffle.mode === 'fires' ? '🔥' : '🪙'}
-                        {' '}{(selectedNumbers.length * raffle.entryPrice).toFixed(2)}
+                        {raffle.mode === RaffleMode.FIRES ? '🔥' : '🪙'}
+                        {' '}{(selectedNumbers.length * (raffle.mode === RaffleMode.FIRES ? (raffle.entryPriceFire || 0) : (raffle.entryPriceCoin || 0))).toFixed(2)}
                       </span>
                     </div>
                     
@@ -562,7 +569,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-text/60">Precio por número:</span>
                         <span className="text-text">
-                          {raffle.mode === 'prize' ? 'Gratis' : `${raffle.entryPrice} ${raffle.mode === 'fires' ? '🔥' : '🪙'}`}
+                          {raffle.mode === RaffleMode.PRIZE ? 'Gratis' : `${raffle.mode === RaffleMode.FIRES ? (raffle.entryPriceFire || 0) : (raffle.entryPriceCoin || 0)} ${raffle.mode === RaffleMode.FIRES ? '🔥' : '🪙'}`}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -579,7 +586,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                         <Users className="w-5 h-5 text-accent" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-text">{raffle.hostName}</p>
+                        <p className="text-sm font-medium text-text">{raffle.hostUsername}</p>
                         <p className="text-xs text-text/60">Organizador</p>
                       </div>
                     </div>
