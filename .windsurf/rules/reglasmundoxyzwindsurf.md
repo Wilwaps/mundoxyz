@@ -21,7 +21,7 @@ Cuando se hace una modificación que debe debe representar cambios en produccion
 git add backend/routes/tictactoe.js frontend/src/pages/TicTacToeRoom.js TICTACTOE_REMATCH_BUGFIX.md
 git commit --amend -m "fix: sistema revanchas TicTacToe"
 git push -u origin HEAD
-se ejecuta automaticamente chromedevtools con sleep 369 segundos en powershell para realizar las pruebas necesarias
+se ejecuta automaticamente chromedevtools en railway para hacer seguimiento del deploy acto seguido de realizado el deploy realizar las pruebas en el proyecto para asegurar que las implementaciones realizadas fueros desplegadas correctamente
 
 esta es la direccion asignada por railway
 

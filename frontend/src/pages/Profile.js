@@ -193,18 +193,6 @@ const Profile = () => {
           </h3>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-violet">
-                {stats.games?.raffles?.participated || 0}
-              </div>
-              <div className="text-xs text-text/60">Rifas Jugadas</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-success">
-                {stats.games?.raffles?.won || 0}
-              </div>
-              <div className="text-xs text-text/60">Rifas Ganadas</div>
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -261,7 +249,7 @@ const Profile = () => {
       )}
 
       {/* Active Games */}
-      {games && (games.raffles?.length > 0 || games.bingo?.length > 0) && (
+      {games && games.bingo?.length > 0 && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -272,20 +260,6 @@ const Profile = () => {
             <Trophy size={20} className="text-accent" />
             Partidas Activas
           </h3>
-
-          {games.raffles?.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-semibold text-text/60 mb-2">Rifas</h4>
-              {games.raffles.map((raffle) => (
-                <div key={raffle.id} className="glass-panel p-3 mb-2">
-                  <div className="font-semibold text-text">{raffle.name}</div>
-                  <div className="text-xs text-text/60">
-                    Código: {raffle.code} • Números: {raffle.numbers?.length || 0}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
           {games.bingo?.length > 0 && (
             <div>

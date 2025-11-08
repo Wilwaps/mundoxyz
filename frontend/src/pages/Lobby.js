@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Ticket, Search, Loader } from 'lucide-react';
+import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -8,14 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Import modales existentes
 import BingoCreateRoomModal from '../components/bingo/CreateRoomModal';
-import CreateRaffleModal from '../components/raffles/CreateRaffleModal';
 
 const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showSelectorModal, setShowSelectorModal] = useState(false);
   const [showBingoModal, setShowBingoModal] = useState(false);
-  const [showRaffleModal, setShowRaffleModal] = useState(false);
   const [quickJoinCode, setQuickJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
@@ -49,9 +47,6 @@ const Lobby = () => {
         break;
       case 'bingo':
         setShowBingoModal(true);
-        break;
-      case 'raffle':
-        setShowRaffleModal(true);
         break;
     }
   };
@@ -105,9 +100,6 @@ const Lobby = () => {
       case 'bingo':
         url = `/bingo/v2/room/${room.code}`;
         break;
-      case 'raffle':
-        url = `/raffles/${room.code}`;
-        break;
     }
     if (url) navigate(url);
   };
@@ -118,8 +110,6 @@ const Lobby = () => {
         return <Grid3x3 size={16} className="text-purple-400" />;
       case 'bingo':
         return <Gamepad2 size={16} className="text-blue-400" />;
-      case 'raffle':
-        return <Ticket size={16} className="text-pink-400" />;
       default:
         return <Globe size={16} />;
     }
@@ -131,8 +121,6 @@ const Lobby = () => {
         return 'TicTacToe';
       case 'bingo':
         return 'Bingo';
-      case 'raffle':
-        return 'Rifa';
       default:
         return 'Sala';
     }
@@ -316,20 +304,6 @@ const Lobby = () => {
                   </div>
                 </motion.button>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSelectGameType('raffle')}
-                  className="w-full bg-gradient-to-r from-pink-600 to-pink-700 p-4 rounded-lg text-left hover:from-pink-500 hover:to-pink-600 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <Ticket size={32} />
-                    <div>
-                      <h3 className="font-bold text-lg">Rifa</h3>
-                      <p className="text-sm text-text/80">Números y premios</p>
-                    </div>
-                  </div>
-                </motion.button>
               </div>
             </motion.div>
           </motion.div>
@@ -348,17 +322,6 @@ const Lobby = () => {
         />
       )}
 
-      {showRaffleModal && (
-        <CreateRaffleModal
-          onClose={() => setShowRaffleModal(false)}
-          onSuccess={() => {
-            setShowRaffleModal(false);
-            toast.success('Rifa creada exitosamente');
-            // Las rifas van al lobby de rifas
-            navigate('/raffles');
-          }}
-        />
-      )}
     </div>
   );
 };

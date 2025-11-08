@@ -214,17 +214,11 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
 
     const result = await query(
       `SELECT 
-        COUNT(DISTINCT r.id) as total_raffles_participated,
-        COUNT(DISTINCT CASE WHEN r.winner_id = u.id THEN r.id END) as raffles_won,
         COUNT(DISTINCT b.id) as total_bingo_games,
         COUNT(DISTINCT CASE WHEN b.winner_id = u.id THEN b.id END) as bingo_won,
-        COALESCE(SUM(CASE WHEN rn.state = 'sold' THEN r.entry_price_fire ELSE 0 END), 0) as total_fires_in_raffles,
-        COALESCE(SUM(CASE WHEN rn.state = 'sold' THEN r.entry_price_coin ELSE 0 END), 0) as total_coins_in_raffles,
         COALESCE(SUM(bp.total_spent), 0) as total_fires_in_bingo,
         COALESCE(SUM(bp.total_spent), 0) as total_coins_in_bingo
       FROM users u
-      LEFT JOIN raffle_numbers rn ON rn.owner_id = u.id
-      LEFT JOIN raffles r ON r.id = rn.raffle_id
       LEFT JOIN bingo_v2_room_players bp ON bp.user_id = u.id
       LEFT JOIN bingo_v2_rooms b ON b.id = bp.room_id
       WHERE u.id::text = $1 OR u.tg_id::text = $1 OR u.username = $1
@@ -241,27 +235,11 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
     // Get achievements
     const achievements = [];
     
-    if (stats.raffles_won > 0) {
-      achievements.push({
-        name: 'Raffle Winner',
-        description: `Won ${stats.raffles_won} raffle${stats.raffles_won > 1 ? 's' : ''}`,
-        icon: '🎯'
-      });
-    }
-
     if (stats.bingo_won > 0) {
       achievements.push({
         name: 'Bingo Master',
         description: `Won ${stats.bingo_won} bingo game${stats.bingo_won > 1 ? 's' : ''}`,
         icon: '🎱'
-      });
-    }
-
-    if (parseInt(stats.total_raffles_participated) >= 10) {
-      achievements.push({
-        name: 'Raffle Enthusiast',
-        description: 'Participated in 10+ raffles',
-        icon: '🎲'
       });
     }
 
@@ -275,12 +253,6 @@ router.get('/:userId/stats', optionalAuth, async (req, res) => {
 
     res.json({
       games: {
-        raffles: {
-          participated: parseInt(stats.total_raffles_participated),
-          won: parseInt(stats.raffles_won),
-          fires_spent: parseFloat(stats.total_fires_in_raffles),
-          coins_spent: parseFloat(stats.total_coins_in_raffles)
-        },
         bingo: {
           played: parseInt(stats.total_bingo_games),
           won: parseInt(stats.bingo_won),
@@ -313,27 +285,6 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Cannot view this user\'s games' });
     }
 
-    // Get active raffles
-    const raffles = await query(
-      `SELECT 
-        r.id,
-        r.code,
-        r.name,
-        r.status,
-        r.mode,
-        r.visibility,
-        r.ends_at,
-        array_agg(rn.number_idx ORDER BY rn.number_idx) FILTER (WHERE rn.number_idx IS NOT NULL) as numbers,
-        COALESCE(SUM(r.entry_price_fire), 0) as fires_spent,
-        COALESCE(SUM(r.entry_price_coin), 0) as coins_spent
-      FROM raffle_numbers rn
-      JOIN raffles r ON r.id = rn.raffle_id
-      WHERE rn.owner_id = $1 AND rn.state = 'sold' AND r.status IN ('pending', 'active')
-      GROUP BY r.id, r.code, r.name, r.status, r.mode, r.visibility, r.ends_at
-      ORDER BY r.created_at DESC`,
-      [req.user.id]
-    );
-
     // Get active bingo rooms
     const bingo = await query(
       `SELECT 
@@ -355,7 +306,6 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
     );
 
     res.json({
-      raffles: raffles.rows,
       bingo: bingo.rows
     });
 

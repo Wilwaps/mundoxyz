@@ -24,7 +24,6 @@ const rolesRoutes = require('./routes/roles');
 const healthRoutes = require('./routes/health');
 const gameRoutes = require('./routes/games');
 const bingoV2Routes = require('./routes/bingoV2');
-const rafflesRoutes = require('./routes/raffles');
 const marketRoutes = require('./routes/market');
 const tictactoeRoutes = require('./routes/tictactoe');
 const roomsRoutes = require('./routes/rooms');
@@ -70,13 +69,6 @@ const io = new Server(server, {
 const handleBingoV2Socket = require('./socket/bingoV2');
 handleBingoV2Socket(io);
 
-// Initialize Raffle Socket Handler
-const RaffleSocketHandler = require('./socket/raffles');
-const raffleSocketHandler = new RaffleSocketHandler(io);
-// Make it globally available
-global.raffleSocket = raffleSocketHandler;
-logger.info('✅ RaffleSocketHandler initialized');
-
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
@@ -96,8 +88,6 @@ io.on('connection', (socket) => {
   roomChatHandler(io, socket);
   ronChatHandler(io, socket);
   
-  // Initialize Raffle socket handlers
-  raffleSocketHandler.setupListeners(socket);
   
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
@@ -244,7 +234,6 @@ app.use('/api/bingo/v2', (req, res, next) => {
   req.io = io;
   next();
 }, bingoV2Routes);
-app.use('/api/raffles', rafflesRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/rooms', roomsRoutes);
 app.use('/api/health', healthRoutes);
@@ -330,28 +319,6 @@ async function startServer() {
         }, 3600000); // Run every hour
         logger.info('✅ Gift Expiration Job started - runs every hour');
 
-        // Start Raffle Reservation Cleanup Job
-        const RaffleService = require('./services/RaffleService');
-        const db = require('./db');
-        const raffleService = new RaffleService(db.pool);
-        setInterval(async () => {
-          try {
-            const expiredByRaffle = await raffleService.cleanExpiredReservations();
-            
-            // Emitir eventos WebSocket para números liberados
-            Object.keys(expiredByRaffle).forEach(raffleId => {
-              expiredByRaffle[raffleId].forEach(numberIdx => {
-                io.to(`raffle-${raffleId}`).emit('number:released', {
-                  number_idx: numberIdx,
-                  expired: true
-                });
-              });
-            });
-          } catch (error) {
-            logger.error('Error in raffle reservation cleanup job:', error);
-          }
-        }, 60000); // Run every minute
-        logger.info('✅ Raffle Reservation Cleanup Job started - runs every minute');
       } catch (error) {
         logger.error('Failed to initialize database:', error);
       }

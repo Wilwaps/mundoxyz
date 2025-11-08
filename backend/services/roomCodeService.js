@@ -9,7 +9,7 @@ class RoomCodeService {
   
   /**
    * Genera y reserva un código único para una sala
-   * @param {string} gameType - 'tictactoe', 'bingo', 'raffle'
+   * @param {string} gameType - 'tictactoe', 'bingo'
    * @param {string} roomId - ID de la sala en su tabla específica
    * @param {object} client - Cliente de transacción opcional
    * @returns {Promise<string>} Código único de 6 dígitos
@@ -21,7 +21,7 @@ class RoomCodeService {
       logger.info('🔐 Reservando código de sala', { gameType, roomId });
       
       // Validar game_type
-      const validTypes = ['tictactoe', 'bingo', 'raffle'];
+      const validTypes = ['tictactoe', 'bingo'];
       if (!validTypes.includes(gameType)) {
         throw new Error(`Tipo de juego inválido: ${gameType}. Tipos válidos: ${validTypes.join(', ')}`);
       }
@@ -182,22 +182,6 @@ class RoomCodeService {
             [code]
           );
           roomDetails = bingoResult.rows[0];
-          break;
-          
-        case 'raffle':
-          const raffleResult = await query(
-            `SELECT 
-              r.*,
-              u.username as host_username,
-              COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as purchased_count
-             FROM raffles r
-             LEFT JOIN users u ON r.host_id = u.id
-             LEFT JOIN raffle_numbers rn ON r.id = rn.raffle_id
-             WHERE r.code = $1
-             GROUP BY r.id, u.username`,
-            [code]
-          );
-          roomDetails = raffleResult.rows[0];
           break;
           
         default:

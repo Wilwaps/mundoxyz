@@ -41,15 +41,6 @@ const UnifiedChat = () => {
       return;
     }
     
-    // Raffle Room
-    const raffleMatch = path.match(/\/raffles\/(\d{6})/);
-    if (raffleMatch) {
-      setCurrentRoom({ type: 'raffle', code: raffleMatch[1] });
-      setShowRoomTab(true);
-      if (isOpen) setActiveTab('room');
-      return;
-    }
-    
     // No está en sala - ocultar pestaña Sala
     if (showRoomTab) {
       setShowRoomTab(false);

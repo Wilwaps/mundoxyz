@@ -68,9 +68,6 @@ router.get('/find/:code', async (req, res) => {
       case 'bingo':
         redirectUrl = `/bingo/v2/room/${code}`;
         break;
-      case 'raffle':
-        redirectUrl = `/raffles/${code}`;
-        break;
       default:
         throw new Error(`Tipo de juego no soportado: ${roomDetails.game_type}`);
     }
@@ -158,31 +155,9 @@ router.get('/active', verifyToken, async (req, res) => {
       ORDER BY r.created_at DESC
     `, [userId]);
     
-    // Rifas - rifas donde el usuario compró números
-    const raffleRooms = await query(`
-      SELECT DISTINCT
-        r.code,
-        r.name,
-        r.mode,
-        r.entry_price_fire,
-        r.status,
-        r.created_at,
-        'raffle' as game_type,
-        u.username as host_username,
-        COUNT(rn.id) as numbers_purchased
-      FROM raffles r
-      LEFT JOIN users u ON r.host_id = u.id
-      JOIN raffle_numbers rn ON r.id = rn.raffle_id
-      WHERE rn.owner_id = $1
-        AND r.status IN ('pending', 'active')
-      GROUP BY r.id, r.code, r.name, r.mode, r.entry_price_fire, r.status, r.created_at, u.username
-      ORDER BY r.created_at DESC
-    `, [userId]);
-    
     const allRooms = [
       ...tictactoeRooms.rows,
       ...bingoRooms.rows,
-      ...raffleRooms.rows
     ];
     
     logger.info('✅ Salas activas obtenidas', {
@@ -190,7 +165,6 @@ router.get('/active', verifyToken, async (req, res) => {
       totalRooms: allRooms.length,
       tictactoe: tictactoeRooms.rows.length,
       bingo: bingoRooms.rows.length,
-      raffle: raffleRooms.rows.length
     });
     
     res.json({

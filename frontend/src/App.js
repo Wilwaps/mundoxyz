@@ -11,8 +11,6 @@ import ResetPassword from './pages/ResetPassword';
 import Games from './pages/Games';
 import Profile from './pages/Profile';
 import Lobby from './pages/Lobby';
-import RafflesLobby from './pages/RafflesLobby';
-import RaffleRoom from './pages/RaffleRoom';
 import Market from './pages/Market';
 import Roles from './pages/Roles';
 import Upcoming from './pages/Upcoming';
@@ -22,7 +20,6 @@ import BingoV2GameRoom from './pages/BingoV2GameRoom';
 import Admin from './pages/Admin';
 import TicTacToeLobby from './pages/TicTacToeLobby';
 import TicTacToeRoom from './pages/TicTacToeRoom';
-import RafflePublicLanding from './pages/RafflePublicLanding';
 import Landing from './pages/Landing';
 
 // Create a client
@@ -109,8 +106,6 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               
-              {/* Ruta pública para landing de rifas empresa (sin login) */}
-              <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
               
               <Route path="/" element={
                 <ProtectedRoute>
@@ -121,10 +116,6 @@ function App() {
                 <Route path="games" element={<Games />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="lobby" element={<Lobby />} />
-                <Route path="raffles" element={<RafflesLobby />} />
-                <Route path="raffles/lobby" element={<Navigate to="/raffles" replace />} />
-                <Route path="raffles/:code" element={<RaffleRoom />} />
-                <Route path="raffles/room/:code" element={<RaffleRoom />} />
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />
                 <Route path="upcoming" element={<Upcoming />} />

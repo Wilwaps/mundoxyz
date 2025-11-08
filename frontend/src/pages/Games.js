@@ -66,32 +66,11 @@ const Games = () => {
         </g>
       </svg>
     ),
-    raffles: (
-      <svg className="w-full h-full" viewBox="0 0 100 100">
-        <defs>
-          <filter id="neon-glow-fire" width="200%" height="200%" x="-50%" y="-50%">
-            <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="3" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <g style={{ filter: 'url(#neon-glow-fire)' }}>
-          <rect x="25" y="35" width="50" height="30" fill="none" stroke="#FFA500" strokeWidth="3" rx="5" />
-          <circle cx="35" cy="50" r="5" fill="#FFFF00" />
-          <circle cx="50" cy="50" r="5" fill="#FFA500" />
-          <circle cx="65" cy="50" r="5" fill="#FF6347" />
-        </g>
-      </svg>
-    )
   };
 
   const handleGameClick = (gameId) => {
     if (gameId === 'bingo') {
       navigate('/bingo');
-    } else if (gameId === 'raffles') {
-      navigate('/raffles/lobby');
     } else if (gameId === 'tictactoe') {
       navigate('/tictactoe/lobby');
     }
@@ -146,7 +125,7 @@ const Games = () => {
       </div>
 
       {/* Active Games Section */}
-      {activeGames && (activeGames.tictactoe?.length > 0 || activeGames.bingo?.length > 0 || activeGames.raffles?.length > 0) && (
+      {activeGames && (activeGames.tictactoe?.length > 0 || activeGames.bingo?.length > 0) && (
         <div className="mt-8">
           <h2 className="text-xl font-bold mb-4 text-text/80">Partidas Activas</h2>
           
@@ -222,43 +201,6 @@ const Games = () => {
                         {room.pot_coins > 0 && (
                           <div className="text-sm text-accent">
                             🪙 {room.pot_coins}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Active Raffles */}
-          {activeGames.raffles?.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 text-fire-orange">Rifas Activas</h3>
-              <div className="space-y-3">
-                {activeGames.raffles.map((raffle) => (
-                  <motion.div
-                    key={raffle.id}
-                    whileHover={{ x: 5 }}
-                    className="glass-panel p-4 cursor-pointer"
-                    onClick={() => navigate(`/raffles/room/${raffle.code}`)}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="font-semibold text-text">{raffle.name}</h4>
-                        <p className="text-sm text-text/60">
-                          {raffle.numbers_sold}/{raffle.numbers_range} números vendidos
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-text/60">
-                          <Clock size={14} className="inline mr-1" />
-                          {new Date(raffle.ends_at).toLocaleDateString()}
-                        </div>
-                        {raffle.pot_fires > 0 && (
-                          <div className="text-sm text-fire-orange">
-                            🔥 {raffle.pot_fires}
                           </div>
                         )}
                       </div>

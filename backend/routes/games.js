@@ -28,16 +28,6 @@ router.get('/list', optionalAuth, async (req, res) => {
         min_players: 2,
         max_players: 20,
         status: 'available'
-      },
-      {
-        id: 'raffles',
-        name: 'Rifas',
-        description: 'Participa en rifas con premios',
-        icon: '🎯',
-        modes: ['free', 'coins', 'fires'],
-        min_players: 1,
-        max_players: 1000,
-        status: 'available'
       }
     ];
 
@@ -62,16 +52,6 @@ router.get('/list', optionalAuth, async (req, res) => {
       games[1].active_rooms = 0;
     }
     
-    try {
-      const raffleCount = await query(
-        "SELECT COUNT(*) as count FROM raffles WHERE status IN ('pending', 'active')"
-      );
-      games[2].active_rooms = parseInt(raffleCount.rows[0].count);
-    } catch (err) {
-      logger.warn('Raffles table not found:', err.message);
-      games[2].active_rooms = 0;
-    }
-
     res.json(games);
 
   } catch (error) {
@@ -113,32 +93,6 @@ router.get('/history', verifyToken, async (req, res) => {
         [userId, limit, offset]
       );
       history = history.concat(bingoResult.rows);
-    }
-
-    // Get raffle history
-    if (!game_type || game_type === 'raffles') {
-      const raffleResult = await query(
-        `SELECT 
-          'raffle' as game_type,
-          r.id,
-          r.code,
-          r.name,
-          r.mode,
-          r.status,
-          r.created_at,
-          r.ends_at,
-          rp.numbers,
-          rp.fires_spent,
-          rp.coins_spent,
-          CASE WHEN r.winner_id = $1 THEN true ELSE false END as won
-        FROM raffle_participants rp
-        JOIN raffles r ON r.id = rp.raffle_id
-        WHERE rp.user_id = $1 AND r.status = 'finished'
-        ORDER BY r.ends_at DESC
-        LIMIT $2 OFFSET $3`,
-        [userId, limit, offset]
-      );
-      history = history.concat(raffleResult.rows);
     }
 
     // Sort by date
@@ -276,36 +230,6 @@ router.get('/active', async (req, res) => {
         LIMIT 20`
       );
       games.bingo = bingoResult.rows;
-    }
-
-    // Get active raffles
-    if (!type || type === 'raffles') {
-      const raffleResult = await query(
-        `SELECT 
-          r.id,
-          r.code,
-          r.name,
-          r.mode,
-          r.status,
-          r.entry_price_fire,
-          r.entry_price_coin,
-          r.pot_fires,
-          r.pot_coins,
-          r.numbers_range,
-          r.ends_at,
-          COUNT(DISTINCT CASE WHEN rn.state = 'sold' THEN rn.owner_id END) as participants,
-          COUNT(CASE WHEN rn.state = 'sold' THEN rn.id END) as numbers_sold,
-          u.username as host_username
-        FROM raffles r
-        LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
-        JOIN users u ON u.id = r.host_id
-        WHERE r.status IN ('pending', 'active') 
-          AND r.visibility = 'public'
-        GROUP BY r.id, u.username
-        ORDER BY r.created_at DESC
-        LIMIT 20`
-      );
-      games.raffles = raffleResult.rows;
     }
 
     res.json(games);

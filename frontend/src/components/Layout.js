@@ -9,7 +9,6 @@ import {
   User,
   DoorOpen,
   Gamepad2,
-  Ticket,
   Store,
   Shield,
   Clock,
@@ -56,7 +55,6 @@ const Layout = () => {
     { path: '/profile', icon: User, label: 'Perfil' },
     { path: '/lobby', icon: DoorOpen, label: 'Lobby' },
     { path: '/games', icon: Gamepad2, label: 'Juegos' },
-    { path: '/raffles/lobby', icon: Ticket, label: 'Rifas' },
     { path: '/market', icon: Store, label: 'Mercado' },
     { path: '/roles', icon: Shield, label: 'Rol' },
     { path: '/upcoming', icon: Clock, label: 'Próximo' }
