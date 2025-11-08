@@ -22,7 +22,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import RaffleCard from '../components/RaffleCard';
 import CreateRaffleModal from '../components/CreateRaffleModal';
 import { useRaffleList, useRaffleFilters } from '../hooks/useRaffleData';
-import { RaffleStatus, RaffleMode } from '../types';
+import { RaffleStatus, RaffleMode, RaffleVisibility } from '../types';
 import { FILTER_OPTIONS, PAGINATION } from '../constants';
 
 const RafflesLobby: React.FC = () => {
@@ -35,8 +35,8 @@ const RafflesLobby: React.FC = () => {
   
   // Hook de filtros
   const { filters, updateFilter, clearFilters, applyFilters } = useRaffleFilters({
-    visibility: ['public'],
-    status: ['active', 'pending'],
+    visibility: [RaffleVisibility.PUBLIC],
+    status: [RaffleStatus.ACTIVE, RaffleStatus.PENDING],
     sortBy: 'created',
     sortOrder: 'desc'
   });
@@ -230,7 +230,7 @@ const RafflesLobby: React.FC = () => {
                     <label className="text-xs text-text/60 mb-1 block">Estado</label>
                     <select
                       value={filters.status?.[0] || ''}
-                      onChange={(e) => updateFilter('status', e.target.value ? [e.target.value] : undefined)}
+                      onChange={(e) => updateFilter('status', e.target.value ? [e.target.value as RaffleStatus] : undefined)}
                       className="w-full px-3 py-2 bg-glass/50 rounded-lg text-text"
                     >
                       <option value="">Todos</option>
@@ -247,7 +247,7 @@ const RafflesLobby: React.FC = () => {
                     <label className="text-xs text-text/60 mb-1 block">Modo</label>
                     <select
                       value={filters.mode?.[0] || ''}
-                      onChange={(e) => updateFilter('mode', e.target.value ? [e.target.value] : undefined)}
+                      onChange={(e) => updateFilter('mode', e.target.value ? [e.target.value as RaffleMode] : undefined)}
                       className="w-full px-3 py-2 bg-glass/50 rounded-lg text-text"
                     >
                       <option value="">Todos</option>
