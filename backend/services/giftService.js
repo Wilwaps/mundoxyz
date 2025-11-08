@@ -351,8 +351,8 @@ class GiftService {
       ),
       return_stats AS (
         SELECT 
-          COUNT(DISTINCT ga.user_id) as users_returned,
-          ROUND(AVG(game_count), 2) as avg_games_after
+          COUNT(DISTINCT sub.user_id) as users_returned,
+          ROUND(AVG(sub.game_count), 2) as avg_games_after
         FROM (
           SELECT 
             ga.user_id,
