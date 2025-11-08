@@ -20,7 +20,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePurchaseNumber, useReleaseNumber } from '../hooks/useRaffleData';
-import { RaffleMode } from '../types';
+import { RaffleMode, PaymentMethod } from '../types';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -67,10 +67,13 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   const handleClose = async () => {
     if (selectedNumbers.length > 0 && !isProcessing) {
       try {
-        await releaseNumbers.mutateAsync({
-          code: raffle.code,
-          numbers: selectedNumbers
-        });
+        // Liberar cada número individualmente
+        for (const idx of selectedNumbers) {
+          await releaseNumbers.mutateAsync({
+            code: raffle.code,
+            idx
+          });
+        }
       } catch (error) {
         console.error('Error releasing numbers:', error);
       }
@@ -98,11 +101,16 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsProcessing(true);
     
     try {
-      await purchaseNumbers.mutateAsync({
-        code: raffle.code,
-        numbers: selectedNumbers,
-        paymentData: null
-      });
+      // Comprar cada número individualmente
+      for (const idx of selectedNumbers) {
+        await purchaseNumbers.mutateAsync({
+          code: raffle.code,
+          idx,
+          form: {
+            paymentMethod: PaymentMethod.FIRES // Pago con moneda virtual
+          }
+        });
+      }
       
       toast.success('¡Compra realizada exitosamente!');
       onSuccess();
@@ -151,12 +159,23 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         formData.append('proofImage', paymentData.proofImage);
       }
       
-      // Por ahora simular compra (el backend debe procesar el FormData)
-      await purchaseNumbers.mutateAsync({
-        code: raffle.code,
-        numbers: selectedNumbers,
-        paymentData: paymentData
-      });
+      // Comprar cada número con datos de pago
+      const form = {
+        buyerName: paymentData.fullName,
+        buyerDocument: paymentData.cedula,
+        buyerPhone: paymentData.phone,
+        buyerEmail: paymentData.email,
+        paymentMethod: paymentData.paymentMethod as PaymentMethod,
+        paymentReference: paymentData.referenceNumber
+      };
+      
+      for (const idx of selectedNumbers) {
+        await purchaseNumbers.mutateAsync({
+          code: raffle.code,
+          idx,
+          form
+        });
+      }
       
       toast.success('¡Solicitud enviada! El organizador revisará tu pago pronto');
       onSuccess();
