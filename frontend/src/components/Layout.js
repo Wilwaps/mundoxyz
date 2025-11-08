@@ -12,7 +12,8 @@ import {
   Store,
   Shield,
   Clock,
-  Settings
+  Settings,
+  Trophy
 } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 
@@ -55,6 +56,7 @@ const Layout = () => {
     { path: '/profile', icon: User, label: 'Perfil' },
     { path: '/lobby', icon: DoorOpen, label: 'Lobby' },
     { path: '/games', icon: Gamepad2, label: 'Juegos' },
+    { path: '/raffles', icon: Trophy, label: 'Rifas' },
     { path: '/market', icon: Store, label: 'Mercado' },
     { path: '/roles', icon: Shield, label: 'Rol' },
     { path: '/upcoming', icon: Clock, label: 'Próximo' }
