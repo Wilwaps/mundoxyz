@@ -863,23 +863,23 @@ router.post('/room/:code/leave', verifyToken, async (req, res) => {
       const updatedRoom = updatedResult.rows[0];
       
       if (updatedRoom.player_x_left && updatedRoom.player_o_left) {
-        // Ambos jugadores abandonaron - archivar sala
+        // Ambos jugadores abandonaron - cancelar sala
         await client.query(
           `UPDATE tictactoe_rooms 
-           SET archived_at = NOW() 
+           SET status = 'cancelled' 
            WHERE id = $1`,
           [room.id]
         );
         
-        logger.info('TicTacToe room archived (both players left)', {
+        logger.info('TicTacToe room cancelled (both players left)', {
           roomId: room.id,
           roomCode: code
         });
         
-        return { archived: true };
+        return { cancelled: true };
       }
       
-      return { archived: false };
+      return { cancelled: false };
     });
     
     res.json({
@@ -909,8 +909,6 @@ router.get('/rooms/public', optionalAuth, async (req, res) => {
       WHERE r.status = 'waiting'
         AND r.visibility = 'public'
         AND r.player_o_id IS NULL
-        AND r.expires_at > NOW()
-        AND r.archived_at IS NULL
     `;
     
     const params = [];
