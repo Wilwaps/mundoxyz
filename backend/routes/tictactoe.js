@@ -1008,6 +1008,187 @@ router.post('/room/:code/leave', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/tictactoe/rooms/:code/can-close - Verificar si usuario puede cerrar sala
+router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const userId = req.user.id;
+    const userRoles = req.user.roles || [];
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('tote');
+    
+    // Obtener sala
+    const roomResult = await query(
+      'SELECT * FROM tictactoe_rooms WHERE code = $1',
+      [code]
+    );
+    
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada' });
+    }
+    
+    const room = roomResult.rows[0];
+    
+    // Admin/tote siempre puede cerrar salas en waiting, ready o playing
+    if (isAdmin) {
+      if (['waiting', 'ready', 'playing'].includes(room.status)) {
+        return res.json({ allowed: true, isAdmin: true });
+      }
+      return res.json({ 
+        allowed: false, 
+        reason: 'Solo se pueden cerrar salas activas'
+      });
+    }
+    
+    // Host puede cerrar solo si está en waiting y no hay jugador O
+    if (room.host_id === userId) {
+      if (room.status === 'waiting' && !room.player_o_id) {
+        return res.json({ allowed: true, isAdmin: false });
+      }
+      return res.json({ 
+        allowed: false, 
+        reason: 'Solo puedes cerrar salas en espera sin invitado'
+      });
+    }
+    
+    return res.json({ allowed: false, reason: 'No tienes permisos' });
+    
+  } catch (error) {
+    logger.error('Error checking if can close room:', error);
+    res.status(500).json({ error: 'Error checking permissions' });
+  }
+});
+
+// DELETE /api/tictactoe/rooms/:code - Cerrar sala y reembolsar (admin/host)
+router.delete('/rooms/:code', verifyToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const userId = req.user.id;
+    const userRoles = req.user.roles || [];
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('tote');
+    
+    const result = await transaction(async (client) => {
+      // Obtener sala con lock
+      const roomResult = await client.query(
+        'SELECT * FROM tictactoe_rooms WHERE code = $1 FOR UPDATE',
+        [code]
+      );
+      
+      if (roomResult.rows.length === 0) {
+        throw new Error('Sala no encontrada');
+      }
+      
+      const room = roomResult.rows[0];
+      
+      // Verificar permisos
+      const canClose = isAdmin || 
+        (room.host_id === userId && room.status === 'waiting' && !room.player_o_id);
+      
+      if (!canClose) {
+        throw new Error('No tienes permisos para cerrar esta sala');
+      }
+      
+      // Verificar que sala esté en estado cerrable
+      if (!['waiting', 'ready', 'playing'].includes(room.status)) {
+        throw new Error('Esta sala no puede ser cerrada');
+      }
+      
+      // Reembolsar a los jugadores
+      let refundedCount = 0;
+      
+      if (room.bet_amount > 0) {
+        const currencyColumn = room.mode === 'coins' ? 'coins_balance' : 'fires_balance';
+        
+        // Reembolsar al host (player X)
+        if (room.player_x_id) {
+          await client.query(
+            `UPDATE wallets 
+             SET ${currencyColumn} = ${currencyColumn} + $1 
+             WHERE user_id = $2`,
+            [room.bet_amount, room.player_x_id]
+          );
+          
+          // Registrar transacción SOLO si es fires
+          if (room.mode === 'fires') {
+            await client.query(
+              `INSERT INTO wallet_transactions 
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
+               SELECT w.id, 'game_refund', 'fires', $1, 
+                      w.fires_balance - $1, w.fires_balance,
+                      'Reembolso TicTacToe - Sala cerrada por admin', $2
+               FROM wallets w WHERE w.user_id = $3`,
+              [room.bet_amount, `tictactoe:${room.code}`, room.player_x_id]
+            );
+          }
+          
+          refundedCount++;
+        }
+        
+        // Reembolsar al invitado (player O) si existe
+        if (room.player_o_id) {
+          await client.query(
+            `UPDATE wallets 
+             SET ${currencyColumn} = ${currencyColumn} + $1 
+             WHERE user_id = $2`,
+            [room.bet_amount, room.player_o_id]
+          );
+          
+          // Registrar transacción SOLO si es fires
+          if (room.mode === 'fires') {
+            await client.query(
+              `INSERT INTO wallet_transactions 
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
+               SELECT w.id, 'game_refund', 'fires', $1, 
+                      w.fires_balance - $1, w.fires_balance,
+                      'Reembolso TicTacToe - Sala cerrada por admin', $2
+               FROM wallets w WHERE w.user_id = $3`,
+              [room.bet_amount, `tictactoe:${room.code}`, room.player_o_id]
+            );
+          }
+          
+          refundedCount++;
+        }
+      }
+      
+      // Marcar sala como cancelada
+      await client.query(
+        `UPDATE tictactoe_rooms 
+         SET status = 'cancelled' 
+         WHERE id = $1`,
+        [room.id]
+      );
+      
+      const action = isAdmin ? 'Admin' : 'Host';
+      logger.info(`${action} closed TicTacToe room`, {
+        roomCode: code,
+        userId,
+        refundedPlayers: refundedCount,
+        betAmount: room.bet_amount,
+        mode: room.mode
+      });
+      
+      return { 
+        refundedCount,
+        betAmount: room.bet_amount,
+        mode: room.mode,
+        roomCode: code
+      };
+    });
+    
+    // Limpiar conexiones del socket
+    cleanupRoom(code);
+    
+    res.json({
+      success: true,
+      message: `Sala cerrada. ${result.refundedCount} jugador(es) reembolsados.`,
+      ...result
+    });
+    
+  } catch (error) {
+    logger.error('Error closing room:', error);
+    res.status(400).json({ error: error.message || 'Error cerrando sala' });
+  }
+});
+
 // GET /api/tictactoe/rooms/public - Listar salas públicas
 router.get('/rooms/public', optionalAuth, async (req, res) => {
   try {

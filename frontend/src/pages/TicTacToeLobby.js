@@ -103,6 +103,31 @@ const TicTacToeLobby = () => {
     }
   });
   
+  // Close room mutation (admin)
+  const closeRoomMutation = useMutation({
+    mutationFn: async (code) => {
+      const response = await axios.delete(`/api/tictactoe/rooms/${code}`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || 'Sala cerrada exitosamente');
+      refetch(); // Refrescar lista de salas
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al cerrar sala');
+    }
+  });
+  
+  const handleCloseRoom = async (room, e) => {
+    e.stopPropagation(); // Prevenir que se abra la sala al hacer clic en X
+    
+    if (!window.confirm(`¿Cerrar sala ${room.code}? Se reembolsará a los jugadores.`)) {
+      return;
+    }
+    
+    closeRoomMutation.mutate(room.code);
+  };
+  
   const handleCreateRoom = () => {
     if (!user) {
       toast.error('Debes iniciar sesión para crear una sala');
@@ -276,9 +301,21 @@ const TicTacToeLobby = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               whileHover={{ scale: 1.02 }}
-              className="card-glass p-4 cursor-pointer"
+              className="card-glass p-4 cursor-pointer relative"
               onClick={() => handleJoinRoom(room.code)}
             >
+              {/* Admin close button */}
+              {user && (user.roles?.includes('admin') || user.roles?.includes('tote')) && (
+                <button
+                  onClick={(e) => handleCloseRoom(room, e)}
+                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-error/80 hover:bg-error text-white transition-colors z-10"
+                  title="Cerrar sala (Admin)"
+                  disabled={closeRoomMutation.isPending}
+                >
+                  <X size={14} />
+                </button>
+              )}
+              
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <h3 className="font-bold text-lg text-text">
