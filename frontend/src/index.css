@@ -65,7 +65,18 @@
   }
 
   .xp-input {
-    @apply flex-1 text-center text-3xl font-bold bg-glass border-2 border-violet/50 rounded-lg px-4 py-3 text-text focus:border-violet focus:outline-none focus:ring-2 focus:ring-violet/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply flex-1 min-w-[120px] text-center text-3xl font-bold bg-glass border-2 border-violet/50 rounded-lg px-4 py-3 text-text focus:border-violet focus:outline-none focus:ring-2 focus:ring-violet/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Ocultar flechas del input number */
+  .xp-input::-webkit-outer-spin-button,
+  .xp-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  
+  .xp-input[type=number] {
+    -moz-appearance: textfield;
   }
 
   .btn-disabled {
