@@ -85,3 +85,6 @@ Tokengithub*.txt
 *.secrets.json
 *-token.txt
 *-token.json
+
+# Documentación local (no subir a GitHub)
+Documentacion rifa/

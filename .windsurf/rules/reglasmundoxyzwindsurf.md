@@ -3,7 +3,8 @@ trigger: always_on
 ---
 
 RAILWAY NO TIENE QUERY!!
-
+https://railway.com/project/9ed64502-9a9f-4129-8cb5-00a50f074995/service/68a15835-82a9-4897-ad6f-fa55a2ec9326?environmentId=dc0d6ff4-7c00-435c-89d8-d6433b4f598d
+Esta es la direccion del proyecto para analizarlo con chromedevtools
 
 te daré la ubicacion postgres y railway
 DATABASE_PUBLIC_URL

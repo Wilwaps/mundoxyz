@@ -41,8 +41,8 @@ const Layout = () => {
       return response.data;
     },
     enabled: !!user,
-    refetchInterval: 3000, // Refetch cada 3 segundos
-    staleTime: 0
+    refetchInterval: 30000, // Refetch cada 30 segundos (antes: 3000ms causaba parpadeo agresivo)
+    staleTime: 10000 // Cache por 10s para reducir requests innecesarios
   });
 
   const displayCoins = parseFloat(balanceData?.coins_balance ?? user?.coins_balance ?? 0);
