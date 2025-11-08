@@ -4,8 +4,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useSocket } from '../../../contexts/SocketContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import * as api from '../api';
 import {
   RaffleFilters,
@@ -271,6 +273,8 @@ export const useUserNumbers = (code: string) => {
  */
 export const useRaffle = (code: string) => {
   const queryClient = useQueryClient();
+  const { socket, connected } = useSocket();
+  const { user } = useAuth();
   
   // Queries
   const raffleQuery = useRaffleDetail(code);
@@ -295,6 +299,93 @@ export const useRaffle = (code: string) => {
     },
     [userNumbersQuery.data]
   );
+  
+  // WebSocket: Unirse a sala y escuchar eventos
+  useEffect(() => {
+    if (!socket || !connected || !code || !user) return;
+    
+    // Unirse a la sala de la rifa
+    socket.emit('raffle:join', { raffleCode: code });
+    
+    // Escuchar eventos de actualización
+    const handleStateUpdate = (data: any) => {
+      if (data.raffle) {
+        queryClient.setQueryData(RAFFLE_QUERY_KEYS.detail(code), { 
+          raffle: data.raffle, 
+          stats: {
+            participants: data.raffle.participants,
+            soldNumbers: data.raffle.soldNumbers,
+            reservedNumbers: data.raffle.reservedNumbers
+          }
+        });
+      }
+      
+      if (data.numbers) {
+        queryClient.setQueryData(RAFFLE_QUERY_KEYS.numbers(code), data.numbers);
+      }
+    };
+    
+    const handleNumberReserved = (data: any) => {
+      if (data.raffleCode === code) {
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+      }
+    };
+    
+    const handleNumberPurchased = (data: any) => {
+      if (data.raffleCode === code) {
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        
+        // Mostrar notificación si no es el usuario actual
+        if (data.userId !== user.id) {
+          toast(`Número ${data.numberIdx} vendido`, { icon: '🎫' });
+        }
+      }
+    };
+    
+    const handleNumberReleased = (data: any) => {
+      if (data.raffleCode === code) {
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+      }
+    };
+    
+    const handleStatusChanged = (data: any) => {
+      if (data.raffleCode === code) {
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        toast(`Estado de rifa cambiado a: ${data.newStatus}`, { icon: '📢' });
+      }
+    };
+    
+    const handleWinnerDrawn = (data: any) => {
+      if (data.raffleCode === code) {
+        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        if (data.winnerId === user.id) {
+          toast.success('¡FELICIDADES! ¡Has ganado la rifa!', { duration: 10000 });
+        } else {
+          toast(`Número ganador: ${data.winningNumber}`, { icon: '🎉' });
+        }
+      }
+    };
+    
+    // Registrar event listeners
+    socket.on('raffle:state_update', handleStateUpdate);
+    socket.on('raffle:number_reserved', handleNumberReserved);
+    socket.on('raffle:number_purchased', handleNumberPurchased);
+    socket.on('raffle:number_released', handleNumberReleased);
+    socket.on('raffle:status_changed', handleStatusChanged);
+    socket.on('raffle:winner_drawn', handleWinnerDrawn);
+    
+    // Cleanup
+    return () => {
+      socket.emit('raffle:leave', { raffleCode: code });
+      socket.off('raffle:state_update', handleStateUpdate);
+      socket.off('raffle:number_reserved', handleNumberReserved);
+      socket.off('raffle:number_purchased', handleNumberPurchased);
+      socket.off('raffle:number_released', handleNumberReleased);
+      socket.off('raffle:status_changed', handleStatusChanged);
+      socket.off('raffle:winner_drawn', handleWinnerDrawn);
+    };
+  }, [socket, connected, code, user, queryClient]);
   
   return {
     // Data

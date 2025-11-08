@@ -607,7 +607,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-dark rounded-2xl shadow-2xl z-50 overflow-hidden"
+            className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:transform md:-translate-x-1/2 md:-translate-y-1/2 w-auto md:w-full md:max-w-md bg-dark rounded-2xl shadow-2xl z-50 flex flex-col md:max-h-[90vh]"
           >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">
@@ -639,7 +639,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             </div>
             
             {/* Content */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="flex-1 p-6 overflow-y-auto min-h-0">
               {renderStepContent()}
             </div>
             

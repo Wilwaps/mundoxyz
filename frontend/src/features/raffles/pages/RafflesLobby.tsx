@@ -3,7 +3,7 @@
  * Página principal con lista de rifas públicas
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -41,7 +41,7 @@ const RafflesLobby: React.FC = () => {
     sortOrder: 'desc'
   });
   
-  // Query de rifas con valores por defecto
+  // Query de rifas con valores por defecto y auto-refresh
   const {
     data = { raffles: [], total: 0, page: 1, totalPages: 1 },
     isLoading,
@@ -58,13 +58,23 @@ const RafflesLobby: React.FC = () => {
     applyFilters();
   }, [applyFilters]);
   
-  // Estadísticas globales (mock por ahora)
-  const stats = {
-    totalRaffles: data?.total || 0,
-    totalParticipants: 2458,
-    totalPotFires: 125840,
-    totalPotCoins: 89320
-  };
+  // Estadísticas globales calculadas en tiempo real
+  const stats = useMemo(() => {
+    const raffles = data?.raffles || [];
+    const totalParticipants = raffles.reduce((sum: number, raffle: any) => 
+      sum + (raffle.participants || 0), 0);
+    const totalPotFires = raffles.reduce((sum: number, raffle: any) => 
+      sum + (parseFloat(raffle.pot_fires || 0)), 0);
+    const totalPotCoins = raffles.reduce((sum: number, raffle: any) => 
+      sum + (parseFloat(raffle.pot_coins || 0)), 0);
+    
+    return {
+      totalRaffles: data?.total || 0,
+      totalParticipants,
+      totalPotFires,
+      totalPotCoins
+    };
+  }, [data]);
   
   return (
     <motion.div

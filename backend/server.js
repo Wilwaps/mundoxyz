@@ -70,9 +70,16 @@ const io = new Server(server, {
 const handleBingoV2Socket = require('./socket/bingoV2');
 handleBingoV2Socket(io);
 
+// Initialize Raffle V2 Socket handler
+const RaffleSocketHandler = require('./modules/raffles/socket/events');
+const raffleSocketHandler = new RaffleSocketHandler(io);
+
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
+  
+  // Get userId from socket handshake
+  const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
   
   // Initialize TicTacToe socket handlers
   const { initTicTacToeSocket } = require('./socket/tictactoe');
@@ -89,6 +96,10 @@ io.on('connection', (socket) => {
   roomChatHandler(io, socket);
   ronChatHandler(io, socket);
   
+  // Initialize Raffle socket handlers
+  if (userId) {
+    raffleSocketHandler.handleConnection(socket, userId);
+  }
   
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);

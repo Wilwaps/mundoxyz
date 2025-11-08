@@ -18,11 +18,12 @@ export const RAFFLE_LIMITS = {
   COMMISSION_RATE: 0.05, // 5% comisión plataforma
 } as const;
 
-// Intervalos de sincronización
+// Intervalos de sincronización (en ms)
 export const SYNC_INTERVALS = {
-  RAFFLE_REFETCH: 5000, // 5 segundos
-  NUMBERS_REFETCH: 3000, // 3 segundos
-  STATS_REFETCH: 10000, // 10 segundos
+  RAFFLE_REFETCH: 10000,   // 10 segundos para rifas activas
+  NUMBERS_REFETCH: 5000,   // 5 segundos para números
+  STATS_REFETCH: 15000,    // 15 segundos para estadísticas
+  RESERVATION_CHECK: 5000,  // 5 segundos
 } as const;
 
 // Query Keys para React Query
