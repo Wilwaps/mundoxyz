@@ -27,8 +27,7 @@ export const useRaffleList = (filters?: RaffleFilters) => {
     queryKey: RAFFLE_QUERY_KEYS.list(filters),
     queryFn: () => api.getRaffles(filters),
     refetchInterval: SYNC_INTERVALS.RAFFLE_REFETCH,
-    staleTime: 30000, // 30 segundos
-    keepPreviousData: true
+    staleTime: 30000 // 30 segundos
   });
 };
 
@@ -43,14 +42,7 @@ export const useRaffleDetail = (code: string, enabled = true) => {
     queryFn: () => api.getRaffleDetail(code),
     enabled: enabled && !!code,
     refetchInterval: SYNC_INTERVALS.RAFFLE_REFETCH,
-    staleTime: 10000,
-    onSuccess: (data) => {
-      // Actualizar cache de números también
-      queryClient.setQueryData(
-        RAFFLE_QUERY_KEYS.numbers(code),
-        data.numbers
-      );
-    }
+    staleTime: 10000
   });
 };
 
@@ -77,10 +69,10 @@ export const useCreateRaffle = () => {
     mutationFn: (data: CreateRaffleForm) => api.createRaffle(data),
     onSuccess: (raffle) => {
       // Invalidar lista de rifas
-      queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.lists());
+      queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.lists() });
       
       // Invalidar rifas del usuario
-      queryClient.invalidateQueries(['user-raffles']);
+      queryClient.invalidateQueries({ queryKey: ['user', 'raffles'] });
       
       toast.success(UI_TEXTS.SUCCESS.RAFFLE_CREATED);
       
@@ -113,7 +105,7 @@ export const useUpdateRaffle = () => {
       );
       
       // Invalidar lista
-      queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.lists());
+      queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.lists() });
       
       toast.success(UI_TEXTS.SUCCESS.RAFFLE_UPDATED);
     },
@@ -143,7 +135,7 @@ export const useCancelRaffle = () => {
       );
       
       // Invalidar lista
-      queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.lists());
+      queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.lists() });
       
       toast.success(UI_TEXTS.SUCCESS.RAFFLE_CANCELLED);
     },
@@ -165,14 +157,14 @@ export const useReserveNumber = () => {
       api.reserveNumber(code, idx),
     onSuccess: (data, variables) => {
       // Invalidar números inmediatamente
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.numbers(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.numbers(variables.code)
+      });
       
       // También invalidar detalle de rifa
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.detail(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.detail(variables.code)
+      });
       
       toast.success(UI_TEXTS.SUCCESS.NUMBER_RESERVED);
     },
@@ -194,14 +186,14 @@ export const useReleaseNumber = () => {
       api.releaseNumber(code, idx),
     onSuccess: (_, variables) => {
       // Invalidar números inmediatamente
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.numbers(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.numbers(variables.code)
+      });
       
       // También invalidar detalle de rifa
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.detail(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.detail(variables.code)
+      });
     },
     onError: (error: any) => {
       // No mostrar toast en release, es silencioso
@@ -228,17 +220,17 @@ export const usePurchaseNumber = () => {
     }) => api.purchaseNumber(code, idx, form),
     onSuccess: (data, variables) => {
       // Invalidar números
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.numbers(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.numbers(variables.code)
+      });
       
       // Invalidar detalle de rifa
-      queryClient.invalidateQueries(
-        RAFFLE_QUERY_KEYS.detail(variables.code)
-      );
+      queryClient.invalidateQueries({
+        queryKey: RAFFLE_QUERY_KEYS.detail(variables.code)
+      });
       
       // Invalidar balance del usuario
-      queryClient.invalidateQueries(['user', 'balance']);
+      queryClient.invalidateQueries({ queryKey: ['user', 'balance'] });
       
       toast.success(UI_TEXTS.SUCCESS.PURCHASE_COMPLETED);
     },
@@ -292,8 +284,8 @@ export const useRaffle = (code: string) => {
   
   // Función para forzar actualización
   const forceRefresh = useCallback(() => {
-    queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.detail(code));
-    queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.numbers(code));
+    queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+    queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
   }, [queryClient, code]);
   
   // Función para verificar si un número pertenece al usuario
@@ -329,9 +321,9 @@ export const useRaffle = (code: string) => {
     isUserNumber,
     
     // Estados de mutaciones
-    isReserving: reserveNumber.isLoading,
-    isReleasing: releaseNumber.isLoading,
-    isPurchasing: purchaseNumber.isLoading
+    isReserving: reserveNumber.isPending,
+    isReleasing: releaseNumber.isPending,
+    isPurchasing: purchaseNumber.isPending
   };
 };
 
@@ -360,7 +352,7 @@ export const useRaffleFilters = (initialFilters?: RaffleFilters) => {
   
   // Aplicar filtros (invalida queries)
   const applyFilters = useCallback(() => {
-    queryClient.invalidateQueries(RAFFLE_QUERY_KEYS.list(filters));
+    queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.list(filters) });
   }, [queryClient, filters]);
   
   return {

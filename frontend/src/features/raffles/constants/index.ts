@@ -96,6 +96,7 @@ export const UI_TEXTS = {
     NUMBER_UNAVAILABLE: 'Este número ya no está disponible',
     RESERVATION_EXPIRED: 'Tu reserva ha expirado',
     MAX_NUMBERS_REACHED: 'Has alcanzado el límite de números',
+    PAYMENT_FAILED: 'Error al procesar el pago',
   },
   SUCCESS: {
     RAFFLE_CREATED: 'Rifa creada exitosamente',
