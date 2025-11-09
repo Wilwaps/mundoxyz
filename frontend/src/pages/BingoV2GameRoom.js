@@ -108,14 +108,23 @@ const BingoV2GameRoom = () => {
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
       const data = await response.json();
       
+      console.log('🎰 Room data received:', data);
+      
       if (data.success) {
         setRoom(data.room);
         setDrawnNumbers(data.room.drawn_numbers || []);
         
         // Get my cards
         const myPlayer = data.room.players?.find(p => p.user_id === user?.id);
+        console.log('🎟️ My player data:', myPlayer);
+        console.log('🎟️ My cards:', myPlayer?.cards);
+        
         if (myPlayer) {
-          setMyCards(myPlayer.cards || []);
+          const cards = myPlayer.cards || [];
+          console.log('🎟️ Setting cards:', cards);
+          setMyCards(cards);
+        } else {
+          console.warn('⚠️ Player not found in room');
         }
       }
     } catch (err) {

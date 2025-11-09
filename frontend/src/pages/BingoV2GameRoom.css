@@ -157,7 +157,7 @@
 .floating-board-btn {
   position: fixed;
   bottom: 90px; /* Subido para no solapar con footer (60px) + margen (30px) */
-  right: 20px;
+  left: 20px; /* Movido a la izquierda para no solapar con el chat */
   width: 60px;
   height: 60px;
   border-radius: 50%;
