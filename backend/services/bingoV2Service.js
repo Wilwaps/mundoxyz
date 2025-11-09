@@ -113,6 +113,15 @@ class BingoV2Service {
       
       room.code = roomCode;
 
+      // CRITICAL FIX: Añadir al host automáticamente a room_players con 0 cartones
+      // Esto permite que el host pueda usar update-cards para comprar sus cartones
+      await dbQuery(
+        `INSERT INTO bingo_v2_room_players (room_id, user_id, cards_purchased, total_spent)
+         VALUES ($1, $2, 0, 0)
+         ON CONFLICT (room_id, user_id) DO NOTHING`,
+        [room.id, hostId]
+      );
+
       // Log the creation
       await dbQuery(
         `INSERT INTO bingo_v2_audit_logs (room_id, user_id, action, details)
@@ -120,7 +129,7 @@ class BingoV2Service {
         [room.id, hostId, 'room_created', { config, autoCallEnabled, userXP: limits.userXP, code: roomCode }]
       );
       
-      logger.info('🎰 Bingo sala creada con código unificado', {
+      logger.info('🎰 Bingo sala creada con código unificado (host auto-añadido)', {
         roomId: room.id,
         code: roomCode,
         hostId
