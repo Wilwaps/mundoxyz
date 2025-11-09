@@ -262,7 +262,7 @@ const searchFiltersSchema = Joi.object({
   minPot: Joi.number().positive().optional(),
   maxPot: Joi.number().positive().greater(Joi.ref('minPot')).optional(),
   
-  search: Joi.string().max(100).optional(),
+  search: Joi.string().max(100).allow('').optional(),
   
   sortBy: Joi.string()
     .valid('created', 'ending', 'pot', 'sold')
