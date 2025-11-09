@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import BingoV2Card from '../components/bingo/BingoV2Card';
-import BingoV2Chat from '../components/bingo/BingoV2Chat';
 import { Clock, LogOut, Repeat } from 'lucide-react';
 import API_URL from '../config/api';
 import './BingoV2GameRoom.css';
@@ -541,10 +540,6 @@ const BingoV2GameRoom = () => {
             ))}
           </div>
         </div>
-
-
-        {/* Chat Section */}
-        <BingoV2Chat roomCode={code} userId={user?.id} />
       </div>
 
       {/* Floating Buttons */}
