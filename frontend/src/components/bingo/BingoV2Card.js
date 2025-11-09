@@ -80,30 +80,50 @@ const BingoV2Card = ({
   };
 
   const renderCell = (cell, row, col) => {
-    if (!cell) return null;
-    
-    const value = cell.value;
     const posKey = `${row},${col}`;
-    const isHighlighted = highlightedNumbers.has(posKey) || value === 'FREE';
-    const isMarked = markedPositions.has(posKey);
     
-    // For 90-ball empty cells
-    if (value === null) {
+    // ✅ CRITICAL: Si cell no existe, crear celda vacía por defecto
+    if (!cell) {
+      console.warn(`⚠️ No cell data for ${posKey}, creating empty cell`);
       return (
         <div 
           key={posKey}
           className="bingo-cell empty"
-        />
+          style={{ minHeight: '35px', minWidth: '35px' }}
+        >
+          &nbsp;
+        </div>
       );
     }
     
+    const value = cell.value;
+    const isHighlighted = highlightedNumbers.has(posKey) || value === 'FREE';
+    const isMarked = markedPositions.has(posKey);
+    
+    // For 90-ball empty cells (value === null)
+    if (value === null || value === undefined) {
+      return (
+        <div 
+          key={posKey}
+          className="bingo-cell empty"
+          style={{ minHeight: '35px', minWidth: '35px' }}
+        >
+          &nbsp;
+        </div>
+      );
+    }
+    
+    // For cells with numbers
     return (
       <div
         key={posKey}
         className={`bingo-cell ${isHighlighted ? 'highlighted' : ''} ${isMarked ? 'marked' : ''} ${value === 'FREE' ? 'free' : ''}`}
         onClick={() => handleCellClick(row, col, value)}
+        style={{ minHeight: '35px', minWidth: '35px' }}
       >
-        {value === 'FREE' ? 'FREE' : value}
+        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+          {value === 'FREE' ? 'FREE' : value}
+        </span>
         {isMarked && <span className="mark">✓</span>}
       </div>
     );
