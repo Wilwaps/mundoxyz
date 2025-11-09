@@ -87,8 +87,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: #ffffff;
+  border: 2px solid #dee2e6;
   font-weight: bold;
   font-size: 1.1rem;
   cursor: pointer;
@@ -97,9 +97,7 @@
   user-select: none;
   min-height: 40px;
   min-width: 40px;
-  color: #333;
-  opacity: 1;
-  visibility: visible;
+  color: #000;
 }
 
 .bingo-cell:hover:not(.empty):not(.marked) {
@@ -129,9 +127,10 @@
 }
 
 .bingo-cell.marked {
-  background: #28a745;
-  color: white;
-  border-color: #1e7e34;
+  background: #d4edda;
+  color: #000;
+  border-color: #28a745;
+  border-width: 3px;
 }
 
 .bingo-cell.free {
@@ -142,12 +141,10 @@
 }
 
 .bingo-cell.empty {
-  background: #e9ecef;
+  background: #f8f9fa;
   cursor: default;
-  min-height: 35px !important;
-  min-width: 35px !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+  border-color: #e9ecef;
+  opacity: 0.5;
 }
 
 .mark {
@@ -156,8 +153,9 @@
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 2rem;
-  color: white;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  color: #28a745;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
   pointer-events: none;
 }
 
@@ -175,20 +173,13 @@
 }
 
 .bingo-card-90 .bingo-cell {
-  aspect-ratio: 1 !important;  /* ✅ FIX: Forzar aspecto cuadrado igual que 75-ball */
-  min-height: 45px !important; /* Aumentado para mayor visibilidad */
-  min-width: 45px !important;
-  max-height: 60px;
-  max-width: 60px;
-  font-size: 1rem !important; /* Aumentado para mejor legibilidad */
-  padding: 4px !important; /* Aumentado padding */
-  font-weight: bold !important;
-  color: #333 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+  aspect-ratio: 1;
+  min-height: 40px;
+  min-width: 40px;
+  font-size: 0.95rem;
+  padding: 2px;
+  font-weight: bold;
+  color: #000;
 }
 
 /* Responsive adjustments */
@@ -201,11 +192,11 @@
     font-size: 0.9rem;
   }
   
-  /* ✅ Ajuste específico para 90-ball en mobile */
+  /* Ajuste específico para 90-ball en mobile */
   .bingo-card-90 .bingo-cell {
-    font-size: 0.7rem;
-    min-height: 28px;
-    padding: 1px;
+    font-size: 0.75rem;
+    min-height: 32px;
+    min-width: 32px;
   }
 
   .header-cell {

@@ -82,14 +82,12 @@ const BingoV2Card = ({
   const renderCell = (cell, row, col) => {
     const posKey = `${row},${col}`;
     
-    // ✅ CRITICAL: Si cell no existe, crear celda vacía por defecto
-    if (!cell) {
-      console.warn(`⚠️ No cell data for ${posKey}, creating empty cell`);
+    // Si cell no existe o value es null/undefined, renderizar celda vacía
+    if (!cell || cell.value === null || cell.value === undefined) {
       return (
         <div 
           key={posKey}
           className="bingo-cell empty"
-          style={{ minHeight: '35px', minWidth: '35px' }}
         >
           &nbsp;
         </div>
@@ -100,30 +98,14 @@ const BingoV2Card = ({
     const isHighlighted = highlightedNumbers.has(posKey) || value === 'FREE';
     const isMarked = markedPositions.has(posKey);
     
-    // For 90-ball empty cells (value === null)
-    if (value === null || value === undefined) {
-      return (
-        <div 
-          key={posKey}
-          className="bingo-cell empty"
-          style={{ minHeight: '35px', minWidth: '35px' }}
-        >
-          &nbsp;
-        </div>
-      );
-    }
-    
-    // For cells with numbers
+    // Celda con número o FREE
     return (
       <div
         key={posKey}
         className={`bingo-cell ${isHighlighted ? 'highlighted' : ''} ${isMarked ? 'marked' : ''} ${value === 'FREE' ? 'free' : ''}`}
         onClick={() => handleCellClick(row, col, value)}
-        style={{ minHeight: '35px', minWidth: '35px' }}
       >
-        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
-          {value === 'FREE' ? 'FREE' : value}
-        </span>
+        {value === 'FREE' ? 'FREE' : value}
         {isMarked && <span className="mark">✓</span>}
       </div>
     );
@@ -151,40 +133,18 @@ const BingoV2Card = ({
   };
 
   const render90BallCard = () => {
-    // DEBUG: Log completo del grid
-    console.log('🎰 Rendering 90-ball card:', {
-      cardId: card.id,
-      hasGrid: !!card.grid,
-      gridType: typeof card.grid,
-      isArray: Array.isArray(card.grid),
-      gridLength: card.grid?.length,
-      grid: card.grid,
-      firstRow: card.grid?.[0],
-      firstCell: card.grid?.[0]?.[0]
-    });
-    
     if (!card.grid || !Array.isArray(card.grid)) {
-      console.error('❌ Invalid grid for 90-ball card:', card);
       return <div className="error">Error: Grid no válido</div>;
     }
     
     return (
       <div className="bingo-card-90">
         <div className="card-grid">
-          {card.grid.map((row, rowIdx) => {
-            console.log(`Row ${rowIdx}:`, row);
-            return (
-              <div key={rowIdx} className="card-row">
-                {row.map((cell, colIdx) => {
-                  const rendered = renderCell(cell, rowIdx, colIdx);
-                  if (!rendered) {
-                    console.warn(`Cell ${rowIdx},${colIdx} returned null:`, cell);
-                  }
-                  return rendered;
-                })}
-              </div>
-            );
-          })}
+          {card.grid.map((row, rowIdx) => (
+            <div key={rowIdx} className="card-row">
+              {row.map((cell, colIdx) => renderCell(cell, rowIdx, colIdx))}
+            </div>
+          ))}
         </div>
       </div>
     );

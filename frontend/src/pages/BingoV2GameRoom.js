@@ -126,26 +126,27 @@ const BingoV2GameRoom = () => {
         
         if (myPlayer) {
           const cards = myPlayer.cards || [];
-          console.log('🎟️ Setting cards:', cards);
           
-          // DEBUG: Log detallado de cada cartón
-          cards.forEach((card, idx) => {
-            console.log(`📋 Card ${idx + 1}:`, {
-              id: card.id,
-              cardNumber: card.card_number,
-              hasGrid: !!card.grid,
-              gridType: typeof card.grid,
-              isArray: Array.isArray(card.grid),
-              gridLength: card.grid?.length,
-              firstRow: card.grid?.[0],
-              firstCell: card.grid?.[0]?.[0],
-              rawGrid: card.grid
-            });
+          // Parsear grid si llega como string
+          const parsedCards = cards.map(card => {
+            let parsedGrid = card.grid;
+            
+            if (typeof card.grid === 'string') {
+              try {
+                parsedGrid = JSON.parse(card.grid);
+              } catch (e) {
+                console.error(`Error parsing grid for card ${card.id}:`, e);
+                parsedGrid = null;
+              }
+            }
+            
+            return {
+              ...card,
+              grid: parsedGrid
+            };
           });
           
-          setMyCards(cards);
-        } else {
-          console.warn('⚠️ Player not found in room');
+          setMyCards(parsedCards);
         }
       }
     } catch (err) {
