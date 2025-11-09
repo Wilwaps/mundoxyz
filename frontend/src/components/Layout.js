@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
+import FiresHistoryModal from './FiresHistoryModal';
 
 const Layout = () => {
   const { user, isAdmin, updateUser } = useAuth();
@@ -25,6 +26,7 @@ const Layout = () => {
   const [showBalanceTooltip, setShowBalanceTooltip] = useState(false);
   const [showExperienceModal, setShowExperienceModal] = useState(false);
   const [showBuyExperienceModal, setShowBuyExperienceModal] = useState(false);
+  const [showFiresHistoryModal, setShowFiresHistoryModal] = useState(false);
 
   // Fetch balance en tiempo real
   const { data: balanceData } = useQuery({
@@ -103,7 +105,7 @@ const Layout = () => {
               </div>
               <div 
                 className="badge-fire cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => navigate('/profile?tab=fires')}
+                onClick={() => setShowFiresHistoryModal(true)}
                 title="Ver historial de fuegos"
               >
                 <span className="text-sm">🔥</span>
@@ -155,6 +157,12 @@ const Layout = () => {
         isOpen={showBuyExperienceModal}
         onClose={() => setShowBuyExperienceModal(false)}
         user={user}
+      />
+
+      {/* Fires History Modal */}
+      <FiresHistoryModal 
+        isOpen={showFiresHistoryModal}
+        onClose={() => setShowFiresHistoryModal(false)}
       />
 
       {/* Unified Chat System */}

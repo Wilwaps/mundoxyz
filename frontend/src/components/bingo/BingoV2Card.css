@@ -148,10 +148,12 @@
 }
 
 .bingo-cell.empty {
-  background: #f8f9fa;
-  cursor: default;
-  border-color: #e9ecef;
-  opacity: 0.5;
+  background: #e9ecef !important;
+  cursor: default !important;
+  border-color: #ced4da !important;
+  opacity: 1 !important;
+  min-height: 40px !important;
+  min-width: 40px !important;
 }
 
 .mark {
