@@ -1719,6 +1719,13 @@ class BingoV2Service {
         [roomId]
       );
       
+      // 6.5. ✅ CRITICAL: Delete drawn numbers from previous round
+      await dbQuery(
+        `DELETE FROM bingo_v2_draws WHERE room_id = $1`,
+        [roomId]
+      );
+      logger.info(`🗑️ Deleted drawn numbers for room ${roomId}`);
+      
       // 7. Reset cards_purchased to 0
       await dbQuery(
         `UPDATE bingo_v2_room_players

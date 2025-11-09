@@ -29,8 +29,9 @@ async function validateUserInRoom(roomType, roomCode, userId) {
           JOIN bingo_v2_rooms r ON p.room_id = r.id
           WHERE r.code = $1 
           AND p.user_id = $2
-          AND p.is_connected = TRUE
         `;
+        // REMOVED: AND p.is_connected = TRUE
+        // Reason: Race condition - chat joins before bingo:join_room completes
         break;
         
       case 'raffle':
