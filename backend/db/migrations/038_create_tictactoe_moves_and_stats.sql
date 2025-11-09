@@ -1,26 +1,68 @@
--- Migración 038: Crear tablas tictactoe_moves y tictactoe_stats
--- Propósito: El código backend usa estas tablas pero nunca fueron creadas en Railway
+-- Migración 038: Actualizar schema de tictactoe_moves y crear tictactoe_stats
+-- Propósito: Añadir columnas faltantes (row, col, move_number) a tabla existente
 -- Fecha: 2025-11-08
 
 BEGIN;
 
 -- ================================================
--- 1. TABLA: tictactoe_moves (Historial de movimientos)
+-- 1. TABLA: tictactoe_moves - Añadir columnas faltantes
 -- ================================================
+
+-- Crear tabla base si no existe (por si acaso)
 CREATE TABLE IF NOT EXISTS tictactoe_moves (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID NOT NULL REFERENCES tictactoe_rooms(id) ON DELETE CASCADE,
   player_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   symbol VARCHAR(1) NOT NULL CHECK (symbol IN ('X', 'O')),
-  row INTEGER NOT NULL CHECK (row >= 0 AND row <= 2),
-  col INTEGER NOT NULL CHECK (col >= 0 AND col <= 2),
-  move_number INTEGER NOT NULL CHECK (move_number > 0 AND move_number <= 9),
-  created_at TIMESTAMP DEFAULT NOW(),
-  
-  -- Constraint: un movimiento por posición por sala
-  CONSTRAINT unique_move_position UNIQUE (room_id, row, col)
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Añadir columnas faltantes si no existen
+DO $$
+BEGIN
+  -- Añadir columna row si no existe
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_moves' AND column_name = 'row'
+  ) THEN
+    ALTER TABLE tictactoe_moves 
+    ADD COLUMN row INTEGER CHECK (row >= 0 AND row <= 2);
+    RAISE NOTICE 'Columna row añadida a tictactoe_moves';
+  END IF;
+  
+  -- Añadir columna col si no existe
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_moves' AND column_name = 'col'
+  ) THEN
+    ALTER TABLE tictactoe_moves 
+    ADD COLUMN col INTEGER CHECK (col >= 0 AND col <= 2);
+    RAISE NOTICE 'Columna col añadida a tictactoe_moves';
+  END IF;
+  
+  -- Añadir columna move_number si no existe
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_moves' AND column_name = 'move_number'
+  ) THEN
+    ALTER TABLE tictactoe_moves 
+    ADD COLUMN move_number INTEGER CHECK (move_number > 0 AND move_number <= 9);
+    RAISE NOTICE 'Columna move_number añadida a tictactoe_moves';
+  END IF;
+END $$;
+
+-- Añadir constraint único si no existe (puede fallar si ya existe, ignoramos)
+DO $$
+BEGIN
+  ALTER TABLE tictactoe_moves 
+  ADD CONSTRAINT unique_move_position UNIQUE (room_id, row, col);
+  RAISE NOTICE 'Constraint unique_move_position añadido';
+EXCEPTION
+  WHEN duplicate_object THEN
+    RAISE NOTICE 'Constraint unique_move_position ya existe';
+END $$;
+
+-- Crear índices (IF NOT EXISTS los hace seguros)
 CREATE INDEX IF NOT EXISTS idx_tictactoe_moves_room ON tictactoe_moves(room_id, move_number);
 CREATE INDEX IF NOT EXISTS idx_tictactoe_moves_player ON tictactoe_moves(player_id);
 CREATE INDEX IF NOT EXISTS idx_tictactoe_moves_created ON tictactoe_moves(created_at DESC);
