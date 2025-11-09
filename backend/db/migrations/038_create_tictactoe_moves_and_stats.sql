@@ -49,6 +49,15 @@ BEGIN
     ADD COLUMN move_number INTEGER CHECK (move_number > 0 AND move_number <= 9);
     RAISE NOTICE 'Columna move_number añadida a tictactoe_moves';
   END IF;
+  
+  -- Hacer columna position NULLABLE si existe (columna legacy no usada)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tictactoe_moves' AND column_name = 'position' AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE tictactoe_moves ALTER COLUMN position DROP NOT NULL;
+    RAISE NOTICE 'Columna position cambiada a NULLABLE (legacy, no usada)';
+  END IF;
 END $$;
 
 -- Añadir constraint único si no existe (puede fallar si ya existe, ignoramos)
