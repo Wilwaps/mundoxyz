@@ -577,7 +577,9 @@ class RaffleServiceV2 {
         contactEmail: raffle.contact_email,
         contactPhone: raffle.contact_phone
       } : null,
-      prizeMeta: raffle.prize_meta ? JSON.parse(raffle.prize_meta) : null,
+      prizeMeta: raffle.prize_meta 
+        ? (typeof raffle.prize_meta === 'string' ? JSON.parse(raffle.prize_meta) : raffle.prize_meta)
+        : null,
       termsConditions: raffle.terms_conditions
     };
   }
