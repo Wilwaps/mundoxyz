@@ -14,6 +14,7 @@ const UnifiedChat = () => {
   const [activeTab, setActiveTab] = useState('global');
   const [showRoomTab, setShowRoomTab] = useState(false);
   const [currentRoom, setCurrentRoom] = useState(null);
+  const [hasOpenedInRoom, setHasOpenedInRoom] = useState(false);
   
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -28,7 +29,8 @@ const UnifiedChat = () => {
     if (tttMatch) {
       setCurrentRoom({ type: 'tictactoe', code: tttMatch[1] });
       setShowRoomTab(true);
-      if (isOpen) setActiveTab('room');
+      // ✅ Solo cambiar a 'room' si la pestaña actual no está definida o es diferente a las disponibles
+      // Esto permite al usuario cambiar libremente entre pestañas
       return;
     }
     
@@ -37,7 +39,8 @@ const UnifiedChat = () => {
     if (bingoMatch) {
       setCurrentRoom({ type: 'bingo', code: bingoMatch[2] });
       setShowRoomTab(true);
-      if (isOpen) setActiveTab('room');
+      // ✅ Solo cambiar a 'room' si la pestaña actual no está definida o es diferente a las disponibles
+      // Esto permite al usuario cambiar libremente entre pestañas
       return;
     }
     
@@ -49,7 +52,20 @@ const UnifiedChat = () => {
       }
     }
     setCurrentRoom(null);
-  }, [location.pathname, isOpen, showRoomTab, activeTab]);
+  }, [location.pathname, showRoomTab, activeTab]);
+
+  // Cambiar a pestaña 'room' solo cuando se ABRE el chat estando en una sala
+  useEffect(() => {
+    if (isOpen && showRoomTab && !hasOpenedInRoom) {
+      setActiveTab('room');
+      setHasOpenedInRoom(true);
+    }
+    
+    // Resetear flag cuando se cierra el chat
+    if (!isOpen) {
+      setHasOpenedInRoom(false);
+    }
+  }, [isOpen, showRoomTab, hasOpenedInRoom]);
 
   // Join/Leave room chat al cambiar de sala
   useEffect(() => {
