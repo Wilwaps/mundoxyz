@@ -111,34 +111,27 @@ const BingoV2Card = ({
     );
   };
 
-  const render75BallCard = () => {
-    const headers = ['B', 'I', 'N', 'G', 'O'];
-    
-    return (
-      <div className="bingo-card-75">
-        <div className="card-header">
-          {headers.map(letter => (
-            <div key={letter} className="header-cell">{letter}</div>
-          ))}
-        </div>
-        <div className="card-grid">
-          {card.grid?.map((row, rowIdx) => (
-            <div key={rowIdx} className="card-row">
-              {row.map((cell, colIdx) => renderCell(cell, rowIdx, colIdx))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const render90BallCard = () => {
+  const renderBingoCard = () => {
+    // Validación del grid
     if (!card.grid || !Array.isArray(card.grid)) {
       return <div className="error">Error: Grid no válido</div>;
     }
     
+    const is75Ball = mode === '75';
+    const cardClassName = is75Ball ? 'bingo-card-75' : 'bingo-card-90';
+    
     return (
-      <div className="bingo-card-90">
+      <div className={cardClassName}>
+        {/* Cabecera BINGO solo para 75-ball */}
+        {is75Ball && (
+          <div className="card-header-bingo">
+            {['B', 'I', 'N', 'G', 'O'].map(letter => (
+              <div key={letter} className="header-cell">{letter}</div>
+            ))}
+          </div>
+        )}
+        
+        {/* Grid de cartón (compartido por ambos modos) */}
         <div className="card-grid">
           {card.grid.map((row, rowIdx) => (
             <div key={rowIdx} className="card-row">
@@ -162,7 +155,7 @@ const BingoV2Card = ({
       </div>
       
       <div className="card-body">
-        {mode === '75' ? render75BallCard() : render90BallCard()}
+        {renderBingoCard()}
       </div>
     </div>
   );

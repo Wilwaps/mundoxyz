@@ -53,12 +53,20 @@
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
 }
 
-/* 75-Ball Card Styles */
-.bingo-card-75 .card-header {
+/* Card Header Styles (usado por 75-ball y opcionalmente 90-ball) */
+.card-header-bingo {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
   gap: 2px;
   margin-bottom: 2px;
+}
+
+/* 75-Ball Card Styles */
+.bingo-card-75 .card-header-bingo {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.bingo-card-75 .card-row {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .header-cell {
@@ -78,7 +86,6 @@
 
 .card-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
   gap: 2px;
 }
 
@@ -160,26 +167,13 @@
 }
 
 /* 90-Ball Card Styles */
-.bingo-card-90 .card-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .bingo-card-90 .card-row {
-  display: grid;
   grid-template-columns: repeat(9, 1fr);
-  gap: 2px;
 }
 
+/* Ajuste de tamaño de fuente para grids más amplios (90-ball) */
 .bingo-card-90 .bingo-cell {
-  aspect-ratio: 1;
-  min-height: 40px;
-  min-width: 40px;
   font-size: 0.95rem;
-  padding: 2px;
-  font-weight: bold;
-  color: #000;
 }
 
 /* Responsive adjustments */
@@ -195,8 +189,6 @@
   /* Ajuste específico para 90-ball en mobile */
   .bingo-card-90 .bingo-cell {
     font-size: 0.75rem;
-    min-height: 32px;
-    min-width: 32px;
   }
 
   .header-cell {
