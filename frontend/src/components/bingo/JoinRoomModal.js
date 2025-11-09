@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 const JoinRoomModal = ({ show, room, onClose, onSuccess }) => {
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [cardsCount, setCardsCount] = useState(1);
 
@@ -19,6 +21,15 @@ const JoinRoomModal = ({ show, room, onClose, onSuccess }) => {
       });
 
       if (response.data.success) {
+        // ✅ CRITICAL: Actualizar balance del usuario si viene en la respuesta
+        if (response.data.updatedBalance) {
+          updateUser({
+            ...user,
+            coins_balance: response.data.updatedBalance.coins,
+            fires_balance: response.data.updatedBalance.fires
+          });
+        }
+        
         toast.success(`¡Te has unido a la sala!`);
         onSuccess(room.code);
         onClose();

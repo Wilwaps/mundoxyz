@@ -376,7 +376,23 @@ class BingoV2Service {
         [room.id, userId, 'player_joined', { cards_purchased: cardsToBuy, cost: totalCost }]
       );
 
-      return { room, player, cardsGenerated: cardsToBuy };
+      // ✅ CRITICAL: Obtener balance actualizado para devolverlo al frontend
+      const updatedWalletResult = await dbQuery(
+        `SELECT coins_balance, fires_balance FROM wallets WHERE user_id = $1`,
+        [userId]
+      );
+      
+      const updatedBalance = {
+        coins: parseFloat(updatedWalletResult.rows[0].coins_balance),
+        fires: parseFloat(updatedWalletResult.rows[0].fires_balance)
+      };
+
+      return { 
+        room, 
+        player, 
+        cardsGenerated: cardsToBuy,
+        updatedBalance  // ✅ Incluir balance actualizado
+      };
     } catch (error) {
       logger.error('Error joining room:', error);
       throw error;

@@ -10,7 +10,7 @@ import './BingoV2WaitingRoom.css';
 const BingoV2WaitingRoom = () => {
   const { code } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { socket } = useSocket();
 
   const [room, setRoom] = useState(null);
@@ -222,6 +222,15 @@ const BingoV2WaitingRoom = () => {
       
       if (data.success) {
         setCurrentCards(pendingCards);
+        
+        // ✅ CRITICAL: Actualizar balance del usuario si viene en la respuesta
+        if (data.updatedBalance) {
+          updateUser({
+            ...user,
+            coins_balance: data.updatedBalance.coins,
+            fires_balance: data.updatedBalance.fires
+          });
+        }
         
         // Si no es host, marcar como listo automáticamente
         if (!isHost) {

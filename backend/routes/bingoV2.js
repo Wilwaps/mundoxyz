@@ -687,6 +687,17 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       }
     }
     
+    // ✅ CRITICAL: Obtener balance actualizado para devolverlo al frontend
+    const updatedWalletResult = await query(
+      `SELECT coins_balance, fires_balance FROM wallets WHERE user_id = $1`,
+      [userId]
+    );
+    
+    const updatedBalance = {
+      coins: parseFloat(updatedWalletResult.rows[0].coins_balance),
+      fires: parseFloat(updatedWalletResult.rows[0].fires_balance)
+    };
+    
     res.json({
       success: true,
       message: `Cards updated to ${cards_count}`,
@@ -694,7 +705,8 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       cards_count: cards_count,
       cost: cards_count * room.card_cost,
       currency: room.currency_type,
-      is_ready: readyStatus
+      is_ready: readyStatus,
+      updatedBalance  // ✅ Incluir balance actualizado
     });
     
   } catch (error) {
