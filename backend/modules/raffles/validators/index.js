@@ -99,13 +99,33 @@ const createRaffleSchema = Joi.object({
     .optional()
     .allow(''),
     
-  prizeMeta: Joi.object({
-    name: Joi.string().required(),
-    description: Joi.string().required(),
-    imageUrl: Joi.string().uri().optional(),
-    estimatedValue: Joi.number().positive().optional(),
-    category: Joi.string().optional()
-  }).optional(),
+  prizeMeta: Joi.when('mode', {
+    is: RaffleMode.PRIZE,
+    then: Joi.object({
+      prizeType: Joi.string().valid('product', 'service', 'experience').default('product'),
+      prizeDescription: Joi.string().required().messages({
+        'any.required': 'La descripción del premio es requerida'
+      }),
+      prizeValue: Joi.number().positive().optional(),
+      prizeImages: Joi.array().items(Joi.string().uri()).optional(),
+      bankingInfo: Joi.object({
+        accountHolder: Joi.string().required().messages({
+          'any.required': 'El nombre del titular es requerido'
+        }),
+        bankName: Joi.string().required().messages({
+          'any.required': 'El nombre del banco es requerido'
+        }),
+        accountNumber: Joi.string().required().messages({
+          'any.required': 'El número de cuenta es requerido'
+        }),
+        accountType: Joi.string().valid('ahorro', 'corriente').default('ahorro'),
+        phone: Joi.string().required().messages({
+          'any.required': 'El teléfono de contacto es requerido'
+        })
+      }).required()
+    }).required(),
+    otherwise: Joi.object().optional()
+  }),
   
   companyConfig: Joi.when('visibility', {
     is: RaffleVisibility.COMPANY,
