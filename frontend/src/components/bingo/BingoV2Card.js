@@ -131,14 +131,40 @@ const BingoV2Card = ({
   };
 
   const render90BallCard = () => {
+    // DEBUG: Log completo del grid
+    console.log('🎰 Rendering 90-ball card:', {
+      cardId: card.id,
+      hasGrid: !!card.grid,
+      gridType: typeof card.grid,
+      isArray: Array.isArray(card.grid),
+      gridLength: card.grid?.length,
+      grid: card.grid,
+      firstRow: card.grid?.[0],
+      firstCell: card.grid?.[0]?.[0]
+    });
+    
+    if (!card.grid || !Array.isArray(card.grid)) {
+      console.error('❌ Invalid grid for 90-ball card:', card);
+      return <div className="error">Error: Grid no válido</div>;
+    }
+    
     return (
       <div className="bingo-card-90">
         <div className="card-grid">
-          {card.grid?.map((row, rowIdx) => (
-            <div key={rowIdx} className="card-row">
-              {row.map((cell, colIdx) => renderCell(cell, rowIdx, colIdx))}
-            </div>
-          ))}
+          {card.grid.map((row, rowIdx) => {
+            console.log(`Row ${rowIdx}:`, row);
+            return (
+              <div key={rowIdx} className="card-row">
+                {row.map((cell, colIdx) => {
+                  const rendered = renderCell(cell, rowIdx, colIdx);
+                  if (!rendered) {
+                    console.warn(`Cell ${rowIdx},${colIdx} returned null:`, cell);
+                  }
+                  return rendered;
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     );

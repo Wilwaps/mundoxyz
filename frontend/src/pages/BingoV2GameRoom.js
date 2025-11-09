@@ -127,6 +127,22 @@ const BingoV2GameRoom = () => {
         if (myPlayer) {
           const cards = myPlayer.cards || [];
           console.log('🎟️ Setting cards:', cards);
+          
+          // DEBUG: Log detallado de cada cartón
+          cards.forEach((card, idx) => {
+            console.log(`📋 Card ${idx + 1}:`, {
+              id: card.id,
+              cardNumber: card.card_number,
+              hasGrid: !!card.grid,
+              gridType: typeof card.grid,
+              isArray: Array.isArray(card.grid),
+              gridLength: card.grid?.length,
+              firstRow: card.grid?.[0],
+              firstCell: card.grid?.[0]?.[0],
+              rawGrid: card.grid
+            });
+          });
+          
           setMyCards(cards);
         } else {
           console.warn('⚠️ Player not found in room');
