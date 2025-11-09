@@ -71,8 +71,8 @@ export const getRaffleDetail = async (code: string): Promise<RaffleDetailRespons
 
 // Crear nueva rifa
 export const createRaffle = async (form: CreateRaffleForm): Promise<Raffle> => {
-  const { data } = await api.post<Raffle>(API_ENDPOINTS.CREATE, form);
-  return data;
+  const { data } = await api.post<{ success: boolean; raffle: Raffle; message: string }>(API_ENDPOINTS.CREATE, form);
+  return data.raffle;
 };
 
 // Actualizar rifa
