@@ -50,6 +50,18 @@ const BingoV2WaitingRoom = () => {
         loadRoomDetails();
       });
 
+      socket.on('bingo:player_cards_updated', (data) => {
+        // Si el usuario que cambió cartones es el actual, resetear estado de listo
+        if (data.userId === user.id) {
+          setIsReady(false);
+          toast.info('Debes marcar "Listo" nuevamente después de cambiar cartones', {
+            icon: '⚠️',
+            duration: 4000
+          });
+        }
+        loadRoomDetails(); // Actualizar vista de todos los jugadores
+      });
+
       socket.on('bingo:game_started', () => {
         navigate(`/bingo/v2/play/${code}`);
       });
@@ -85,6 +97,7 @@ const BingoV2WaitingRoom = () => {
         socket.off('bingo:player_joined');
         socket.off('bingo:player_left');
         socket.off('bingo:player_ready');
+        socket.off('bingo:player_cards_updated');
         socket.off('bingo:game_started');
         socket.off('bingo:new_round_ready');
         socket.off('bingo:error');
@@ -175,6 +188,12 @@ const BingoV2WaitingRoom = () => {
   // Handler: Actualizar cartones (comprar o ajustar)
   const handleUpdateCards = async () => {
     try {
+      // CRITICAL UX: Resetear estado de "listo" inmediatamente al cambiar cartones
+      // El usuario debe volver a confirmar que está listo con la nueva cantidad
+      if (isReady) {
+        setIsReady(false);
+      }
+      
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/update-cards`, {
         method: 'POST',
         headers: {
@@ -188,10 +207,19 @@ const BingoV2WaitingRoom = () => {
       
       if (data.success) {
         setCurrentCards(pendingCards);
-        toast.success(`Cartones actualizados: ${pendingCards}`, {
-          icon: '🎟️',
-          duration: 3000
-        });
+        
+        if (data.ready_reset) {
+          toast.success(`Cartones actualizados: ${pendingCards}. Marca "Listo" nuevamente.`, {
+            icon: '🎟️',
+            duration: 4000
+          });
+        } else {
+          toast.success(`Cartones actualizados: ${pendingCards}`, {
+            icon: '🎟️',
+            duration: 3000
+          });
+        }
+        
         loadRoomDetails(); // Refresh room data
       } else {
         toast.error(data.error || 'Error actualizando cartones');

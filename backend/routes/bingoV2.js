@@ -591,14 +591,20 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       logger.info(`User ${userId} removed ${Math.abs(cardsDifference)} cards. Refunded ${costDifference} ${room.currency_type}`);
     }
     
-    // Update player cards_purchased and total_spent
+    // Update player cards_purchased, total_spent and reset ready status
+    // CRITICAL UX: Si el jugador cambia cartones después de marcar "listo",
+    // debe confirmar nuevamente que está listo con la nueva cantidad
     await query(
       `UPDATE bingo_v2_room_players
        SET cards_purchased = $1,
-           total_spent = $2
+           total_spent = $2,
+           is_ready = FALSE
        WHERE id = $3`,
       [cards_count, cards_count * room.card_cost, room.player_id]
     );
+    
+    logger.info(`Player ${userId} ready status reset after changing cards`);
+
     
     // Delete old cards
     await query(
@@ -614,13 +620,23 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       room.mode
     );
     
+    // Emit socket event to notify room that player changed cards and is no longer ready
+    if (req.io) {
+      req.io.to(`bingo:${code}`).emit('bingo:player_cards_updated', {
+        userId,
+        cards_count,
+        is_ready: false // Player must mark ready again
+      });
+    }
+    
     res.json({
       success: true,
       message: `Cards updated to ${cards_count}`,
       cards: newCards,
       cards_count: cards_count,
       cost: cards_count * room.card_cost,
-      currency: room.currency_type
+      currency: room.currency_type,
+      ready_reset: true // Notifica al frontend que debe actualizar el estado de listo
     });
     
   } catch (error) {
