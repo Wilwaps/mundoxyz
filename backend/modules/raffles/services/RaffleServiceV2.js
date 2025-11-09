@@ -95,7 +95,18 @@ class RaffleServiceV2 {
         );
       }
       
-      // Crear números disponibles (trigger automático)
+      // Crear números disponibles
+      const numbers = [];
+      for (let i = 0; i < numbersRange; i++) {
+        numbers.push(`(${raffle.id}, ${i}, 'available')`);
+      }
+      
+      if (numbers.length > 0) {
+        await dbQuery(
+          `INSERT INTO raffle_numbers (raffle_id, number_idx, state) 
+           VALUES ${numbers.join(', ')}`
+        );
+      }
       
       logger.info('[RaffleServiceV2] Rifa creada exitosamente', { 
         raffleId: raffle.id, 
