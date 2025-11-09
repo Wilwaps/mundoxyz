@@ -514,10 +514,19 @@ function handleBingoV2Socket(io) {
         
         const room = roomResult.rows[0];
         
-        // Validar que la sala esté en estado 'finished'
-        if (room.status !== 'finished') {
-          throw new Error('Room must be finished to start new round');
+        // Validar que la sala NO esté ya en espera (evitar reseteos múltiples)
+        if (room.status === 'waiting') {
+          // Ya está en espera, emitir estado actual sin resetear
+          const currentRoom = await BingoV2Service.getRoomDetails(roomCode);
+          io.to(roomCode).emit('bingo:new_round_ready', {
+            room: currentRoom.room,
+            message: 'La sala ya está lista para nueva ronda.'
+          });
+          return;
         }
+        
+        // Permitir resetear si está en 'finished' o 'cancelled'
+        // (eliminada validación restrictiva que causaba el error)
         
         // Stop auto-call if it was enabled
         if (autoCallIntervals.has(roomCode)) {
