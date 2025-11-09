@@ -53,7 +53,14 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       prizeType: 'product',
       prizeDescription: '',
       prizeValue: 0,
-      prizeImages: []
+      prizeImages: [],
+      bankingInfo: {
+        accountHolder: '',
+        bankName: '',
+        accountNumber: '',
+        accountType: 'ahorro',
+        phone: ''
+      }
     },
     companyConfig: undefined
   });
@@ -133,6 +140,22 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         if (formData.mode === RaffleMode.PRIZE) {
           if (!formData.prizeMeta?.prizeDescription) {
             toast.error('Por favor describe el premio');
+            return false;
+          }
+          if (!formData.prizeMeta?.bankingInfo?.accountHolder) {
+            toast.error('Por favor ingresa el nombre del titular');
+            return false;
+          }
+          if (!formData.prizeMeta?.bankingInfo?.bankName) {
+            toast.error('Por favor ingresa el banco');
+            return false;
+          }
+          if (!formData.prizeMeta?.bankingInfo?.accountNumber) {
+            toast.error('Por favor ingresa el número de cuenta');
+            return false;
+          }
+          if (!formData.prizeMeta?.bankingInfo?.phone) {
+            toast.error('Por favor ingresa el teléfono de contacto');
             return false;
           }
         } else {
@@ -273,22 +296,21 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             </h3>
             
             {/* Selector de modo */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { value: RaffleMode.FIRES, label: 'Fuegos', icon: '🔥' },
-                { value: RaffleMode.COINS, label: 'Monedas', icon: '🪙' },
                 { value: RaffleMode.PRIZE, label: 'Premio', icon: '🎁' }
               ].map(mode => (
                 <button
                   key={mode.value}
                   onClick={() => updateField('mode', mode.value)}
-                  className={`p-3 rounded-lg border-2 transition-all ${
+                  className={`p-4 rounded-lg border-2 transition-all ${
                     formData.mode === mode.value
                       ? 'border-accent bg-accent/20'
                       : 'border-white/10 bg-glass hover:bg-glass-lighter'
                   }`}
                 >
-                  <div className="text-2xl mb-1">{mode.icon}</div>
+                  <div className="text-3xl mb-2">{mode.icon}</div>
                   <div className="text-sm font-medium text-text">{mode.label}</div>
                 </button>
               ))}
@@ -352,6 +374,143 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     placeholder="0.00"
                     className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
                   />
+                </div>
+                
+                {/* Imagen del premio */}
+                <div>
+                  <label className="block text-sm text-text/80 mb-1">
+                    Imagen del Premio
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          // Aquí se manejará la carga de imagen
+                          toast.success('Imagen seleccionada (carga pendiente de implementar)');
+                        }
+                      }}
+                      className="hidden"
+                      id="prize-image-upload"
+                    />
+                    <label
+                      htmlFor="prize-image-upload"
+                      className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
+                    >
+                      <Image className="w-5 h-5" />
+                      <span className="text-sm">Seleccionar imagen del premio</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-text/60 mt-1">JPG, PNG o GIF. Máx. 5MB</p>
+                </div>
+                
+                {/* Datos bancarios para pago */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <h4 className="text-sm font-semibold text-text flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-accent" />
+                    Datos Bancarios para Recibir Pagos
+                  </h4>
+                  <p className="text-xs text-text/60">Los participantes verán esta información para transferir el pago</p>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Nombre del Titular *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.prizeMeta?.bankingInfo?.accountHolder || ''}
+                      onChange={(e) => updateField('prizeMeta', {
+                        ...formData.prizeMeta,
+                        bankingInfo: {
+                          ...formData.prizeMeta?.bankingInfo,
+                          accountHolder: e.target.value
+                        }
+                      })}
+                      placeholder="Nombre completo del titular"
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-text/80 mb-1">
+                        Banco *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.prizeMeta?.bankingInfo?.bankName || ''}
+                        onChange={(e) => updateField('prizeMeta', {
+                          ...formData.prizeMeta,
+                          bankingInfo: {
+                            ...formData.prizeMeta?.bankingInfo,
+                            bankName: e.target.value
+                          }
+                        })}
+                        placeholder="Ej: Banco Venezuela"
+                        className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-text/80 mb-1">
+                        Tipo de Cuenta *
+                      </label>
+                      <select
+                        value={formData.prizeMeta?.bankingInfo?.accountType || 'ahorro'}
+                        onChange={(e) => updateField('prizeMeta', {
+                          ...formData.prizeMeta,
+                          bankingInfo: {
+                            ...formData.prizeMeta?.bankingInfo,
+                            accountType: e.target.value as 'ahorro' | 'corriente'
+                          }
+                        })}
+                        className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        <option value="ahorro">Ahorro</option>
+                        <option value="corriente">Corriente</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Número de Cuenta *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.prizeMeta?.bankingInfo?.accountNumber || ''}
+                      onChange={(e) => updateField('prizeMeta', {
+                        ...formData.prizeMeta,
+                        bankingInfo: {
+                          ...formData.prizeMeta?.bankingInfo,
+                          accountNumber: e.target.value
+                        }
+                      })}
+                      placeholder="0000-0000-00-0000000000"
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Teléfono de Contacto *
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.prizeMeta?.bankingInfo?.phone || ''}
+                      onChange={(e) => updateField('prizeMeta', {
+                        ...formData.prizeMeta,
+                        bankingInfo: {
+                          ...formData.prizeMeta?.bankingInfo,
+                          phone: e.target.value
+                        }
+                      })}
+                      placeholder="0414-1234567"
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
                 </div>
                 
                 <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
@@ -516,7 +675,6 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 <span className="text-text/60">Modo:</span>
                 <span className="text-text">
                   {formData.mode === RaffleMode.FIRES && '🔥 Fuegos'}
-                  {formData.mode === RaffleMode.COINS && '🪙 Monedas'}
                   {formData.mode === RaffleMode.PRIZE && '🎁 Premio'}
                 </span>
               </div>
@@ -607,7 +765,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:transform md:-translate-x-1/2 md:-translate-y-1/2 w-auto md:w-full md:max-w-md bg-dark rounded-2xl shadow-2xl z-50 flex flex-col md:max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-lg bg-dark rounded-2xl shadow-2xl z-50 flex flex-col max-h-[90vh]"
           >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">

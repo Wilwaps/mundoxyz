@@ -104,6 +104,15 @@ export interface CompanyConfig {
   contactPhone?: string;
 }
 
+// Información bancaria para rifas con premio
+export interface BankingInfo {
+  accountHolder: string;
+  bankName: string;
+  accountNumber: string;
+  accountType: 'ahorro' | 'corriente';
+  phone: string;
+}
+
 // Información del premio
 export interface PrizeMeta {
   prizeType?: string;
@@ -111,6 +120,7 @@ export interface PrizeMeta {
   prizeValue?: number;
   prizeImages?: string[];
   category?: string;
+  bankingInfo?: BankingInfo;
 }
 
 // Número de rifa
