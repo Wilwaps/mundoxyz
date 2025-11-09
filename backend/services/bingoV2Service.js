@@ -1062,11 +1062,37 @@ class BingoV2Service {
 
       // Award prizes
       const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      const currency = room.currency_type === 'coins' ? 'coins' : 'fires';
+      
+      // Get winner wallet before update
+      const winnerWalletBefore = await dbQuery(
+        `SELECT ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+        [winnerUserId]
+      );
+      const balanceBefore = parseFloat(winnerWalletBefore.rows[0].balance);
+      
       await dbQuery(
         `UPDATE wallets 
          SET ${currencyColumn} = ${currencyColumn} + $1
          WHERE user_id = $2`,
         [winnerPrize, winnerUserId]
+      );
+      
+      // ✅ CRITICAL: Registrar transacción en wallet_transactions
+      await dbQuery(
+        `INSERT INTO wallet_transactions 
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         SELECT w.id, 'bingo_prize', $1, $2, $3, $4, $5, $6
+         FROM wallets w WHERE w.user_id = $7`,
+        [
+          currency,
+          winnerPrize,
+          balanceBefore,
+          balanceBefore + winnerPrize,
+          `Premio Bingo - Sala #${room.code}`,
+          `bingo:${room.code}`,
+          winnerUserId
+        ]
       );
 
       // Update user stats
@@ -1081,11 +1107,35 @@ class BingoV2Service {
 
       // Award host (if not the winner)
       if (room.host_id !== winnerUserId) {
+        // Get host wallet before update
+        const hostWalletBefore = await dbQuery(
+          `SELECT ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+          [room.host_id]
+        );
+        const hostBalanceBefore = parseFloat(hostWalletBefore.rows[0].balance);
+        
         await dbQuery(
           `UPDATE wallets 
            SET ${currencyColumn} = ${currencyColumn} + $1
            WHERE user_id = $2`,
           [hostPrize, room.host_id]
+        );
+        
+        // ✅ CRITICAL: Registrar transacción de recompensa host
+        await dbQuery(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           SELECT w.id, 'bingo_host_reward', $1, $2, $3, $4, $5, $6
+           FROM wallets w WHERE w.user_id = $7`,
+          [
+            currency,
+            hostPrize,
+            hostBalanceBefore,
+            hostBalanceBefore + hostPrize,
+            `Recompensa Host - Sala #${room.code}`,
+            `bingo:${room.code}`,
+            room.host_id
+          ]
         );
 
         await dbQuery(
@@ -1125,50 +1175,55 @@ class BingoV2Service {
         [winnerPrize, roomId, winnerUserId]
       );
 
-      // Create system messages for all players
+      // ✅ CRITICAL: Enviar notificaciones a todos los jugadores
       const playersResult = await dbQuery(
         `SELECT user_id FROM bingo_v2_room_players WHERE room_id = $1`,
         [roomId]
       );
 
+      const currencyEmoji = room.currency_type === 'coins' ? '🪙' : '🔥';
+      
       for (const player of playersResult.rows) {
         const isWinner = player.user_id === winnerUserId;
-        const message = isWinner
-          ? `¡Felicidades! Has ganado ${winnerPrize.toFixed(2)} ${room.currency_type} en el Bingo (Sala #${room.code})`
-          : `El juego ha terminado. El ganador fue anunciado (Sala #${room.code})`;
-
-        await dbQuery(
-          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
-           VALUES ($1, 'system', 'Resultado de Bingo', $2, $3)`,
-          [
-            player.user_id,
-            message,
-            JSON.stringify({
-              room_code: room.code,
-              winner_id: winnerUserId,
-              prize: isWinner ? winnerPrize : 0,
-              total_pot: totalPot
-            })
-          ]
-        );
+        
+        if (isWinner) {
+          // Notificación de ganador
+          await dbQuery(
+            `INSERT INTO notifications (user_id, type, title, message, metadata)
+             VALUES ($1, 'bingo_win', 'Ganaste el Bingo!', $2, $3)`,
+            [
+              player.user_id,
+              `¡Felicidades! Ganaste ${winnerPrize.toFixed(2)} ${currencyEmoji} ${room.currency_type} en Bingo`,
+              JSON.stringify({
+                room_code: room.code,
+                prize: winnerPrize,
+                currency: room.currency_type,
+                total_pot: totalPot
+              })
+            ]
+          );
+        } else {
+          // Notificación de fin de juego
+          await dbQuery(
+            `INSERT INTO notifications (user_id, type, title, message)
+             VALUES ($1, 'bingo_end', 'Juego Terminado', 'El juego de Bingo ha finalizado. Puedes unirte a una nueva ronda.')`,
+            [player.user_id]
+          );
+        }
       }
 
-      // Send additional message to host with their prize (if not the winner)
+      // ✅ Notificación adicional al host (si no es el ganador)
       if (room.host_id !== winnerUserId) {
-        const currencyEmoji = room.currency_type === 'coins' ? '🪙' : '🔥';
-        const currencyName = room.currency_type === 'coins' ? 'monedas' : 'fuegos';
-        
         await dbQuery(
-          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
-           VALUES ($1, 'system', 'Recompensa de Bingo', $2, $3)`,
+          `INSERT INTO notifications (user_id, type, title, message, metadata)
+           VALUES ($1, 'bingo_host_reward', 'Recompensa de Host', $2, $3)`,
           [
             room.host_id,
-            `Has recibido ${hostPrize.toFixed(2)} ${currencyEmoji} de ${currencyName} como host de la sala #${room.code}`,
+            `Recibiste ${hostPrize.toFixed(2)} ${currencyEmoji} ${room.currency_type} como host de Bingo`,
             JSON.stringify({
               room_code: room.code,
               prize: hostPrize,
-              prize_type: 'host_reward',
-              currency_type: room.currency_type,
+              currency: room.currency_type,
               total_pot: totalPot
             })
           ]
@@ -1319,10 +1374,26 @@ class BingoV2Service {
       );
 
       const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      const currency = room.currency_type === 'coins' ? 'coins' : 'fires';
+      const currencyEmoji = room.currency_type === 'coins' ? '🪙' : '🔥';
       let totalRefunded = 0;
+
+      const reasonText = {
+        'host_closed': 'El anfitrión cerró la sala',
+        'system_failure': 'Falla del sistema',
+        'admin_forced': 'Acción administrativa',
+        'timeout': 'Sala inactiva por tiempo prolongado'
+      }[reason] || reason;
 
       for (const player of playersResult.rows) {
         if (player.total_spent <= 0) continue;
+
+        // Get wallet balance before refund
+        const walletBefore = await dbQuery(
+          `SELECT ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+          [player.user_id]
+        );
+        const balanceBefore = parseFloat(walletBefore.rows[0].balance);
 
         // Refund to wallet
         await dbQuery(
@@ -1330,6 +1401,23 @@ class BingoV2Service {
            SET ${currencyColumn} = ${currencyColumn} + $1
            WHERE user_id = $2`,
           [player.total_spent, player.user_id]
+        );
+
+        // ✅ CRITICAL: Registrar transacción de reembolso
+        await dbQuery(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           SELECT w.id, 'bingo_refund', $1, $2, $3, $4, $5, $6
+           FROM wallets w WHERE w.user_id = $7`,
+          [
+            currency,
+            player.total_spent,
+            balanceBefore,
+            balanceBefore + player.total_spent,
+            `Reembolso Bingo - ${reasonText} - Sala #${room.code}`,
+            `bingo:${room.code}:refund`,
+            player.user_id
+          ]
         );
 
         // Register refund in history
@@ -1348,20 +1436,13 @@ class BingoV2Service {
           ]
         );
 
-        // Send notification message
-        const reasonText = {
-          'host_closed': 'El anfitrión cerró la sala',
-          'system_failure': 'Falla del sistema',
-          'admin_forced': 'Acción administrativa',
-          'timeout': 'Sala inactiva por tiempo prolongado'
-        }[reason] || reason;
-
+        // ✅ CRITICAL: Enviar notificación de reembolso
         await dbQuery(
-          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
-           VALUES ($1, 'system', 'Reembolso de Bingo', $2, $3)`,
+          `INSERT INTO notifications (user_id, type, title, message, metadata)
+           VALUES ($1, 'bingo_refund', 'Reembolso de Bingo', $2, $3)`,
           [
             player.user_id,
-            `La sala de Bingo #${room.code} fue cancelada. Motivo: ${reasonText}. Se te han devuelto ${player.total_spent} ${room.currency_type}.`,
+            `Sala #${room.code} cancelada: ${reasonText}. Reembolso: ${player.total_spent} ${currencyEmoji} ${room.currency_type}`,
             JSON.stringify({
               room_code: room.code,
               room_id: roomId,

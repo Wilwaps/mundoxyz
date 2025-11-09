@@ -415,17 +415,24 @@ function handleBingoV2Socket(io) {
             [playerResult.rows[0].id]
           );
 
-          // Emit game over to all
+          // Get updated room state
+          const updatedRoomResult = await query(
+            `SELECT * FROM bingo_v2_rooms WHERE code = $1`,
+            [roomCode]
+          );
+
+          // Emit game over to all with updated room state
           io.to(roomCode).emit('bingo:game_over', {
             winner: {
               userId,
               username: winnerResult.rows[0].username,
               pattern: result.pattern
             },
-            prizes: result.prizes
+            prizes: result.prizes,
+            room: updatedRoomResult.rows[0]  // ✅ Enviar estado actualizado
           });
 
-          console.log('🎉 BINGO VALIDATED! Game over emitted');
+          console.log('🎉 BINGO VALIDATED! Game over emitted with updated room state');
         }
         
         // Send callback response
@@ -445,7 +452,7 @@ function handleBingoV2Socket(io) {
       }
     });
 
-    // Chat message
+    // Chat message (DEPRECATED - usar UnifiedChat room:chat_message)
     socket.on('bingo:chat_message', async (data) => {
       try {
         const { roomCode, userId, message } = data;

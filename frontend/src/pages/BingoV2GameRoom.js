@@ -75,6 +75,12 @@ const BingoV2GameRoom = () => {
         console.log('🎉 GAME OVER EVENT RECEIVED:', data);
         setWinner(data.winner);
         setShowWinnerModal(true);
+        
+        // CRITICAL FIX: Actualizar estado de sala para permitir nueva ronda
+        if (data.room) {
+          setRoom(data.room);
+          console.log('✅ Room state updated to:', data.room.status);
+        }
       });
 
       socket.on('bingo:error', (data) => {
