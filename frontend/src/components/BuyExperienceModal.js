@@ -5,11 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
+import { useAuth } from '../contexts/AuthContext';
 
 const BuyExperienceModal = ({ isOpen, onClose, user }) => {
   const [amount, setAmount] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const queryClient = useQueryClient();
+  const { updateUser } = useAuth();
 
   // Mutation para comprar experiencia (debe estar antes del early return)
   const buyMutation = useMutation({
@@ -55,6 +57,13 @@ const BuyExperienceModal = ({ isOpen, onClose, user }) => {
           color: '#fff',
           border: '1px solid #9333ea'
         }
+      });
+
+      // Actualizar usuario en contexto con nueva experiencia y balances
+      updateUser({
+        experience: data.newExperience,
+        coins_balance: data.newCoinsBalance,
+        fires_balance: data.newFiresBalance
       });
 
       // Invalidar queries para actualizar balances
