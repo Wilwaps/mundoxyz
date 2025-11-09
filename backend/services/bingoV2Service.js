@@ -1189,8 +1189,8 @@ class BingoV2Service {
         if (isWinner) {
           // Notificación de ganador
           await dbQuery(
-            `INSERT INTO notifications (user_id, type, title, message, metadata)
-             VALUES ($1, 'bingo_win', 'Ganaste el Bingo!', $2, $3)`,
+            `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+             VALUES ($1, 'system', 'Ganaste el Bingo!', $2, $3)`,
             [
               player.user_id,
               `¡Felicidades! Ganaste ${winnerPrize.toFixed(2)} ${currencyEmoji} ${room.currency_type} en Bingo`,
@@ -1205,8 +1205,8 @@ class BingoV2Service {
         } else {
           // Notificación de fin de juego
           await dbQuery(
-            `INSERT INTO notifications (user_id, type, title, message)
-             VALUES ($1, 'bingo_end', 'Juego Terminado', 'El juego de Bingo ha finalizado. Puedes unirte a una nueva ronda.')`,
+            `INSERT INTO bingo_v2_messages (user_id, category, title, content)
+             VALUES ($1, 'system', 'Juego Terminado', 'El juego de Bingo ha finalizado. Puedes unirte a una nueva ronda.')`,
             [player.user_id]
           );
         }
@@ -1215,8 +1215,8 @@ class BingoV2Service {
       // ✅ Notificación adicional al host (si no es el ganador)
       if (room.host_id !== winnerUserId) {
         await dbQuery(
-          `INSERT INTO notifications (user_id, type, title, message, metadata)
-           VALUES ($1, 'bingo_host_reward', 'Recompensa de Host', $2, $3)`,
+          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+           VALUES ($1, 'system', 'Recompensa de Host', $2, $3)`,
           [
             room.host_id,
             `Recibiste ${hostPrize.toFixed(2)} ${currencyEmoji} ${room.currency_type} como host de Bingo`,
@@ -1438,8 +1438,8 @@ class BingoV2Service {
 
         // ✅ CRITICAL: Enviar notificación de reembolso
         await dbQuery(
-          `INSERT INTO notifications (user_id, type, title, message, metadata)
-           VALUES ($1, 'bingo_refund', 'Reembolso de Bingo', $2, $3)`,
+          `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+           VALUES ($1, 'system', 'Reembolso de Bingo', $2, $3)`,
           [
             player.user_id,
             `Sala #${room.code} cancelada: ${reasonText}. Reembolso: ${player.total_spent} ${currencyEmoji} ${room.currency_type}`,
