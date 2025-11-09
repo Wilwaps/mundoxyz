@@ -324,11 +324,31 @@ class BingoV2Service {
         throw new Error(`Insufficient ${room.currency_type}`);
       }
 
-      // Deduct cost
+      // Deduct cost and register transaction
       const columnName = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
+      const currency = room.currency_type === 'coins' ? 'coins' : 'fires';
+      const balanceBefore = parseFloat(userBalance);
+      
       await dbQuery(
         `UPDATE wallets SET ${columnName} = ${columnName} - $1 WHERE user_id = $2`,
         [totalCost, userId]
+      );
+
+      // ✅ CRITICAL: Registrar transacción de compra
+      await dbQuery(
+        `INSERT INTO wallet_transactions 
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         SELECT w.id, 'bingo_card_purchase', $1, $2, $3, $4, $5, $6
+         FROM wallets w WHERE w.user_id = $7`,
+        [
+          currency,
+          totalCost,
+          balanceBefore,
+          balanceBefore - totalCost,
+          `Compra de ${cardsToBuy} cartón(es) Bingo - Sala #${room.code}`,
+          `bingo:${room.code}:purchase`,
+          userId
+        ]
       );
 
       // Add player to room

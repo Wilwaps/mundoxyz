@@ -550,11 +550,30 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       }
       
       // Deduct from wallet
+      const balanceBefore = balance;
       await query(
         `UPDATE wallets 
          SET ${currencyColumn} = ${currencyColumn} - $1
          WHERE user_id = $2`,
         [costDifference, userId]
+      );
+      
+      // ✅ Registrar transacción de compra adicional
+      const currency = room.currency_type === 'coins' ? 'coins' : 'fires';
+      await query(
+        `INSERT INTO wallet_transactions 
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         SELECT w.id, 'bingo_card_purchase', $1, $2, $3, $4, $5, $6
+         FROM wallets w WHERE w.user_id = $7`,
+        [
+          currency,
+          costDifference,
+          balanceBefore,
+          balanceBefore - costDifference,
+          `Compra adicional de ${cardsDifference} cartón(es) Bingo - Sala #${code}`,
+          `bingo:${code}:purchase_add`,
+          userId
+        ]
       );
       
       // Add to pot
@@ -573,11 +592,35 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       const currencyColumn = room.currency_type === 'coins' ? 'coins_balance' : 'fires_balance';
       
       // Refund to wallet
+      const balletResult = await query(
+        `SELECT ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+        [userId]
+      );
+      const balanceBefore = parseFloat(balletResult.rows[0].balance);
+      
       await query(
         `UPDATE wallets 
          SET ${currencyColumn} = ${currencyColumn} + $1
          WHERE user_id = $2`,
         [costDifference, userId]
+      );
+      
+      // ✅ Registrar transacción de reembolso parcial
+      const currency = room.currency_type === 'coins' ? 'coins' : 'fires';
+      await query(
+        `INSERT INTO wallet_transactions 
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         SELECT w.id, 'bingo_card_refund', $1, $2, $3, $4, $5, $6
+         FROM wallets w WHERE w.user_id = $7`,
+        [
+          currency,
+          costDifference,
+          balanceBefore,
+          balanceBefore + costDifference,
+          `Reembolso parcial ${Math.abs(cardsDifference)} cartón(es) Bingo - Sala #${code}`,
+          `bingo:${code}:refund_partial`,
+          userId
+        ]
       );
       
       // Subtract from pot
