@@ -1683,8 +1683,8 @@ class BingoV2Service {
     try {
       for (let i = 0; i < count; i++) {
         const grid = mode === '75' 
-          ? this.generate75BallGrid() 
-          : this.generate90BallGrid();
+          ? this.generate75BallCard() 
+          : this.generate90BallCard();
         
         const cardResult = await dbQuery(
           `INSERT INTO bingo_v2_cards 

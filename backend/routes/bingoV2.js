@@ -475,7 +475,7 @@ router.get('/admin/detect-failures', verifyToken, async (req, res) => {
 router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
   try {
     const { code } = req.params;
-    const { cards_count } = req.body;
+    const { cards_count, auto_ready } = req.body;
     const userId = req.user.id;
     
     // Validate cards_count
@@ -591,19 +591,22 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       logger.info(`User ${userId} removed ${Math.abs(cardsDifference)} cards. Refunded ${costDifference} ${room.currency_type}`);
     }
     
-    // Update player cards_purchased, total_spent and reset ready status
-    // CRITICAL UX: Si el jugador cambia cartones después de marcar "listo",
-    // debe confirmar nuevamente que está listo con la nueva cantidad
+    // Update player cards_purchased, total_spent and ready status
+    // CRITICAL UX:
+    // - Si auto_ready = true: marcar como listo automáticamente (jugadores normales)
+    // - Si auto_ready = false: NO marcar listo (host puede iniciar cuando quiera)
+    const readyStatus = auto_ready === true;
+    
     await query(
       `UPDATE bingo_v2_room_players
        SET cards_purchased = $1,
            total_spent = $2,
-           is_ready = FALSE
-       WHERE id = $3`,
-      [cards_count, cards_count * room.card_cost, room.player_id]
+           is_ready = $3
+       WHERE id = $4`,
+      [cards_count, cards_count * room.card_cost, readyStatus, room.player_id]
     );
     
-    logger.info(`Player ${userId} ready status reset after changing cards`);
+    logger.info(`Player ${userId} cards updated. Ready status: ${readyStatus}`);
 
     
     // Delete old cards
@@ -620,13 +623,21 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       room.mode
     );
     
-    // Emit socket event to notify room that player changed cards and is no longer ready
+    // Emit socket event to notify room about card update
     if (req.io) {
       req.io.to(`bingo:${code}`).emit('bingo:player_cards_updated', {
         userId,
         cards_count,
-        is_ready: false // Player must mark ready again
+        is_ready: readyStatus
       });
+      
+      // Si se marcó como listo, emitir evento adicional
+      if (readyStatus) {
+        req.io.to(`bingo:${code}`).emit('bingo:player_ready', {
+          userId,
+          username: req.user.username
+        });
+      }
     }
     
     res.json({
@@ -636,7 +647,7 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
       cards_count: cards_count,
       cost: cards_count * room.card_cost,
       currency: room.currency_type,
-      ready_reset: true // Notifica al frontend que debe actualizar el estado de listo
+      is_ready: readyStatus
     });
     
   } catch (error) {

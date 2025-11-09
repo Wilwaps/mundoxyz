@@ -173,6 +173,14 @@ const BingoV2WaitingRoom = () => {
 
   // Handler: Modificar cantidad de cartones con botones +/-
   const handleCardChange = (delta) => {
+    // Si el jugador ya estaba listo y cambia cantidad, desactivar listo
+    if (isReady && currentCards > 0) {
+      setIsReady(false);
+      toast.info('⚠️ Debes confirmar nuevamente después de cambiar cartones', {
+        duration: 3000
+      });
+    }
+    
     setPendingCards(prev => {
       const newValue = prev + delta;
       return Math.max(1, Math.min(room.max_cards_per_player, newValue));
@@ -181,6 +189,14 @@ const BingoV2WaitingRoom = () => {
 
   // Handler: Modificar cantidad directamente en input
   const handleCardChangeInput = (value) => {
+    // Si el jugador ya estaba listo y cambia cantidad, desactivar listo
+    if (isReady && currentCards > 0) {
+      setIsReady(false);
+      toast.info('⚠️ Debes confirmar nuevamente después de cambiar cartones', {
+        duration: 3000
+      });
+    }
+    
     const numValue = parseInt(value) || 1;
     setPendingCards(Math.max(1, Math.min(room.max_cards_per_player, numValue)));
   };
@@ -188,11 +204,7 @@ const BingoV2WaitingRoom = () => {
   // Handler: Actualizar cartones (comprar o ajustar)
   const handleUpdateCards = async () => {
     try {
-      // CRITICAL UX: Resetear estado de "listo" inmediatamente al cambiar cartones
-      // El usuario debe volver a confirmar que está listo con la nueva cantidad
-      if (isReady) {
-        setIsReady(false);
-      }
+      const isHost = room?.host_id === user?.id;
       
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/update-cards`, {
         method: 'POST',
@@ -200,7 +212,10 @@ const BingoV2WaitingRoom = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ cards_count: pendingCards })
+        body: JSON.stringify({ 
+          cards_count: pendingCards,
+          auto_ready: !isHost // Solo marcar listo automáticamente si NO es host
+        })
       });
 
       const data = await response.json();
@@ -208,13 +223,21 @@ const BingoV2WaitingRoom = () => {
       if (data.success) {
         setCurrentCards(pendingCards);
         
-        if (data.ready_reset) {
-          toast.success(`Cartones actualizados: ${pendingCards}. Marca "Listo" nuevamente.`, {
+        // Si no es host, marcar como listo automáticamente
+        if (!isHost) {
+          setIsReady(true);
+          if (socket) {
+            socket.emit('bingo:player_ready', {
+              roomCode: code,
+              userId: user.id
+            });
+          }
+          toast.success(`✅ ${pendingCards} cartones comprados y marcado como listo`, {
             icon: '🎟️',
-            duration: 4000
+            duration: 3000
           });
         } else {
-          toast.success(`Cartones actualizados: ${pendingCards}`, {
+          toast.success(`✅ ${pendingCards} cartones comprados`, {
             icon: '🎟️',
             duration: 3000
           });
