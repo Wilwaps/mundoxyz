@@ -471,14 +471,56 @@ class BingoV2Service {
         
         // CRITICAL FIX: Parse grid as JSON if it's a string
         const parsedCards = cardsResult.rows.map(card => {
+          let parsedGrid = card.grid;
+          let parsedMarkedNumbers = card.marked_numbers;
+          let parsedMarkedPositions = card.marked_positions;
+          
+          // Parse grid
+          if (typeof card.grid === 'string') {
+            try {
+              parsedGrid = JSON.parse(card.grid);
+            } catch (e) {
+              logger.error(`❌ Error parsing grid for card ${card.id}:`, e);
+              parsedGrid = null;
+            }
+          }
+          
+          // Parse marked_numbers
+          if (typeof card.marked_numbers === 'string') {
+            try {
+              parsedMarkedNumbers = JSON.parse(card.marked_numbers);
+            } catch (e) {
+              logger.error(`❌ Error parsing marked_numbers for card ${card.id}:`, e);
+              parsedMarkedNumbers = [];
+            }
+          }
+          
+          // Parse marked_positions
+          if (typeof card.marked_positions === 'string') {
+            try {
+              parsedMarkedPositions = JSON.parse(card.marked_positions);
+            } catch (e) {
+              logger.error(`❌ Error parsing marked_positions for card ${card.id}:`, e);
+              parsedMarkedPositions = [];
+            }
+          }
+          
           const parsed = {
             ...card,
-            grid: typeof card.grid === 'string' ? JSON.parse(card.grid) : card.grid,
-            marked_numbers: typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers,
-            marked_positions: typeof card.marked_positions === 'string' ? JSON.parse(card.marked_positions) : card.marked_positions
+            grid: parsedGrid,
+            marked_numbers: parsedMarkedNumbers,
+            marked_positions: parsedMarkedPositions
           };
           
-          logger.info(`🎟️ Card ${card.id}: grid type = ${typeof card.grid}, parsed grid type = ${typeof parsed.grid}`);
+          logger.info(`🎟️ Card ${card.id}:`, {
+            gridType: typeof card.grid,
+            parsedGridType: typeof parsedGrid,
+            isArray: Array.isArray(parsedGrid),
+            gridLength: parsedGrid?.length,
+            firstRow: parsedGrid?.[0],
+            sampleCell: parsedGrid?.[0]?.[0]
+          });
+          
           return parsed;
         });
         
