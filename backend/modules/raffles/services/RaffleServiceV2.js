@@ -82,17 +82,15 @@ class RaffleServiceV2 {
         await dbQuery(
           `INSERT INTO raffle_companies (
             raffle_id, company_name, rif_number, brand_color,
-            secondary_color, logo_url, contact_email, contact_phone
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            logo_url, website_url
+          ) VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             raffle.id,
             companyConfig.companyName,
             companyConfig.rifNumber,
             companyConfig.primaryColor || null,
-            companyConfig.secondaryColor || null,
             companyConfig.logoUrl || null,
-            companyConfig.contactEmail || null,
-            companyConfig.contactPhone || null
+            companyConfig.websiteUrl || null
           ]
         );
       }
@@ -264,18 +262,15 @@ class RaffleServiceV2 {
           rc.company_name,
           rc.rif_number,
           rc.brand_color as primary_color,
-          rc.secondary_color,
           rc.logo_url,
-          rc.contact_email,
-          rc.contact_phone
+          rc.website_url
          FROM raffles r
          JOIN users u ON r.host_id = u.id
          LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.code = $1
          GROUP BY r.id, u.username, rc.company_name, rc.rif_number, 
-                  rc.brand_color, rc.secondary_color, rc.logo_url,
-                  rc.contact_email, rc.contact_phone`,
+                  rc.brand_color, rc.logo_url, rc.website_url`,
         [code]
       );
       
@@ -572,10 +567,8 @@ class RaffleServiceV2 {
         companyName: raffle.company_name,
         rifNumber: raffle.rif_number,
         primaryColor: raffle.primary_color,
-        secondaryColor: raffle.secondary_color,
         logoUrl: raffle.logo_url,
-        contactEmail: raffle.contact_email,
-        contactPhone: raffle.contact_phone
+        websiteUrl: raffle.website_url
       } : null,
       prizeMeta: raffle.prize_meta 
         ? (typeof raffle.prize_meta === 'string' ? JSON.parse(raffle.prize_meta) : raffle.prize_meta)
