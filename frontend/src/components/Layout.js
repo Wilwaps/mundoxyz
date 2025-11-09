@@ -98,11 +98,8 @@ const Layout = () => {
               </div>
               <div 
                 className="badge-coins cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => {
-                  setWalletHistoryInitialTab('coins');
-                  setShowWalletHistoryModal(true);
-                }}
-                title="Ver historial de monedas"
+                onClick={() => setShowBuyExperienceModal(true)}
+                title="Comprar experiencia"
               >
                 <span className="text-sm">🪙</span>
                 <span className="text-xs font-semibold">{displayCoins.toFixed(2)}</span>
