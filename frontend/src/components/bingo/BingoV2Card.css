@@ -166,8 +166,10 @@
 }
 
 .bingo-card-90 .bingo-cell {
-  min-height: 40px;
-  font-size: 1rem;
+  aspect-ratio: 1;  /* ✅ FIX: Forzar aspecto cuadrado igual que 75-ball */
+  min-height: 35px; /* Reducido para grids 3x9 */
+  font-size: 0.85rem; /* Reducido para caber mejor */
+  padding: 2px; /* Pequeño padding para números grandes */
 }
 
 /* Responsive adjustments */
@@ -178,6 +180,13 @@
 
   .bingo-cell {
     font-size: 0.9rem;
+  }
+  
+  /* ✅ Ajuste específico para 90-ball en mobile */
+  .bingo-card-90 .bingo-cell {
+    font-size: 0.7rem;
+    min-height: 28px;
+    padding: 1px;
   }
 
   .header-cell {
