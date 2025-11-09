@@ -616,12 +616,16 @@ router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
     );
     
     // Generate new cards
+    logger.info(`🎲 Generating ${cards_count} cards for player ${userId} in room ${room.id}, mode: ${room.mode}`);
+    
     const newCards = await BingoV2Service.generateCards(
       room.id,
       room.player_id,
       cards_count,
       room.mode
     );
+    
+    logger.info(`✅ Generated ${newCards.length} cards for player ${userId}`);
     
     // Emit socket event to notify room about card update
     if (req.io) {

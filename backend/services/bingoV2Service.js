@@ -438,6 +438,8 @@ class BingoV2Service {
       // Get cards for each player
       const players = [];
       for (const player of playersResult.rows) {
+        logger.info(`🔍 Fetching cards for player ${player.user_id} (player_id: ${player.id})`);
+        
         const cardsResult = await dbQuery(
           `SELECT * FROM bingo_v2_cards 
            WHERE room_id = $1 AND player_id = $2
@@ -445,9 +447,24 @@ class BingoV2Service {
           [room.id, player.id]
         );
         
+        logger.info(`📊 Found ${cardsResult.rows.length} cards for player ${player.user_id}`);
+        
+        // CRITICAL FIX: Parse grid as JSON if it's a string
+        const parsedCards = cardsResult.rows.map(card => {
+          const parsed = {
+            ...card,
+            grid: typeof card.grid === 'string' ? JSON.parse(card.grid) : card.grid,
+            marked_numbers: typeof card.marked_numbers === 'string' ? JSON.parse(card.marked_numbers) : card.marked_numbers,
+            marked_positions: typeof card.marked_positions === 'string' ? JSON.parse(card.marked_positions) : card.marked_positions
+          };
+          
+          logger.info(`🎟️ Card ${card.id}: grid type = ${typeof card.grid}, parsed grid type = ${typeof parsed.grid}`);
+          return parsed;
+        });
+        
         players.push({
           ...player,
-          cards: cardsResult.rows
+          cards: parsedCards
         });
       }
 
@@ -1686,13 +1703,22 @@ class BingoV2Service {
           ? this.generate75BallCard() 
           : this.generate90BallCard();
         
+        logger.info(`🎯 Generated grid for card ${i + 1}:`, {
+          mode,
+          gridType: typeof grid,
+          gridLength: Array.isArray(grid) ? grid.length : 'not array',
+          firstRow: Array.isArray(grid) && grid[0] ? grid[0] : null
+        });
+        
         const cardResult = await dbQuery(
           `INSERT INTO bingo_v2_cards 
            (room_id, player_id, card_number, grid, marked_numbers, marked_positions)
-           VALUES ($1, $2, $3, $4, '[]'::jsonb, '[]'::jsonb)
+           VALUES ($1, $2, $3, $4::jsonb, '[]'::jsonb, '[]'::jsonb)
            RETURNING *`,
           [roomId, playerId, i + 1, JSON.stringify(grid)]
         );
+        
+        logger.info(`💾 Card ${i + 1} saved to DB. Returned grid type: ${typeof cardResult.rows[0].grid}`);
         
         cards.push(cardResult.rows[0]);
       }
