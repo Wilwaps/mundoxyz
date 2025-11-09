@@ -1099,60 +1099,90 @@ router.delete('/rooms/:code', verifyToken, async (req, res) => {
         throw new Error('Esta sala no puede ser cerrada');
       }
       
-      // Reembolsar a los jugadores
+      // Reembolsar a los jugadores SOLO del pot de la sala (no crear dinero nuevo)
       let refundedCount = 0;
+      const currency = room.mode; // 'coins' o 'fires'
+      const potTotal = parseFloat(room.mode === 'coins' ? room.pot_coins : room.pot_fires);
       
-      if (room.bet_amount > 0) {
+      if (potTotal > 0) {
         const currencyColumn = room.mode === 'coins' ? 'coins_balance' : 'fires_balance';
         
-        // Reembolsar al host (player X)
-        if (room.player_x_id) {
-          await client.query(
-            `UPDATE wallets 
-             SET ${currencyColumn} = ${currencyColumn} + $1 
-             WHERE user_id = $2`,
-            [room.bet_amount, room.player_x_id]
+        // Calcular cuánto corresponde a cada jugador del pot
+        const playersToRefund = [room.player_x_id, room.player_o_id].filter(Boolean);
+        const refundPerPlayer = playersToRefund.length > 0 ? potTotal / playersToRefund.length : 0;
+        
+        // Reembolsar al host (player X) su parte del pot
+        if (room.player_x_id && refundPerPlayer > 0) {
+          // Obtener balance actual
+          const walletResult = await client.query(
+            `SELECT id, ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+            [room.player_x_id]
           );
           
-          // Registrar transacción SOLO si es fires
-          if (room.mode === 'fires') {
+          if (walletResult.rows.length > 0) {
+            const wallet = walletResult.rows[0];
+            const balanceBefore = parseFloat(wallet.balance);
+            const balanceAfter = balanceBefore + refundPerPlayer;
+            
+            // Actualizar balance
             await client.query(
-              `INSERT INTO wallet_transactions 
-               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
-               SELECT w.id, 'game_refund', 'fires', $1, 
-                      w.fires_balance - $1, w.fires_balance,
-                      'Reembolso TicTacToe - Sala cerrada por admin', $2
-               FROM wallets w WHERE w.user_id = $3`,
-              [room.bet_amount, `tictactoe:${room.code}`, room.player_x_id]
+              `UPDATE wallets 
+               SET ${currencyColumn} = $1,
+                   updated_at = NOW()
+               WHERE user_id = $2`,
+              [balanceAfter, room.player_x_id]
             );
+            
+            // Registrar transacción SOLO si es fires
+            if (room.mode === 'fires') {
+              await client.query(
+                `INSERT INTO wallet_transactions 
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
+                 VALUES ($1, 'game_refund', 'fires', $2, $3, $4, $5, $6)`,
+                [wallet.id, refundPerPlayer, balanceBefore, balanceAfter, 
+                 'Reembolso TicTacToe - Sala cerrada', `tictactoe:${room.code}`]
+              );
+            }
+            
+            refundedCount++;
           }
-          
-          refundedCount++;
         }
         
-        // Reembolsar al invitado (player O) si existe
-        if (room.player_o_id) {
-          await client.query(
-            `UPDATE wallets 
-             SET ${currencyColumn} = ${currencyColumn} + $1 
-             WHERE user_id = $2`,
-            [room.bet_amount, room.player_o_id]
+        // Reembolsar al invitado (player O) su parte del pot
+        if (room.player_o_id && refundPerPlayer > 0) {
+          // Obtener balance actual
+          const walletResult = await client.query(
+            `SELECT id, ${currencyColumn} as balance FROM wallets WHERE user_id = $1`,
+            [room.player_o_id]
           );
           
-          // Registrar transacción SOLO si es fires
-          if (room.mode === 'fires') {
+          if (walletResult.rows.length > 0) {
+            const wallet = walletResult.rows[0];
+            const balanceBefore = parseFloat(wallet.balance);
+            const balanceAfter = balanceBefore + refundPerPlayer;
+            
+            // Actualizar balance
             await client.query(
-              `INSERT INTO wallet_transactions 
-               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
-               SELECT w.id, 'game_refund', 'fires', $1, 
-                      w.fires_balance - $1, w.fires_balance,
-                      'Reembolso TicTacToe - Sala cerrada por admin', $2
-               FROM wallets w WHERE w.user_id = $3`,
-              [room.bet_amount, `tictactoe:${room.code}`, room.player_o_id]
+              `UPDATE wallets 
+               SET ${currencyColumn} = $1,
+                   updated_at = NOW()
+               WHERE user_id = $2`,
+              [balanceAfter, room.player_o_id]
             );
+            
+            // Registrar transacción SOLO si es fires
+            if (room.mode === 'fires') {
+              await client.query(
+                `INSERT INTO wallet_transactions 
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference) 
+                 VALUES ($1, 'game_refund', 'fires', $2, $3, $4, $5, $6)`,
+                [wallet.id, refundPerPlayer, balanceBefore, balanceAfter, 
+                 'Reembolso TicTacToe - Sala cerrada', `tictactoe:${room.code}`]
+              );
+            }
+            
+            refundedCount++;
           }
-          
-          refundedCount++;
         }
       }
       
