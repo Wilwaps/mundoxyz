@@ -76,7 +76,7 @@ const NumberGrid: React.FC<NumberGridProps> = ({
     } else if (state === 'reserved' && isUser) {
       baseClass += 'bg-yellow-500/20 text-yellow-400 ring-2 ring-yellow-500 ';
     } else if (isUser) {
-      baseClass += 'bg-accent/20 text-accent ring-2 ring-accent ';
+      baseClass += 'bg-cyan-500/20 text-cyan-400 ring-2 ring-cyan-500 ';
     } else if (selected) {
       baseClass += 'bg-fire-orange/30 text-fire-orange ring-2 ring-fire-orange ';
     } else {

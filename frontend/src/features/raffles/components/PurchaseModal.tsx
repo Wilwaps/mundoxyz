@@ -495,7 +495,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={!isProcessing ? handleClose : undefined}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-start pl-4 p-4"
           >
             {/* Modal */}
             <motion.div

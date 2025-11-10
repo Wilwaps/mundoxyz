@@ -265,14 +265,14 @@ class RaffleSocketHandler {
       // Obtener números
       const numbersResult = await query(`
         SELECT 
-          rn.idx,
+          rn.number_idx,
           rn.state,
           rn.owner_id,
           u.username as owner_username
         FROM raffle_numbers rn
         LEFT JOIN users u ON rn.owner_id = u.id
         WHERE rn.raffle_id = $1
-        ORDER BY rn.idx
+        ORDER BY rn.number_idx
       `, [raffle.id]);
 
       socket.emit('raffle:state_update', {
