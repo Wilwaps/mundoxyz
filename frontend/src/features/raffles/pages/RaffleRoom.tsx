@@ -251,7 +251,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-br from-dark via-dark to-dark/95 pb-40"
+      className="min-h-screen bg-gradient-to-br from-dark via-dark to-dark/95 pb-48"
     >
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         {/* Header */}
@@ -457,7 +457,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6 pb-8"
+              className="space-y-6 pb-12"
             >
               {/* Grilla de números */}
               <div className="bg-glass rounded-xl p-6">
@@ -475,33 +475,36 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 <motion.div
                   initial={{ y: 100, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-4 z-40 max-w-3xl"
+                  className="fixed bottom-32 left-1/2 transform -translate-x-1/2 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-3 z-40 max-w-3xl w-[92%] sm:w-auto"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="text-text">
-                      <span className="text-sm text-text/60">Seleccionados:</span>
-                      <span className="ml-2 font-bold">{selectedNumbers.length} números</span>
+                  <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="text-text">
+                        <span className="text-text/60">Seleccionados:</span>
+                        <span className="ml-1 font-bold">{selectedNumbers.length}</span>
+                      </div>
+                      
+                      <div className="h-6 w-px bg-white/20" />
+                      
+                      <div className="text-text">
+                        <span className="text-text/60">Total:</span>
+                        <span className="ml-1 font-bold text-fire-orange">
+                          {(selectedNumbers.length * (raffle.mode === RaffleMode.FIRES ? (raffle.entryPriceFire || 0) : (raffle.entryPriceCoin || 0))).toFixed(0)}
+                          {' '}{raffle.mode === RaffleMode.FIRES ? '🔥' : '🪙'}
+                        </span>
+                      </div>
                     </div>
                     
-                    <div className="h-8 w-px bg-white/20" />
-                    
-                    <div className="text-text">
-                      <span className="text-sm text-text/60">Total:</span>
-                      <span className="ml-2 font-bold text-fire-orange">
-                        {raffle.mode === RaffleMode.FIRES ? '🔥' : '🪙'}
-                        {' '}{(selectedNumbers.length * (raffle.mode === RaffleMode.FIRES ? (raffle.entryPriceFire || 0) : (raffle.entryPriceCoin || 0))).toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleProceedToPurchase}
-                      className="btn-primary px-6 py-2 flex items-center gap-2"
-                    >
-                      <ShoppingCart className="w-5 h-5" />
-                      Proceder a Compra
-                    </motion.button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleProceedToPurchase}
+                        className="btn-primary px-4 py-2 flex items-center gap-2 text-sm flex-1 sm:flex-none"
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        Comprar
+                      </motion.button>
                     
                     <button
                       onClick={() => setSelectedNumbers([])}
