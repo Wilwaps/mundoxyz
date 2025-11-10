@@ -486,22 +486,22 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={!isProcessing ? handleClose : undefined}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-          />
-          
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 m-auto w-[92%] max-w-lg h-fit max-h-[90vh] bg-dark rounded-2xl shadow-2xl z-[60] overflow-hidden flex flex-col"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg max-h-[90vh] bg-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col relative"
+            >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">
               {!isProcessing && (
@@ -534,6 +534,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             <div className="flex-1 p-6 overflow-y-auto">
               {renderContent()}
             </div>
+            </motion.div>
           </motion.div>
         </>
       )}
