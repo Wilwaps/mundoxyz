@@ -75,6 +75,9 @@ handleBingoV2Socket(io);
 const RaffleSocketHandler = require('./modules/raffles/socket/events');
 const raffleSocketHandler = new RaffleSocketHandler(io);
 
+// Make io available globally for services
+global.io = io;
+
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
@@ -362,6 +365,51 @@ async function startServer() {
         }
       } catch (error) {
         logger.error('Failed to initialize Telegram bot:', error);
+      }
+    })();
+    
+    // ✅ NUEVO: Scheduler para limpiar reservas expiradas
+    (async () => {
+      try {
+        const raffleService = require('./modules/raffles/services/RaffleServiceV2');
+        
+        // Ejecutar cada 30 segundos
+        setInterval(async () => {
+          try {
+            const expired = await raffleService.cleanExpiredReservations();
+            
+            if (expired && Object.keys(expired).length > 0) {
+              // Emitir eventos WebSocket por cada rifa afectada
+              for (const [raffleId, numbers] of Object.entries(expired)) {
+                // Obtener código de la rifa para el room
+                const { query } = require('./db');
+                const result = await query(
+                  'SELECT code FROM raffles WHERE id = $1',
+                  [raffleId]
+                );
+                
+                if (result.rows.length > 0) {
+                  const raffleCode = result.rows[0].code;
+                  io.to(`raffle_${raffleCode}`).emit('numbers:released', {
+                    numbers,
+                    reason: 'expired'
+                  });
+                  
+                  logger.info('[Scheduler] Reservas liberadas', {
+                    raffleCode,
+                    count: numbers.length
+                  });
+                }
+              }
+            }
+          } catch (err) {
+            logger.error('[Scheduler] Error limpiando reservas:', err);
+          }
+        }, 30000); // 30 segundos
+        
+        logger.info('✅ Scheduler de reservas iniciado (cada 30s)');
+      } catch (error) {
+        logger.error('Failed to initialize reservation scheduler:', error);
       }
     })();
     

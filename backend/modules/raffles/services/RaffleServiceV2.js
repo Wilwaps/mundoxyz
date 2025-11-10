@@ -662,7 +662,7 @@ class RaffleServiceV2 {
         currency: raffle.raffle_mode
       });
       
-      return {
+      const result = {
         success: true,
         transaction: {
           amount: cost,
@@ -670,6 +670,17 @@ class RaffleServiceV2 {
           numberIdx
         }
       };
+      
+      // ✅ NUEVO: Verificar si la rifa debe finalizarse automáticamente
+      setImmediate(async () => {
+        try {
+          await this.checkAndFinishRaffle(raffleId);
+        } catch (err) {
+          logger.error('[RaffleServiceV2] Error verificando finalización', err);
+        }
+      });
+      
+      return result;
       
     } catch (error) {
       // Rollback en caso de error
@@ -685,6 +696,219 @@ class RaffleServiceV2 {
       if (transactionClient) {
         transactionClient.release();
       }
+    }
+  }
+  
+  /**
+   * Verificar y finalizar rifa si todos los números están vendidos
+   */
+  async checkAndFinishRaffle(raffleId) {
+    try {
+      // Verificar si todos los números están vendidos
+      const checkResult = await query(
+        `SELECT 
+           COUNT(*) as total,
+           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold
+         FROM raffle_numbers
+         WHERE raffle_id = $1`,
+        [raffleId]
+      );
+      
+      const { total, sold } = checkResult.rows[0];
+      
+      logger.info('[RaffleServiceV2] Verificando finalización', {
+        raffleId,
+        total: parseInt(total),
+        sold: parseInt(sold)
+      });
+      
+      // Si todos los números están vendidos, finalizar
+      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0) {
+        logger.info('[RaffleServiceV2] Todos los números vendidos - Finalizando rifa', {
+          raffleId
+        });
+        await this.finishRaffle(raffleId);
+      }
+    } catch (error) {
+      logger.error('[RaffleServiceV2] Error verificando finalización', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Finalizar rifa y seleccionar ganador (modo FIRES/PRIZE)
+   */
+  async finishRaffle(raffleId) {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Obtener datos de la rifa
+      const raffleResult = await client.query(
+        `SELECT r.*, rc.company_name
+         FROM raffles r
+         LEFT JOIN raffle_companies rc ON r.company_id = rc.id
+         WHERE r.id = $1`,
+        [raffleId]
+      );
+      
+      if (raffleResult.rows.length === 0) {
+        throw new Error('Rifa no encontrada');
+      }
+      
+      const raffle = raffleResult.rows[0];
+      
+      // Solo finalizar si está activa
+      if (raffle.status !== RaffleStatus.ACTIVE) {
+        logger.warn('[RaffleServiceV2] Rifa no está activa', {
+          raffleId,
+          status: raffle.status
+        });
+        await client.query('ROLLBACK');
+        return;
+      }
+      
+      // Obtener participantes únicos
+      const participantsResult = await client.query(
+        `SELECT DISTINCT rn.owner_id, u.telegram_username, u.display_name
+         FROM raffle_numbers rn
+         JOIN users u ON u.id = rn.owner_id
+         WHERE rn.raffle_id = $1 AND rn.state = 'sold'`,
+        [raffleId]
+      );
+      
+      if (participantsResult.rows.length === 0) {
+        throw new Error('No hay participantes en la rifa');
+      }
+      
+      const participants = participantsResult.rows;
+      
+      // Seleccionar ganador aleatorio
+      const randomIndex = Math.floor(Math.random() * participants.length);
+      const winner = participants[randomIndex];
+      
+      logger.info('[RaffleServiceV2] Ganador seleccionado', {
+        raffleId,
+        winnerId: winner.owner_id,
+        winnerUsername: winner.telegram_username,
+        totalParticipants: participants.length
+      });
+      
+      // Acreditar premio si es modo FIRES o COINS
+      if (raffle.raffle_mode === RaffleMode.FIRES || raffle.raffle_mode === RaffleMode.COINS) {
+        const prizeAmount = raffle.raffle_mode === RaffleMode.FIRES 
+          ? (raffle.pot_fires || 0) 
+          : (raffle.pot_coins || 0);
+        const currency = raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins';
+        const balanceField = currency === 'fires' ? 'fires_balance' : 'coins_balance';
+        
+        if (prizeAmount > 0) {
+          // Obtener wallet del ganador
+          const walletResult = await client.query(
+            `SELECT id, ${balanceField} FROM wallets WHERE user_id = $1`,
+            [winner.owner_id]
+          );
+          
+          if (walletResult.rows.length > 0) {
+            const wallet = walletResult.rows[0];
+            const balanceBefore = wallet[balanceField];
+            
+            // Acreditar premio
+            await client.query(
+              `UPDATE wallets
+               SET ${balanceField} = ${balanceField} + $1
+               WHERE user_id = $2`,
+              [prizeAmount, winner.owner_id]
+            );
+            
+            // Registrar transacción
+            await client.query(
+              `INSERT INTO wallet_transactions
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+               VALUES ($1, 'raffle_prize', $2, $3, $4, $5, $6, $7)`,
+              [
+                wallet.id,
+                currency,
+                prizeAmount,
+                balanceBefore,
+                balanceBefore + prizeAmount,
+                `Premio ganado en rifa ${raffle.code}`,
+                `raffle_win_${raffle.code}`
+              ]
+            );
+            
+            logger.info('[RaffleServiceV2] Premio acreditado', {
+              raffleId,
+              winnerId: winner.owner_id,
+              prize: prizeAmount,
+              currency
+            });
+          }
+        }
+      }
+      
+      // Actualizar estado de la rifa
+      await client.query(
+        `UPDATE raffles
+         SET status = $1,
+             winner_id = $2,
+             finished_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [RaffleStatus.FINISHED, winner.owner_id, raffleId]
+      );
+      
+      await client.query('COMMIT');
+      
+      logger.info('[RaffleServiceV2] Rifa finalizada exitosamente', {
+        raffleId,
+        code: raffle.code,
+        winner: winner.telegram_username,
+        prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
+      });
+      
+      // Emitir evento WebSocket (si está disponible)
+      if (global.io) {
+        global.io.to(`raffle_${raffle.code}`).emit('raffle:finished', {
+          raffleCode: raffle.code,
+          winner: {
+            id: winner.owner_id,
+            username: winner.telegram_username,
+            displayName: winner.display_name
+          },
+          prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+          currency: raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins'
+        });
+        
+        // Notificar a cada participante individualmente
+        for (const participant of participants) {
+          const isWinner = participant.owner_id === winner.owner_id;
+          global.io.to(`user_${participant.owner_id}`).emit('notification', {
+            type: 'raffle_finished',
+            raffleCode: raffle.code,
+            isWinner,
+            winner: winner.telegram_username,
+            prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+            message: isWinner
+              ? `🎉 ¡Felicidades! Ganaste la rifa ${raffle.code}. Premio: ${raffle.pot_fires || raffle.pot_coins} ${raffle.raffle_mode === RaffleMode.FIRES ? '🔥' : '🪙'}`
+              : `La rifa ${raffle.code} finalizó. Ganador: @${winner.telegram_username}`
+          });
+        }
+      }
+      
+      return {
+        success: true,
+        winner,
+        prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
+      };
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('[RaffleServiceV2] Error finalizando rifa', error);
+      throw error;
+    } finally {
+      client.release();
     }
   }
   
