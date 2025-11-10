@@ -216,8 +216,19 @@ class RaffleController {
       const { code, idx } = req.params;
       const userId = req.user.id;
       
+      logger.info('[RaffleController] Intentando reservar número', { code, idx, userId });
+      
       // Obtener rifa
       const raffleData = await raffleService.getRaffleByCode(code);
+      
+      if (!raffleData || !raffleData.raffle) {
+        logger.error('[RaffleController] Rifa no encontrada', { code });
+        return res.status(404).json({
+          success: false,
+          message: 'La rifa no existe o fue eliminada'
+        });
+      }
+      
       const raffle = raffleData.raffle;
       
       // Verificar estado

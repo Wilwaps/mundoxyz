@@ -171,8 +171,19 @@ export const useReserveNumber = () => {
       toast.success(UI_TEXTS.SUCCESS.NUMBER_RESERVED);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || UI_TEXTS.ERRORS.NUMBER_UNAVAILABLE;
-      toast.error(message);
+      console.error('[useReserveNumber] Error reservando:', error);
+      
+      // Mensajes específicos según el código de error
+      if (error.response?.status === 404) {
+        toast.error('Esta rifa no existe o fue eliminada');
+        // Redirigir al lobby después de un momento
+        setTimeout(() => {
+          window.location.href = '/raffles';
+        }, 2000);
+      } else {
+        const message = error.response?.data?.message || UI_TEXTS.ERRORS.NUMBER_UNAVAILABLE;
+        toast.error(message);
+      }
     }
   });
 };
