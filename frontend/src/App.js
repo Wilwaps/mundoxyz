@@ -23,6 +23,7 @@ import TicTacToeRoom from './pages/TicTacToeRoom';
 import RafflesLobby from './features/raffles/pages/RafflesLobby';
 import RaffleRoom from './features/raffles/pages/RaffleRoom';
 import MyRaffles from './features/raffles/pages/MyRaffles';
+import RafflePublicLanding from './features/raffles/pages/RafflePublicLanding';
 import Landing from './pages/Landing';
 
 // Create a client
@@ -104,6 +105,9 @@ function App() {
             <Routes>
               {/* Landing Page Principal (sin login) */}
               <Route path="/landing" element={<Landing />} />
+              
+              {/* Landing Pública de Rifas (sin login) */}
+              <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
               
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />

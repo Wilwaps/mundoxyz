@@ -411,6 +411,40 @@ class RaffleController {
       });
     }
   }
+  
+  /**
+   * Landing pública (sin auth) - Optimizado para empresas
+   * GET /api/raffles/v2/public/:code
+   */
+  async getPublicLanding(req, res) {
+    try {
+      const { code } = req.params;
+      
+      logger.info('[RaffleController] Acceso a landing pública', { code });
+      
+      const result = await raffleService.getPublicLandingData(code);
+      
+      res.json({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      logger.error('[RaffleController] Error en landing pública', { code: req.params.code, error: error.message });
+      
+      if (error.code === ErrorCodes.RAFFLE_NOT_FOUND) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rifa no encontrada'
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo información de la rifa'
+      });
+    }
+  }
 }
 
 module.exports = new RaffleController();

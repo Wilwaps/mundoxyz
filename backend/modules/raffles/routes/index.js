@@ -30,6 +30,12 @@ router.get(
   raffleController.listRaffles.bind(raffleController)
 );
 
+// Landing pública (sin auth, optimizado para empresas)
+router.get(
+  '/public/:code',
+  raffleController.getPublicLanding.bind(raffleController)
+);
+
 // Obtener detalle de rifa (público con info limitada)
 router.get(
   '/:code',

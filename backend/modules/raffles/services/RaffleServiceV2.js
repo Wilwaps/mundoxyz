@@ -754,6 +754,93 @@ class RaffleServiceV2 {
   }
   
   /**
+   * Obtener datos para landing pública (sin auth)
+   * Optimizado para empresas con branding
+   */
+  async getPublicLandingData(code) {
+    try {
+      // Obtener información básica de la rifa con empresa
+      const result = await query(
+        `SELECT 
+          r.id, r.code, r.name, r.description, r.status, r.mode,
+          r.numbers_range, r.entry_price_fire, r.entry_price_coin,
+          r.pot_fires, r.pot_coins, r.created_at, r.starts_at, r.ends_at,
+          u.username as host_username,
+          COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as numbers_sold,
+          COUNT(CASE WHEN rn.state = 'reserved' THEN 1 END) as numbers_reserved,
+          rc.company_name,
+          rc.rif_number,
+          rc.brand_color as primary_color,
+          rc.secondary_color,
+          rc.logo_url,
+          rc.website_url
+         FROM raffles r
+         JOIN users u ON r.host_id = u.id
+         LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
+         LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
+         WHERE r.code = $1
+         GROUP BY r.id, u.username, rc.company_name, rc.rif_number, 
+                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.website_url`,
+        [code]
+      );
+      
+      if (result.rows.length === 0) {
+        throw {
+          code: ErrorCodes.RAFFLE_NOT_FOUND,
+          status: 404
+        };
+      }
+      
+      const raffle = result.rows[0];
+      
+      // Calcular estadísticas
+      const totalNumbers = raffle.numbers_range;
+      const soldNumbers = parseInt(raffle.numbers_sold || 0);
+      const reservedNumbers = parseInt(raffle.numbers_reserved || 0);
+      const availableNumbers = totalNumbers - soldNumbers - reservedNumbers;
+      const progress = totalNumbers > 0 ? Math.round((soldNumbers / totalNumbers) * 100) : 0;
+      
+      // Formatear respuesta optimizada
+      return {
+        raffle: {
+          code: raffle.code,
+          name: raffle.name,
+          description: raffle.description,
+          status: raffle.status,
+          mode: raffle.mode,
+          hostUsername: raffle.host_username,
+          entryPriceFire: raffle.entry_price_fire,
+          entryPriceCoin: raffle.entry_price_coin,
+          potFires: parseFloat(raffle.pot_fires || 0),
+          potCoins: parseFloat(raffle.pot_coins || 0),
+          createdAt: raffle.created_at,
+          startsAt: raffle.starts_at,
+          endsAt: raffle.ends_at
+        },
+        company: raffle.company_name ? {
+          name: raffle.company_name,
+          rif: raffle.rif_number,
+          primaryColor: raffle.primary_color,
+          secondaryColor: raffle.secondary_color,
+          logoUrl: raffle.logo_url,
+          websiteUrl: raffle.website_url
+        } : null,
+        stats: {
+          totalNumbers,
+          soldNumbers,
+          reservedNumbers,
+          availableNumbers,
+          progress
+        }
+      };
+      
+    } catch (error) {
+      logger.error('[RaffleServiceV2] Error obteniendo landing pública', error);
+      throw error;
+    }
+  }
+  
+  /**
    * Crear números en batch optimizado
    * Divide en chunks para evitar queries muy largos
    */
