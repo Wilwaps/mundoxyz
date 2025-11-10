@@ -317,7 +317,8 @@ class RaffleServiceV2 {
           state,
           owner_id,
           u.username as owner_username,
-          reserved_at,
+          reserved_by,
+          reserved_until,
           purchased_at
          FROM raffle_numbers rn
          LEFT JOIN users u ON rn.owner_id = u.id
@@ -331,7 +332,8 @@ class RaffleServiceV2 {
         state: n.state,
         ownerId: n.owner_id,
         ownerUsername: n.owner_username,
-        reservedAt: n.reserved_at,
+        reservedBy: n.reserved_by,
+        reservedUntil: n.reserved_until,
         purchasedAt: n.purchased_at
       }));
       
@@ -381,7 +383,7 @@ class RaffleServiceV2 {
     try {
       // Verificar estado del número
       const checkResult = await dbQuery(
-        `SELECT state, owner_id, reserved_at
+        `SELECT state, owner_id, reserved_by, reserved_until
          FROM raffle_numbers
          WHERE raffle_id = $1 AND number_idx = $2
          FOR UPDATE`,
@@ -402,7 +404,7 @@ class RaffleServiceV2 {
           
           await dbQuery(
             `UPDATE raffle_numbers
-             SET reserved_at = NOW(), reservation_expires_at = $1
+             SET reserved_until = $1
              WHERE raffle_id = $2 AND number_idx = $3`,
             [newExpiry, raffleId, numberIdx]
           );
@@ -425,10 +427,10 @@ class RaffleServiceV2 {
       
       await dbQuery(
         `UPDATE raffle_numbers
-         SET state = $1, owner_id = $2, reserved_at = NOW(), 
-             reservation_expires_at = $3
-         WHERE raffle_id = $4 AND number_idx = $5`,
-        [NumberState.RESERVED, userId, expiresAt, raffleId, numberIdx]
+         SET state = $1, owner_id = $2, reserved_by = $3, 
+             reserved_until = $4
+         WHERE raffle_id = $5 AND number_idx = $6`,
+        [NumberState.RESERVED, userId, userId, expiresAt, raffleId, numberIdx]
       );
       
       logger.info('[RaffleServiceV2] Número reservado', {
@@ -458,8 +460,8 @@ class RaffleServiceV2 {
     try {
       const result = await dbQuery(
         `UPDATE raffle_numbers
-         SET state = $1, owner_id = NULL, reserved_at = NULL,
-             reservation_expires_at = NULL
+         SET state = $1, owner_id = NULL, reserved_by = NULL,
+             reserved_until = NULL
          WHERE raffle_id = $2 AND number_idx = $3 
                AND owner_id = $4 AND state = $5
          RETURNING *`,
@@ -494,9 +496,9 @@ class RaffleServiceV2 {
     try {
       const result = await query(
         `UPDATE raffle_numbers
-         SET state = $1, owner_id = NULL, reserved_at = NULL,
-             reservation_expires_at = NULL
-         WHERE state = $2 AND reservation_expires_at < NOW()
+         SET state = $1, owner_id = NULL, reserved_by = NULL,
+             reserved_until = NULL
+         WHERE state = $2 AND reserved_until < NOW()
          RETURNING raffle_id, number_idx`,
         [NumberState.AVAILABLE, NumberState.RESERVED]
       );
