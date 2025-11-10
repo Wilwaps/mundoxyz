@@ -1,81 +1,101 @@
-# ✅ FIXES: Modal de Compra + Manejo de Errores NOT_FOUND
+# ✅ FIXES: Barra de Selección + Modal Compra + Errores NOT_FOUND
 
-**Fecha**: 2025-11-10 08:40  
-**Commits**: ad8283c (hotfix reserved_at) + 3a41daf (modal + errores)  
-**Problemas Resueltos**: 2 críticos  
+**Fecha**: 2025-11-10 08:56  
+**Commits**: 
+- ad8283c (hotfix reserved_at)
+- 3a41daf (intento incorrecto - modal equivocado)
+- 3f9f345 (FIX CORRECTO - barra selección + purchaseNumber)
+
+**Problemas Resueltos**: 3 críticos  
 
 ---
 
-## 🐛 PROBLEMA 1: Modal de Compra Mal Ubicado
+## 🐛 PROBLEMA 1: Barra de Selección Mal Ubicada (CORREGIDO)
 
 ### Síntoma:
-El modal de compra aparecía centrado en la pantalla en lugar de alineado a la izquierda como se requería.
+La barra flotante que muestra "Seleccionados: X" y el botón "Comprar" estaba centrada en la pantalla. Debía estar alineada a la izquierda.
+
+**⚠️ NOTA**: En el commit 3a41daf se modificó el modal INCORRECTO (PurchaseModal). El problema era con la **barra de selección flotante**, no con el modal de compra.
 
 ### Causa:
-El contenedor backdrop usaba `justify-center` por defecto y el modal no tenía animación de slide desde la izquierda.
+La barra de selección usaba `left-1/2 transform -translate-x-1/2` para centrado horizontal.
 
 ### Solución Aplicada:
 
-**Archivo**: `frontend/src/features/raffles/components/PurchaseModal.tsx` (líneas 492-506)
+**Archivo**: `frontend/src/features/raffles/pages/RaffleRoom.tsx` (líneas 535-541)
 
-**ANTES**:
+**ANTES** (centrado):
 ```tsx
 <motion.div
-  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 
-             flex items-center justify-start pl-4 p-4"
+  initial={{ y: 100, opacity: 0 }}
+  animate={{ y: 0, opacity: 1 }}
+  className="fixed bottom-32 left-1/2 transform -translate-x-1/2 
+             bg-dark rounded-2xl shadow-2xl border border-accent/30 p-3 z-40 
+             max-w-3xl w-[92%] sm:w-auto"
 >
-  <motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.9 }}
-    className="w-full max-w-lg max-h-[90vh] bg-dark rounded-2xl"
-  >
 ```
 
-**DESPUÉS**:
+**DESPUÉS** (alineado izquierda):
 ```tsx
 <motion.div
-  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 
-             flex items-center justify-start p-0"
+  initial={{ x: -100, opacity: 0 }}       // ✅ Slide desde izquierda
+  animate={{ x: 0, opacity: 1 }}
+  exit={{ x: -100, opacity: 0 }}
+  className="fixed bottom-32 left-4      // ✅ Alineado a la izquierda
+             bg-dark rounded-2xl shadow-2xl border border-accent/30 p-3 z-40 
+             w-auto max-w-[calc(100vw-2rem)] sm:max-w-2xl"
 >
-  <motion.div
-    initial={{ opacity: 0, x: -100 }}        // ✅ Slide desde izquierda
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: -100 }}
-    className="w-full max-w-md sm:max-w-lg h-full sm:h-auto 
-               sm:max-h-[95vh] bg-dark sm:rounded-r-2xl 
-               shadow-2xl overflow-hidden flex flex-col relative sm:ml-0"
-  >
 ```
 
 ### Mejoras Visuales:
 
-1. **Animación**: Slide horizontal desde la izquierda (`x: -100 → 0`)
-2. **Responsive**:
-   - **Mobile**: Pantalla completa (`h-full`)
-   - **Desktop**: Modal flotante con altura máxima 95vh
-3. **Bordes**:
-   - **Mobile**: Sin bordes redondeados
-   - **Desktop**: Solo borde derecho redondeado (`sm:rounded-r-2xl`)
-4. **Ancho máximo**:
-   - **Mobile**: `max-w-md` (448px)
-   - **Desktop**: `max-w-lg` (512px)
+1. **Posición**: `left-4` (16px desde el borde izquierdo)
+2. **Animación**: Slide horizontal desde la izquierda (`x: -100 → 0`)
+3. **Ancho adaptativo**: 
+   - **Mobile**: `max-w-[calc(100vw-2rem)]` (full width menos márgenes)
+   - **Desktop**: `max-w-2xl` (672px)
+4. **Exit animation**: Se desliza hacia la izquierda al desaparecer
 
 ---
 
-## 🐛 PROBLEMA 2: Error "NOT_FOUND" al Comprar Números
+## ✅ ACLARACIÓN: Modal de Compra (PurchaseModal)
 
-### Síntoma:
-Al intentar reservar/comprar números, aparecía error:
-```
-[RaffleServiceV2] Error cancelando rifa code: "NOT_FOUND" 
-status: 404
+El **modal de compra** (PurchaseModal.tsx) debe permanecer **CENTRADO**, no a la izquierda.
+
+**Estado actual** (CORRECTO):
+```tsx
+<motion.div
+  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 
+             flex items-center justify-center p-4"    // ✅ CENTRADO
+>
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="w-full max-w-lg max-h-[90vh] bg-dark rounded-2xl"
+  >
 ```
 
-**Railway Logs**:
+**Componentes distintos**:
+- **Barra de selección**: Flotante inferior, muestra números seleccionados → **IZQUIERDA**
+- **Modal de compra**: Overlay completo con formulario de pago → **CENTRO**
+
+---
+
+## 🐛 PROBLEMA 2: Error "NOT_FOUND" al Reservar/Comprar Números
+
+### Síntomas:
+Dos endpoints fallaban con rifas inexistentes:
+
+**1. Al reservar**:
 ```
 POST /api/raffles/v2/253797/numbers/1/reserve
-[RaffleController] Error reservando número code: 'NOT_FOUND'
+[RaffleController] Error reservando número code: 'NOT_FOUND' status: 404
+```
+
+**2. Al comprar** (error reportado en Railway):
+```
+[RaffleServiceV2] Error comprando número code: "RAFFLE_NOT_FOUND" status: 404
+[RaffleController] Error comprando número code: "354208" errorCode: "RAFFLE_NOT_FOUND" idx: "18"
 ```
 
 ### Causa:
@@ -86,9 +106,9 @@ La rifa con código `253797` no existe en la base de datos. Posibles razones:
 
 ### Solución Aplicada:
 
-#### Backend: Mejor Logging y Validación
+#### Backend: Mejor Logging y Validación (2 endpoints)
 
-**Archivo**: `backend/modules/raffles/controllers/RaffleController.js` (líneas 214-230)
+**1. reserveNumber()** - `backend/modules/raffles/controllers/RaffleController.js` (líneas 214-232)
 
 **AGREGADO**:
 ```javascript
@@ -123,7 +143,45 @@ async reserveNumber(req, res) {
 - Validación explícita de existencia
 - Mensaje de error claro para el usuario
 
-#### Frontend: Auto-Redirect si Rifa No Existe
+**2. purchaseNumber()** - `backend/modules/raffles/controllers/RaffleController.js` (líneas 330-347)
+
+**AGREGADO**:
+```javascript
+async purchaseNumber(req, res) {
+  try {
+    const { code, idx } = req.params;
+    const userId = req.user.id;
+    const purchaseData = req.validatedData || req.body;
+    
+    logger.info('[RaffleController] Iniciando compra', {
+      code, idx, userId, paymentMethod: purchaseData?.paymentMethod
+    });
+    
+    // Obtener raffleId desde el código
+    const raffleData = await raffleService.getRaffleByCode(code);
+    
+    // ✅ Validación explícita ANTES de usar raffle
+    if (!raffleData || !raffleData.raffle) {
+      logger.error('[RaffleController] Rifa no encontrada al comprar', { code });
+      return res.status(404).json({
+        success: false,
+        message: 'La rifa no existe o fue eliminada'
+      });
+    }
+    
+    const raffle = raffleData.raffle;  // ✅ Ahora es seguro acceder
+    // ... resto del código
+```
+
+**Problema anterior**:
+El código accedía directamente a `raffle.id` sin validar si `raffleData.raffle` existía, causando crashes silenciosos.
+
+**Beneficios**:
+- Valida existencia ANTES de usar el objeto
+- Log específico para compras
+- Mensaje claro si rifa no existe
+
+#### Frontend: Auto-Redirect si Rifa No Existe (2 hooks)
 
 **Archivo**: `frontend/src/features/raffles/hooks/useRaffleData.ts` (líneas 173-187)
 
@@ -148,10 +206,34 @@ onError: (error: any) => {
 }
 ```
 
-**Beneficios**:
+**Beneficios (useReserveNumber)**:
 - Usuario ve mensaje claro: "Esta rifa no existe o fue eliminada"
 - Redirige automáticamente al lobby de rifas después de 2 segundos
 - Evita que el usuario se quede atascado en una página inválida
+
+**2. usePurchaseNumber** - Mismo archivo (líneas 250-263)
+
+**AGREGADO** (mismo patrón):
+```typescript
+onError: (error: any) => {
+  console.error('[usePurchaseNumber] Error comprando:', error);
+  
+  if (error.response?.status === 404) {
+    toast.error('Esta rifa no existe o fue eliminada');
+    setTimeout(() => {
+      window.location.href = '/raffles';
+    }, 2000);
+  } else {
+    const message = error.response?.data?.message || UI_TEXTS.ERRORS.PAYMENT_FAILED;
+    toast.error(message);
+  }
+}
+```
+
+**Beneficios (usePurchaseNumber)**:
+- Consistencia: ambos hooks (reserve y purchase) manejan error 404 igual
+- Usuario nunca queda en estado de error sin salida
+- Experiencia unificada en toda la app
 
 ---
 
@@ -195,44 +277,57 @@ WHERE raffle_id = $1
 
 ## 📦 ARCHIVOS MODIFICADOS
 
-### Backend:
+### Backend (commit ad8283c + 3f9f345):
 1. `backend/modules/raffles/services/RaffleServiceV2.js`
-   - Corregir columnas `reserved_by` y `reserved_until`
+   - ✅ Corregir columnas `reserved_at` → `reserved_by` + `reserved_until` en `cancelRaffle()`
    
 2. `backend/modules/raffles/controllers/RaffleController.js`
-   - Agregar logging detallado en `reserveNumber()`
-   - Validación explícita de existencia de rifa
-   - Mensaje de error claro
+   - ✅ Logging detallado en `reserveNumber()` (líneas 219-232)
+   - ✅ Validación explícita en `reserveNumber()` antes de usar raffle
+   - ✅ Logging detallado en `purchaseNumber()` (líneas 323-347)
+   - ✅ Validación explícita en `purchaseNumber()` ANTES de acceder a `raffle.id`
+   - ✅ Mensajes de error claros en ambos endpoints
 
-### Frontend:
-3. `frontend/src/features/raffles/components/PurchaseModal.tsx`
-   - Animación slide desde izquierda (`x: -100`)
-   - Modal alineado a la izquierda
-   - Responsive mejorado (mobile fullscreen, desktop flotante)
-   - Bordes adaptativos
+### Frontend (commit 3a41daf + 3f9f345):
+3. `frontend/src/features/raffles/pages/RaffleRoom.tsx`
+   - ✅ Barra de selección alineada a la izquierda (`left-4`)
+   - ✅ Animación slide horizontal (`x: -100 → 0`)
+   - ✅ Ancho adaptativo responsive
 
-4. `frontend/src/features/raffles/hooks/useRaffleData.ts`
-   - Manejo específico de error 404 en `useReserveNumber`
-   - Auto-redirect al lobby si rifa no existe
-   - Logging de errores en consola
+4. `frontend/src/features/raffles/components/PurchaseModal.tsx`
+   - ✅ REVERTIDO a centrado (commit 3a41daf era incorrecto)
+   - ✅ Modal permanece centrado como debe ser
+
+5. `frontend/src/features/raffles/hooks/useRaffleData.ts`
+   - ✅ Manejo error 404 en `useReserveNumber()` (líneas 173-187)
+   - ✅ Manejo error 404 en `usePurchaseNumber()` (líneas 250-263)
+   - ✅ Auto-redirect al lobby `/raffles` en ambos hooks
+   - ✅ Logging de errores en consola
 
 ---
 
 ## 🧪 TESTING MANUAL REQUERIDO
 
-### 1. Modal de Compra (UI):
-- [ ] Abrir modal de compra en mobile
-  - ✅ Debe ocupar pantalla completa
-  - ✅ Sin bordes redondeados
-  - ✅ Slide desde izquierda
+### 1. Barra de Selección (UI):
+- [ ] Seleccionar números en una rifa activa
+  - ✅ Barra flotante aparece en la parte inferior
+  - ✅ Debe estar alineada a la IZQUIERDA (16px del borde)
+  - ✅ Slide horizontal desde la izquierda
+  - ✅ Muestra "Seleccionados: X" y total con emoji correcto
   
-- [ ] Abrir modal de compra en desktop
-  - ✅ Debe estar alineado a la izquierda
-  - ✅ Borde derecho redondeado
-  - ✅ Ancho máximo 512px
-  - ✅ Slide horizontal suave
+- [ ] Responsive de la barra
+  - ✅ Mobile: se adapta al ancho con márgenes
+  - ✅ Desktop: max-width 672px (2xl)
+  - ✅ Exit animation: se desliza hacia la izquierda
 
-### 2. Error NOT_FOUND:
+### 2. Modal de Compra (UI):
+- [ ] Click en botón "Comprar" de la barra de selección
+  - ✅ Modal debe aparecer CENTRADO (no a la izquierda)
+  - ✅ Animación scale (0.9 → 1.0)
+  - ✅ Backdrop blur correcto
+  - ✅ Formulario completo visible
+
+### 3. Error NOT_FOUND:
 - [ ] Intentar acceder a rifa que no existe
   - ✅ Ver toast: "Esta rifa no existe o fue eliminada"
   - ✅ Auto-redirect a `/raffles` después de 2s
