@@ -1000,7 +1000,8 @@ class RaffleServiceV2 {
         `UPDATE raffle_numbers 
          SET state = 'available',
              owner_id = NULL,
-             reserved_at = NULL
+             reserved_by = NULL,
+             reserved_until = NULL
          WHERE raffle_id = $1`,
         [raffle.id]
       );
