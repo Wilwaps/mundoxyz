@@ -46,6 +46,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'numbers' | 'info' | 'winners'>('numbers');
+  const [refreshTimer, setRefreshTimer] = useState<NodeJS.Timeout | null>(null);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -53,7 +54,28 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const numbers = raffleData.numbers;
   const isLoading = raffleData.isLoading;
   const error = raffleData.error;
-  const refetch = () => { window.location.reload(); }; // Temporal
+  
+  // Debounced refetch para evitar múltiples actualizaciones simultáneas
+  const debouncedRefetch = useCallback(() => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+    }
+    
+    const timer = setTimeout(() => {
+      raffleData.forceRefresh();
+    }, 300); // 300ms debounce
+    
+    setRefreshTimer(timer);
+  }, [raffleData, refreshTimer]);
+  
+  // Cleanup del timer
+  useEffect(() => {
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+    };
+  }, [refreshTimer]);
   
   // Mutations
   const reserveNumbers = useReserveNumber();
@@ -85,36 +107,47 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     }
   }, [socket, code]);
   
-  // Manejadores de eventos socket
+  // Manejadores de eventos socket - optimizados para no refrescar en eventos propios
   const handleNumberReserved = useCallback((data: any) => {
     console.log('Number reserved:', data);
-    refetch();
-  }, [refetch]);
+    // Solo refrescar si no es el usuario actual
+    if (data.userId !== user?.id) {
+      debouncedRefetch();
+    }
+  }, [debouncedRefetch, user]);
   
   const handleNumberReleased = useCallback((data: any) => {
     console.log('Number released:', data);
-    refetch();
-  }, [refetch]);
+    // Siempre refrescar cuando se liberen números
+    debouncedRefetch();
+  }, [debouncedRefetch]);
   
   const handleNumberPurchased = useCallback((data: any) => {
     console.log('Number purchased:', data);
-    refetch();
-    if (data.userId === user?.id) {
+    // Refrescar solo si es otro usuario
+    if (data.userId !== user?.id) {
+      debouncedRefetch();
+      toast(`Número ${data.number} vendido`, { icon: '🎫' });
+    } else {
+      // Para el usuario actual, forzar refresh inmediato
+      raffleData.forceRefresh();
       toast.success(`¡Compraste el número ${data.number}!`);
     }
-  }, [refetch, user]);
+  }, [debouncedRefetch, raffleData, user]);
   
   const handleStatusChanged = useCallback((data: any) => {
     console.log('Status changed:', data);
-    refetch();
+    raffleData.forceRefresh();
     if (data.status === 'finished') {
       toast.success('¡La rifa ha finalizado!');
+      // Limpiar selección
+      setSelectedNumbers([]);
     }
-  }, [refetch]);
+  }, [raffleData]);
   
   const handleWinnerDrawn = useCallback((data: any) => {
     console.log('Winner drawn:', data);
-    refetch();
+    raffleData.forceRefresh();
     if (data.winnerId === user?.id) {
       toast.success('🎉 ¡FELICIDADES! ¡Has ganado la rifa! 🎉', {
         duration: 10000,
@@ -123,7 +156,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     } else {
       toast.success(`El ganador es: ${data.winnerName}`);
     }
-  }, [refetch, user]);
+  }, [raffleData, user]);
   
   const handleRaffleCancelled = useCallback((data: any) => {
     console.log('Raffle cancelled:', data);
@@ -173,26 +206,66 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     });
   };
   
-  // Proceder a compra
+  // Proceder a compra - OPTIMIZADO: reserva batch
   const handleProceedToPurchase = async () => {
     if (selectedNumbers.length === 0) {
       toast.error('Selecciona al menos un número');
       return;
     }
     
+    // Verificar que la rifa sigue activa
+    if (!raffle || raffle.status !== RaffleStatus.ACTIVE) {
+      toast.error('Esta rifa ya no está disponible');
+      setSelectedNumbers([]);
+      return;
+    }
+    
+    const toastId = toast.loading(`Reservando ${selectedNumbers.length} número${selectedNumbers.length > 1 ? 's' : ''}...`);
+    
     try {
-      // Primero reservar los números
-      // Reservar cada número individualmente
+      // Reservar números individualmente pero con manejo de errores mejorado
+      let reservedCount = 0;
+      const failedNumbers: number[] = [];
+      
       for (const num of selectedNumbers) {
-        await reserveNumbers.mutateAsync({
-          code: code!,
-          idx: num
-        });
+        try {
+          await reserveNumbers.mutateAsync({
+            code: code!,
+            idx: num
+          });
+          reservedCount++;
+        } catch (err: any) {
+          console.error(`Error reservando número ${num}:`, err);
+          failedNumbers.push(num);
+          
+          // Si la rifa no existe, detener todo
+          if (err.response?.status === 404 || err.response?.data?.code === 'NOT_FOUND') {
+            toast.error('Esta rifa ya no existe o fue eliminada', { id: toastId });
+            setTimeout(() => navigate('/raffles'), 2000);
+            return;
+          }
+        }
       }
       
-      setShowPurchaseModal(true);
-    } catch (error) {
-      // Error ya manejado en el hook
+      if (failedNumbers.length > 0) {
+        toast.error(
+          `No se pudieron reservar ${failedNumbers.length} número${failedNumbers.length > 1 ? 's' : ''}: ${failedNumbers.join(', ')}`,
+          { id: toastId, duration: 5000 }
+        );
+        // Remover números que no se pudieron reservar
+        setSelectedNumbers(prev => prev.filter(n => !failedNumbers.includes(n)));
+      }
+      
+      if (reservedCount > 0) {
+        toast.success(`${reservedCount} número${reservedCount > 1 ? 's' : ''} reservado${reservedCount > 1 ? 's' : ''}`, { id: toastId });
+        setShowPurchaseModal(true);
+      } else {
+        toast.error('No se pudo reservar ningún número', { id: toastId });
+      }
+      
+    } catch (error: any) {
+      console.error('Error en handleProceedToPurchase:', error);
+      toast.error('Error al reservar números', { id: toastId });
     }
   };
   
