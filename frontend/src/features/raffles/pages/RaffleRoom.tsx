@@ -162,8 +162,10 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       if (prev.includes(number)) {
         return prev.filter(n => n !== number);
       } else {
-        if (prev.length >= 10) {
-          toast.error('Máximo 10 números por compra');
+        // Límite flexible: máximo 50 números por compra
+        const MAX_NUMBERS_PER_PURCHASE = 50;
+        if (prev.length >= MAX_NUMBERS_PER_PURCHASE) {
+          toast.error(`Máximo ${MAX_NUMBERS_PER_PURCHASE} números por compra`);
           return prev;
         }
         return [...prev, number];
