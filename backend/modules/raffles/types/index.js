@@ -107,6 +107,7 @@ const ErrorCodes = {
   RAFFLE_FULL: 'RAFFLE_FULL',
   
   // Números
+  NUMBER_NOT_FOUND: 'NUMBER_NOT_FOUND',
   NUMBER_NOT_AVAILABLE: 'NUMBER_NOT_AVAILABLE',
   NUMBER_ALREADY_RESERVED: 'NUMBER_ALREADY_RESERVED',
   NUMBER_ALREADY_SOLD: 'NUMBER_ALREADY_SOLD',
@@ -114,6 +115,7 @@ const ErrorCodes = {
   MAX_NUMBERS_EXCEEDED: 'MAX_NUMBERS_EXCEEDED',
   
   // Pagos
+  WALLET_NOT_FOUND: 'WALLET_NOT_FOUND',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
   INVALID_PAYMENT_METHOD: 'INVALID_PAYMENT_METHOD',
   PAYMENT_FAILED: 'PAYMENT_FAILED',
@@ -136,12 +138,14 @@ const ErrorMessages = {
   [ErrorCodes.RAFFLE_EXPIRED]: 'La rifa ha expirado',
   [ErrorCodes.RAFFLE_FULL]: 'Todos los números han sido vendidos',
   
+  [ErrorCodes.NUMBER_NOT_FOUND]: 'Número no encontrado',
   [ErrorCodes.NUMBER_NOT_AVAILABLE]: 'El número no está disponible',
   [ErrorCodes.NUMBER_ALREADY_RESERVED]: 'El número ya está reservado',
   [ErrorCodes.NUMBER_ALREADY_SOLD]: 'El número ya ha sido vendido',
   [ErrorCodes.RESERVATION_EXPIRED]: 'Tu reserva ha expirado',
   [ErrorCodes.MAX_NUMBERS_EXCEEDED]: 'Has alcanzado el límite máximo de números',
   
+  [ErrorCodes.WALLET_NOT_FOUND]: 'Wallet no encontrado',
   [ErrorCodes.INSUFFICIENT_BALANCE]: 'Saldo insuficiente',
   [ErrorCodes.INVALID_PAYMENT_METHOD]: 'Método de pago inválido',
   [ErrorCodes.PAYMENT_FAILED]: 'El pago no pudo ser procesado',

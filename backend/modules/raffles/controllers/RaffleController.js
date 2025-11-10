@@ -302,25 +302,35 @@ class RaffleController {
       const userId = req.user.id;
       const purchaseData = req.validatedData || req.body;
       
-      // Por ahora retornamos un placeholder
-      // Este método se implementará en la Fase 2
+      // Obtener raffleId desde el código
+      const raffle = await raffleService.getRaffleByCode(code);
+      
+      if (!raffle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rifa no encontrada'
+        });
+      }
+      
+      // Llamar al servicio para procesar la compra
+      const result = await raffleService.purchaseNumber(
+        raffle.id,
+        parseInt(idx),
+        userId,
+        purchaseData
+      );
       
       res.json({
         success: true,
-        message: 'Compra registrada (pendiente implementación completa)',
-        transaction: {
-          id: Date.now().toString(),
-          amount: 0,
-          currency: 'fires',
-          numberIdx: parseInt(idx)
-        }
+        message: 'Número comprado exitosamente',
+        transaction: result.transaction
       });
       
     } catch (error) {
       logger.error('[RaffleController] Error comprando número', error);
       res.status(error.status || 500).json({
         success: false,
-        message: ErrorMessages[error.code] || 'Error comprando número'
+        message: error.message || ErrorMessages[error.code] || 'Error comprando número'
       });
     }
   }

@@ -490,6 +490,211 @@ class RaffleServiceV2 {
   }
   
   /**
+   * Comprar número (convertir reserva a compra)
+   */
+  async purchaseNumber(raffleId, numberIdx, userId, paymentData = {}) {
+    let transactionClient = null;
+    const useTransaction = true; // Siempre usar transacción para compras
+    
+    try {
+      // Iniciar transacción
+      transactionClient = await getClient();
+      await transactionClient.query('BEGIN');
+      const dbQuery = transactionClient.query.bind(transactionClient);
+      
+      logger.info('[RaffleServiceV2] Comprando número', {
+        raffleId,
+        numberIdx,
+        userId
+      });
+      
+      // 1. Obtener detalles de la rifa
+      const raffleResult = await dbQuery(
+        `SELECT r.*, r.mode as raffle_mode, r.entry_price_fire, r.entry_price_coin
+         FROM raffles r
+         WHERE r.id = $1 AND r.status = 'active'
+         FOR UPDATE`,
+        [raffleId]
+      );
+      
+      if (raffleResult.rows.length === 0) {
+        throw { code: ErrorCodes.RAFFLE_NOT_FOUND, status: 404 };
+      }
+      
+      const raffle = raffleResult.rows[0];
+      
+      // 2. Verificar estado del número (debe estar reservado por este usuario)
+      const numberResult = await dbQuery(
+        `SELECT state, owner_id, reserved_by, reserved_until
+         FROM raffle_numbers
+         WHERE raffle_id = $1 AND number_idx = $2
+         FOR UPDATE`,
+        [raffleId, numberIdx]
+      );
+      
+      if (numberResult.rows.length === 0) {
+        throw { code: ErrorCodes.NUMBER_NOT_FOUND, status: 404 };
+      }
+      
+      const numberData = numberResult.rows[0];
+      
+      // Validar que esté reservado por este usuario
+      if (numberData.state !== NumberState.RESERVED || numberData.reserved_by !== userId) {
+        throw { 
+          code: ErrorCodes.UNAUTHORIZED, 
+          status: 403,
+          message: 'Número no reservado por este usuario'
+        };
+      }
+      
+      // Validar que no haya expirado
+      if (numberData.reserved_until && new Date(numberData.reserved_until) < new Date()) {
+        throw {
+          code: ErrorCodes.RESERVATION_EXPIRED,
+          status: 400,
+          message: 'Reserva expirada'
+        };
+      }
+      
+      // 3. Determinar costo según modo de rifa
+      let cost = 0;
+      let currency = '';
+      
+      if (raffle.raffle_mode === RaffleMode.FIRES) {
+        cost = raffle.entry_price_fire || 10;
+        currency = 'fires';
+      } else if (raffle.raffle_mode === RaffleMode.COINS) {
+        cost = raffle.entry_price_coin || 10;
+        currency = 'coins';
+      }
+      // Modo PRIZE se maneja diferente (aprobación manual)
+      
+      // 4. Si es modo fires/coins, validar y cobrar
+      if (raffle.raffle_mode !== RaffleMode.PRIZE) {
+        // Obtener balance del usuario
+        const walletResult = await dbQuery(
+          `SELECT fires_balance, coins_balance
+           FROM wallets
+           WHERE user_id = $1
+           FOR UPDATE`,
+          [userId]
+        );
+        
+        if (walletResult.rows.length === 0) {
+          throw {
+            code: ErrorCodes.WALLET_NOT_FOUND,
+            status: 404,
+            message: 'Wallet no encontrado'
+          };
+        }
+        
+        const wallet = walletResult.rows[0];
+        const currentBalance = currency === 'fires' ? wallet.fires_balance : wallet.coins_balance;
+        
+        // VALIDACIÓN CRÍTICA: Verificar balance suficiente
+        if (currentBalance < cost) {
+          throw {
+            code: ErrorCodes.INSUFFICIENT_BALANCE,
+            status: 400,
+            message: `Balance insuficiente. Necesitas ${cost} ${currency}, tienes ${currentBalance}`
+          };
+        }
+        
+        // 5. Cobrar del wallet
+        const balanceField = currency === 'fires' ? 'fires_balance' : 'coins_balance';
+        const spentField = currency === 'fires' ? 'total_fires_spent' : 'total_coins_spent';
+        
+        await dbQuery(
+          `UPDATE wallets
+           SET ${balanceField} = ${balanceField} - $1,
+               ${spentField} = ${spentField} + $1
+           WHERE user_id = $2`,
+          [cost, userId]
+        );
+        
+        // 6. Registrar transacción
+        await dbQuery(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           VALUES ($1, 'debit', $2, $3, $4, $5, $6, $7)`,
+          [
+            userId,
+            currency,
+            cost,
+            currentBalance,
+            currentBalance - cost,
+            `Compra número ${numberIdx} en rifa ${raffle.code}`,
+            `raffle_${raffle.code}_num_${numberIdx}`
+          ]
+        );
+        
+        // 7. Actualizar pot de la rifa
+        const potField = currency === 'fires' ? 'pot_fires' : 'pot_coins';
+        await dbQuery(
+          `UPDATE raffles
+           SET ${potField} = COALESCE(${potField}, 0) + $1
+           WHERE id = $2`,
+          [cost, raffleId]
+        );
+        
+        logger.info('[RaffleServiceV2] Pago procesado', {
+          userId,
+          cost,
+          currency,
+          newBalance: currentBalance - cost
+        });
+      }
+      
+      // 8. Marcar número como SOLD
+      await dbQuery(
+        `UPDATE raffle_numbers
+         SET state = $1,
+             owner_id = $2,
+             purchased_at = NOW(),
+             reserved_by = NULL,
+             reserved_until = NULL
+         WHERE raffle_id = $3 AND number_idx = $4`,
+        [NumberState.SOLD, userId, raffleId, numberIdx]
+      );
+      
+      // Commit transacción
+      await transactionClient.query('COMMIT');
+      
+      logger.info('[RaffleServiceV2] Número comprado exitosamente', {
+        raffleId,
+        numberIdx,
+        userId,
+        cost,
+        currency: raffle.raffle_mode
+      });
+      
+      return {
+        success: true,
+        transaction: {
+          amount: cost,
+          currency: currency || raffle.raffle_mode,
+          numberIdx
+        }
+      };
+      
+    } catch (error) {
+      // Rollback en caso de error
+      if (transactionClient) {
+        await transactionClient.query('ROLLBACK');
+      }
+      
+      logger.error('[RaffleServiceV2] Error comprando número', error);
+      throw error;
+      
+    } finally {
+      // Liberar conexión
+      if (transactionClient) {
+        transactionClient.release();
+      }
+    }
+  }
+  
+  /**
    * Limpiar reservas expiradas (Job)
    */
   async cleanExpiredReservations() {
