@@ -955,6 +955,19 @@ class RaffleServiceV2 {
           [refundAmount, purchase.owner_id]
         );
         
+        // Obtener wallet_id (INTEGER) para la transacción
+        const walletResult = await client.query(
+          `SELECT id FROM wallets WHERE user_id = $1`,
+          [purchase.owner_id]
+        );
+        
+        if (walletResult.rows.length === 0) {
+          logger.warn('[RaffleServiceV2] Wallet no encontrado para reembolso', {
+            userId: purchase.owner_id
+          });
+          continue;
+        }
+        
         // Registrar transacción de reembolso
         await client.query(
           `INSERT INTO wallet_transactions 
@@ -968,7 +981,7 @@ class RaffleServiceV2 {
              $5
            )`,
           [
-            purchase.owner_id,
+            walletResult.rows[0].id,  // ✅ FIX: usar wallet.id (INTEGER), no userId (UUID)
             raffle.mode === RaffleMode.FIRES ? 'fires' : 'coins',
             refundAmount,
             `Reembolso por cancelación de rifa ${raffle.code}`,
