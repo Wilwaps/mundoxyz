@@ -302,8 +302,21 @@ class RaffleController {
       const userId = req.user.id;
       const purchaseData = req.validatedData || req.body;
       
+      logger.info('[RaffleController] Iniciando compra', {
+        code,
+        idx,
+        userId,
+        paymentMethod: purchaseData?.paymentMethod
+      });
+      
       // Obtener raffleId desde el código
       const raffle = await raffleService.getRaffleByCode(code);
+      
+      logger.info('[RaffleController] Rifa encontrada', {
+        raffleId: raffle.id,
+        mode: raffle.mode,
+        status: raffle.status
+      });
       
       if (!raffle) {
         return res.status(404).json({
@@ -320,6 +333,12 @@ class RaffleController {
         purchaseData
       );
       
+      logger.info('[RaffleController] Compra exitosa', {
+        userId,
+        numberIdx: idx,
+        amount: result.transaction?.amount
+      });
+      
       res.json({
         success: true,
         message: 'Número comprado exitosamente',
@@ -327,7 +346,14 @@ class RaffleController {
       });
       
     } catch (error) {
-      logger.error('[RaffleController] Error comprando número', error);
+      logger.error('[RaffleController] Error comprando número', {
+        code: req.params.code,
+        idx: req.params.idx,
+        userId: req.user?.id,
+        error: error.message,
+        errorCode: error.code,
+        stack: error.stack
+      });
       res.status(error.status || 500).json({
         success: false,
         message: error.message || ErrorMessages[error.code] || 'Error comprando número'
