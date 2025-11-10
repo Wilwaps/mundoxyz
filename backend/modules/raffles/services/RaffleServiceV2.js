@@ -879,6 +879,154 @@ class RaffleServiceV2 {
     });
   }
   
+  /**
+   * Cancelar rifa y reembolsar compradores desde el pot
+   */
+  async cancelRaffle(code) {
+    const client = await getClient();
+    
+    try {
+      await client.query('BEGIN');
+      
+      logger.info('[RaffleServiceV2] Iniciando cancelación de rifa', { code });
+      
+      // Obtener rifa
+      const raffleResult = await client.query(
+        `SELECT r.id, r.code, r.status, r.mode, r.pot_fires, r.pot_coins
+         FROM raffles r
+         WHERE r.code = $1`,
+        [code]
+      );
+      
+      if (raffleResult.rows.length === 0) {
+        const error = new Error('Rifa no encontrada');
+        error.code = ErrorCodes.RAFFLE_NOT_FOUND;
+        throw error;
+      }
+      
+      const raffle = raffleResult.rows[0];
+      
+      if (raffle.status === RaffleStatus.CANCELLED) {
+        const error = new Error('La rifa ya está cancelada');
+        error.code = ErrorCodes.INVALID_OPERATION;
+        throw error;
+      }
+      
+      if (raffle.status === RaffleStatus.FINISHED) {
+        const error = new Error('No se puede cancelar una rifa finalizada');
+        error.code = ErrorCodes.INVALID_OPERATION;
+        throw error;
+      }
+      
+      // Obtener números vendidos agrupados por comprador
+      const purchasesResult = await client.query(
+        `SELECT 
+           rn.owner_id,
+           COUNT(*) as numbers_count,
+           SUM(CASE 
+             WHEN r.mode = 'fires' THEN r.entry_price_fire 
+             ELSE r.entry_price_coin 
+           END) as total_spent
+         FROM raffle_numbers rn
+         JOIN raffles r ON r.id = rn.raffle_id
+         WHERE rn.raffle_id = $1 
+           AND rn.state = 'sold'
+           AND rn.owner_id IS NOT NULL
+         GROUP BY rn.owner_id`,
+        [raffle.id]
+      );
+      
+      logger.info('[RaffleServiceV2] Números vendidos encontrados', {
+        code,
+        buyers: purchasesResult.rows.length,
+        totalNumbers: purchasesResult.rows.reduce((sum, p) => sum + parseInt(p.numbers_count), 0)
+      });
+      
+      // Reembolsar a cada comprador
+      for (const purchase of purchasesResult.rows) {
+        const refundAmount = parseFloat(purchase.total_spent);
+        const currencyColumn = raffle.mode === RaffleMode.FIRES ? 'fires_balance' : 'coins_balance';
+        
+        // Acreditar reembolso a wallet del comprador
+        await client.query(
+          `UPDATE wallets 
+           SET ${currencyColumn} = ${currencyColumn} + $1
+           WHERE user_id = $2`,
+          [refundAmount, purchase.owner_id]
+        );
+        
+        // Registrar transacción de reembolso
+        await client.query(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, description, reference)
+           VALUES (
+             $1, 
+             'refund', 
+             $2, 
+             $3, 
+             $4,
+             $5
+           )`,
+          [
+            purchase.owner_id,
+            raffle.mode === RaffleMode.FIRES ? 'fires' : 'coins',
+            refundAmount,
+            `Reembolso por cancelación de rifa ${raffle.code}`,
+            `raffle_cancel_${raffle.code}`
+          ]
+        );
+        
+        logger.info('[RaffleServiceV2] Reembolso procesado', {
+          code,
+          userId: purchase.owner_id,
+          amount: refundAmount,
+          currency: raffle.mode
+        });
+      }
+      
+      // Actualizar estado de la rifa a CANCELLED
+      await client.query(
+        `UPDATE raffles 
+         SET status = $1,
+             pot_fires = 0,
+             pot_coins = 0,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [RaffleStatus.CANCELLED, raffle.id]
+      );
+      
+      // Liberar todos los números vendidos/reservados
+      await client.query(
+        `UPDATE raffle_numbers 
+         SET state = 'available',
+             owner_id = NULL,
+             reserved_at = NULL
+         WHERE raffle_id = $1`,
+        [raffle.id]
+      );
+      
+      await client.query('COMMIT');
+      
+      logger.info('[RaffleServiceV2] Rifa cancelada exitosamente', {
+        code,
+        refundedUsers: purchasesResult.rows.length
+      });
+      
+      return {
+        success: true,
+        refundedUsers: purchasesResult.rows.length,
+        totalRefunded: purchasesResult.rows.reduce((sum, p) => sum + parseFloat(p.total_spent), 0)
+      };
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('[RaffleServiceV2] Error cancelando rifa', { code, error: error.message });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
   formatRaffleResponse(raffle) {
     return {
       id: raffle.id,

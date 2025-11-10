@@ -136,17 +136,24 @@ class RaffleController {
   }
   
   /**
-   * Cancelar rifa (solo host o admin)
+   * Cancelar rifa (solo host, admin o Tote)
    */
   async cancelRaffle(req, res) {
     try {
       const { code } = req.params;
       const userId = req.user.id;
+      const userTgId = req.user.tg_id;
       
       // Verificar permisos
       const raffle = await raffleService.getRaffleByCode(code);
       
-      if (raffle.raffle.hostId !== userId && !req.user.roles?.includes('admin')) {
+      // Permitir: host de la rifa, admin, rol Tote, o usuario específico con tg_id 1417856820
+      const isHost = raffle.raffle.hostId === userId;
+      const isAdmin = req.user.roles?.includes('admin');
+      const isTote = req.user.roles?.includes('Tote');
+      const isToteUser = userTgId === '1417856820';
+      
+      if (!isHost && !isAdmin && !isTote && !isToteUser) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para cancelar esta rifa'

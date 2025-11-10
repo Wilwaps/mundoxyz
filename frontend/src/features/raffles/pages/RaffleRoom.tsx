@@ -22,12 +22,13 @@ import {
   TrendingUp,
   Info,
   DollarSign,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSocket } from '../../../contexts/SocketContext';
-import { useRaffle, useReserveNumber, usePurchaseNumber } from '../hooks/useRaffleData';
+import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
 import { RaffleStatus, RaffleMode, NumberState } from '../types';
@@ -57,6 +58,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   // Mutations
   const reserveNumbers = useReserveNumber();
   const purchaseNumbers = usePurchaseNumber();
+  const cancelRaffle = useCancelRaffle();
   
   // Conectar a socket room
   useEffect(() => {
@@ -69,6 +71,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       socket.on('raffle:number_purchased', handleNumberPurchased);
       socket.on('raffle:status_changed', handleStatusChanged);
       socket.on('raffle:winner_drawn', handleWinnerDrawn);
+      socket.on('raffle:cancelled', handleRaffleCancelled);
       
       return () => {
         socket.emit('raffle:leave_room', { code });
@@ -77,6 +80,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
         socket.off('raffle:number_purchased');
         socket.off('raffle:status_changed');
         socket.off('raffle:winner_drawn');
+        socket.off('raffle:cancelled');
       };
     }
   }, [socket, code]);
@@ -120,6 +124,16 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       toast.success(`El ganador es: ${data.winnerName}`);
     }
   }, [refetch, user]);
+  
+  const handleRaffleCancelled = useCallback((data: any) => {
+    console.log('Raffle cancelled:', data);
+    toast.error('⚠️ Esta rifa ha sido cancelada. Serás reembolsado automáticamente.', {
+      duration: 6000
+    });
+    setTimeout(() => {
+      navigate('/raffles');
+    }, 3000);
+  }, [navigate]);
   
   // Manejar selección de números
   const handleNumberClick = (number: number) => {
@@ -199,6 +213,30 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     }
     
     setShowShareMenu(false);
+  };
+  
+  // Cancelar rifa
+  const handleCancelRaffle = async () => {
+    if (!code) return;
+    
+    const confirmCancel = window.confirm(
+      '⚠️ ¿Estás seguro de cancelar esta rifa?\n\n' +
+      'Esto hará lo siguiente:\n' +
+      '• Se reembolsarán todos los compradores desde el pot\n' +
+      '• La rifa quedará marcada como CANCELADA\n' +
+      '• No se podrá revertir esta acción\n\n' +
+      '¿Deseas continuar?'
+    );
+    
+    if (!confirmCancel) return;
+    
+    try {
+      await cancelRaffle.mutateAsync(code);
+      toast.success('Rifa cancelada exitosamente. Todos los compradores fueron reembolsados.');
+      setTimeout(() => navigate('/raffles'), 2000);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al cancelar la rifa');
+    }
   };
   
   // Calcular estadísticas desde los datos del hook
@@ -355,8 +393,26 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 <button
                   onClick={() => navigate(`/raffles/${code}/manage`)}
                   className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
+                  title="Administrar rifa"
                 >
                   <Settings className="w-5 h-5 text-text" />
+                </button>
+              )}
+              
+              {/* Botón cancelar rifa - Para host, admin, Tote o usuario específico */}
+              {(user?.id === raffle.hostId || 
+                user?.roles?.includes('admin') || 
+                user?.roles?.includes('Tote') ||
+                (user as any)?.tg_id === '1417856820') &&
+                raffle.status !== RaffleStatus.FINISHED &&
+                raffle.status !== RaffleStatus.CANCELLED && (
+                <button
+                  onClick={handleCancelRaffle}
+                  disabled={cancelRaffle.isPending}
+                  className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                  title="Cancelar rifa y reembolsar compradores"
+                >
+                  <Trash2 className="w-5 h-5 text-red-400" />
                 </button>
               )}
             </div>
