@@ -484,7 +484,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                         <span className="ml-1 font-bold">{selectedNumbers.length}</span>
                       </div>
                       
-                      <div className="h-6 w-px bg-white/20" />
+                      <div className="h-6 w-px bg-white/20"></div>
                       
                       <div className="text-text">
                         <span className="text-text/60">Total:</span>
@@ -494,6 +494,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                         </span>
                       </div>
                     </div>
+                    
                     
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <motion.button
@@ -506,12 +507,13 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                         Comprar
                       </motion.button>
                     
-                    <button
-                      onClick={() => setSelectedNumbers([])}
-                      className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
-                    >
-                      <XCircle className="w-5 h-5 text-text/60" />
-                    </button>
+                      <button
+                        onClick={() => setSelectedNumbers([])}
+                        className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
+                      >
+                        <XCircle className="w-5 h-5 text-text/60" />
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
