@@ -497,10 +497,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
           
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-dark rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[85vh] flex flex-col"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed inset-0 m-auto w-[92%] max-w-lg h-fit max-h-[90vh] bg-dark rounded-2xl shadow-2xl z-[60] overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">

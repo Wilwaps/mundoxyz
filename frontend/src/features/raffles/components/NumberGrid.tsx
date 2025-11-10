@@ -66,7 +66,7 @@ const NumberGrid: React.FC<NumberGridProps> = ({
     const isUser = isUserNumber(idx);
     const selected = isSelected(idx);
     
-    let baseClass = 'relative w-12 h-12 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-200 cursor-pointer select-none ';
+    let baseClass = 'relative w-14 h-14 rounded-lg flex items-center justify-center font-bold text-base transition-all duration-200 cursor-pointer select-none ';
     
     // Estado base del número
     if (state === 'sold' && !isUser) {
@@ -180,7 +180,7 @@ const NumberGrid: React.FC<NumberGridProps> = ({
       
       {/* Grilla de números */}
       <div 
-        className={`grid gap-2 p-4 bg-glass rounded-xl`}
+        className={`grid gap-3 p-6 bg-glass rounded-xl`}
         style={{
           gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`
         }}
