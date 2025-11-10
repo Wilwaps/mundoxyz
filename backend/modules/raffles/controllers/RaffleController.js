@@ -328,20 +328,23 @@ class RaffleController {
       });
       
       // Obtener raffleId desde el código
-      const raffle = await raffleService.getRaffleByCode(code);
+      const raffleData = await raffleService.getRaffleByCode(code);
+      
+      if (!raffleData || !raffleData.raffle) {
+        logger.error('[RaffleController] Rifa no encontrada al comprar', { code });
+        return res.status(404).json({
+          success: false,
+          message: 'La rifa no existe o fue eliminada'
+        });
+      }
+      
+      const raffle = raffleData.raffle;
       
       logger.info('[RaffleController] Rifa encontrada', {
         raffleId: raffle.id,
         mode: raffle.mode,
         status: raffle.status
       });
-      
-      if (!raffle) {
-        return res.status(404).json({
-          success: false,
-          message: 'Rifa no encontrada'
-        });
-      }
       
       // Llamar al servicio para procesar la compra
       const result = await raffleService.purchaseNumber(

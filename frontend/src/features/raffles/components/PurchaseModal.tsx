@@ -495,15 +495,15 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={!isProcessing ? handleClose : undefined}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-start p-0"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
-            {/* Modal - Alineado a la izquierda */}
+            {/* Modal - Centrado */}
             <motion.div
-              initial={{ opacity: 0, x: -100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md sm:max-w-lg h-full sm:h-auto sm:max-h-[95vh] bg-dark sm:rounded-r-2xl shadow-2xl overflow-hidden flex flex-col relative sm:ml-0"
+              className="w-full max-w-lg max-h-[90vh] bg-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col relative"
             >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">

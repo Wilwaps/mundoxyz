@@ -248,8 +248,19 @@ export const usePurchaseNumber = () => {
       toast.success(UI_TEXTS.SUCCESS.PURCHASE_COMPLETED);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || UI_TEXTS.ERRORS.PAYMENT_FAILED;
-      toast.error(message);
+      console.error('[usePurchaseNumber] Error comprando:', error);
+      
+      // Mensajes específicos según el código de error
+      if (error.response?.status === 404) {
+        toast.error('Esta rifa no existe o fue eliminada');
+        // Redirigir al lobby después de un momento
+        setTimeout(() => {
+          window.location.href = '/raffles';
+        }, 2000);
+      } else {
+        const message = error.response?.data?.message || UI_TEXTS.ERRORS.PAYMENT_FAILED;
+        toast.error(message);
+      }
     }
   });
 };

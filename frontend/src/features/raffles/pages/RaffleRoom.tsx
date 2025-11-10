@@ -532,12 +532,13 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 />
               </div>
               
-              {/* Barra de compra flotante */}
+              {/* Barra de compra flotante - Alineada a la izquierda */}
               {selectedNumbers.length > 0 && raffle.status === 'active' && (
                 <motion.div
-                  initial={{ y: 100, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="fixed bottom-32 left-1/2 transform -translate-x-1/2 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-3 z-40 max-w-3xl w-[92%] sm:w-auto"
+                  initial={{ x: -100, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: -100, opacity: 0 }}
+                  className="fixed bottom-32 left-4 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-3 z-40 w-auto max-w-[calc(100vw-2rem)] sm:max-w-2xl"
                 >
                   <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
                     <div className="flex items-center gap-3 text-sm">
