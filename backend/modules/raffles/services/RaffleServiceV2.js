@@ -1170,18 +1170,11 @@ class RaffleServiceV2 {
       for (const purchase of purchasesResult.rows) {
         const refundAmount = parseFloat(purchase.total_spent);
         const currencyColumn = raffle.mode === RaffleMode.FIRES ? 'fires_balance' : 'coins_balance';
+        const currency = raffle.mode === RaffleMode.FIRES ? 'fires' : 'coins';
         
-        // Acreditar reembolso a wallet del comprador
-        await client.query(
-          `UPDATE wallets 
-           SET ${currencyColumn} = ${currencyColumn} + $1
-           WHERE user_id = $2`,
-          [refundAmount, purchase.owner_id]
-        );
-        
-        // Obtener wallet_id (INTEGER) para la transacción
+        // Obtener wallet y balance ANTES del reembolso
         const walletResult = await client.query(
-          `SELECT id FROM wallets WHERE user_id = $1`,
+          `SELECT id, ${currencyColumn} FROM wallets WHERE user_id = $1`,
           [purchase.owner_id]
         );
         
@@ -1192,22 +1185,29 @@ class RaffleServiceV2 {
           continue;
         }
         
+        const wallet = walletResult.rows[0];
+        const balanceBefore = parseFloat(wallet[currencyColumn]);
+        const balanceAfter = balanceBefore + refundAmount;
+        
+        // Acreditar reembolso a wallet del comprador
+        await client.query(
+          `UPDATE wallets 
+           SET ${currencyColumn} = ${currencyColumn} + $1
+           WHERE user_id = $2`,
+          [refundAmount, purchase.owner_id]
+        );
+        
         // Registrar transacción de reembolso
         await client.query(
           `INSERT INTO wallet_transactions 
-           (wallet_id, type, currency, amount, description, reference)
-           VALUES (
-             $1, 
-             'refund', 
-             $2, 
-             $3, 
-             $4,
-             $5
-           )`,
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+           VALUES ($1, 'refund', $2, $3, $4, $5, $6, $7)`,
           [
-            walletResult.rows[0].id,  // ✅ FIX: usar wallet.id (INTEGER), no userId (UUID)
-            raffle.mode === RaffleMode.FIRES ? 'fires' : 'coins',
+            wallet.id,
+            currency,
             refundAmount,
+            balanceBefore,
+            balanceAfter,
             `Reembolso por cancelación de rifa ${raffle.code}`,
             `raffle_cancel_${raffle.code}`
           ]
