@@ -81,36 +81,28 @@ class RaffleServiceV2 {
       if (visibility === 'company' && companyConfig) {
         await dbQuery(
           `INSERT INTO raffle_companies (
-            raffle_id, company_name, rif_number, brand_color,
+            raffle_id, company_name, rif_number, brand_color, secondary_color,
             logo_url, website_url
-          ) VALUES ($1, $2, $3, $4, $5, $6)`,
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             raffle.id,
             companyConfig.companyName,
             companyConfig.rifNumber,
             companyConfig.primaryColor || null,
+            companyConfig.secondaryColor || null,
             companyConfig.logoUrl || null,
             companyConfig.websiteUrl || null
           ]
         );
       }
       
-      // Crear números disponibles
-      const numbers = [];
-      for (let i = 0; i < numbersRange; i++) {
-        numbers.push(`(${raffle.id}, ${i}, 'available')`);
-      }
-      
-      if (numbers.length > 0) {
-        await dbQuery(
-          `INSERT INTO raffle_numbers (raffle_id, number_idx, state) 
-           VALUES ${numbers.join(', ')}`
-        );
-      }
+      // Crear números disponibles (optimizado con batch)
+      await this.createNumbersBatch(raffle.id, numbersRange, dbQuery);
       
       logger.info('[RaffleServiceV2] Rifa creada exitosamente', { 
         raffleId: raffle.id, 
-        code 
+        code,
+        numbersRange 
       });
       
       return this.formatRaffleResponse(raffle);
@@ -232,13 +224,14 @@ class RaffleServiceV2 {
           COUNT(CASE WHEN rn.state = 'reserved' THEN 1 END) as numbers_reserved,
           rc.company_name,
           rc.brand_color as primary_color,
+          rc.secondary_color,
           rc.logo_url
          FROM raffles r
          JOIN users u ON r.host_id = u.id
          LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          ${whereClause}
-         GROUP BY r.id, u.username, rc.company_name, rc.brand_color, rc.logo_url
+         GROUP BY r.id, u.username, rc.company_name, rc.brand_color, rc.secondary_color, rc.logo_url
          ORDER BY ${orderBy}
          LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
         params
@@ -273,6 +266,7 @@ class RaffleServiceV2 {
           rc.company_name,
           rc.rif_number,
           rc.brand_color as primary_color,
+          rc.secondary_color,
           rc.logo_url,
           rc.website_url
          FROM raffles r
@@ -281,7 +275,7 @@ class RaffleServiceV2 {
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.code = $1
          GROUP BY r.id, u.username, rc.company_name, rc.rif_number, 
-                  rc.brand_color, rc.logo_url, rc.website_url`,
+                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.website_url`,
         [code]
       );
       
@@ -759,6 +753,45 @@ class RaffleServiceV2 {
     throw new Error('No se pudo generar código único');
   }
   
+  /**
+   * Crear números en batch optimizado
+   * Divide en chunks para evitar queries muy largos
+   */
+  async createNumbersBatch(raffleId, totalNumbers, dbQuery) {
+    const CHUNK_SIZE = 1000;
+    const chunks = Math.ceil(totalNumbers / CHUNK_SIZE);
+    
+    logger.info('[RaffleServiceV2] Iniciando creación de números en batch', {
+      raffleId,
+      totalNumbers,
+      chunks
+    });
+    
+    for (let chunk = 0; chunk < chunks; chunk++) {
+      const start = chunk * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, totalNumbers);
+      const numbers = [];
+      
+      for (let i = start; i < end; i++) {
+        numbers.push(`(${raffleId}, ${i}, 'available')`);
+      }
+      
+      if (numbers.length > 0) {
+        await dbQuery(
+          `INSERT INTO raffle_numbers (raffle_id, number_idx, state) 
+           VALUES ${numbers.join(', ')}`
+        );
+        
+        logger.debug(`[RaffleServiceV2] Chunk ${chunk + 1}/${chunks} insertado: ${numbers.length} números`);
+      }
+    }
+    
+    logger.info('[RaffleServiceV2] Números creados exitosamente', {
+      raffleId,
+      totalNumbers
+    });
+  }
+  
   formatRaffleResponse(raffle) {
     return {
       id: raffle.id,
@@ -785,6 +818,7 @@ class RaffleServiceV2 {
         companyName: raffle.company_name,
         rifNumber: raffle.rif_number,
         primaryColor: raffle.primary_color,
+        secondaryColor: raffle.secondary_color,
         logoUrl: raffle.logo_url,
         websiteUrl: raffle.website_url
       } : null,
