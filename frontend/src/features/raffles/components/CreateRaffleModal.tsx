@@ -16,13 +16,16 @@ import {
   FileText,
   Image,
   AlertCircle,
-  Check
+  Check,
+  Upload,
+  Palette
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateRaffle } from '../hooks/useRaffleData';
 import { CreateRaffleForm, RaffleMode, RaffleVisibility } from '../types';
 import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
+import { VENEZUELAN_BANKS } from '../../../constants/banks';
 
 interface CreateRaffleModalProps {
   isOpen: boolean;
@@ -39,6 +42,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   const createRaffle = useCreateRaffle();
   
   const [step, setStep] = useState(1);
+  const [isCompanyMode, setIsCompanyMode] = useState(false);
   const [formData, setFormData] = useState<CreateRaffleForm>({
     name: '',
     description: '',
@@ -56,9 +60,11 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       prizeImages: [],
       bankingInfo: {
         accountHolder: '',
+        bankCode: '',
         bankName: '',
         accountNumber: '',
         accountType: 'ahorro',
+        idNumber: '',
         phone: ''
       }
     },
@@ -285,6 +291,142 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 <p className="text-xs text-red-500 mt-1">{errors.numbersRange}</p>
               )}
             </div>
+            
+            {/* Toggle Modo Empresa */}
+            <div className="pt-4 border-t border-white/10">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isCompanyMode}
+                  onChange={(e) => {
+                    setIsCompanyMode(e.target.checked);
+                    if (e.target.checked) {
+                      updateField('visibility', RaffleVisibility.COMPANY);
+                      updateField('mode', RaffleMode.PRIZE);
+                    } else {
+                      updateField('visibility', RaffleVisibility.PUBLIC);
+                      updateField('companyConfig', undefined);
+                    }
+                  }}
+                  className="w-5 h-5 rounded bg-glass border-2 border-white/20 checked:bg-accent checked:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
+                />
+                <div>
+                  <div className="text-sm font-medium text-text flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Modo Empresa
+                  </div>
+                  <div className="text-xs text-text/60">
+                    Activa landing pública personalizada con branding
+                  </div>
+                </div>
+              </label>
+            </div>
+            
+            {/* Campos de Empresa (condicional) */}
+            {isCompanyMode && (
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <h4 className="text-sm font-semibold text-text">
+                  Información de la Empresa (Opcional)
+                </h4>
+                
+                <div>
+                  <label className="block text-sm text-text/80 mb-1">
+                    Nombre de la Empresa
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.companyConfig?.companyName || ''}
+                    onChange={(e) => updateField('companyConfig', {
+                      ...formData.companyConfig,
+                      companyName: e.target.value
+                    })}
+                    placeholder="Ej: Tech Store Venezuela"
+                    className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-text/80 mb-1">
+                    RIF
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.companyConfig?.rifNumber || ''}
+                    onChange={(e) => updateField('companyConfig', {
+                      ...formData.companyConfig,
+                      rifNumber: e.target.value
+                    })}
+                    placeholder="J-123456789"
+                    className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+                
+                {/* Upload Logo */}
+                <div>
+                  <label className="block text-sm text-text/80 mb-1">
+                    Logo de la Empresa
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          toast.success('Logo seleccionado (carga pendiente)');
+                          // TODO: Implementar upload a Cloudinary/S3
+                        }
+                      }}
+                      className="hidden"
+                      id="company-logo-upload"
+                    />
+                    <label
+                      htmlFor="company-logo-upload"
+                      className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-sm">Subir logo de empresa</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-text/60 mt-1">PNG o JPG. Máx. 2MB</p>
+                </div>
+                
+                {/* Selectores de Color */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1 flex items-center gap-2">
+                      <Palette className="w-4 h-4" />
+                      Color Primario
+                    </label>
+                    <input
+                      type="color"
+                      value={formData.companyConfig?.primaryColor || '#8B5CF6'}
+                      onChange={(e) => updateField('companyConfig', {
+                        ...formData.companyConfig,
+                        primaryColor: e.target.value
+                      })}
+                      className="w-full h-10 rounded-lg cursor-pointer bg-glass border-2 border-white/20 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1 flex items-center gap-2">
+                      <Palette className="w-4 h-4" />
+                      Color Secundario
+                    </label>
+                    <input
+                      type="color"
+                      value={formData.companyConfig?.secondaryColor || '#06B6D4'}
+                      onChange={(e) => updateField('companyConfig', {
+                        ...formData.companyConfig,
+                        secondaryColor: e.target.value
+                      })}
+                      className="w-full h-10 rounded-lg cursor-pointer bg-glass border-2 border-white/20 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
         
@@ -295,6 +437,19 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
               Modo de Rifa
             </h3>
             
+            {/* Aviso si modo empresa está activo */}
+            {isCompanyMode && (
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-3">
+                <div className="flex items-start gap-2">
+                  <Building2 className="w-4 h-4 text-accent mt-0.5" />
+                  <div className="text-xs text-accent">
+                    <p className="font-semibold">Modo Empresa Activo</p>
+                    <p>Las rifas empresariales siempre usan modo Premio</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Selector de modo */}
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -303,12 +458,13 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
               ].map(mode => (
                 <button
                   key={mode.value}
-                  onClick={() => updateField('mode', mode.value)}
+                  onClick={() => !isCompanyMode && updateField('mode', mode.value)}
+                  disabled={isCompanyMode && mode.value !== RaffleMode.PRIZE}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     formData.mode === mode.value
                       ? 'border-accent bg-accent/20'
                       : 'border-white/10 bg-glass hover:bg-glass-lighter'
-                  }`}
+                  } ${isCompanyMode && mode.value !== RaffleMode.PRIZE ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   <div className="text-3xl mb-2">{mode.icon}</div>
                   <div className="text-sm font-medium text-text">{mode.label}</div>
@@ -433,22 +589,50 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     />
                   </div>
                   
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Banco *
+                    </label>
+                    <select
+                      value={formData.prizeMeta?.bankingInfo?.bankCode || ''}
+                      onChange={(e) => {
+                        const selected = VENEZUELAN_BANKS.find(b => b.code === e.target.value);
+                        updateField('prizeMeta', {
+                          ...formData.prizeMeta,
+                          bankingInfo: {
+                            ...formData.prizeMeta?.bankingInfo,
+                            bankCode: e.target.value,
+                            bankName: selected?.fullName || ''
+                          }
+                        });
+                      }}
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="">Seleccionar banco...</option>
+                      {VENEZUELAN_BANKS.map(bank => (
+                        <option key={bank.code} value={bank.code}>
+                          {bank.code} - {bank.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm text-text/80 mb-1">
-                        Banco *
+                        Número de Cédula *
                       </label>
                       <input
                         type="text"
-                        value={formData.prizeMeta?.bankingInfo?.bankName || ''}
+                        value={formData.prizeMeta?.bankingInfo?.idNumber || ''}
                         onChange={(e) => updateField('prizeMeta', {
                           ...formData.prizeMeta,
                           bankingInfo: {
                             ...formData.prizeMeta?.bankingInfo,
-                            bankName: e.target.value
+                            idNumber: e.target.value
                           }
                         })}
-                        placeholder="Ej: Banco Venezuela"
+                        placeholder="V-12345678"
                         className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
                       />
                     </div>

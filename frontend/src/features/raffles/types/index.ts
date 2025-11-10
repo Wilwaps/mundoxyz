@@ -107,9 +107,11 @@ export interface CompanyConfig {
 // Información bancaria para rifas con premio
 export interface BankingInfo {
   accountHolder: string;
+  bankCode: string;  // Código del banco (ej: 0102, 0134)
   bankName: string;
   accountNumber: string;
   accountType: 'ahorro' | 'corriente';
+  idNumber: string;  // Cédula/ID del titular
   phone: string;
 }
 

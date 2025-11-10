@@ -414,6 +414,7 @@ CREATE TABLE IF NOT EXISTS raffle_companies (
   company_name VARCHAR(200) NOT NULL,
   rif_number VARCHAR(50),
   brand_color VARCHAR(7) DEFAULT '#8B5CF6',
+  secondary_color VARCHAR(7) DEFAULT '#06B6D4',
   logo_url TEXT,
   website_url TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -422,6 +423,8 @@ CREATE TABLE IF NOT EXISTS raffle_companies (
 CREATE INDEX IF NOT EXISTS idx_raffle_companies_raffle ON raffle_companies(raffle_id);
 
 COMMENT ON TABLE raffle_companies IS 'Información de empresas patrocinadoras';
+COMMENT ON COLUMN raffle_companies.brand_color IS 'Color primario de marca (HEX)';
+COMMENT ON COLUMN raffle_companies.secondary_color IS 'Color secundario de marca (HEX)';
 
 -- ============================================
 -- 13. RAFFLE_PARTICIPANTS
