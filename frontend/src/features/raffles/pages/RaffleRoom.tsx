@@ -475,7 +475,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 <motion.div
                   initial={{ y: 100, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-4 z-40"
+                  className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-dark rounded-2xl shadow-2xl border border-accent/30 p-4 z-40 max-w-3xl"
                 >
                   <div className="flex items-center gap-4">
                     <div className="text-text">

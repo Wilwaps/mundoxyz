@@ -500,7 +500,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-dark rounded-2xl shadow-2xl z-50 overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-dark rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[85vh] flex flex-col"
           >
             {/* Header */}
             <div className="relative p-6 bg-gradient-to-r from-accent/20 to-fire-orange/20">
@@ -531,7 +531,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             </div>
             
             {/* Content */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="flex-1 p-6 overflow-y-auto">
               {renderContent()}
             </div>
           </motion.div>
