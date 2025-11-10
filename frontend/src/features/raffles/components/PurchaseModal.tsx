@@ -55,7 +55,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     proofImage: null as File | null
   });
   
-  const totalCost = selectedNumbers.length * (raffle?.entryPrice || 0);
+  const pricePerNumber = raffle?.mode === 'fires' 
+    ? (raffle?.entryPriceFire || 0) 
+    : (raffle?.entryPriceCoin || 0);
+  const totalCost = selectedNumbers.length * pricePerNumber;
   const userBalance = raffle?.mode === 'fires' 
     ? user?.fires_balance || 0 
     : user?.coins_balance || 0;
@@ -417,7 +420,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
           <div className="flex justify-between text-sm">
             <span className="text-text/60">Precio por número:</span>
             <span className="text-text">
-              {raffle?.entryPrice} {raffle?.mode === 'fires' ? '🔥' : '🪙'}
+              {pricePerNumber} {raffle?.mode === 'fires' ? '🔥' : '🪙'}
             </span>
           </div>
           
