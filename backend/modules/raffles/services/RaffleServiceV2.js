@@ -567,7 +567,7 @@ class RaffleServiceV2 {
       if (raffle.raffle_mode !== RaffleMode.PRIZE) {
         // Obtener balance del usuario
         const walletResult = await dbQuery(
-          `SELECT fires_balance, coins_balance
+          `SELECT id, fires_balance, coins_balance
            FROM wallets
            WHERE user_id = $1
            FOR UPDATE`,
@@ -612,7 +612,7 @@ class RaffleServiceV2 {
            (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
            VALUES ($1, 'debit', $2, $3, $4, $5, $6, $7)`,
           [
-            userId,
+            wallet.id,  // ✅ FIX: usar wallet.id (INTEGER), no userId (UUID)
             currency,
             cost,
             currentBalance,
