@@ -349,14 +349,37 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             </div>
             
             {/* Acciones */}
-            <div className="flex items-center gap-2">
+            <div className="flex gap-2">
+              {/* Botón cancelar rifa - Posición destacada */}
+              {(user?.id === raffle.hostId || 
+                user?.roles?.includes('admin') || 
+                user?.roles?.includes('Tote') ||
+                (user as any)?.tg_id === '1417856820') &&
+                raffle.status !== RaffleStatus.FINISHED &&
+                raffle.status !== RaffleStatus.CANCELLED && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCancelRaffle}
+                  disabled={cancelRaffle.isPending}
+                  className="px-3 py-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium text-red-400"
+                  title="Cancelar rifa y reembolsar compradores"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Cancelar Rifa</span>
+                </motion.button>
+              )}
+              
+              {/* Botón compartir */}
               <div className="relative">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowShareMenu(!showShareMenu)}
                   className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
                 >
                   <Share2 className="w-5 h-5 text-text" />
-                </button>
+                </motion.button>
                 
                 <AnimatePresence>
                   {showShareMenu && (
@@ -396,23 +419,6 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   title="Administrar rifa"
                 >
                   <Settings className="w-5 h-5 text-text" />
-                </button>
-              )}
-              
-              {/* Botón cancelar rifa - Para host, admin, Tote o usuario específico */}
-              {(user?.id === raffle.hostId || 
-                user?.roles?.includes('admin') || 
-                user?.roles?.includes('Tote') ||
-                (user as any)?.tg_id === '1417856820') &&
-                raffle.status !== RaffleStatus.FINISHED &&
-                raffle.status !== RaffleStatus.CANCELLED && (
-                <button
-                  onClick={handleCancelRaffle}
-                  disabled={cancelRaffle.isPending}
-                  className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
-                  title="Cancelar rifa y reembolsar compradores"
-                >
-                  <Trash2 className="w-5 h-5 text-red-400" />
                 </button>
               )}
             </div>

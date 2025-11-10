@@ -16,8 +16,12 @@ import {
   Eye,
   Award,
   Building2,
-  Globe
+  Globe,
+  Trash2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useCancelRaffle } from '../hooks/useRaffleData';
 import { Raffle } from '../types';
 import { STATUS_COLORS, STATUS_MESSAGES } from '../constants';
 
@@ -35,6 +39,8 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
   showStats = true
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const cancelRaffle = useCancelRaffle();
   
   // Calcular progreso
   const progress = (raffle.numbersSold / raffle.numbersRange) * 100;
@@ -58,12 +64,40 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
   const statusColor = STATUS_COLORS[raffle.status] || 'bg-gray-500';
   const statusText = STATUS_MESSAGES[raffle.status] || raffle.status;
   
+  // Verificar permisos para cancelar
+  const canCancel = user && (
+    raffle.hostId === user.id ||
+    user.roles?.includes('admin') ||
+    user.roles?.includes('Tote') ||
+    (user as any)?.tg_id === '1417856820'
+  ) && raffle.status !== 'finished' && raffle.status !== 'cancelled';
+  
   // Manejar click
   const handleClick = () => {
     if (onClick) {
       onClick();
     } else {
       navigate(`/raffles/${raffle.code}`);
+    }
+  };
+  
+  // Manejar cancelación
+  const handleCancelRaffle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const confirmCancel = window.confirm(
+      `⚠️ ¿Cancelar "${raffle.name}"?\n\n` +
+      'Se reembolsarán todos los compradores.\n' +
+      'Esta acción no se puede revertir.'
+    );
+    
+    if (!confirmCancel) return;
+    
+    try {
+      await cancelRaffle.mutateAsync(raffle.code);
+      toast.success('Rifa cancelada y compradores reembolsados');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al cancelar');
     }
   };
   
@@ -105,12 +139,27 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
         onClick={handleClick}
         className="relative bg-gradient-to-br from-accent/20 to-fire-orange/20 rounded-xl overflow-hidden cursor-pointer group"
       >
-        {/* Badge de destacado */}
-        <div className="absolute top-3 right-3 z-10">
+        {/* Badges y acciones superiores */}
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          {/* Badge de destacado */}
           <div className="bg-fire-orange text-dark px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
             <Award className="w-3 h-3" />
             DESTACADA
           </div>
+          
+          {/* Botón cancelar (si tiene permisos) */}
+          {canCancel && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleCancelRaffle}
+              disabled={cancelRaffle.isPending}
+              className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              title="Cancelar rifa"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </motion.button>
+          )}
         </div>
         
         {/* Logo de empresa si existe */}
@@ -198,11 +247,26 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
     >
       {/* Header con estado */}
       <div className="relative p-4 pb-0">
-        {/* Badge de estado */}
-        <div className="absolute top-3 right-3">
+        {/* Botones de acción superior */}
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {/* Badge de estado */}
           <div className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColor}`}>
             {statusText}
           </div>
+          
+          {/* Botón cancelar (si tiene permisos) */}
+          {canCancel && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleCancelRaffle}
+              disabled={cancelRaffle.isPending}
+              className="p-1.5 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              title="Cancelar rifa"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </motion.button>
+          )}
         </div>
         
         {/* Tipo de rifa */}
