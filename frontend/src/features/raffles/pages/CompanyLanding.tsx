@@ -40,11 +40,11 @@ const CompanyLanding: React.FC<CompanyLandingProps> = () => {
   
   // Estadísticas en tiempo real
   const stats = {
-    totalNumbers: raffle?.numbers_range || 0,
+    totalNumbers: raffle?.numbersRange || 0,
     soldNumbers: numbers?.filter(n => n.state === 'sold').length || 0,
-    participants: new Set(numbers?.filter(n => n.state === 'sold').map(n => n.owner_id)).size || 0,
-    progress: Math.round(((numbers?.filter(n => n.state === 'sold').length || 0) / (raffle?.numbers_range || 1)) * 100),
-    timeLeft: raffle?.ends_at ? Math.max(0, new Date(raffle.ends_at).getTime() - Date.now()) : null
+    participants: new Set(numbers?.filter(n => n.state === 'sold').map(n => n.ownerId)).size || 0,
+    progress: Math.round(((numbers?.filter(n => n.state === 'sold').length || 0) / (raffle?.numbersRange || 1)) * 100),
+    timeLeft: raffle?.endsAt ? Math.max(0, new Date(raffle.endsAt).getTime() - Date.now()) : null
   };
   
   if (isLoading) {
@@ -269,7 +269,7 @@ const CompanyLanding: React.FC<CompanyLandingProps> = () => {
             </div>
             
             <NumberGrid
-              totalNumbers={raffle.numbers_range}
+              totalNumbers={raffle.numbersRange}
               numbers={numbers}
               onNumberClick={(idx) => {
                 if (selectedNumbers.includes(idx)) {
@@ -392,6 +392,7 @@ const CompanyLanding: React.FC<CompanyLandingProps> = () => {
       <AnimatePresence>
         {showPurchaseModal && (
           <PurchaseModal
+            isOpen={showPurchaseModal}
             raffle={raffle}
             selectedNumbers={selectedNumbers}
             onClose={() => setShowPurchaseModal(false)}
