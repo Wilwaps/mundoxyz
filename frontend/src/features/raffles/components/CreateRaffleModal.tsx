@@ -718,129 +718,6 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-text mb-2">
-              Visibilidad
-            </h3>
-            
-            {/* Selector de visibilidad */}
-            <div className="space-y-2">
-              {[
-                {
-                  value: 'public',
-                  label: 'Pública',
-                  icon: Globe,
-                  description: 'Visible para todos los usuarios'
-                },
-                {
-                  value: 'private',
-                  label: 'Privada',
-                  icon: Lock,
-                  description: 'Solo accesible con código'
-                },
-                {
-                  value: 'company',
-                  label: 'Empresa',
-                  icon: Building2,
-                  description: 'Rifa patrocinada por empresa'
-                }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => updateField('visibility', option.value as RaffleVisibility)}
-                  className={`w-full p-3 rounded-lg border-2 transition-all flex items-start gap-3 ${
-                    formData.visibility === option.value
-                      ? 'border-accent bg-accent/20'
-                      : 'border-white/10 bg-glass hover:bg-glass-lighter'
-                  }`}
-                >
-                  <option.icon className="w-5 h-5 text-text/80 mt-0.5" />
-                  <div className="text-left">
-                    <div className="font-medium text-text">{option.label}</div>
-                    <div className="text-xs text-text/60">{option.description}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            
-            {/* Configuración de empresa */}
-            {formData.visibility === 'company' && (
-              <div className="space-y-3 mt-4 pt-4 border-t border-white/10">
-                <h4 className="text-sm font-semibold text-text">
-                  Información de la Empresa
-                </h4>
-                
-                <div>
-                  <label className="block text-sm text-text/80 mb-1">
-                    Nombre de la Empresa *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.companyConfig?.companyName || ''}
-                    onChange={(e) => updateField('companyConfig', {
-                      ...formData.companyConfig,
-                      companyName: e.target.value
-                    })}
-                    placeholder="Ej: Tech Store Venezuela"
-                    className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-text/80 mb-1">
-                    RIF
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.companyConfig?.rifNumber || ''}
-                    onChange={(e) => updateField('companyConfig', {
-                      ...formData.companyConfig,
-                      rifNumber: e.target.value
-                    })}
-                    placeholder="J-123456789"
-                    className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Fechas */}
-            <div className="space-y-3 pt-4 border-t border-white/10">
-              <h4 className="text-sm font-semibold text-text">
-                Programación (opcional)
-              </h4>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-text/80 mb-1">
-                    Fecha de Inicio
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.startsAt || ''}
-                    onChange={(e) => updateField('startsAt', e.target.value || null)}
-                    className="w-full px-3 py-2 bg-glass rounded-lg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-text/80 mb-1">
-                    Fecha de Cierre
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.endsAt || ''}
-                    onChange={(e) => updateField('endsAt', e.target.value || null)}
-                    className="w-full px-3 py-2 bg-glass rounded-lg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 4:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-text mb-2">
               Confirmar Rifa
             </h3>
             
@@ -966,7 +843,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-text">Crear Nueva Rifa</h2>
-                  <p className="text-sm text-text/60">Paso {step} de 4</p>
+                  <p className="text-sm text-text/60">Paso {step} de 3</p>
                 </div>
               </div>
               
@@ -974,7 +851,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
               <div className="mt-4 h-2 bg-dark/50 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: '0%' }}
-                  animate={{ width: `${(step / 4) * 100}%` }}
+                  animate={{ width: `${(step / 3) * 100}%` }}
                   className="h-full bg-gradient-to-r from-accent to-fire-orange"
                 />
               </div>
@@ -999,7 +876,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   </motion.button>
                 )}
                 
-                {step < 4 ? (
+                {step < 3 ? (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

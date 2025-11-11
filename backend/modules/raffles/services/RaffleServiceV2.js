@@ -971,7 +971,7 @@ class RaffleServiceV2 {
       const raffleResult = await client.query(
         `SELECT r.*, rc.company_name
          FROM raffles r
-         LEFT JOIN raffle_companies rc ON r.company_id = rc.id
+         LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.id = $1`,
         [raffleId]
       );
