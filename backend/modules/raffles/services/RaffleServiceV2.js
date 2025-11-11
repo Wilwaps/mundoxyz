@@ -1141,8 +1141,9 @@ class RaffleServiceV2 {
       const end = Math.min(start + CHUNK_SIZE, totalNumbers);
       const numbers = [];
       
+      // IMPORTANTE: Números 1-based (1, 2, 3, ..., N) para coincidir con frontend
       for (let i = start; i < end; i++) {
-        numbers.push(`(${raffleId}, ${i}, 'available')`);
+        numbers.push(`(${raffleId}, ${i + 1}, 'available')`);
       }
       
       if (numbers.length > 0) {
