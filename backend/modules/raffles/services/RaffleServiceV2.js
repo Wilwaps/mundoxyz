@@ -704,30 +704,39 @@ class RaffleServiceV2 {
    */
   async checkAndFinishRaffle(raffleId) {
     try {
-      // Verificar si todos los números están vendidos
+      // Verificar si todos los números están vendidos Y no hay reservas pendientes
       const checkResult = await query(
         `SELECT 
            COUNT(*) as total,
-           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold
+           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold,
+           SUM(CASE WHEN state = 'reserved' AND reserved_until > NOW() THEN 1 ELSE 0 END) as reserved_active
          FROM raffle_numbers
          WHERE raffle_id = $1`,
         [raffleId]
       );
       
-      const { total, sold } = checkResult.rows[0];
+      const { total, sold, reserved_active } = checkResult.rows[0];
       
       logger.info('[RaffleServiceV2] Verificando finalización', {
         raffleId,
         total: parseInt(total),
-        sold: parseInt(sold)
+        sold: parseInt(sold),
+        reserved_active: parseInt(reserved_active)
       });
       
-      // Si todos los números están vendidos, finalizar
-      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0) {
-        logger.info('[RaffleServiceV2] Todos los números vendidos - Finalizando rifa', {
+      // Solo finalizar si:
+      // 1. Todos los números están vendidos
+      // 2. NO hay reservas activas pendientes
+      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0 && parseInt(reserved_active) === 0) {
+        logger.info('[RaffleServiceV2] Todos los números vendidos y sin reservas pendientes - Finalizando rifa', {
           raffleId
         });
         await this.finishRaffle(raffleId);
+      } else if (parseInt(reserved_active) > 0) {
+        logger.info('[RaffleServiceV2] Hay reservas activas, no se finaliza aún', {
+          raffleId,
+          reserved_active: parseInt(reserved_active)
+        });
       }
     } catch (error) {
       logger.error('[RaffleServiceV2] Error verificando finalización', error);
