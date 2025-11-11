@@ -93,7 +93,7 @@ class RaffleServiceV2 {
         
         // Obtener usuario de plataforma
         const platformUserResult = await dbClient.query(
-          'SELECT id FROM users WHERE telegram_id = $1',
+          'SELECT id FROM users WHERE tg_id = $1',
           [PLATFORM_TELEGRAM_ID]
         );
         
@@ -1132,7 +1132,7 @@ class RaffleServiceV2 {
         if (platformCommission > 0 && raffle.raffle_mode === RaffleMode.FIRES) {
           // Obtener o crear usuario de la plataforma
           const platformUserResult = await client.query(
-            `SELECT id FROM users WHERE telegram_id = $1`,
+            `SELECT id FROM users WHERE tg_id = $1`,
             [PLATFORM_TELEGRAM_ID]
           );
           
