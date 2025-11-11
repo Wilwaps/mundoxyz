@@ -23,22 +23,153 @@ class RaffleServiceV2 {
    * Crear nueva rifa
    */
   async createRaffle(hostId, data, client = null) {
-    const dbQuery = client?.query || query;
+    const useExternalClient = !!client;
+    const dbClient = client || await getClient();
     
     try {
+      if (!useExternalClient) await dbClient.query('BEGIN');
+      
       logger.info('[RaffleServiceV2] Creando nueva rifa', { hostId, data });
       
-      // Generar código único
-      const code = await this.generateUniqueCode(dbQuery);
+      // PASO 1: VALIDAR Y COBRAR COMISIONES ANTES DE CREAR LA RIFA
+      const { mode, entryPrice, visibility } = data;
+      const hostWalletResult = await dbClient.query(
+        'SELECT id, fires_balance FROM wallets WHERE user_id = $1',
+        [hostId]
+      );
       
-      // Preparar datos para inserción
+      if (hostWalletResult.rows.length === 0) {
+        throw {
+          code: ErrorCodes.WALLET_NOT_FOUND,
+          status: 404,
+          message: 'Wallet del host no encontrado'
+        };
+      }
+      
+      const hostWallet = hostWalletResult.rows[0];
+      let totalCost = 0;
+      let costDescription = '';
+      
+      // Calcular costo según modo
+      if (mode === RaffleMode.FIRES) {
+        // Modo FIRES: comisión = precio por número
+        totalCost = entryPrice || 0;
+        costDescription = `Comisión apertura rifa modo FIRES (${totalCost} fuegos)`;
+        
+        logger.info('[RaffleServiceV2] Comisión modo FIRES calculada', {
+          hostId,
+          entryPrice,
+          totalCost
+        });
+        
+      } else if (mode === RaffleMode.PRIZE || visibility === 'company') {
+        // Modo PRIZE o EMPRESA: 500 fuegos fijos
+        totalCost = SystemLimits.PRIZE_MODE_CREATION_COST; // 500
+        costDescription = `Costo creación rifa modo ${mode === RaffleMode.PRIZE ? 'PREMIO' : 'EMPRESA'} (${totalCost} fuegos)`;
+        
+        logger.info('[RaffleServiceV2] Costo modo PRIZE/EMPRESA calculado', {
+          hostId,
+          mode,
+          totalCost
+        });
+      }
+      
+      // Verificar balance
+      if (totalCost > 0) {
+        if (hostWallet.fires_balance < totalCost) {
+          throw {
+            code: ErrorCodes.INSUFFICIENT_BALANCE,
+            status: 400,
+            message: `Necesitas ${totalCost} fuegos para crear esta rifa. Balance actual: ${hostWallet.fires_balance}`
+          };
+        }
+        
+        // Descontar del host
+        const hostBalanceBefore = hostWallet.fires_balance;
+        await dbClient.query(
+          'UPDATE wallets SET fires_balance = fires_balance - $1 WHERE user_id = $2',
+          [totalCost, hostId]
+        );
+        
+        // Obtener usuario de plataforma
+        const platformUserResult = await dbClient.query(
+          'SELECT id FROM users WHERE telegram_id = $1',
+          [PLATFORM_TELEGRAM_ID]
+        );
+        
+        if (platformUserResult.rows.length > 0) {
+          const platformUserId = platformUserResult.rows[0].id;
+          
+          // Obtener wallet de plataforma
+          const platformWalletResult = await dbClient.query(
+            'SELECT id, fires_balance FROM wallets WHERE user_id = $1',
+            [platformUserId]
+          );
+          
+          if (platformWalletResult.rows.length > 0) {
+            const platformWallet = platformWalletResult.rows[0];
+            const platformBalanceBefore = platformWallet.fires_balance;
+            
+            // Acreditar a plataforma
+            await dbClient.query(
+              'UPDATE wallets SET fires_balance = fires_balance + $1 WHERE user_id = $2',
+              [totalCost, platformUserId]
+            );
+            
+            // Registrar transacción del host
+            await dbClient.query(
+              `INSERT INTO wallet_transactions
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+               VALUES ($1, 'raffle_creation_fee', $2, $3, $4, $5, $6, $7)`,
+              [
+                hostWallet.id,
+                'fires',
+                -totalCost,
+                hostBalanceBefore,
+                hostBalanceBefore - totalCost,
+                costDescription,
+                `raffle_fee_pending`
+              ]
+            );
+            
+            // Registrar transacción de plataforma
+            await dbClient.query(
+              `INSERT INTO wallet_transactions
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+               VALUES ($1, 'raffle_platform_fee', $2, $3, $4, $5, $6, $7)`,
+              [
+                platformWallet.id,
+                'fires',
+                totalCost,
+                platformBalanceBefore,
+                platformBalanceBefore + totalCost,
+                `Comisión recibida: ${costDescription}`,
+                `raffle_fee_pending`
+              ]
+            );
+            
+            logger.info('[RaffleServiceV2] Comisión cobrada exitosamente', {
+              hostId,
+              platformUserId,
+              amount: totalCost
+            });
+          }
+        } else {
+          logger.warn('[RaffleServiceV2] Usuario de plataforma no encontrado', {
+            telegramId: PLATFORM_TELEGRAM_ID
+          });
+        }
+      }
+      
+      // PASO 2: CREAR LA RIFA
+      // Generar código único
+      const code = await this.generateUniqueCode(dbClient.query.bind(dbClient));
+      
+      // Preparar datos para inserción (mode, entryPrice, visibility ya fueron extraídos arriba)
       const {
         name,
         description,
-        mode,
-        visibility,
         numbersRange,
-        entryPrice,
         startsAt,
         endsAt,
         termsConditions,
@@ -51,14 +182,17 @@ class RaffleServiceV2 {
         ? RaffleStatus.PENDING 
         : RaffleStatus.ACTIVE;
       
-      // Insertar rifa
-      const result = await dbQuery(
+      // Insertar rifa (ahora con allow_fires_payment y prize_image_base64)
+      const allowFiresPayment = data.allowFiresPayment || false;
+      const prizeImageBase64 = data.prizeImageBase64 || null;
+      
+      const result = await dbClient.query(
         `INSERT INTO raffles (
           code, name, description, status, mode, visibility,
           host_id, numbers_range, entry_price_fire, entry_price_coin,
           starts_at, ends_at, terms_conditions, prize_meta,
-          pot_fires, pot_coins
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0)
+          pot_fires, pot_coins, allow_fires_payment, prize_image_base64
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0, $15, $16)
         RETURNING *`,
         [
           code,
@@ -74,19 +208,32 @@ class RaffleServiceV2 {
           startsAt || null,
           endsAt || null,
           termsConditions || null,
-          prizeMeta ? JSON.stringify(prizeMeta) : null
+          prizeMeta ? JSON.stringify(prizeMeta) : null,
+          allowFiresPayment,
+          prizeImageBase64
         ]
       );
       
       const raffle = result.rows[0];
       
+      // Actualizar referencias con el código real
+      if (totalCost > 0) {
+        await dbClient.query(
+          `UPDATE wallet_transactions
+           SET reference = $1
+           WHERE reference = 'raffle_fee_pending' AND created_at > NOW() - INTERVAL '1 minute'`,
+          [`raffle_fee_${code}`]
+        );
+      }
+      
       // Si es modo empresa, crear configuración
       if (visibility === 'company' && companyConfig) {
-        await dbQuery(
+        const logoBase64 = companyConfig.logoBase64 || null;
+        await dbClient.query(
           `INSERT INTO raffle_companies (
             raffle_id, company_name, rif_number, brand_color, secondary_color,
-            logo_url, website_url
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            logo_url, website_url, logo_base64
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             raffle.id,
             companyConfig.companyName,
@@ -94,25 +241,40 @@ class RaffleServiceV2 {
             companyConfig.primaryColor || null,
             companyConfig.secondaryColor || null,
             companyConfig.logoUrl || null,
-            companyConfig.websiteUrl || null
+            companyConfig.websiteUrl || null,
+            logoBase64
           ]
         );
       }
       
       // Crear números disponibles (optimizado con batch)
-      await this.createNumbersBatch(raffle.id, numbersRange, dbQuery);
+      await this.createNumbersBatch(raffle.id, numbersRange, dbClient.query.bind(dbClient));
+      
+      if (!useExternalClient) await dbClient.query('COMMIT');
       
       logger.info('[RaffleServiceV2] Rifa creada exitosamente', { 
         raffleId: raffle.id, 
         code,
-        numbersRange 
+        numbersRange,
+        costCharged: totalCost
       });
       
       return this.formatRaffleResponse(raffle);
       
     } catch (error) {
+      if (!useExternalClient) {
+        try {
+          await dbClient.query('ROLLBACK');
+        } catch (rollbackError) {
+          logger.error('[RaffleServiceV2] Error en rollback', rollbackError);
+        }
+      }
       logger.error('[RaffleServiceV2] Error creando rifa', error);
       throw error;
+    } finally {
+      if (!useExternalClient) {
+        dbClient.release();
+      }
     }
   }
   
@@ -1473,6 +1635,286 @@ class RaffleServiceV2 {
         : null,
       termsConditions: raffle.terms_conditions
     };
+  }
+  
+  /**
+   * Obtener participantes de una rifa
+   */
+  async getParticipants(raffleCode, userId = null) {
+    try {
+      // Obtener rifa
+      const raffleResult = await query(
+        `SELECT r.id, r.mode, r.host_id 
+         FROM raffles r 
+         WHERE r.code = $1`,
+        [raffleCode]
+      );
+      
+      if (raffleResult.rows.length === 0) {
+        throw { code: ErrorCodes.RAFFLE_NOT_FOUND, status: 404 };
+      }
+      
+      const raffle = raffleResult.rows[0];
+      const isHost = raffle.host_id === userId;
+      
+      if (raffle.mode === RaffleMode.FIRES || raffle.mode === RaffleMode.COINS) {
+        // Modo FIRES/COINS: mostrar participantes públicos
+        const result = await query(
+          `SELECT 
+             u.display_name,
+             u.telegram_username,
+             array_agg(rn.number_idx ORDER BY rn.number_idx) as numbers
+           FROM raffle_numbers rn
+           JOIN users u ON rn.owner_id = u.id
+           WHERE rn.raffle_id = $1 AND rn.state = 'sold'
+           GROUP BY u.id, u.display_name, u.telegram_username
+           ORDER BY u.display_name`,
+          [raffle.id]
+        );
+        
+        return {
+          participants: result.rows,
+          totalParticipants: result.rows.length
+        };
+        
+      } else if (raffle.mode === RaffleMode.PRIZE) {
+        // Modo PREMIO
+        if (isHost) {
+          // Host ve solicitudes completas con botones de acción
+          const result = await query(
+            `SELECT 
+               rr.id as request_id,
+               rr.buyer_profile,
+               rr.request_data,
+               rr.status,
+               rr.created_at,
+               array_agg(rr.number_idx ORDER BY rr.number_idx) as numbers,
+               u.telegram_username
+             FROM raffle_requests rr
+             LEFT JOIN users u ON rr.buyer_id = u.id
+             WHERE rr.raffle_id = $1
+             GROUP BY rr.id, rr.buyer_profile, rr.request_data, rr.status, rr.created_at, u.telegram_username
+             ORDER BY rr.created_at DESC`,
+            [raffle.id]
+          );
+          
+          return {
+            requests: result.rows.map(row => ({
+              requestId: row.request_id,
+              buyerProfile: row.buyer_profile,
+              requestData: row.request_data,
+              status: row.status,
+              numbers: row.numbers,
+              telegramUsername: row.telegram_username,
+              createdAt: row.created_at
+            })),
+            totalRequests: result.rows.length
+          };
+        } else {
+          // Usuario normal ve solo nombres públicos aprobados
+          const result = await query(
+            `SELECT 
+               (rr.buyer_profile->>'displayName') as display_name,
+               array_agg(rr.number_idx ORDER BY rr.number_idx) as numbers
+             FROM raffle_requests rr
+             WHERE rr.raffle_id = $1 AND rr.status = 'approved'
+             GROUP BY rr.buyer_profile->>'displayName'
+             ORDER BY display_name`,
+            [raffle.id]
+          );
+          
+          return {
+            participants: result.rows,
+            totalParticipants: result.rows.length
+          };
+        }
+      }
+      
+      return { participants: [], totalParticipants: 0 };
+      
+    } catch (error) {
+      logger.error('[RaffleServiceV2] Error obteniendo participantes', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Aprobar solicitud de pago (solo host)
+   */
+  async approvePaymentRequest(requestId, hostId) {
+    const client = await getClient();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Obtener solicitud
+      const requestResult = await client.query(
+        `SELECT rr.*, r.host_id, r.code as raffle_code
+         FROM raffle_requests rr
+         JOIN raffles r ON rr.raffle_id = r.id
+         WHERE rr.id = $1
+         FOR UPDATE`,
+        [requestId]
+      );
+      
+      if (requestResult.rows.length === 0) {
+        throw { code: ErrorCodes.NOT_FOUND, status: 404, message: 'Solicitud no encontrada' };
+      }
+      
+      const request = requestResult.rows[0];
+      
+      // Verificar que el usuario es el host
+      if (request.host_id !== hostId) {
+        throw { code: ErrorCodes.UNAUTHORIZED, status: 403, message: 'Solo el host puede aprobar solicitudes' };
+      }
+      
+      // Verificar estado
+      if (request.status !== 'pending') {
+        throw { code: ErrorCodes.INVALID_INPUT, status: 400, message: 'La solicitud ya fue procesada' };
+      }
+      
+      // Marcar número como vendido
+      await client.query(
+        `UPDATE raffle_numbers
+         SET state = 'sold', owner_id = $1, reserved_by = NULL, reserved_until = NULL
+         WHERE raffle_id = $2 AND number_idx = $3`,
+        [request.buyer_id, request.raffle_id, request.number_idx]
+      );
+      
+      // Actualizar estado de solicitud
+      await client.query(
+        `UPDATE raffle_requests
+         SET status = 'approved', updated_at = NOW()
+         WHERE id = $1`,
+        [requestId]
+      );
+      
+      await client.query('COMMIT');
+      
+      logger.info('[RaffleServiceV2] Solicitud aprobada', {
+        requestId,
+        hostId,
+        buyerId: request.buyer_id,
+        numberIdx: request.number_idx
+      });
+      
+      // Notificar al comprador
+      if (global.io) {
+        global.io.to(`user_${request.buyer_id}`).emit('request_approved', {
+          requestId,
+          raffleCode: request.raffle_code,
+          numberIdx: request.number_idx
+        });
+      }
+      
+      // Verificar si la rifa debe finalizarse
+      setImmediate(() => {
+        this.checkAndFinishRaffle(request.raffle_id).catch(err => {
+          logger.error('[RaffleServiceV2] Error verificando finalización tras aprobación', err);
+        });
+      });
+      
+      return {
+        success: true,
+        message: 'Solicitud aprobada exitosamente',
+        numberIdx: request.number_idx
+      };
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('[RaffleServiceV2] Error aprobando solicitud', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  /**
+   * Rechazar solicitud de pago (solo host)
+   */
+  async rejectPaymentRequest(requestId, hostId, reason = null) {
+    const client = await getClient();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Obtener solicitud
+      const requestResult = await client.query(
+        `SELECT rr.*, r.host_id, r.code as raffle_code
+         FROM raffle_requests rr
+         JOIN raffles r ON rr.raffle_id = r.id
+         WHERE rr.id = $1
+         FOR UPDATE`,
+        [requestId]
+      );
+      
+      if (requestResult.rows.length === 0) {
+        throw { code: ErrorCodes.NOT_FOUND, status: 404, message: 'Solicitud no encontrada' };
+      }
+      
+      const request = requestResult.rows[0];
+      
+      // Verificar que el usuario es el host
+      if (request.host_id !== hostId) {
+        throw { code: ErrorCodes.UNAUTHORIZED, status: 403, message: 'Solo el host puede rechazar solicitudes' };
+      }
+      
+      // Verificar estado
+      if (request.status !== 'pending') {
+        throw { code: ErrorCodes.INVALID_INPUT, status: 400, message: 'La solicitud ya fue procesada' };
+      }
+      
+      // Liberar número (volver a disponible)
+      await client.query(
+        `UPDATE raffle_numbers
+         SET state = 'available', owner_id = NULL, reserved_by = NULL, reserved_until = NULL
+         WHERE raffle_id = $1 AND number_idx = $2`,
+        [request.raffle_id, request.number_idx]
+      );
+      
+      // Actualizar estado de solicitud
+      await client.query(
+        `UPDATE raffle_requests
+         SET status = 'rejected', 
+             request_data = jsonb_set(COALESCE(request_data, '{}'::jsonb), '{rejection_reason}', to_jsonb($2::text)),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [requestId, reason || 'Sin razón especificada']
+      );
+      
+      await client.query('COMMIT');
+      
+      logger.info('[RaffleServiceV2] Solicitud rechazada', {
+        requestId,
+        hostId,
+        buyerId: request.buyer_id,
+        numberIdx: request.number_idx,
+        reason
+      });
+      
+      // Notificar al comprador
+      if (global.io) {
+        global.io.to(`user_${request.buyer_id}`).emit('request_rejected', {
+          requestId,
+          raffleCode: request.raffle_code,
+          numberIdx: request.number_idx,
+          reason
+        });
+      }
+      
+      return {
+        success: true,
+        message: 'Solicitud rechazada',
+        numberIdx: request.number_idx
+      };
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('[RaffleServiceV2] Error rechazando solicitud', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

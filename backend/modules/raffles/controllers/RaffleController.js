@@ -9,6 +9,78 @@ const { ErrorCodes, ErrorMessages } = require('../types');
 
 class RaffleController {
   /**
+   * Obtener participantes de una rifa
+   */
+  async getParticipants(req, res) {
+    try {
+      const { code } = req.params;
+      const userId = req.user?.id || null;
+      
+      const result = await raffleService.getParticipants(code, userId);
+      
+      res.json({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      logger.error('[RaffleController] Error obteniendo participantes', error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Error obteniendo participantes'
+      });
+    }
+  }
+  
+  /**
+   * Aprobar solicitud de pago
+   */
+  async approveRequest(req, res) {
+    try {
+      const { code, requestId } = req.params;
+      const hostId = req.user.id;
+      
+      const result = await raffleService.approvePaymentRequest(parseInt(requestId), hostId);
+      
+      res.json({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      logger.error('[RaffleController] Error aprobando solicitud', error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Error aprobando solicitud'
+      });
+    }
+  }
+  
+  /**
+   * Rechazar solicitud de pago
+   */
+  async rejectRequest(req, res) {
+    try {
+      const { code, requestId } = req.params;
+      const { reason } = req.body;
+      const hostId = req.user.id;
+      
+      const result = await raffleService.rejectPaymentRequest(parseInt(requestId), hostId, reason);
+      
+      res.json({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      logger.error('[RaffleController] Error rechazando solicitud', error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Error rechazando solicitud'
+      });
+    }
+  }
+  /**
    * Listar rifas públicas con filtros
    */
   async listRaffles(req, res) {

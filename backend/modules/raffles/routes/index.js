@@ -56,6 +56,13 @@ router.get(
   raffleController.getRaffleStats.bind(raffleController)
 );
 
+// Obtener participantes de rifa (público con auth opcional)
+router.get(
+  '/:code/participants',
+  optionalAuth,
+  raffleController.getParticipants.bind(raffleController)
+);
+
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)
  */
@@ -151,26 +158,14 @@ router.post(
 router.post(
   '/:code/requests/:requestId/approve',
   verifyToken,
-  async (req, res) => {
-    // TODO: Implementar en Fase 2
-    res.status(501).json({
-      success: false,
-      message: 'Aprobación de pagos pendiente de implementación'
-    });
-  }
+  raffleController.approveRequest.bind(raffleController)
 );
 
 // Rechazar solicitud de pago
 router.post(
   '/:code/requests/:requestId/reject',
   verifyToken,
-  async (req, res) => {
-    // TODO: Implementar en Fase 2
-    res.status(501).json({
-      success: false,
-      message: 'Rechazo de pagos pendiente de implementación'
-    });
-  }
+  raffleController.rejectRequest.bind(raffleController)
 );
 
 /**

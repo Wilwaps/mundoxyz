@@ -91,6 +91,10 @@ export interface Raffle {
   
   // Términos
   termsConditions?: string;
+  
+  // Nuevos campos
+  allowFiresPayment?: boolean; // ✨ Toggle pago con fuegos en modo Premio
+  prizeImageBase64?: string; // ✨ Imagen del premio en base64
 }
 
 // Configuración de empresa
@@ -100,8 +104,10 @@ export interface CompanyConfig {
   primaryColor?: string;
   secondaryColor?: string;
   logoUrl?: string;
+  logoBase64?: string; // ✨ Logo en base64
   contactEmail?: string;
   contactPhone?: string;
+  websiteUrl?: string;
 }
 
 // Información bancaria para rifas con premio
@@ -252,6 +258,68 @@ export interface BuyNumberForm {
   paymentMethod: PaymentMethod;
   paymentReference?: string;
   buyerName?: string;
+}
+
+// ✨ NUEVOS TIPOS PARA SISTEMA DE APROBACIÓN
+
+// Perfil del comprador (datos opcionales)
+export interface BuyerProfile {
+  displayName?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  idNumber?: string;
+}
+
+// Datos de solicitud de pago
+export interface PaymentRequestData {
+  reference?: string;
+  paymentMethod?: string;
+  bankCode?: string;
+  paymentProofBase64?: string; // ✨ Comprobante en base64
+  notes?: string;
+  rejectionReason?: string; // Si fue rechazado
+}
+
+// Solicitud completa (vista del host)
+export interface PaymentRequestDetail {
+  requestId: number;
+  buyerProfile: BuyerProfile;
+  requestData: PaymentRequestData;
+  status: PaymentStatus;
+  numbers: number[];
+  telegramUsername?: string;
+  createdAt: string;
+}
+
+// Participante público (modo FIRES/COINS)
+export interface PublicParticipant {
+  displayName: string;
+  telegramUsername: string;
+  numbers: number[];
+}
+
+// Participante aprobado (modo PRIZE - vista usuario)
+export interface ApprovedParticipant {
+  displayName: string;
+  numbers: number[];
+}
+
+// Respuesta de participantes
+export interface ParticipantsResponse {
+  // Para modo FIRES/COINS
+  participants?: PublicParticipant[];
+  totalParticipants?: number;
+  
+  // Para modo PRIZE (host)
+  requests?: PaymentRequestDetail[];
+  totalRequests?: number;
+}
+
+// Form para crear rifa actualizado
+export interface CreateRaffleFormExtended extends CreateRaffleForm {
+  allowFiresPayment?: boolean; // ✨ Toggle pago con fuegos
+  prizeImageBase64?: string; // ✨ Imagen del premio
   buyerEmail?: string;
   buyerPhone?: string;
   buyerDocument?: string;
