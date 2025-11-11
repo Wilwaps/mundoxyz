@@ -745,9 +745,9 @@ class RaffleServiceV2 {
         reserved: parseInt(reserved)
       });
       
-      // Solo finalizar si TODOS los números están vendidos (ninguna reserva debe existir ya)
-      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0) {
-        logger.info('[RaffleServiceV2] ✅ Todos los números vendidos - Programando finalización en 10 segundos', {
+      // Solo finalizar si TODOS los números están vendidos Y NO hay reservas activas
+      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0 && parseInt(reserved) === 0) {
+        logger.info('[RaffleServiceV2] ✅ Todos los números vendidos y sin reservas - Programando finalización en 10 segundos', {
           raffleId
         });
         
@@ -777,11 +777,14 @@ class RaffleServiceV2 {
         }, 10000); // 10 segundos
         
       } else {
+        const disponibles = parseInt(total) - parseInt(sold) - parseInt(reserved);
         logger.info('[RaffleServiceV2] Rifa aún no completa', {
           raffleId,
+          total: parseInt(total),
           vendidos: parseInt(sold),
           reservados: parseInt(reserved),
-          disponibles: parseInt(total) - parseInt(sold) - parseInt(reserved)
+          disponibles: disponibles,
+          razon: parseInt(reserved) > 0 ? 'Hay reservas activas pendientes' : 'Faltan números por vender'
         });
       }
     } catch (error) {
