@@ -54,22 +54,40 @@ const CreateRoomModal = ({ show, onClose, onSuccess }) => {
             <label className="block text-white/80 mb-2">Modo</label>
             <select
               value={config.mode}
-              onChange={(e) => setConfig({ ...config, mode: e.target.value })}
+              onChange={(e) => {
+                const newMode = e.target.value;
+                // Si selecciona modo británico (90), forzar fullcard
+                if (newMode === '90') {
+                  setConfig({ ...config, mode: newMode, pattern_type: 'fullcard' });
+                } else {
+                  setConfig({ ...config, mode: newMode });
+                }
+              }}
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
             >
               <option value="75">75 números (5×5 Clásico)</option>
               <option value="90-in-5x5">90 números (5×5 Ampliado) ⭐ NUEVO</option>
-              <option value="90">90 números (9×3 Británico)</option>
+              <option value="90">90 números (9×3 Británico) - Solo Cartón Completo</option>
             </select>
           </div>
 
           {/* Patrón */}
           <div>
-            <label className="block text-white/80 mb-2">Patrón de Victoria</label>
+            <label className="block text-white/80 mb-2">
+              Patrón de Victoria
+              {config.mode === '90' && (
+                <span className="ml-2 text-xs text-yellow-400">
+                  (Fijo: Cartón Completo para modo británico)
+                </span>
+              )}
+            </label>
             <select
               value={config.pattern_type}
               onChange={(e) => setConfig({ ...config, pattern_type: e.target.value })}
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+              disabled={config.mode === '90'}
+              className={`w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white ${
+                config.mode === '90' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               <option value="line">Línea</option>
               <option value="corners">Esquinas</option>
