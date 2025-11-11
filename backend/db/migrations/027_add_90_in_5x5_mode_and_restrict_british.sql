@@ -15,18 +15,19 @@ ALTER TABLE bingo_v2_rooms
   ADD CONSTRAINT bingo_v2_rooms_mode_check 
   CHECK (mode IN ('75', '90', '90-in-5x5'));
 
--- 3. Agregar constraint para modo británico: solo fullcard
+-- 3. PRIMERO: Actualizar salas existentes con modo '90' para asegurar patrón fullcard
+--    Esto DEBE hacerse ANTES de agregar el constraint
+UPDATE bingo_v2_rooms
+  SET pattern_type = 'fullcard'
+  WHERE mode = '90' AND pattern_type != 'fullcard';
+
+-- 4. LUEGO: Agregar constraint para modo británico (ahora no hay filas que lo violen)
 ALTER TABLE bingo_v2_rooms
   ADD CONSTRAINT bingo_v2_rooms_british_fullcard_check
   CHECK (
     (mode != '90') OR 
     (mode = '90' AND pattern_type = 'fullcard')
   );
-
--- 4. Actualizar salas existentes con modo '90' para asegurar patrón fullcard
-UPDATE bingo_v2_rooms
-  SET pattern_type = 'fullcard'
-  WHERE mode = '90' AND pattern_type != 'fullcard';
 
 COMMIT;
 
