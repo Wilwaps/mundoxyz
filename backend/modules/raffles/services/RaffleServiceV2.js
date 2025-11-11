@@ -704,38 +704,84 @@ class RaffleServiceV2 {
    */
   async checkAndFinishRaffle(raffleId) {
     try {
-      // Verificar si todos los números están vendidos Y no hay reservas pendientes
+      // PASO 1: LIMPIAR reservas expiradas ANTES de verificar
+      logger.info('[RaffleServiceV2] Limpiando reservas expiradas antes de verificar finalización', { raffleId });
+      
+      const cleanResult = await query(
+        `UPDATE raffle_numbers
+         SET state = $1, owner_id = NULL, reserved_by = NULL, reserved_until = NULL
+         WHERE raffle_id = $2 
+           AND state = $3 
+           AND reserved_until < NOW()
+         RETURNING number_idx`,
+        ['available', raffleId, 'reserved']
+      );
+      
+      if (cleanResult.rows.length > 0) {
+        logger.info('[RaffleServiceV2] Reservas expiradas liberadas', {
+          raffleId,
+          count: cleanResult.rows.length,
+          numbers: cleanResult.rows.map(r => r.number_idx)
+        });
+      }
+      
+      // PASO 2: Verificar si todos los números están vendidos
       const checkResult = await query(
         `SELECT 
            COUNT(*) as total,
            SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold,
-           SUM(CASE WHEN state = 'reserved' AND reserved_until > NOW() THEN 1 ELSE 0 END) as reserved_active
+           SUM(CASE WHEN state = 'reserved' THEN 1 ELSE 0 END) as reserved
          FROM raffle_numbers
          WHERE raffle_id = $1`,
         [raffleId]
       );
       
-      const { total, sold, reserved_active } = checkResult.rows[0];
+      const { total, sold, reserved } = checkResult.rows[0];
       
       logger.info('[RaffleServiceV2] Verificando finalización', {
         raffleId,
         total: parseInt(total),
         sold: parseInt(sold),
-        reserved_active: parseInt(reserved_active)
+        reserved: parseInt(reserved)
       });
       
-      // Solo finalizar si:
-      // 1. Todos los números están vendidos
-      // 2. NO hay reservas activas pendientes
-      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0 && parseInt(reserved_active) === 0) {
-        logger.info('[RaffleServiceV2] Todos los números vendidos y sin reservas pendientes - Finalizando rifa', {
+      // Solo finalizar si TODOS los números están vendidos (ninguna reserva debe existir ya)
+      if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0) {
+        logger.info('[RaffleServiceV2] ✅ Todos los números vendidos - Programando finalización en 10 segundos', {
           raffleId
         });
-        await this.finishRaffle(raffleId);
-      } else if (parseInt(reserved_active) > 0) {
-        logger.info('[RaffleServiceV2] Hay reservas activas, no se finaliza aún', {
+        
+        // Obtener código de rifa para socket
+        const raffleCodeResult = await query(
+          'SELECT code FROM raffles WHERE id = $1',
+          [raffleId]
+        );
+        const raffleCode = raffleCodeResult.rows[0]?.code;
+        
+        // Emitir evento de sorteo programado
+        if (raffleCode && global.io) {
+          global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
+            code: raffleCode,
+            drawInSeconds: 10,
+            message: '¡Todos los números vendidos! Sorteo en 10 segundos...'
+          });
+        }
+        
+        // DELAY DE 10 SEGUNDOS antes de sorteo
+        setTimeout(async () => {
+          try {
+            await this.finishRaffle(raffleId);
+          } catch (err) {
+            logger.error('[RaffleServiceV2] Error en finalización retrasada', err);
+          }
+        }, 10000); // 10 segundos
+        
+      } else {
+        logger.info('[RaffleServiceV2] Rifa aún no completa', {
           raffleId,
-          reserved_active: parseInt(reserved_active)
+          vendidos: parseInt(sold),
+          reservados: parseInt(reserved),
+          disponibles: parseInt(total) - parseInt(sold) - parseInt(reserved)
         });
       }
     } catch (error) {

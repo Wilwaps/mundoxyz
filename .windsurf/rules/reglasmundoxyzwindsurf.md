@@ -14,7 +14,7 @@ postgresql://postgres:gUUCiUgVwQOOoERDqqGTzNkJTLlsJeWG@postgres.railway.internal
 ubicacion en railway
 https://mundoxyz-production.up.railway.app
 
-
+prueba1/Mirame12veces.
 en la carpeta local /no es fundamental existe documentacion que tal vez sea de utilidad para saber de donde hemos evolucionado
 
 cuando sea necesario crear un script Node.js que use el módulo pg para ejecutar directamente el SQL.
