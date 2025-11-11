@@ -26,6 +26,7 @@ import { useCreateRaffle } from '../hooks/useRaffleData';
 import { CreateRaffleForm, RaffleMode, RaffleVisibility } from '../types';
 import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
+import { processImage } from '../utils/imageHelpers';
 
 interface CreateRaffleModalProps {
   isOpen: boolean;
@@ -43,6 +44,9 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   
   const [step, setStep] = useState(1);
   const [isCompanyMode, setIsCompanyMode] = useState(false);
+  const [prizeImageBase64, setPrizeImageBase64] = useState<string>('');
+  const [logoBase64, setLogoBase64] = useState<string>('');
+  const [allowFiresPayment, setAllowFiresPayment] = useState(false);
   const [formData, setFormData] = useState<CreateRaffleForm>({
     name: '',
     description: '',
@@ -206,7 +210,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     
     // Verificar balance si es modo premio
     if (formData.mode === RaffleMode.PRIZE) {
-      const requiredFires = formData.visibility === 'company' ? 3000 : 300;
+      const requiredFires = formData.visibility === 'company' ? 500 : 500;
       if ((user?.fires_balance || 0) < requiredFires) {
         toast.error(`Necesitas ${requiredFires} fuegos para crear una rifa en modo premio`);
         return;
@@ -214,7 +218,18 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     }
     
     try {
-      const result = await createRaffle.mutateAsync(formData);
+      // Agregar datos de base64 y toggle al payload
+      const payload: any = {
+        ...formData,
+        allowFiresPayment: formData.mode === RaffleMode.PRIZE ? allowFiresPayment : undefined,
+        prizeImageBase64: prizeImageBase64 || undefined,
+        companyConfig: formData.companyConfig ? {
+          ...formData.companyConfig,
+          logoBase64: logoBase64 || undefined
+        } : undefined
+      };
+      
+      const result = await createRaffle.mutateAsync(payload);
       toast.success('¡Rifa creada exitosamente!');
       onSuccess?.(result.code);
       onClose();
@@ -541,11 +556,16 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          // Aquí se manejará la carga de imagen
-                          toast.success('Imagen seleccionada (carga pendiente de implementar)');
+                          const result = await processImage(file, 5);
+                          if (result.error) {
+                            toast.error(result.error);
+                          } else {
+                            setPrizeImageBase64(result.base64);
+                            toast.success('Imagen cargada exitosamente');
+                          }
                         }
                       }}
                       className="hidden"
@@ -556,11 +576,31 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                       className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
                     >
                       <Image className="w-5 h-5" />
-                      <span className="text-sm">Seleccionar imagen del premio</span>
+                      <span className="text-sm">{prizeImageBase64 ? '✅ Imagen cargada' : 'Seleccionar imagen del premio'}</span>
                     </label>
                   </div>
                   <p className="text-xs text-text/60 mt-1">JPG, PNG o GIF. Máx. 5MB</p>
                 </div>
+                
+                {/* Toggle Permitir Pago con Fuegos */}
+                {formData.mode === RaffleMode.PRIZE && (
+                  <div className="pt-3 border-t border-white/10">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={allowFiresPayment}
+                        onChange={(e) => setAllowFiresPayment(e.target.checked)}
+                        className="w-5 h-5 rounded bg-glass border-2 border-white/20 checked:bg-accent checked:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-text">Permitir Pago con Fuegos</div>
+                        <div className="text-xs text-text/60">
+                          Los compradores podrán pagar con sus fuegos sin aprobación
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                )}
                 
                 {/* Datos bancarios para pago */}
                 <div className="space-y-3 pt-3 border-t border-white/10">
