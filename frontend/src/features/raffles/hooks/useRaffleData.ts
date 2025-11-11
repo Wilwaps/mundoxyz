@@ -310,8 +310,8 @@ export const useRaffle = (code: string) => {
   
   // Función para forzar actualización
   const forceRefresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
-    queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+    queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+    queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
   }, [queryClient, code]);
   
   // Función para verificar si un número pertenece al usuario
@@ -349,14 +349,16 @@ export const useRaffle = (code: string) => {
     
     const handleNumberReserved = (data: any) => {
       if (data.raffleCode === code) {
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+        // Usar refetch para mantener datos previos mientras actualiza
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
       }
     };
     
     const handleNumberPurchased = (data: any) => {
       if (data.raffleCode === code) {
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        // Usar refetch para mantener datos previos mientras actualiza
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
         
         // Mostrar notificación si no es el usuario actual
         if (data.userId !== user.id) {
@@ -367,20 +369,23 @@ export const useRaffle = (code: string) => {
     
     const handleNumberReleased = (data: any) => {
       if (data.raffleCode === code) {
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
+        // Usar refetch para mantener datos previos mientras actualiza
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
       }
     };
     
     const handleStatusChanged = (data: any) => {
       if (data.raffleCode === code) {
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        // Usar refetch para mantener datos previos mientras actualiza
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
         toast(`Estado de rifa cambiado a: ${data.newStatus}`, { icon: '📢' });
       }
     };
     
     const handleWinnerDrawn = (data: any) => {
       if (data.raffleCode === code) {
-        queryClient.invalidateQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+        // Usar refetch para mantener datos previos mientras actualiza
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
         if (data.winnerId === user.id) {
           toast.success('¡FELICIDADES! ¡Has ganado la rifa!', { duration: 10000 });
         } else {

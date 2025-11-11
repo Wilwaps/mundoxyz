@@ -233,9 +233,18 @@ class RaffleController {
       
       // Verificar estado
       if (raffle.status !== 'active') {
+        logger.warn('[RaffleController] Rifa no activa', { 
+          code, 
+          status: raffle.status,
+          idx,
+          userId
+        });
         return res.status(400).json({
           success: false,
-          message: 'La rifa no está activa'
+          code: 'RAFFLE_NOT_ACTIVE',
+          message: raffle.status === 'finished' 
+            ? 'Esta rifa ya finalizó' 
+            : 'La rifa no está activa'
         });
       }
       

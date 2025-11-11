@@ -18,7 +18,7 @@ https://mundoxyz-production.up.railway.app
 en la carpeta local /no es fundamental existe documentacion que tal vez sea de utilidad para saber de donde hemos evolucionado
 
 cuando sea necesario crear un script Node.js que use el módulo pg para ejecutar directamente el SQL.
-ANTES DE REALIZAR COMMIT Y PUSH REALIZA PRUEBAS INTERNAS PARA ASEGURAR QUE TODO FUNCIONA ANTES DE DESPLEGAR
+REALIZA PRUEBAS INTERNAS (npm run build) PARA ASEGURAR QUE TODO FUNCIONA ANTES DE DESPLEGAR COMMIT Y PUSH 
 Cuando se hace una modificación que debe debe representar cambios en produccion, se realiza commit y push a github
 git add backend/routes/tictactoe.js frontend/src/pages/TicTacToeRoom.js TICTACTOE_REMATCH_BUGFIX.md
 git commit --amend -m "fix: sistema revanchas TicTacToe"
