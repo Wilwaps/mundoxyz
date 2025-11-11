@@ -10,16 +10,18 @@ const logger = require('./logger');
 class BingoCardGenerator {
   /**
    * Genera un cartón de bingo según el modo especificado
-   * @param {number} mode - 75 o 90
+   * @param {number|string} mode - 75, 90, o '90-in-5x5'
    * @returns {Object} Cartón con estructura específica
    */
   static generateCard(mode) {
-    if (mode === 75) {
+    if (mode === 75 || mode === '75') {
       return this.generate75Card();
-    } else if (mode === 90) {
+    } else if (mode === 90 || mode === '90') {
       return this.generate90Card();
+    } else if (mode === '90-in-5x5') {
+      return this.generate90In5x5Card();
     } else {
-      throw new Error(`Modo de bingo inválido: ${mode}. Debe ser 75 o 90.`);
+      throw new Error(`Modo de bingo inválido: ${mode}. Debe ser 75, 90 o '90-in-5x5'.`);
     }
   }
 
@@ -81,6 +83,71 @@ class BingoCardGenerator {
     logger.info('Cartón de 75 números generado', { 
       totalNumbers: card.allNumbers.length,
       hasFreeSpace: true 
+    });
+
+    return card;
+  }
+
+  /**
+   * Genera cartón de 90 números en formato 5x5 (híbrido innovador)
+   * Usa estructura 5x5 familiar de 75-ball pero con rangos ampliados hasta 90
+   * Mayor variedad de cartones únicos y probabilidades
+   * B: 1-18, I: 19-36, N: 37-54, G: 55-72, O: 73-90
+   */
+  static generate90In5x5Card() {
+    const card = {
+      mode: '90-in-5x5',
+      structure: 'grid_5x5',
+      columns: {
+        B: [], // 1-18
+        I: [], // 19-36
+        N: [], // 37-54 (con centro libre)
+        G: [], // 55-72
+        O: []  // 73-90
+      },
+      grid: [],
+      allNumbers: []
+    };
+
+    // Rangos ampliados para 90 números distribuidos en 5 columnas
+    const ranges = {
+      B: { min: 1, max: 18 },
+      I: { min: 19, max: 36 },
+      N: { min: 37, max: 54 },
+      G: { min: 55, max: 72 },
+      O: { min: 73, max: 90 }
+    };
+
+    // Generar números para cada columna (5 por columna, igual que 75-ball)
+    Object.keys(ranges).forEach(letter => {
+      const range = ranges[letter];
+      const numbers = this.getRandomNumbers(range.min, range.max, 5);
+      card.columns[letter] = numbers.sort((a, b) => a - b);
+    });
+
+    // Construir grid 5x5 (MISMA estructura que 75-ball)
+    for (let row = 0; row < 5; row++) {
+      const gridRow = [];
+      ['B', 'I', 'N', 'G', 'O'].forEach((letter, col) => {
+        // Centro libre en N (posición 2,2) - IGUAL que 75-ball
+        if (letter === 'N' && row === 2) {
+          gridRow.push({ value: 'FREE', marked: true, free: true });
+        } else {
+          const value = card.columns[letter][row];
+          gridRow.push({ value, marked: false, free: false });
+          card.allNumbers.push(value);
+        }
+      });
+      card.grid.push(gridRow);
+    }
+
+    // Remover el número del centro de la columna N
+    card.columns.N.splice(2, 1);
+
+    logger.info('Cartón de 90 números en 5x5 generado', { 
+      totalNumbers: card.allNumbers.length,
+      hasFreeSpace: true,
+      ranges: '1-18, 19-36, 37-54, 55-72, 73-90'
     });
 
     return card;
@@ -287,8 +354,8 @@ class BingoCardGenerator {
         return { valid: false, error: 'Estructura de cartón inválida' };
       }
 
-      if (card.mode === 75) {
-        // Validar cartón de 75
+      if (card.mode === 75 || card.mode === '75' || card.mode === '90-in-5x5') {
+        // Validar cartón de 75 o 90-in-5x5 (ambos usan 5x5)
         if (card.grid.length !== 5) {
           return { valid: false, error: 'Grid debe ser 5x5' };
         }
@@ -309,7 +376,7 @@ class BingoCardGenerator {
         if (!card.grid[2][2].free) {
           return { valid: false, error: 'Centro debe ser espacio libre' };
         }
-      } else if (card.mode === 90) {
+      } else if (card.mode === 90 || card.mode === '90') {
         // Validar cartón de 90
         if (card.grid.length !== 3) {
           return { valid: false, error: 'Grid debe ser 3x9' };

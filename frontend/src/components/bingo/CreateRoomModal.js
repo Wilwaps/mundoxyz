@@ -57,8 +57,9 @@ const CreateRoomModal = ({ show, onClose, onSuccess }) => {
               onChange={(e) => setConfig({ ...config, mode: e.target.value })}
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
             >
-              <option value="75">75 números</option>
-              <option value="90">90 números</option>
+              <option value="75">75 números (5×5 Clásico)</option>
+              <option value="90-in-5x5">90 números (5×5 Ampliado) ⭐ NUEVO</option>
+              <option value="90">90 números (9×3 Británico)</option>
             </select>
           </div>
 

@@ -117,13 +117,14 @@ const BingoV2Card = ({
       return <div className="error">Error: Grid no válido</div>;
     }
     
-    const is75Ball = mode === '75';
-    const cardClassName = is75Ball ? 'bingo-card-75' : 'bingo-card-90';
+    // Modos 5x5: 75 y 90-in-5x5 usan el mismo layout
+    const is5x5 = mode === '75' || mode === '90-in-5x5';
+    const cardClassName = is5x5 ? 'bingo-card-75' : 'bingo-card-90';
     
     return (
       <div className={cardClassName}>
-        {/* Cabecera BINGO solo para 75-ball */}
-        {is75Ball && (
+        {/* Cabecera BINGO para modos 5x5 (75 y 90-in-5x5) */}
+        {is5x5 && (
           <div className="card-header-bingo">
             {['B', 'I', 'N', 'G', 'O'].map(letter => (
               <div key={letter} className="header-cell">{letter}</div>

@@ -1,6 +1,7 @@
 const { query, getClient } = require('../db');
 const logger = require('../utils/logger');
 const RoomCodeService = require('./roomCodeService');
+const BingoCardGenerator = require('../utils/bingoCardGenerator');
 
 class BingoV2Service {
   /**
@@ -406,11 +407,14 @@ class BingoV2Service {
     const cards = [];
     
     for (let i = 0; i < count; i++) {
-      const grid = mode === '75' ? this.generate75BallCard() : this.generate90BallCard();
+      // Usar BingoCardGenerator unificado que soporta 75, 90 y 90-in-5x5
+      const cardData = BingoCardGenerator.generateCard(mode);
+      const grid = cardData.grid;
       
-      // CRITICAL FIX: For 75-ball, auto-mark FREE space (2,2)
-      const markedNumbers = mode === '75' ? ['FREE'] : [];
-      const markedPositions = mode === '75' ? [{row: 2, col: 2}] : [];
+      // Para modos 5x5 (75 y 90-in-5x5), FREE space ya viene marcado
+      const is5x5 = mode === '75' || mode === '90-in-5x5';
+      const markedNumbers = is5x5 ? ['FREE'] : [];
+      const markedPositions = is5x5 ? [{row: 2, col: 2}] : [];
       
       // CRITICAL FIX: pg driver needs JSON string with ::jsonb cast
       const result = await dbQuery(
@@ -1865,12 +1869,14 @@ class BingoV2Service {
     
     try {
       for (let i = 0; i < count; i++) {
-        const grid = mode === '75' 
-          ? this.generate75BallCard() 
-          : this.generate90BallCard();
+        // Usar BingoCardGenerator unificado que soporta 75, 90 y 90-in-5x5
+        const cardData = BingoCardGenerator.generateCard(mode);
+        const grid = cardData.grid;
         
         logger.info(`🎯 Generated grid for card ${i + 1}:`, {
           mode,
+          cardMode: cardData.mode,
+          structure: cardData.structure,
           gridType: typeof grid,
           gridLength: Array.isArray(grid) ? grid.length : 'not array',
           firstRow: Array.isArray(grid) && grid[0] ? grid[0] : null
