@@ -46,7 +46,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'numbers' | 'info' | 'winners'>('numbers');
-  const [refreshTimer, setRefreshTimer] = useState<NodeJS.Timeout | null>(null);
+  const refreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -57,25 +57,23 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   
   // Debounced refetch para evitar múltiples actualizaciones simultáneas
   const debouncedRefetch = useCallback(() => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
     }
     
-    const timer = setTimeout(() => {
+    refreshTimerRef.current = setTimeout(() => {
       raffleData.forceRefresh();
     }, 300); // 300ms debounce
-    
-    setRefreshTimer(timer);
-  }, [raffleData, refreshTimer]);
+  }, [raffleData.forceRefresh]);
   
-  // Cleanup del timer
+  // Cleanup del timer al desmontar
   useEffect(() => {
     return () => {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [refreshTimer]);
+  }, []);
   
   // Mutations
   const reserveNumbers = useReserveNumber();
@@ -752,7 +750,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           onSuccess={() => {
             setShowPurchaseModal(false);
             setSelectedNumbers([]);
-            refetch();
+            raffleData.forceRefresh();
           }}
         />
       </div>
