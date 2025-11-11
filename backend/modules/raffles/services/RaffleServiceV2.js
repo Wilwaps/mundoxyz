@@ -15,6 +15,9 @@ const {
   SystemLimits
 } = require('../types');
 
+// ID de la plataforma (Telegram)
+const PLATFORM_TELEGRAM_ID = '1417856820';
+
 class RaffleServiceV2 {
   /**
    * Crear nueva rifa
@@ -797,7 +800,7 @@ class RaffleServiceV2 {
    * Finalizar rifa y seleccionar ganador (modo FIRES/PRIZE)
    */
   async finishRaffle(raffleId) {
-    const client = await pool.connect();
+    const client = await getClient();
     
     try {
       await client.query('BEGIN');
@@ -853,54 +856,165 @@ class RaffleServiceV2 {
         totalParticipants: participants.length
       });
       
-      // Acreditar premio si es modo FIRES o COINS
-      if (raffle.raffle_mode === RaffleMode.FIRES || raffle.raffle_mode === RaffleMode.COINS) {
-        const prizeAmount = raffle.raffle_mode === RaffleMode.FIRES 
-          ? (raffle.pot_fires || 0) 
-          : (raffle.pot_coins || 0);
-        const currency = raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins';
-        const balanceField = currency === 'fires' ? 'fires_balance' : 'coins_balance';
+      // Calcular distribución según modo
+      let winnerPrize = 0;
+      let hostReward = 0;
+      let platformCommission = 0;
+      
+      if (raffle.raffle_mode === RaffleMode.FIRES) {
+        // Modo FIRES: Split 70% ganador, 20% host, 10% plataforma
+        const totalPot = raffle.pot_fires || 0;
+        winnerPrize = Math.floor(totalPot * 0.7);
+        hostReward = Math.floor(totalPot * 0.2);
+        platformCommission = totalPot - winnerPrize - hostReward; // El resto para evitar pérdidas por redondeo
         
-        if (prizeAmount > 0) {
-          // Obtener wallet del ganador
-          const walletResult = await client.query(
-            `SELECT id, ${balanceField} FROM wallets WHERE user_id = $1`,
-            [winner.owner_id]
+        logger.info('[RaffleServiceV2] Distribución calculada (modo FIRES)', {
+          totalPot,
+          winnerPrize,
+          hostReward,
+          platformCommission
+        });
+      } else if (raffle.raffle_mode === RaffleMode.COINS) {
+        // Modo COINS: 100% al ganador (sin split)
+        winnerPrize = raffle.pot_coins || 0;
+      } else if (raffle.raffle_mode === RaffleMode.PRIZE) {
+        // Modo PRIZE: No hay premio en moneda virtual
+        logger.info('[RaffleServiceV2] Modo PRIZE - Sin premio en moneda virtual');
+      }
+      
+      const currency = raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins';
+      const balanceField = currency === 'fires' ? 'fires_balance' : 'coins_balance';
+        
+      // Acreditar premios y comisiones
+      if (winnerPrize > 0) {
+        // 1. PREMIO AL GANADOR
+        const winnerWalletResult = await client.query(
+          `SELECT id, ${balanceField} FROM wallets WHERE user_id = $1`,
+          [winner.owner_id]
+        );
+        
+        if (winnerWalletResult.rows.length > 0) {
+          const winnerWallet = winnerWalletResult.rows[0];
+          const winnerBalanceBefore = winnerWallet[balanceField];
+          
+          await client.query(
+            `UPDATE wallets
+             SET ${balanceField} = ${balanceField} + $1
+             WHERE user_id = $2`,
+            [winnerPrize, winner.owner_id]
           );
           
-          if (walletResult.rows.length > 0) {
-            const wallet = walletResult.rows[0];
-            const balanceBefore = wallet[balanceField];
+          await client.query(
+            `INSERT INTO wallet_transactions
+             (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+             VALUES ($1, 'raffle_prize', $2, $3, $4, $5, $6, $7)`,
+            [
+              winnerWallet.id,
+              currency,
+              winnerPrize,
+              winnerBalanceBefore,
+              winnerBalanceBefore + winnerPrize,
+              `Premio ganado en rifa ${raffle.code} (70% del pot)`,
+              `raffle_win_${raffle.code}`
+            ]
+          );
+          
+          logger.info('[RaffleServiceV2] Premio acreditado al ganador', {
+            winnerId: winner.owner_id,
+            prize: winnerPrize,
+            currency
+          });
+        }
+        
+        // 2. RECOMPENSA AL HOST (solo modo FIRES)
+        if (hostReward > 0 && raffle.raffle_mode === RaffleMode.FIRES) {
+          const hostWalletResult = await client.query(
+            `SELECT id, fires_balance FROM wallets WHERE user_id = $1`,
+            [raffle.host_id]
+          );
+          
+          if (hostWalletResult.rows.length > 0) {
+            const hostWallet = hostWalletResult.rows[0];
+            const hostBalanceBefore = hostWallet.fires_balance;
             
-            // Acreditar premio
             await client.query(
               `UPDATE wallets
-               SET ${balanceField} = ${balanceField} + $1
+               SET fires_balance = fires_balance + $1
                WHERE user_id = $2`,
-              [prizeAmount, winner.owner_id]
+              [hostReward, raffle.host_id]
             );
             
-            // Registrar transacción
             await client.query(
               `INSERT INTO wallet_transactions
                (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
-               VALUES ($1, 'raffle_prize', $2, $3, $4, $5, $6, $7)`,
+               VALUES ($1, 'raffle_host_reward', $2, $3, $4, $5, $6, $7)`,
               [
-                wallet.id,
-                currency,
-                prizeAmount,
-                balanceBefore,
-                balanceBefore + prizeAmount,
-                `Premio ganado en rifa ${raffle.code}`,
-                `raffle_win_${raffle.code}`
+                hostWallet.id,
+                'fires',
+                hostReward,
+                hostBalanceBefore,
+                hostBalanceBefore + hostReward,
+                `Recompensa como host de rifa ${raffle.code} (20% del pot)`,
+                `raffle_host_${raffle.code}`
               ]
             );
             
-            logger.info('[RaffleServiceV2] Premio acreditado', {
-              raffleId,
-              winnerId: winner.owner_id,
-              prize: prizeAmount,
-              currency
+            logger.info('[RaffleServiceV2] Recompensa acreditada al host', {
+              hostId: raffle.host_id,
+              reward: hostReward
+            });
+          }
+        }
+        
+        // 3. COMISIÓN A LA PLATAFORMA (solo modo FIRES)
+        if (platformCommission > 0 && raffle.raffle_mode === RaffleMode.FIRES) {
+          // Obtener o crear usuario de la plataforma
+          const platformUserResult = await client.query(
+            `SELECT id FROM users WHERE telegram_id = $1`,
+            [PLATFORM_TELEGRAM_ID]
+          );
+          
+          if (platformUserResult.rows.length > 0) {
+            const platformUserId = platformUserResult.rows[0].id;
+            const platformWalletResult = await client.query(
+              `SELECT id, fires_balance FROM wallets WHERE user_id = $1`,
+              [platformUserId]
+            );
+            
+            if (platformWalletResult.rows.length > 0) {
+              const platformWallet = platformWalletResult.rows[0];
+              const platformBalanceBefore = platformWallet.fires_balance;
+              
+              await client.query(
+                `UPDATE wallets
+                 SET fires_balance = fires_balance + $1
+                 WHERE user_id = $2`,
+                [platformCommission, platformUserId]
+              );
+              
+              await client.query(
+                `INSERT INTO wallet_transactions
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+                 VALUES ($1, 'raffle_platform_commission', $2, $3, $4, $5, $6, $7)`,
+                [
+                  platformWallet.id,
+                  'fires',
+                  platformCommission,
+                  platformBalanceBefore,
+                  platformBalanceBefore + platformCommission,
+                  `Comisión de rifa ${raffle.code} (10% del pot)`,
+                  `raffle_commission_${raffle.code}`
+                ]
+              );
+              
+              logger.info('[RaffleServiceV2] Comisión acreditada a la plataforma', {
+                platformUserId,
+                commission: platformCommission
+              });
+            }
+          } else {
+            logger.warn('[RaffleServiceV2] Usuario de plataforma no encontrado', {
+              telegramId: PLATFORM_TELEGRAM_ID
             });
           }
         }

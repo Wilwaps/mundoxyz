@@ -81,7 +81,17 @@ const SystemLimits = {
   MAX_DESCRIPTION_LENGTH: 500,
   RESERVATION_TIMEOUT_MS: 5 * 60 * 1000, // 5 minutos
   MAX_NUMBERS_PER_USER: 50,
-  COMMISSION_RATE: 0.05 // 5%
+  COMMISSION_RATE: 0.05, // 5% (ya no se usa, ahora es split 70/20/10)
+  
+  // Costos de creación y comisiones
+  PRIZE_MODE_CREATION_COST: 500, // Fuegos para crear rifa modo Premio
+  COMPANY_MODE_CREATION_COST: 500, // Fuegos para crear rifa modo Empresa
+  FIRES_MODE_PLATFORM_FEE_MULTIPLIER: 1, // Comisión = precio por número × 1
+  
+  // Distribución del pot en modo FIRES
+  FIRES_WINNER_PERCENTAGE: 0.70, // 70% para el ganador
+  FIRES_HOST_PERCENTAGE: 0.20, // 20% para el host
+  FIRES_PLATFORM_PERCENTAGE: 0.10 // 10% para la plataforma
 };
 
 // Configuración de cache
