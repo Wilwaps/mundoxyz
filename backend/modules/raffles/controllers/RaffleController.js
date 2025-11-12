@@ -566,8 +566,12 @@ class RaffleController {
       logger.info('[RaffleController] Solicitud de sorteo manual', { code, userId });
       
       // Obtener rifa y verificar permisos
-      const raffle = await raffleService.getRaffleByCode(code);
-      
+      const data = await raffleService.getRaffleByCode(code);
+      const raffle = data?.raffle;
+      if (!raffle) {
+        return res.status(404).json({ success: false, message: 'Rifa no encontrada' });
+      }
+
       if (raffle.hostId !== userId) {
         return res.status(403).json({
           success: false,
@@ -618,17 +622,18 @@ class RaffleController {
       logger.info('[RaffleController] Ejecutando sorteo manual', { raffleId: raffle.id, code });
       
       await raffleService.finishRaffle(raffle.id);
-      
+
       // Obtener datos actualizados
-      const updatedRaffle = await raffleService.getRaffleByCode(code);
+      const updated = await raffleService.getRaffleByCode(code);
+      const upd = updated?.raffle || {};
       
       res.json({
         success: true,
         message: '¡Ganador elegido exitosamente!',
-        raffle: updatedRaffle,
+        raffle: updated,
         winner: {
-          number: updatedRaffle.winnerNumber,
-          userId: updatedRaffle.winnerId
+          number: upd.winnerNumber,
+          userId: upd.winnerId
         }
       });
       
@@ -650,12 +655,14 @@ class RaffleController {
     try {
       const { code } = req.params;
       const userId = req.user?.id;
-      const raffle = await raffleService.getRaffleByCode(code);
+      const data = await raffleService.getRaffleByCode(code);
+      const raffle = data?.raffle;
       if (!raffle) {
         return res.status(404).json({ success: false, message: 'Rifa no encontrada' });
       }
-      if (raffle.hostId !== userId) {
-        return res.status(403).json({ success: false, message: 'Solo el host puede forzar el cierre (debug)' });
+      const isAdmin = Array.isArray(req.user?.roles) && (req.user.roles.includes('admin') || req.user.roles.includes('tote'));
+      if (raffle.hostId !== userId && !isAdmin) {
+        return res.status(403).json({ success: false, message: 'Solo el host o admin puede forzar el cierre (debug)' });
       }
       const { query } = require('../../../db');
       const rid = await query('SELECT id FROM raffles WHERE code = $1', [code]);
