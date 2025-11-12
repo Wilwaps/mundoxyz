@@ -19,11 +19,12 @@ export const RAFFLE_LIMITS = {
 } as const;
 
 // Intervalos de sincronización (en ms)
+// ⚠️ DESACTIVADOS: El refetch agresivo causa parpadeo de datos
 export const SYNC_INTERVALS = {
-  RAFFLE_REFETCH: 10000,   // 10 segundos para rifas activas
-  NUMBERS_REFETCH: 5000,   // 5 segundos para números
-  STATS_REFETCH: 15000,    // 15 segundos para estadísticas
-  RESERVATION_CHECK: 5000,  // 5 segundos
+  RAFFLE_REFETCH: false,   // ❌ Desactivado - solo refetch manual vía sockets
+  NUMBERS_REFETCH: false,  // ❌ Desactivado - actualización vía eventos socket
+  STATS_REFETCH: false,    // ❌ Desactivado - invalidación manual post-acción
+  RESERVATION_CHECK: false, // ❌ Desactivado - socket notifica cambios
 } as const;
 
 // Query Keys para React Query

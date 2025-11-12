@@ -15,6 +15,6 @@ export const useParticipants = (raffleCode: string, enabled = true) => {
     },
     enabled: enabled && !!raffleCode,
     staleTime: 30000, // 30 segundos
-    refetchInterval: 60000 // Refetch cada minuto
+    refetchInterval: false // ❌ Desactivado - actualización vía socket events
   });
 };
