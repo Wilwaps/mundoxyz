@@ -39,7 +39,7 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
   showStats = true
 }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const cancelRaffle = useCancelRaffle();
   
   // Calcular progreso
@@ -67,8 +67,7 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
   // Verificar permisos para cancelar
   const canCancel = user && (
     raffle.hostId === user.id ||
-    user.roles?.includes('admin') ||
-    user.roles?.includes('Tote') ||
+    isAdmin() ||
     (user as any)?.tg_id === '1417856820'
   ) && raffle.status !== 'finished' && raffle.status !== 'cancelled';
   

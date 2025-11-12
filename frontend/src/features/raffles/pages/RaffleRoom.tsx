@@ -41,7 +41,7 @@ interface RaffleRoomProps {}
 const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { socket } = useSocket();
   
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -82,6 +82,32 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const reserveNumbers = useReserveNumber();
   const purchaseNumbers = usePurchaseNumber();
   const cancelRaffle = useCancelRaffle();
+
+  // Forzar cierre (admin)
+  const [isForceFinishing, setIsForceFinishing] = useState(false);
+  const handleForceFinish = async () => {
+    if (!code) return;
+    setIsForceFinishing(true);
+    try {
+      const response = await fetch(`/api/raffles/v2/${code}/finish-debug`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Error al forzar cierre');
+      }
+      toast.success('Rifa finalizada');
+      raffleData.forceRefresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Error al forzar cierre');
+    } finally {
+      setIsForceFinishing(false);
+    }
+  };
   
   // Conectar a socket room
   useEffect(() => {
@@ -496,12 +522,28 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   {!isDrawing && <Sparkles className="w-4 h-4" />}
                 </motion.button>
               )}
+
+              {(isAdmin() || String((user as any)?.tg_id) === '1417856820') &&
+                raffle.status === RaffleStatus.ACTIVE &&
+                soldNumbers === totalNumbers &&
+                totalNumbers > 0 && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleForceFinish}
+                  disabled={isForceFinishing}
+                  className="px-3 py-2 bg-accent/20 rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-semibold text-accent"
+                  title="Forzar cierre (admin)"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span className="hidden sm:inline">{isForceFinishing ? 'Cerrando...' : 'Forzar Cierre'}</span>
+                </motion.button>
+              )}
               
               {/* Botón cancelar rifa - Posición destacada */}
               {(user?.id === raffle.hostId || 
-                user?.roles?.includes('admin') || 
-                user?.roles?.includes('Tote') ||
-                (user as any)?.tg_id === '1417856820') &&
+                isAdmin() ||
+                String((user as any)?.tg_id) === '1417856820') &&
                 raffle.status !== RaffleStatus.FINISHED &&
                 raffle.status !== RaffleStatus.CANCELLED && (
                 <motion.button

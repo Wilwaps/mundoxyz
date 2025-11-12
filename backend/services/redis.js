@@ -20,28 +20,37 @@ async function initRedis() {
       return null;
     }
 
-    const redisConfig = {
-      socket: {
-        host: config.redis.host,
-        port: config.redis.port,
-        connectTimeout: 5000,
-        reconnectStrategy: (retries) => {
-          // Stop reconnecting after 3 attempts
-          if (retries > 3) {
-            logger.warn('Redis reconnect attempts exhausted. Disabling Redis.');
-            return false; // Stop reconnecting
-          }
-          return Math.min(retries * 100, 3000);
+    // Prefer URL (e.g., Upstash REDIS_URL or rediss://)
+    const url = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL || '';
+    const useUrl = typeof url === 'string' && url.length > 0;
+
+    const baseSocket = {
+      connectTimeout: 5000,
+      reconnectStrategy: (retries) => {
+        if (retries > 3) {
+          logger.warn('Redis reconnect attempts exhausted. Disabling Redis.');
+          return false;
         }
+        return Math.min(retries * 100, 3000);
       }
     };
 
-    if (config.redis.password) {
-      redisConfig.password = config.redis.password;
-    }
-
-    if (config.redis.db) {
-      redisConfig.database = config.redis.db;
+    let redisConfig;
+    if (useUrl) {
+      redisConfig = { url, socket: { ...baseSocket } };
+      if (url.startsWith('rediss://') || process.env.REDIS_TLS === 'true') {
+        redisConfig.socket.tls = true;
+      }
+    } else {
+      redisConfig = {
+        socket: {
+          host: config.redis.host,
+          port: config.redis.port,
+          ...baseSocket
+        }
+      };
+      if (config.redis.password) redisConfig.password = config.redis.password;
+      if (config.redis.db) redisConfig.database = config.redis.db;
     }
 
     client = redis.createClient(redisConfig);

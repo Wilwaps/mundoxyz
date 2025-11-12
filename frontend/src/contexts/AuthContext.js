@@ -87,8 +87,18 @@ export const AuthProvider = ({ children }) => {
   const normalizeUserData = (userData) => {
     return {
       ...userData,
-      roles: Array.isArray(userData?.roles) ? userData.roles : 
-             (userData?.roles ? [userData.roles] : ['user']),
+      roles: Array.isArray(userData?.roles)
+        ? userData.roles
+            .map(r => (typeof r === 'string' ? r : r?.name))
+            .filter(Boolean)
+            .map(r => r.toLowerCase())
+        : (userData?.roles
+            ? [
+                (typeof userData.roles === 'string' ? userData.roles : userData.roles?.name)
+              ]
+                .filter(Boolean)
+                .map(r => r.toLowerCase())
+            : ['user']),
       // Normalizar security_answer: backend puede enviar has_security_answer o security_answer
       security_answer: userData?.security_answer !== undefined 
         ? userData.security_answer 
@@ -109,7 +119,10 @@ export const AuthProvider = ({ children }) => {
           const userData = JSON.parse(storedUser);
           // Asegurar que roles sea un array y manejar ambos formatos
           const rolesArray = response.data.roles || [];
-          const normalizedRoles = rolesArray.map(r => typeof r === 'string' ? r : r.name).filter(Boolean);
+          const normalizedRoles = rolesArray
+            .map(r => (typeof r === 'string' ? r : r?.name))
+            .filter(Boolean)
+            .map(r => r.toLowerCase());
           setUser({
             ...userData,
             roles: normalizedRoles
