@@ -340,10 +340,16 @@ async function startServer() {
 
     (async () => {
       try {
-        await initRedis();
-        redisReady = true;
-        logger.info('✅ Redis connected');
+        const redisClient = await initRedis();
+        if (redisClient && redisClient.isOpen) {
+          redisReady = true;
+          logger.info('✅ Redis connected');
+        } else {
+          redisReady = false;
+          logger.warn('Redis not connected. Continuing without cache.');
+        }
       } catch (error) {
+        redisReady = false;
         logger.error('Failed to initialize Redis:', error);
       }
     })();
