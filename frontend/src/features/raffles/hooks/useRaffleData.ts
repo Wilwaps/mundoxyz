@@ -302,6 +302,14 @@ export const useRaffle = (code: string) => {
   const raffleQuery = useRaffleDetail(code);
   const numbersQuery = useRaffleNumbers(code);
   const userNumbersQuery = useUserNumbers(code);
+  const winner = raffleQuery.data?.winner || (raffleQuery.data?.raffle?.winnerId ? {
+    userId: raffleQuery.data.raffle.winnerId,
+    username: raffleQuery.data.raffle.winnerUsername,
+    displayName: raffleQuery.data.raffle.winnerDisplayName,
+    winningNumber: raffleQuery.data.raffle.winnerNumber,
+    prizeAmount: raffleQuery.data.raffle.mode === 'fires' ? raffleQuery.data.raffle.potFires : raffleQuery.data.raffle.potCoins,
+    currency: raffleQuery.data.raffle.mode === 'fires' ? 'fires' : 'coins'
+  } : undefined);
   
   // Mutations
   const reserveNumber = useReserveNumber();
@@ -382,15 +390,20 @@ export const useRaffle = (code: string) => {
       }
     };
     
-    const handleWinnerDrawn = (data: any) => {
-      if (data.raffleCode === code) {
-        // Usar refetch para mantener datos previos mientras actualiza
-        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
-        if (data.winnerId === user.id) {
-          toast.success('¡FELICIDADES! ¡Has ganado la rifa!', { duration: 10000 });
-        } else {
-          toast(`Número ganador: ${data.winningNumber}`, { icon: '🎉' });
-        }
+    const handleWinnerEvent = (data: any) => {
+      if (data.raffleCode !== code) return;
+      queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.detail(code) });
+      const isCurrentUserWinner = data.winner?.id === user?.id || data.winnerId === user?.id;
+      const winnerName = data.winner?.displayName || data.winner?.username || data.winnerDisplayName || data.winnerUsername;
+      const winningNumber = data.winningNumber;
+
+      if (isCurrentUserWinner) {
+        toast.success('🎉 ¡FELICIDADES! ¡Has ganado la rifa! 🎉', { duration: 10000 });
+      } else if (winnerName || winningNumber !== undefined) {
+        const message = winnerName
+          ? `Ganador: ${winnerName}${winningNumber !== undefined ? ` (#${winningNumber})` : ''}`
+          : `Número ganador: ${winningNumber}`;
+        toast.success(message, { icon: '🏆' });
       }
     };
     
@@ -400,7 +413,8 @@ export const useRaffle = (code: string) => {
     socket.on('raffle:number_purchased', handleNumberPurchased);
     socket.on('raffle:number_released', handleNumberReleased);
     socket.on('raffle:status_changed', handleStatusChanged);
-    socket.on('raffle:winner_drawn', handleWinnerDrawn);
+    socket.on('raffle:winner_drawn', handleWinnerEvent);
+    socket.on('raffle:finished', handleWinnerEvent);
     
     // Cleanup
     return () => {
@@ -410,7 +424,8 @@ export const useRaffle = (code: string) => {
       socket.off('raffle:number_purchased', handleNumberPurchased);
       socket.off('raffle:number_released', handleNumberReleased);
       socket.off('raffle:status_changed', handleStatusChanged);
-      socket.off('raffle:winner_drawn', handleWinnerDrawn);
+      socket.off('raffle:winner_drawn', handleWinnerEvent);
+      socket.off('raffle:finished', handleWinnerEvent);
     };
   }, [socket, connected, code, user, queryClient]);
   
@@ -420,6 +435,7 @@ export const useRaffle = (code: string) => {
     numbers: numbersQuery.data || [],
     userNumbers: userNumbersQuery.data || [],
     stats: raffleQuery.data?.stats,
+    winner,
     
     // Estados de carga
     isLoading: raffleQuery.isLoading || numbersQuery.isLoading,

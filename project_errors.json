@@ -1,0 +1,222 @@
+{
+  "project": "MUNDOXYZ",
+  "last_updated": "2025-11-11T22:10:00-04:00",
+  "environment": "production",
+  "url": "https://mundoxyz-production.up.railway.app",
+  "critical_errors": [
+    {
+      "id": "RAFFLE_001",
+      "severity": "CRITICAL",
+      "status": "OPEN",
+      "feature": "Rifas - Sorteo Automático",
+      "title": "Sorteo automático no se ejecuta después de vender todos los números",
+      "description": "Cuando se venden todos los números de una rifa con draw_mode='automatic', el sistema no ejecuta el sorteo después de 10 segundos como está configurado.",
+      "expected_behavior": "Al vender el último número, después de 10 segundos debe: 1) Seleccionar ganador aleatorio, 2) Cambiar status a 'finished', 3) Distribuir pote, 4) Emitir evento socket raffle:winner_drawn",
+      "actual_behavior": "La rifa permanece en estado 'ACTIVA' indefinidamente, sin ganador seleccionado ni distribución de pote",
+      "reproduction_steps": [
+        "1. Crear rifa de 10 números en modo fuego público",
+        "2. Configurar draw_mode='automatic'",
+        "3. Comprar todos los números (100% vendidos)",
+        "4. Esperar >10 segundos",
+        "5. Observar que estado sigue 'ACTIVA'"
+      ],
+      "affected_files": [
+        "backend/modules/raffles/services/RaffleServiceV2.js",
+        "backend/modules/raffles/controllers/RaffleController.js",
+        "backend/modules/raffles/routes/index.js"
+      ],
+      "suspected_cause": "Método checkAndFinishRaffle() no se llama después de la compra del último número, o el scheduler no está activo",
+      "impact": "Bloquea completamente el flujo de rifas automáticas. Los usuarios no pueden ganar premios.",
+      "test_case": {
+        "raffle_code": "403256",
+        "numbers_sold": "10/10",
+        "wait_time": "15s",
+        "status_after_wait": "ACTIVA (debería ser FINISHED)"
+      },
+      "priority": 1,
+      "assigned_to": null,
+      "created_at": "2025-11-11T22:05:00-04:00",
+      "detected_by": "Chrome DevTools Testing",
+      "commit_when_detected": "8c316b7"
+    },
+    {
+      "id": "RAFFLE_002",
+      "severity": "CRITICAL",
+      "status": "OPEN",
+      "feature": "Rifas - Visualización de Datos",
+      "title": "Datos de rifa muestran valores 0 o incorrectos en la interfaz",
+      "description": "La información de la rifa muestra valores incorrectos: total números=0, precio=0, pote=0, disponibles=-10, progreso=0%, cuando los valores reales son diferentes.",
+      "expected_behavior": "Mostrar: total=10, precio=10🔥, pote=100🔥, disponibles=0, progreso=100%",
+      "actual_behavior": "Muestra: total=0, precio=0🔥, pote=0🔥, disponibles=-10, progreso=0%",
+      "reproduction_steps": [
+        "1. Crear rifa de 10 números a 10🔥 cada uno",
+        "2. Comprar todos los números",
+        "3. Verificar tab 'Información'",
+        "4. Observar valores incorrectos"
+      ],
+      "affected_files": [
+        "backend/modules/raffles/services/RaffleServiceV2.js (getRaffleByCode)",
+        "frontend/src/features/raffles/pages/RaffleRoom.tsx"
+      ],
+      "suspected_cause": "Query de getRaffleByCode() no incluye todas las columnas necesarias (total_numbers, entry_price, total_pot) o frontend recibe null/undefined",
+      "impact": "Información incorrecta confunde a usuarios, imposible ver pote acumulado o precio real",
+      "test_case": {
+        "raffle_code": "403256",
+        "expected_data": {
+          "total_numbers": 10,
+          "entry_price": 10,
+          "total_pot": 100,
+          "available": 0,
+          "progress": 100
+        },
+        "actual_data": {
+          "total_numbers": 0,
+          "entry_price": 0,
+          "total_pot": 0,
+          "available": -10,
+          "progress": 0
+        }
+      },
+      "priority": 1,
+      "assigned_to": null,
+      "created_at": "2025-11-11T22:08:00-04:00",
+      "detected_by": "Chrome DevTools Testing",
+      "commit_when_detected": "8c316b7"
+    }
+  ],
+  "medium_errors": [
+    {
+      "id": "RAFFLE_003",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "feature": "Rifas - Fecha de Creación",
+      "title": "Fecha de creación muestra 'Invalid Date'",
+      "description": "El campo 'Creada' muestra 'Invalid Date' en lugar de la fecha/hora real de creación",
+      "expected_behavior": "Mostrar 'Hace X minutos' o fecha formateada",
+      "actual_behavior": "Muestra 'Invalid Date'",
+      "suspected_cause": "Campo created_at no viene del backend o formato incompatible con Date() de JavaScript",
+      "affected_files": [
+        "backend/modules/raffles/services/RaffleServiceV2.js",
+        "frontend/src/features/raffles/pages/RaffleRoom.tsx"
+      ],
+      "impact": "Cosmético - información temporal no disponible",
+      "priority": 3,
+      "created_at": "2025-11-11T22:09:00-04:00"
+    },
+    {
+      "id": "RAFFLE_004",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "feature": "Rifas - Contador de Participantes",
+      "title": "Contador de participantes muestra cantidad de números en lugar de usuarios únicos",
+      "description": "Muestra '10 participantes' cuando solo hay 1 usuario que compró 10 números",
+      "expected_behavior": "Mostrar '1 participante' (COUNT DISTINCT usuarios)",
+      "actual_behavior": "Muestra '10 participantes' (COUNT números)",
+      "suspected_cause": "Frontend cuenta números vendidos en lugar de owner_id únicos",
+      "affected_files": [
+        "frontend/src/features/raffles/pages/RaffleRoom.tsx"
+      ],
+      "impact": "Información incorrecta pero no crítica",
+      "priority": 4,
+      "created_at": "2025-11-11T22:09:00-04:00"
+    }
+  ],
+  "minor_errors": [
+    {
+      "id": "RAFFLE_005",
+      "severity": "LOW",
+      "status": "OPEN",
+      "feature": "Rifas - Notificaciones",
+      "title": "Toasts de compra duplicados (10 mensajes para 10 números)",
+      "description": "Al comprar 10 números se muestran 10 toasts 'Compra completada exitosamente', uno por cada número",
+      "expected_behavior": "Mostrar 1 toast con '10 números comprados exitosamente'",
+      "actual_behavior": "Muestra 10 toasts individuales",
+      "suspected_cause": "Toast se emite en loop por cada número en lugar de 1 vez al final",
+      "affected_files": [
+        "frontend/src/features/raffles/components/PurchaseModal.tsx o RaffleRoom.tsx"
+      ],
+      "impact": "UX subóptima - pantalla saturada de notificaciones",
+      "priority": 5,
+      "created_at": "2025-11-11T22:09:00-04:00"
+    }
+  ],
+  "resolved_errors": [
+    {
+      "id": "RAFFLE_000",
+      "severity": "CRITICAL",
+      "status": "RESOLVED",
+      "feature": "Rifas - Modal de Creación",
+      "title": "Modal bloqueado en paso 4, imposible avanzar a paso 5",
+      "description": "El botón 'Siguiente' en paso 4 (Modo de Victoria) no avanzaba al paso 5 de confirmación",
+      "root_cause": "Límite hardcodeado Math.min(prev + 1, 4) cuando ahora son 5 pasos totales",
+      "solution": "Cambiar límite a Math.min(prev + 1, 5) y agregar validación case 4",
+      "fixed_in_commit": "8c316b7",
+      "fixed_files": [
+        "frontend/src/features/raffles/components/CreateRaffleModal.tsx"
+      ],
+      "verification": "Probado flujo completo 1→5, funciona correctamente",
+      "resolved_at": "2025-11-11T21:50:00-04:00"
+    }
+  ],
+  "testing_summary": {
+    "date": "2025-11-11",
+    "duration_minutes": 8,
+    "features_tested": 8,
+    "features_working": 5,
+    "features_broken": 3,
+    "critical_bugs": 2,
+    "medium_bugs": 2,
+    "minor_bugs": 1,
+    "pass_rate": "62.5%"
+  },
+  "next_actions": [
+    {
+      "priority": 1,
+      "action": "Implementar sorteo automático en RaffleServiceV2.checkAndFinishRaffle()",
+      "estimated_time": "30 min",
+      "blocking": true
+    },
+    {
+      "priority": 2,
+      "action": "Corregir query getRaffleByCode() para incluir todos los campos",
+      "estimated_time": "15 min",
+      "blocking": true
+    },
+    {
+      "priority": 3,
+      "action": "Fix fecha de creación (formato created_at)",
+      "estimated_time": "10 min",
+      "blocking": false
+    },
+    {
+      "priority": 4,
+      "action": "Corregir contador de participantes (COUNT DISTINCT)",
+      "estimated_time": "5 min",
+      "blocking": false
+    },
+    {
+      "priority": 5,
+      "action": "Optimizar toasts de compra (1 mensaje en lugar de N)",
+      "estimated_time": "5 min",
+      "blocking": false
+    }
+  ],
+  "dependencies_check": {
+    "frontend": {
+      "react": "OK",
+      "typescript": "OK",
+      "framer-motion": "OK",
+      "lucide-react": "OK"
+    },
+    "backend": {
+      "node": "OK",
+      "express": "OK",
+      "postgresql": "OK",
+      "socket.io": "OK"
+    },
+    "railway": {
+      "deploy": "OK",
+      "database": "OK"
+    }
+  }
+}

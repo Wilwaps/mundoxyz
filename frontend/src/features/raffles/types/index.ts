@@ -89,6 +89,10 @@ export interface Raffle {
   startsAt?: Date;
   endsAt?: Date;
   finishedAt?: Date;
+  winnerNumber?: number;
+  winnerId?: string;
+  winnerUsername?: string;
+  winnerDisplayName?: string;
   
   // Configuración empresa
   companyConfig?: CompanyConfig;
@@ -182,8 +186,10 @@ export interface RaffleParticipant {
 export interface RaffleWinner {
   userId: string;
   username: string;
+  displayName?: string;
   winningNumber: number;
   prizeAmount: number;
+  currency?: 'fires' | 'coins';
   claimedAt?: Date;
 }
 
@@ -225,6 +231,7 @@ export interface RaffleDetailResponse {
   raffle: Raffle;
   numbers: RaffleNumber[];
   userNumbers?: number[];
+  winner?: RaffleWinner;
   stats?: RaffleStats;
 }
 

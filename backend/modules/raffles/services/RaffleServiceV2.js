@@ -431,6 +431,8 @@ class RaffleServiceV2 {
         `SELECT 
           r.*,
           u.username as host_username,
+          wu.username as winner_username,
+          wu.display_name as winner_display_name,
           COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as numbers_sold,
           COUNT(CASE WHEN rn.state = 'reserved' THEN 1 END) as numbers_reserved,
           rc.company_name,
@@ -441,10 +443,11 @@ class RaffleServiceV2 {
           rc.website_url
          FROM raffles r
          JOIN users u ON r.host_id = u.id
+         LEFT JOIN users wu ON r.winner_id = wu.id
          LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.code = $1
-         GROUP BY r.id, u.username, rc.company_name, rc.rif_number, 
+         GROUP BY r.id, u.username, wu.username, wu.display_name, rc.company_name, rc.rif_number, 
                   rc.brand_color, rc.secondary_color, rc.logo_url, rc.website_url`,
         [code]
       );
@@ -1066,10 +1069,14 @@ class RaffleServiceV2 {
       
       // Obtener participantes únicos
       const participantsResult = await client.query(
-        `SELECT DISTINCT rn.owner_id, u.telegram_username, u.display_name
+        `SELECT rn.owner_id,
+                COALESCE(u.display_name, u.username) AS display_name,
+                u.username,
+                array_agg(rn.number_idx ORDER BY rn.number_idx) AS numbers
          FROM raffle_numbers rn
          JOIN users u ON u.id = rn.owner_id
-         WHERE rn.raffle_id = $1 AND rn.state = 'sold'`,
+         WHERE rn.raffle_id = $1 AND rn.state = 'sold'
+         GROUP BY rn.owner_id, u.display_name, u.username`,
         [raffleId]
       );
       
@@ -1082,12 +1089,20 @@ class RaffleServiceV2 {
       // Seleccionar ganador aleatorio
       const randomIndex = Math.floor(Math.random() * participants.length);
       const winner = participants[randomIndex];
+      const winnerNumbers = winner.numbers || [];
+      const winningNumber = winnerNumbers.length > 0
+        ? winnerNumbers[Math.floor(Math.random() * winnerNumbers.length)]
+        : null;
       
+      const winnerDisplayName = winner.display_name || winner.username;
+
       logger.info('[RaffleServiceV2] Ganador seleccionado', {
         raffleId,
         winnerId: winner.owner_id,
-        winnerUsername: winner.telegram_username,
-        totalParticipants: participants.length
+        winnerUsername: winner.username,
+        winnerDisplayName,
+        totalParticipants: participants.length,
+        winningNumber
       });
       
       // Calcular distribución según modo
@@ -1259,10 +1274,11 @@ class RaffleServiceV2 {
         `UPDATE raffles
          SET status = $1,
              winner_id = $2,
+             winner_number = $3,
              finished_at = NOW(),
              updated_at = NOW()
-         WHERE id = $3`,
-        [RaffleStatus.FINISHED, winner.owner_id, raffleId]
+         WHERE id = $4`,
+        [RaffleStatus.FINISHED, winner.owner_id, winningNumber, raffleId]
       );
       
       await client.query('COMMIT');
@@ -1270,19 +1286,35 @@ class RaffleServiceV2 {
       logger.info('[RaffleServiceV2] Rifa finalizada exitosamente', {
         raffleId,
         code: raffle.code,
-        winner: winner.telegram_username,
+        winnerUsername: winner.username,
+        winnerDisplayName,
+        winningNumber,
         prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
       });
       
       // Emitir evento WebSocket (si está disponible)
       if (global.io) {
-        global.io.to(`raffle_${raffle.code}`).emit('raffle:finished', {
+        const roomName = `raffle:${raffle.code}`;
+        const winnerPayload = {
           raffleCode: raffle.code,
           winner: {
             id: winner.owner_id,
-            username: winner.telegram_username,
-            displayName: winner.display_name
+            username: winner.username,
+            displayName: winnerDisplayName
           },
+          winningNumber,
+          prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+          currency: raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins'
+        };
+
+        global.io.to(roomName).emit('raffle:finished', winnerPayload);
+        // Compatibilidad hacia atrás con listeners antiguos
+        global.io.to(roomName).emit('raffle:winner_drawn', {
+          raffleCode: raffle.code,
+          winnerId: winner.owner_id,
+          winnerUsername: winner.username,
+          winnerDisplayName,
+          winningNumber,
           prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
           currency: raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins'
         });
@@ -1294,18 +1326,24 @@ class RaffleServiceV2 {
             type: 'raffle_finished',
             raffleCode: raffle.code,
             isWinner,
-            winner: winner.telegram_username,
+            winner: winner.username,
+            winningNumber,
             prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
             message: isWinner
               ? `🎉 ¡Felicidades! Ganaste la rifa ${raffle.code}. Premio: ${raffle.pot_fires || raffle.pot_coins} ${raffle.raffle_mode === RaffleMode.FIRES ? '🔥' : '🪙'}`
-              : `La rifa ${raffle.code} finalizó. Ganador: @${winner.telegram_username}`
+              : `La rifa ${raffle.code} finalizó. Ganador: @${winner.username}`
           });
         }
       }
       
       return {
         success: true,
-        winner,
+        winner: {
+          id: winner.owner_id,
+          username: winner.username,
+          displayName: winnerDisplayName,
+          winningNumber
+        },
         prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
       };
       
@@ -1690,6 +1728,10 @@ class RaffleServiceV2 {
       entryPriceCoin: raffle.entry_price_coin,
       potFires: parseFloat(raffle.pot_fires || 0),
       potCoins: parseFloat(raffle.pot_coins || 0),
+      winnerId: raffle.winner_id,
+      winnerNumber: raffle.winner_number,
+      winnerUsername: raffle.winner_username,
+      winnerDisplayName: raffle.winner_display_name,
       createdAt: raffle.created_at,
       startsAt: raffle.starts_at,
       endsAt: raffle.ends_at,
@@ -1733,14 +1775,14 @@ class RaffleServiceV2 {
         // Modo FIRES/COINS: mostrar participantes públicos
         const result = await query(
           `SELECT 
-             u.display_name,
-             u.telegram_username,
+             COALESCE(u.display_name, u.username) as display_name,
+             u.username,
              array_agg(rn.number_idx ORDER BY rn.number_idx) as numbers
            FROM raffle_numbers rn
            JOIN users u ON rn.owner_id = u.id
            WHERE rn.raffle_id = $1 AND rn.state = 'sold'
-           GROUP BY u.id, u.display_name, u.telegram_username
-           ORDER BY u.display_name`,
+           GROUP BY u.id, u.display_name, u.username
+           ORDER BY display_name`,
           [raffle.id]
         );
         
@@ -1755,34 +1797,36 @@ class RaffleServiceV2 {
           // Host ve solicitudes completas con botones de acción
           const result = await query(
             `SELECT 
-               rr.id as request_id,
-               rr.buyer_profile,
-               rr.request_data,
-               rr.status,
-               rr.created_at,
-               array_agg(rr.number_idx ORDER BY rr.number_idx) as numbers,
-               u.telegram_username
-             FROM raffle_requests rr
-             LEFT JOIN users u ON rr.buyer_id = u.id
-             WHERE rr.raffle_id = $1
-             GROUP BY rr.id, rr.buyer_profile, rr.request_data, rr.status, rr.created_at, u.telegram_username
-             ORDER BY rr.created_at DESC`,
-            [raffle.id]
-          );
-          
-          return {
-            requests: result.rows.map(row => ({
-              requestId: row.request_id,
+             rr.id,
+             rr.buyer_profile,
+             rr.request_data,
+             rr.status,
+             rr.created_at,
+             array_agg(rr.number_idx ORDER BY rr.number_idx) as numbers,
+             u.username,
+             u.display_name
+           FROM raffle_requests rr
+           LEFT JOIN users u ON rr.buyer_id = u.id
+           WHERE rr.raffle_id = $1
+           GROUP BY rr.id, rr.buyer_profile, rr.request_data, rr.status, rr.created_at, u.username, u.display_name
+           ORDER BY rr.created_at DESC`,
+          [raffle.id]
+        );
+
+        return {
+          requests: result.rows.map(row => ({
+              requestId: row.id,
               buyerProfile: row.buyer_profile,
               requestData: row.request_data,
               status: row.status,
-              numbers: row.numbers,
-              telegramUsername: row.telegram_username,
+              username: row.username,
+              displayName: row.display_name,
               createdAt: row.created_at
             })),
             totalRequests: result.rows.length
           };
-        } else {
+        }
+ else {
           // Usuario normal ve solo nombres públicos aprobados
           const result = await query(
             `SELECT 
