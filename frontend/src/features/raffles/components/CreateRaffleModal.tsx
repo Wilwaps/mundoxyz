@@ -192,6 +192,34 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
           }
         }
         break;
+      
+      case 4:
+        // Validar que se haya seleccionado un modo de sorteo
+        if (!drawMode) {
+          toast.error('Por favor selecciona un modo de victoria');
+          console.warn('[CreateRaffleModal] drawMode no seleccionado');
+          return false;
+        }
+        
+        // Si es programado, verificar fecha
+        if (drawMode === DrawMode.SCHEDULED) {
+          if (!scheduledDrawAt) {
+            toast.error('Por favor ingresa la fecha y hora del sorteo');
+            console.warn('[CreateRaffleModal] scheduledDrawAt vacío');
+            return false;
+          }
+          
+          const scheduledDate = new Date(scheduledDrawAt);
+          const now = new Date();
+          if (scheduledDate <= now) {
+            toast.error('La fecha debe ser futura');
+            console.warn('[CreateRaffleModal] scheduledDrawAt es pasada');
+            return false;
+          }
+        }
+        
+        console.log('[CreateRaffleModal] Paso 4 validado correctamente', { drawMode, scheduledDrawAt });
+        break;
     }
     
     return true;
@@ -199,8 +227,17 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   
   // Avanzar paso
   const nextStep = () => {
+    console.log('[CreateRaffleModal] nextStep llamado', {
+      currentStep: step,
+      drawMode,
+      formData
+    });
+    
     if (validateStep()) {
-      setStep(prev => Math.min(prev + 1, 4));
+      console.log('[CreateRaffleModal] Validación exitosa, avanzando a:', step + 1);
+      setStep(prev => Math.min(prev + 1, 5)); // FIXED: 4 → 5 pasos
+    } else {
+      console.warn('[CreateRaffleModal] Validación fallida, no se puede avanzar');
     }
   };
   
