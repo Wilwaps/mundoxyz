@@ -119,12 +119,8 @@ let redisReady = false;
 
 // Trust proxy - Always enable in production (Railway, Heroku, etc.)
 // This is required for rate limiting and getting correct client IPs
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1); // Trust first proxy (Railway)
-  logger.info('Trust proxy enabled for production');
-} else if (config.server.trustProxyHops) {
-  app.set('trust proxy', config.server.trustProxyHops);
-}
+app.set('trust proxy', true);
+logger.info('Trust proxy enabled');
 
 // Security middleware
 app.use(helmet({
@@ -390,7 +386,7 @@ async function startServer() {
                 
                 if (result.rows.length > 0) {
                   const raffleCode = result.rows[0].code;
-                  io.to(`raffle_${raffleCode}`).emit('numbers:released', {
+                  io.to(`raffle:${raffleCode}`).emit('numbers:released', {
                     numbers,
                     reason: 'expired'
                   });

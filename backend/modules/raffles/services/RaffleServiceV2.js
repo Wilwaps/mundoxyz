@@ -528,11 +528,27 @@ class RaffleServiceV2 {
         completionRate: Math.round((statsResult.rows[0].total_numbers_sold / raffle.numbersRange) * 100)
       };
       
+      // Construir objeto de ganador si existe
+      let winner = undefined;
+      if (raffle.winnerId) {
+        const currency = raffle.mode === RaffleMode.FIRES ? 'fires' : (raffle.mode === RaffleMode.COINS ? 'coins' : undefined);
+        const prizeAmount = raffle.mode === RaffleMode.FIRES ? raffle.potFires : (raffle.mode === RaffleMode.COINS ? raffle.potCoins : undefined);
+        winner = {
+          userId: raffle.winnerId,
+          username: raffle.winnerUsername,
+          displayName: raffle.winnerDisplayName,
+          winningNumber: raffle.winnerNumber,
+          prizeAmount,
+          currency
+        };
+      }
+
       return {
         raffle,
         numbers,
         userNumbers,
-        stats
+        stats,
+        ...(winner ? { winner } : {})
       };
       
     } catch (error) {
@@ -945,7 +961,7 @@ class RaffleServiceV2 {
           
           // Solo notificar que todos los números están vendidos
           if (raffleCode && global.io) {
-            global.io.to(`raffle_${raffleCode}`).emit('raffle:all_sold', {
+            global.io.to(`raffle:${raffleCode}`).emit('raffle:all_sold', {
               code: raffleCode,
               message: '¡Todos los números vendidos! El host puede elegir el ganador cuando desee.'
             });
@@ -965,7 +981,7 @@ class RaffleServiceV2 {
             });
             
             if (raffleCode && global.io) {
-              global.io.to(`raffle_${raffleCode}`).emit('raffle:all_sold', {
+              global.io.to(`raffle:${raffleCode}`).emit('raffle:all_sold', {
                 code: raffleCode,
                 scheduledDrawAt,
                 message: `¡Todos los números vendidos! Sorteo programado para ${scheduledDate.toLocaleString('es-VE')}`
@@ -979,7 +995,7 @@ class RaffleServiceV2 {
             });
             
             if (raffleCode && global.io) {
-              global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
+              global.io.to(`raffle:${raffleCode}`).emit('raffle:drawing_scheduled', {
                 code: raffleCode,
                 drawInSeconds: 0,
                 message: '¡Hora del sorteo! Eligiendo ganador...'
@@ -991,29 +1007,21 @@ class RaffleServiceV2 {
           }
           
         } else {
-          // MODO AUTOMÁTICO (comportamiento actual)
-          logger.info('[RaffleServiceV2] ⚡ Modo AUTOMÁTICO - Programando finalización en 10 segundos', {
+          logger.info('[RaffleServiceV2] ⚡ Modo AUTOMÁTICO - Finalizando inmediatamente (sin delay)', {
             raffleId,
             code: raffleCode
           });
           
-          // Emitir evento de sorteo programado
           if (raffleCode && global.io) {
-            global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
+            global.io.to(`raffle:${raffleCode}`).emit('raffle:drawing_scheduled', {
               code: raffleCode,
-              drawInSeconds: 10,
-              message: '¡Todos los números vendidos! Sorteo en 10 segundos...'
+              drawInSeconds: 0,
+              message: '¡Todos los números vendidos! Eligiendo ganador...'
             });
           }
           
-          // DELAY DE 10 SEGUNDOS antes de sorteo
-          setTimeout(async () => {
-            try {
-              await this.finishRaffle(raffleId);
-            } catch (err) {
-              logger.error('[RaffleServiceV2] Error en finalización retrasada', err);
-            }
-          }, 10000); // 10 segundos
+          // Finalizar inmediatamente
+          await this.finishRaffle(raffleId);
         }
         
       } else {

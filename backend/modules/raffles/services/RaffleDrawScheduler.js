@@ -102,7 +102,7 @@ class RaffleDrawScheduler {
           try {
             // Emitir socket antes de finalizar
             if (global.io) {
-              global.io.to(`raffle_${raffle.code}`).emit('raffle:drawing_scheduled', {
+              global.io.to(`raffle:${raffle.code}`).emit('raffle:drawing_scheduled', {
                 code: raffle.code,
                 drawInSeconds: 0,
                 message: '¡Hora del sorteo programado! Eligiendo ganador...'
@@ -125,7 +125,7 @@ class RaffleDrawScheduler {
 
           // Emitir socket informando que no se puede sortear
           if (global.io) {
-            global.io.to(`raffle_${raffle.code}`).emit('raffle:draw_cancelled', {
+            global.io.to(`raffle:${raffle.code}`).emit('raffle:draw_cancelled', {
               code: raffle.code,
               reason: 'no_all_sold',
               message: `No se puede realizar el sorteo programado. Faltan ${totalNumbers - soldNumbers} números por vender.`

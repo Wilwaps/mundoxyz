@@ -340,18 +340,29 @@ export const useRaffle = (code: string) => {
     // Escuchar eventos de actualización
     const handleStateUpdate = (data: any) => {
       if (data.raffle) {
-        queryClient.setQueryData(RAFFLE_QUERY_KEYS.detail(code), { 
-          raffle: data.raffle, 
-          stats: {
-            participants: data.raffle.participants,
-            soldNumbers: data.raffle.soldNumbers,
-            reservedNumbers: data.raffle.reservedNumbers
-          }
+        queryClient.setQueryData(RAFFLE_QUERY_KEYS.detail(code), (prev: any) => {
+          const prevRaffle = prev?.raffle || {};
+          const prevStats = prev?.stats || {};
+          return {
+            ...prev,
+            raffle: {
+              ...prevRaffle,
+              numbersSold: data.raffle.soldNumbers ?? prevRaffle.numbersSold,
+              numbersReserved: data.raffle.reservedNumbers ?? prevRaffle.numbersReserved
+            },
+            stats: {
+              ...prevStats,
+              participants: data.raffle.participants ?? prevStats.participants,
+              soldNumbers: data.raffle.soldNumbers ?? prevStats.soldNumbers,
+              reservedNumbers: data.raffle.reservedNumbers ?? prevStats.reservedNumbers
+            }
+          };
         });
       }
       
+      // Evitar sobreescribir la cache de números con un payload con diferente forma
       if (data.numbers) {
-        queryClient.setQueryData(RAFFLE_QUERY_KEYS.numbers(code), data.numbers);
+        queryClient.refetchQueries({ queryKey: RAFFLE_QUERY_KEYS.numbers(code) });
       }
     };
     
