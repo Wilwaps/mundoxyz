@@ -547,6 +547,98 @@ class RaffleController {
       });
     }
   }
+  
+  /**
+   * Elegir ganador manualmente (solo host, modo manual)
+   * POST /api/raffles/v2/:code/draw-winner
+   */
+  async drawWinnerManually(req, res) {
+    try {
+      const { code } = req.params;
+      const userId = req.user.id;
+      
+      logger.info('[RaffleController] Solicitud de sorteo manual', { code, userId });
+      
+      // Obtener rifa y verificar permisos
+      const raffle = await raffleService.getRaffleByCode(code);
+      
+      if (raffle.hostId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo el host puede elegir el ganador manualmente'
+        });
+      }
+      
+      if (raffle.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'La rifa no está activa'
+        });
+      }
+      
+      if (raffle.drawMode !== 'manual') {
+        return res.status(400).json({
+          success: false,
+          message: 'Esta rifa no está en modo manual'
+        });
+      }
+      
+      // Verificar que todos los números estén vendidos
+      const { query } = require('../../../db');
+      const checkResult = await query(
+        `SELECT 
+           COUNT(*) as total,
+           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold
+         FROM raffle_numbers
+         WHERE raffle_id = $1`,
+        [raffle.id]
+      );
+      
+      const { total, sold } = checkResult.rows[0];
+      
+      if (parseInt(total) !== parseInt(sold)) {
+        return res.status(400).json({
+          success: false,
+          message: `No se puede sortear aún. Faltan ${parseInt(total) - parseInt(sold)} números por vender`,
+          stats: {
+            total: parseInt(total),
+            sold: parseInt(sold),
+            remaining: parseInt(total) - parseInt(sold)
+          }
+        });
+      }
+      
+      // Ejecutar finalización
+      logger.info('[RaffleController] Ejecutando sorteo manual', { raffleId: raffle.id, code });
+      
+      await raffleService.finishRaffle(raffle.id);
+      
+      // Obtener datos actualizados
+      const updatedRaffle = await raffleService.getRaffleByCode(code);
+      
+      res.json({
+        success: true,
+        message: '¡Ganador elegido exitosamente!',
+        raffle: updatedRaffle,
+        winner: {
+          number: updatedRaffle.winnerNumber,
+          userId: updatedRaffle.winnerId
+        }
+      });
+      
+    } catch (error) {
+      logger.error('[RaffleController] Error en sorteo manual', {
+        code: req.params.code,
+        userId: req.user?.id,
+        error: error.message
+      });
+      
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Error eligiendo ganador'
+      });
+    }
+  }
 }
 
 module.exports = new RaffleController();

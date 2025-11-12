@@ -50,6 +50,13 @@ export enum PaymentMethod {
   FIRES = 'fires'
 }
 
+// Modos de sorteo/victoria ✨ NUEVO
+export enum DrawMode {
+  AUTOMATIC = 'automatic',  // 10 segundos después de vender último número
+  SCHEDULED = 'scheduled',  // Fecha y hora específica
+  MANUAL = 'manual'         // Host decide cuándo sortear
+}
+
 // Interfaz principal de Rifa
 export interface Raffle {
   id: number;
@@ -95,6 +102,8 @@ export interface Raffle {
   // Nuevos campos
   allowFiresPayment?: boolean; // ✨ Toggle pago con fuegos en modo Premio
   prizeImageBase64?: string; // ✨ Imagen del premio en base64
+  drawMode?: DrawMode; // ✨ Modo de sorteo
+  scheduledDrawAt?: Date; // ✨ Fecha programada para sorteo (si modo = scheduled)
 }
 
 // Configuración de empresa
@@ -252,6 +261,8 @@ export interface CreateRaffleForm {
   termsConditions?: string;
   prizeMeta?: PrizeMeta;
   companyConfig?: CompanyConfig;
+  drawMode?: DrawMode; // ✨ Modo de sorteo
+  scheduledDrawAt?: string; // ✨ Fecha programada (ISO string)
 }
 
 export interface BuyNumberForm {

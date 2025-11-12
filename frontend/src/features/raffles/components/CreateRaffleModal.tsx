@@ -18,12 +18,15 @@ import {
   AlertCircle,
   Check,
   Upload,
-  Palette
+  Palette,
+  Zap,
+  Clock,
+  Hand
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateRaffle } from '../hooks/useRaffleData';
-import { CreateRaffleForm, RaffleMode, RaffleVisibility } from '../types';
+import { CreateRaffleForm, RaffleMode, RaffleVisibility, DrawMode } from '../types';
 import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 import { processImage } from '../utils/imageHelpers';
@@ -47,6 +50,8 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   const [prizeImageBase64, setPrizeImageBase64] = useState<string>('');
   const [logoBase64, setLogoBase64] = useState<string>('');
   const [allowFiresPayment, setAllowFiresPayment] = useState(false);
+  const [drawMode, setDrawMode] = useState<DrawMode>(DrawMode.AUTOMATIC);
+  const [scheduledDrawAt, setScheduledDrawAt] = useState<string>('');
   const [formData, setFormData] = useState<CreateRaffleForm>({
     name: '',
     description: '',
@@ -218,11 +223,13 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     }
     
     try {
-      // Agregar datos de base64 y toggle al payload
+      // Agregar datos de base64, toggle y modo de sorteo al payload
       const payload: any = {
         ...formData,
         allowFiresPayment: formData.mode === RaffleMode.PRIZE ? allowFiresPayment : undefined,
         prizeImageBase64: prizeImageBase64 || undefined,
+        drawMode: drawMode,
+        scheduledDrawAt: drawMode === DrawMode.SCHEDULED ? scheduledDrawAt : undefined,
         companyConfig: formData.companyConfig ? {
           ...formData.companyConfig,
           logoBase64: logoBase64 || undefined
@@ -758,6 +765,191 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-text mb-2">
+              Visibilidad de la Rifa
+            </h3>
+            
+            {/* Aviso si modo empresa está activo */}
+            {isCompanyMode && (
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-3">
+                <div className="flex items-start gap-2">
+                  <Building2 className="w-4 h-4 text-accent mt-0.5" />
+                  <div className="text-xs text-accent">
+                    <p className="font-semibold">Modo Empresa Activo</p>
+                    <p>Las rifas empresariales siempre tienen visibilidad "Empresa"</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Selector de visibilidad */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => !isCompanyMode && updateField('visibility', RaffleVisibility.PUBLIC)}
+                disabled={isCompanyMode}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.visibility === RaffleVisibility.PUBLIC
+                    ? 'border-accent bg-accent/20'
+                    : 'border-white/10 bg-glass hover:bg-glass-lighter'
+                } ${isCompanyMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <Globe className="w-8 h-8 mx-auto mb-2 text-accent" />
+                <div className="text-sm font-medium text-text">Pública</div>
+                <div className="text-xs text-text/60 mt-1">Todos pueden ver y participar</div>
+              </button>
+              
+              <button
+                onClick={() => !isCompanyMode && updateField('visibility', RaffleVisibility.PRIVATE)}
+                disabled={isCompanyMode}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.visibility === RaffleVisibility.PRIVATE
+                    ? 'border-accent bg-accent/20'
+                    : 'border-white/10 bg-glass hover:bg-glass-lighter'
+                } ${isCompanyMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <Lock className="w-8 h-8 mx-auto mb-2 text-accent" />
+                <div className="text-sm font-medium text-text">Privada</div>
+                <div className="text-xs text-text/60 mt-1">Solo con código de acceso</div>
+              </button>
+            </div>
+            
+            <div className="bg-info/10 border border-info/30 rounded-lg p-3 mt-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-info mt-0.5" />
+                <div className="text-xs text-info">
+                  <p className="font-semibold mb-1">Sobre la visibilidad</p>
+                  <p>• <strong>Pública:</strong> Aparece en el lobby, cualquiera puede participar</p>
+                  <p>• <strong>Privada:</strong> Solo con el código, ideal para grupos privados</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case 4:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-text mb-2">
+              Modo de Victoria
+            </h3>
+            
+            <p className="text-sm text-text/70 mb-4">
+              Elige cómo se determinará el ganador de la rifa
+            </p>
+            
+            {/* Selector de modo de sorteo */}
+            <div className="space-y-3">
+              {/* Automático */}
+              <button
+                onClick={() => setDrawMode(DrawMode.AUTOMATIC)}
+                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                  drawMode === DrawMode.AUTOMATIC
+                    ? 'border-accent bg-accent/20'
+                    : 'border-white/10 bg-glass hover:bg-glass-lighter'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Zap className="w-6 h-6 text-accent flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-text mb-1">
+                      Automático (Recomendado)
+                    </div>
+                    <div className="text-xs text-text/70">
+                      El ganador se elige automáticamente 10 segundos después de que se venda el último número
+                    </div>
+                  </div>
+                  {drawMode === DrawMode.AUTOMATIC && (
+                    <Check className="w-5 h-5 text-accent flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+              
+              {/* Programado */}
+              <button
+                onClick={() => setDrawMode(DrawMode.SCHEDULED)}
+                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                  drawMode === DrawMode.SCHEDULED
+                    ? 'border-accent bg-accent/20'
+                    : 'border-white/10 bg-glass hover:bg-glass-lighter'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Clock className="w-6 h-6 text-accent flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-text mb-1">
+                      Fecha Programada
+                    </div>
+                    <div className="text-xs text-text/70">
+                      Elige una fecha y hora específica para realizar el sorteo
+                    </div>
+                  </div>
+                  {drawMode === DrawMode.SCHEDULED && (
+                    <Check className="w-5 h-5 text-accent flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+              
+              {/* Campo de fecha si está en modo programado */}
+              {drawMode === DrawMode.SCHEDULED && (
+                <div className="ml-9 mt-2">
+                  <label className="block text-sm text-text/80 mb-1">
+                    Fecha y Hora del Sorteo *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledDrawAt}
+                    onChange={(e) => setScheduledDrawAt(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                    className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+              )}
+              
+              {/* Manual */}
+              <button
+                onClick={() => setDrawMode(DrawMode.MANUAL)}
+                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                  drawMode === DrawMode.MANUAL
+                    ? 'border-accent bg-accent/20'
+                    : 'border-white/10 bg-glass hover:bg-glass-lighter'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Hand className="w-6 h-6 text-accent flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-text mb-1">
+                      Manual
+                    </div>
+                    <div className="text-xs text-text/70">
+                      Tú decides cuándo elegir el ganador con un botón en la sala de la rifa
+                    </div>
+                  </div>
+                  {drawMode === DrawMode.MANUAL && (
+                    <Check className="w-5 h-5 text-accent flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+            </div>
+            
+            <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mt-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-warning mt-0.5" />
+                <div className="text-xs text-warning">
+                  <p className="font-semibold mb-1">Importante</p>
+                  <p>
+                    {drawMode === DrawMode.AUTOMATIC && 'El sorteo se ejecutará automáticamente. No podrás cancelarlo una vez iniciado.'}
+                    {drawMode === DrawMode.SCHEDULED && 'El sorteo se ejecutará en la fecha programada. Asegúrate de que todos los números estén vendidos para esa fecha.'}
+                    {drawMode === DrawMode.MANUAL && 'Tendrás control total sobre cuándo se elige el ganador, pero debes hacerlo manualmente.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case 5:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-text mb-2">
               Confirmar Rifa
             </h3>
             
@@ -883,7 +1075,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-text">Crear Nueva Rifa</h2>
-                  <p className="text-sm text-text/60">Paso {step} de 3</p>
+                  <p className="text-sm text-text/60">Paso {step} de 5</p>
                 </div>
               </div>
               
@@ -891,7 +1083,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
               <div className="mt-4 h-2 bg-dark/50 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: '0%' }}
-                  animate={{ width: `${(step / 3) * 100}%` }}
+                  animate={{ width: `${(step / 5) * 100}%` }}
                   className="h-full bg-gradient-to-r from-accent to-fire-orange"
                 />
               </div>
@@ -916,7 +1108,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   </motion.button>
                 )}
                 
-                {step < 3 ? (
+                {step < 5 ? (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

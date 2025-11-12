@@ -95,12 +95,13 @@ CREATE TABLE IF NOT EXISTS raffles (
   host_id UUID NOT NULL REFERENCES users(id),
   description TEXT,
   mode VARCHAR(20) NOT NULL CHECK (mode IN ('fires', 'prize')),
+  raffle_mode VARCHAR(20) NOT NULL DEFAULT 'fires' CHECK (raffle_mode IN ('fires', 'coins', 'prize')),
   type VARCHAR(20) DEFAULT 'public',
   entry_price_fire DECIMAL(10,2) DEFAULT 0,
   entry_price_coin DECIMAL(10,2) DEFAULT 0,
   entry_price_fiat DECIMAL(10,2) DEFAULT 0,
   numbers_range INTEGER NOT NULL DEFAULT 100,
-  visibility VARCHAR(20) DEFAULT 'public',
+  visibility VARCHAR(20) DEFAULT 'public' CHECK (visibility IN ('public', 'private', 'company')),
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'finished', 'cancelled')),
   is_company_mode BOOLEAN DEFAULT false,
   company_cost DECIMAL(10,2) DEFAULT 0,
@@ -109,17 +110,31 @@ CREATE TABLE IF NOT EXISTS raffles (
   terms_conditions TEXT,
   prize_meta JSONB DEFAULT '{}',
   host_meta JSONB DEFAULT '{}',
+  pot_fires DECIMAL(10,2) DEFAULT 0,
+  pot_coins DECIMAL(10,2) DEFAULT 0,
+  allow_fires_payment BOOLEAN DEFAULT false,
+  prize_image_base64 TEXT,
+  draw_mode VARCHAR(20) DEFAULT 'automatic' CHECK (draw_mode IN ('automatic', 'scheduled', 'manual')),
+  scheduled_draw_at TIMESTAMP,
   winner_number INTEGER,
   winner_id UUID REFERENCES users(id),
   created_at TIMESTAMP DEFAULT NOW(),
+  starts_at TIMESTAMP,
   started_at TIMESTAMP,
+  ends_at TIMESTAMP,
   ended_at TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT check_scheduled_draw_date CHECK (
+    (draw_mode != 'scheduled') OR 
+    (draw_mode = 'scheduled' AND scheduled_draw_at IS NOT NULL)
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_raffles_code ON raffles(code);
 CREATE INDEX IF NOT EXISTS idx_raffles_host ON raffles(host_id);
 CREATE INDEX IF NOT EXISTS idx_raffles_status ON raffles(status);
+CREATE INDEX IF NOT EXISTS idx_raffles_allow_fires_payment ON raffles(allow_fires_payment) WHERE allow_fires_payment = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raffles_scheduled_draw ON raffles(scheduled_draw_at, draw_mode) WHERE draw_mode = 'scheduled' AND status = 'active';
 
 -- 6. RAFFLE_NUMBERS
 CREATE TABLE IF NOT EXISTS raffle_numbers (
@@ -141,8 +156,12 @@ CREATE TABLE IF NOT EXISTS raffle_companies (
   company_name VARCHAR(200) NOT NULL,
   rif_number VARCHAR(50),
   brand_color VARCHAR(7) DEFAULT '#8B5CF6',
+  secondary_color VARCHAR(7) DEFAULT '#06B6D4',
   logo_url TEXT,
+  logo_base64 TEXT,
   website_url TEXT,
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

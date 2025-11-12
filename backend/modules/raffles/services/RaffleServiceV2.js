@@ -182,17 +182,20 @@ class RaffleServiceV2 {
         ? RaffleStatus.PENDING 
         : RaffleStatus.ACTIVE;
       
-      // Insertar rifa (ahora con allow_fires_payment y prize_image_base64)
+      // Insertar rifa (ahora con allow_fires_payment, prize_image_base64, draw_mode, scheduled_draw_at)
       const allowFiresPayment = data.allowFiresPayment || false;
       const prizeImageBase64 = data.prizeImageBase64 || null;
+      const drawMode = data.drawMode || 'automatic';
+      const scheduledDrawAt = data.scheduledDrawAt || null;
       
       const result = await dbClient.query(
         `INSERT INTO raffles (
           code, name, description, status, mode, visibility,
           host_id, numbers_range, entry_price_fire, entry_price_coin,
           starts_at, ends_at, terms_conditions, prize_meta,
-          pot_fires, pot_coins, allow_fires_payment, prize_image_base64
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0, $15, $16)
+          pot_fires, pot_coins, allow_fires_payment, prize_image_base64,
+          draw_mode, scheduled_draw_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0, $15, $16, $17, $18)
         RETURNING *`,
         [
           code,
@@ -210,7 +213,9 @@ class RaffleServiceV2 {
           termsConditions || null,
           prizeMeta ? JSON.stringify(prizeMeta) : null,
           allowFiresPayment,
-          prizeImageBase64
+          prizeImageBase64,
+          drawMode,
+          scheduledDrawAt
         ]
       );
       
@@ -912,34 +917,101 @@ class RaffleServiceV2 {
       
       // Solo finalizar si TODOS los números están vendidos Y NO hay reservas activas
       if (parseInt(total) === parseInt(sold) && parseInt(sold) > 0 && parseInt(reserved) === 0) {
-        logger.info('[RaffleServiceV2] ✅ Todos los números vendidos y sin reservas - Programando finalización en 10 segundos', {
-          raffleId
-        });
-        
-        // Obtener código de rifa para socket
-        const raffleCodeResult = await query(
-          'SELECT code FROM raffles WHERE id = $1',
+        // Verificar el modo de sorteo
+        const drawModeResult = await query(
+          'SELECT code, draw_mode, scheduled_draw_at FROM raffles WHERE id = $1',
           [raffleId]
         );
-        const raffleCode = raffleCodeResult.rows[0]?.code;
+        const raffleCode = drawModeResult.rows[0]?.code;
+        const drawMode = drawModeResult.rows[0]?.draw_mode || 'automatic';
+        const scheduledDrawAt = drawModeResult.rows[0]?.scheduled_draw_at;
         
-        // Emitir evento de sorteo programado
-        if (raffleCode && global.io) {
-          global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
-            code: raffleCode,
-            drawInSeconds: 10,
-            message: '¡Todos los números vendidos! Sorteo en 10 segundos...'
+        logger.info('[RaffleServiceV2] ✅ Todos los números vendidos y sin reservas', {
+          raffleId,
+          drawMode,
+          scheduledDrawAt
+        });
+        
+        // Comportamiento según modo de sorteo
+        if (drawMode === 'manual') {
+          // MODO MANUAL: No finalizar automáticamente
+          logger.info('[RaffleServiceV2] 🛑 Modo MANUAL - Host debe elegir ganador manualmente', {
+            raffleId,
+            code: raffleCode
           });
-        }
-        
-        // DELAY DE 10 SEGUNDOS antes de sorteo
-        setTimeout(async () => {
-          try {
-            await this.finishRaffle(raffleId);
-          } catch (err) {
-            logger.error('[RaffleServiceV2] Error en finalización retrasada', err);
+          
+          // Solo notificar que todos los números están vendidos
+          if (raffleCode && global.io) {
+            global.io.to(`raffle_${raffleCode}`).emit('raffle:all_sold', {
+              code: raffleCode,
+              message: '¡Todos los números vendidos! El host puede elegir el ganador cuando desee.'
+            });
           }
-        }, 10000); // 10 segundos
+          
+        } else if (drawMode === 'scheduled') {
+          // MODO PROGRAMADO: Verificar si llegó la fecha
+          const now = new Date();
+          const scheduledDate = scheduledDrawAt ? new Date(scheduledDrawAt) : null;
+          
+          if (scheduledDate && scheduledDate > now) {
+            logger.info('[RaffleServiceV2] ⏰ Modo PROGRAMADO - Esperando fecha programada', {
+              raffleId,
+              code: raffleCode,
+              scheduledDrawAt,
+              minutosRestantes: Math.floor((scheduledDate - now) / 60000)
+            });
+            
+            if (raffleCode && global.io) {
+              global.io.to(`raffle_${raffleCode}`).emit('raffle:all_sold', {
+                code: raffleCode,
+                scheduledDrawAt,
+                message: `¡Todos los números vendidos! Sorteo programado para ${scheduledDate.toLocaleString('es-VE')}`
+              });
+            }
+          } else {
+            // Ya llegó la fecha programada, finalizar
+            logger.info('[RaffleServiceV2] ⏰ Fecha programada alcanzada - Finalizando ahora', {
+              raffleId,
+              code: raffleCode
+            });
+            
+            if (raffleCode && global.io) {
+              global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
+                code: raffleCode,
+                drawInSeconds: 0,
+                message: '¡Hora del sorteo! Eligiendo ganador...'
+              });
+            }
+            
+            // Finalizar inmediatamente
+            await this.finishRaffle(raffleId);
+          }
+          
+        } else {
+          // MODO AUTOMÁTICO (comportamiento actual)
+          logger.info('[RaffleServiceV2] ⚡ Modo AUTOMÁTICO - Programando finalización en 10 segundos', {
+            raffleId,
+            code: raffleCode
+          });
+          
+          // Emitir evento de sorteo programado
+          if (raffleCode && global.io) {
+            global.io.to(`raffle_${raffleCode}`).emit('raffle:drawing_scheduled', {
+              code: raffleCode,
+              drawInSeconds: 10,
+              message: '¡Todos los números vendidos! Sorteo en 10 segundos...'
+            });
+          }
+          
+          // DELAY DE 10 SEGUNDOS antes de sorteo
+          setTimeout(async () => {
+            try {
+              await this.finishRaffle(raffleId);
+            } catch (err) {
+              logger.error('[RaffleServiceV2] Error en finalización retrasada', err);
+            }
+          }, 10000); // 10 segundos
+        }
         
       } else {
         const disponibles = parseInt(total) - parseInt(sold) - parseInt(reserved);

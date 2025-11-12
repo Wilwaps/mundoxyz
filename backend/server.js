@@ -413,6 +413,21 @@ async function startServer() {
       }
     })();
     
+    // ✅ NUEVO: Scheduler para sorteos programados
+    (async () => {
+      try {
+        const raffleService = require('./modules/raffles/services/RaffleServiceV2');
+        const RaffleDrawScheduler = require('./modules/raffles/services/RaffleDrawScheduler');
+        
+        const drawScheduler = new RaffleDrawScheduler(raffleService);
+        drawScheduler.start();
+        
+        logger.info('✅ Scheduler de sorteos programados iniciado (cada 60s)');
+      } catch (error) {
+        logger.error('Failed to initialize draw scheduler:', error);
+      }
+    })();
+    
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

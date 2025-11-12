@@ -168,6 +168,13 @@ router.post(
   raffleController.rejectRequest.bind(raffleController)
 );
 
+// Elegir ganador manualmente (solo host)
+router.post(
+  '/:code/draw-winner',
+  verifyToken,
+  raffleController.drawWinnerManually.bind(raffleController)
+);
+
 /**
  * RUTAS DE UPLOADS (archivos)
  */

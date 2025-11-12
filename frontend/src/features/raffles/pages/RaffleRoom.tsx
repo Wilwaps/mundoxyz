@@ -23,7 +23,8 @@ import {
   Info,
   DollarSign,
   Sparkles,
-  Trash2
+  Trash2,
+  Hand
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -31,7 +32,7 @@ import { useSocket } from '../../../contexts/SocketContext';
 import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
-import { RaffleStatus, RaffleMode, NumberState } from '../types';
+import { RaffleStatus, RaffleMode, NumberState, DrawMode } from '../types';
 import { formatDate, formatCurrency } from '../../../utils/format';
 
 interface RaffleRoomProps {}
@@ -312,6 +313,57 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     }
   };
   
+  // Elegir ganador manualmente (solo modo manual)
+  const [isDrawing, setIsDrawing] = useState(false);
+  const handleDrawWinner = async () => {
+    if (!code) return;
+    
+    const confirmDraw = window.confirm(
+      '🎯 ¿Deseas elegir el ganador ahora?\n\n' +
+      'Esto hará lo siguiente:\n' +
+      '• Se elegirá un ganador al azar de todos los números vendidos\n' +
+      '• Se distribuirán los premios automáticamente\n' +
+      '• La rifa quedará marcada como FINALIZADA\n' +
+      '• No se podrá revertir esta acción\n\n' +
+      '¿Deseas continuar?'
+    );
+    
+    if (!confirmDraw) return;
+    
+    setIsDrawing(true);
+    try {
+      const response = await fetch(`/api/raffles/v2/${code}/draw-winner`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al elegir ganador');
+      }
+      
+      const data = await response.json();
+      toast.success('¡Ganador elegido exitosamente! 🎉');
+      
+      // Recargar datos de la rifa
+      raffleData.forceRefresh();
+      
+      // Opcional: Mostrar notificación con el ganador
+      if (data.winner) {
+        setTimeout(() => {
+          toast.success(`Número ganador: ${data.winner.number}`, { duration: 5000 });
+        }, 1000);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al elegir ganador');
+    } finally {
+      setIsDrawing(false);
+    }
+  };
+  
   // Calcular estadísticas desde los datos del hook
   const soldNumbers = numbers?.filter((n: any) => n.state === 'sold').length || 0;
   const reservedNumbers = numbers?.filter((n: any) => n.state === 'reserved').length || 0;
@@ -423,6 +475,26 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             
             {/* Acciones */}
             <div className="flex gap-2">
+              {/* Botón elegir ganador manual - Solo host, modo manual, todos vendidos */}
+              {user?.id === raffle.hostId &&
+                raffle.drawMode === 'manual' &&
+                raffle.status === RaffleStatus.ACTIVE &&
+                soldNumbers === totalNumbers &&
+                totalNumbers > 0 && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleDrawWinner}
+                  disabled={isDrawing}
+                  className="px-4 py-2 bg-gradient-to-r from-accent to-fire-orange rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-bold text-dark"
+                  title="Elegir ganador manualmente"
+                >
+                  <Hand className="w-5 h-5" />
+                  <span>{isDrawing ? 'Eligiendo...' : 'Elegir Ganador'}</span>
+                  {!isDrawing && <Sparkles className="w-4 h-4" />}
+                </motion.button>
+              )}
+              
               {/* Botón cancelar rifa - Posición destacada */}
               {(user?.id === raffle.hostId || 
                 user?.roles?.includes('admin') || 
