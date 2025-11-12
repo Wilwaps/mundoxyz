@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const raffleController = require('../controllers/RaffleController');
-const { verifyToken, optionalAuth } = require('../../../middleware/auth');
+const { verifyToken, optionalAuth, adminAuth } = require('../../../middleware/auth');
 const {
   validate,
   validateParams,
@@ -173,6 +173,13 @@ router.post(
   '/:code/draw-winner',
   verifyToken,
   raffleController.drawWinnerManually.bind(raffleController)
+);
+
+// Debug: Forzar finalización (solo host autenticado)
+router.post(
+  '/:code/finish-debug',
+  verifyToken,
+  raffleController.forceFinishDebug.bind(raffleController)
 );
 
 /**

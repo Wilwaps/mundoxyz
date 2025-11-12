@@ -645,6 +645,27 @@ class RaffleController {
       });
     }
   }
+  
+  async forceFinishDebug(req, res) {
+    try {
+      const { code } = req.params;
+      const userId = req.user?.id;
+      const raffle = await raffleService.getRaffleByCode(code);
+      if (!raffle) {
+        return res.status(404).json({ success: false, message: 'Rifa no encontrada' });
+      }
+      if (raffle.hostId !== userId) {
+        return res.status(403).json({ success: false, message: 'Solo el host puede forzar el cierre (debug)' });
+      }
+      const { query } = require('../../../db');
+      const rid = await query('SELECT id FROM raffles WHERE code = $1', [code]);
+      await raffleService.finishRaffle(rid.rows[0].id);
+      const updated = await raffleService.getRaffleByCode(code);
+      res.json({ success: true, raffle: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
 module.exports = new RaffleController();
