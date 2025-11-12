@@ -1,6 +1,6 @@
 {
   "name": "mundoxyz-frontend-nuclear-20251107-2216",
-  "version": "1.3.7-nuclear-build",
+  "version": "1.3.8-no-refetch",
   "private": true,
   "dependencies": {
     "@headlessui/react": "^1.7.17",
