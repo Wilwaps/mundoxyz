@@ -208,27 +208,33 @@ class RaffleController {
   }
   
   /**
-   * Cancelar rifa (solo host, admin o Tote)
+   * Cancelar rifa (SOLO usuario con tg_id 1417856820)
    */
   async cancelRaffle(req, res) {
     try {
       const { code } = req.params;
-      const userId = req.user.id;
       const userTgId = req.user.tg_id;
       
-      // Verificar permisos
-      const raffle = await raffleService.getRaffleByCode(code);
-      
-      // Permitir: host de la rifa, admin, rol Tote, o usuario específico con tg_id 1417856820
-      const isHost = raffle.raffle.hostId === userId;
-      const isAdmin = req.user.roles?.includes('admin');
-      const isTote = req.user.roles?.includes('Tote');
-      const isToteUser = userTgId === '1417856820';
-      
-      if (!isHost && !isAdmin && !isTote && !isToteUser) {
+      // SEGURIDAD CRÍTICA: Solo el usuario con tg_id 1417856820 puede cancelar rifas
+      if (userTgId !== '1417856820') {
+        logger.warn('[RaffleController] Intento no autorizado de cancelar rifa', {
+          code,
+          userTgId,
+          userId: req.user.id
+        });
         return res.status(403).json({
           success: false,
-          message: 'No tienes permisos para cancelar esta rifa'
+          message: 'No tienes permisos para cancelar rifas. Solo el administrador puede realizar esta acción.'
+        });
+      }
+      
+      // Verificar que la rifa existe
+      const raffle = await raffleService.getRaffleByCode(code);
+      
+      if (!raffle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rifa no encontrada'
         });
       }
       
