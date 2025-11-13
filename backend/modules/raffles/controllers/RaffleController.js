@@ -332,10 +332,16 @@ class RaffleController {
         userId
       );
       
-      // Emitir evento de reserva
+      // Emitir evento de reserva (legacy y nuevo)
       if (req.app.get('io')) {
-        req.app.get('io').to(`raffle-${code}`).emit('number:reserved', {
+        const io = req.app.get('io');
+        io.to(`raffle-${code}`).emit('number:reserved', {
           raffleId: raffle.id,
+          numberIdx: parseInt(idx),
+          userId
+        });
+        io.to(`raffle-${code}`).emit('raffle:number_reserved', {
+          raffleCode: code,
           numberIdx: parseInt(idx),
           userId
         });
@@ -376,10 +382,15 @@ class RaffleController {
         userId
       );
       
-      // Emitir evento de liberación
+      // Emitir evento de liberación (legacy y nuevo)
       if (req.app.get('io')) {
-        req.app.get('io').to(`raffle-${code}`).emit('number:released', {
+        const io = req.app.get('io');
+        io.to(`raffle-${code}`).emit('number:released', {
           raffleId: raffle.id,
+          numberIdx: parseInt(idx)
+        });
+        io.to(`raffle-${code}`).emit('raffle:number_released', {
+          raffleCode: code,
           numberIdx: parseInt(idx)
         });
       }
@@ -447,6 +458,21 @@ class RaffleController {
         amount: result.transaction?.amount
       });
       
+      // Emitir evento de compra (legacy y nuevo)
+      if (req.app.get('io')) {
+        const io = req.app.get('io');
+        io.to(`raffle-${code}`).emit('number:purchased', {
+          raffleId: raffle.id,
+          numberIdx: parseInt(idx),
+          userId
+        });
+        io.to(`raffle-${code}`).emit('raffle:number_purchased', {
+          raffleCode: code,
+          numberIdx: parseInt(idx),
+          userId
+        });
+      }
+
       res.json({
         success: true,
         message: 'Número comprado exitosamente',
