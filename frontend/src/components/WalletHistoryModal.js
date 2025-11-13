@@ -97,6 +97,7 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
   // Determinar si una transacción es un débito (debe mostrar signo negativo)
   const isDebitTransaction = (type, amount) => {
     const debitTypes = [
+      'debit',
       'transfer_out',
       'game_bet',
       'tictactoe_bet',

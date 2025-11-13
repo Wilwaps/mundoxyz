@@ -67,9 +67,9 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   // Validar balance
   const hasBalance = raffle?.mode === 'prize' || userBalance >= totalCost;
   
-  // Manejar cierre con liberación (evitar liberar en PRIZE: host decide)
+  // Manejar cierre con liberación (también en PRIZE si no se envió solicitud)
   const handleClose = async () => {
-    if (raffle?.mode !== 'prize' && selectedNumbers.length > 0 && !isProcessing && !hasSubmittedRef.current) {
+    if (selectedNumbers.length > 0 && !isProcessing && !hasSubmittedRef.current) {
       try {
         // Liberar cada número individualmente
         for (const idx of selectedNumbers) {
@@ -164,14 +164,43 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         formData.append('proofImage', paymentData.proofImage);
       }
       
+      // Normalizar datos para cumplir con Joi en backend
+      // - Phone: aceptar '0412-xxxxxxx' convirtiendo a '+58xxxxxxxxxx'
+      // - Documento: quitar guiones y mayúsculas sin espacios (p.ej. 'V-12345678' -> 'V12345678')
+      // - Referencia: enviar en mayúsculas, alfanumérica
+      let normalizedPhone = (paymentData.phone || '').trim();
+      const rawDigits = normalizedPhone.replace(/[^0-9+]/g, '');
+      if (/^0\d{10}$/.test(rawDigits)) {
+        // 0 + 10 dígitos -> usar formato internacional +58 + (sin 0)
+        normalizedPhone = `+58${rawDigits.slice(1)}`;
+      } else if (/^\+58\d{10}$/.test(rawDigits)) {
+        normalizedPhone = rawDigits; // ya está correcto
+      } else if (/^\d{10}$/.test(rawDigits)) {
+        normalizedPhone = rawDigits; // 10 dígitos locales
+      } else {
+        // fallback: dejar solo dígitos y si tiene 11 empezando en 0, recortar 0
+        const onlyDigits = (paymentData.phone || '').replace(/\D/g, '');
+        normalizedPhone = onlyDigits.length === 11 && onlyDigits.startsWith('0')
+          ? `+58${onlyDigits.slice(1)}`
+          : onlyDigits;
+      }
+
+      const normalizedDocument = (paymentData.cedula || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, ''); // quita guiones y espacios
+
+      const normalizedReference = (paymentData.referenceNumber || '')
+        .toUpperCase()
+        .replace(/\s+/g, '');
+
       // Comprar cada número con datos de pago
       const form = {
         buyerName: paymentData.fullName,
-        buyerDocument: paymentData.cedula,
-        buyerPhone: paymentData.phone,
+        buyerDocument: normalizedDocument,
+        buyerPhone: normalizedPhone,
         buyerEmail: paymentData.email,
         paymentMethod: paymentData.paymentMethod as PaymentMethod,
-        paymentReference: paymentData.referenceNumber
+        paymentReference: normalizedReference
       };
       
       for (const idx of selectedNumbers) {
