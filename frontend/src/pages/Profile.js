@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
-import FiresHistoryModal from '../components/FiresHistoryModal';
+import WalletHistoryModal from '../components/WalletHistoryModal';
 import SendFiresModal from '../components/SendFiresModal';
 import BuyFiresModal from '../components/BuyFiresModal';
 import ReceiveFiresModal from '../components/ReceiveFiresModal';
@@ -37,11 +37,32 @@ const Profile = () => {
   const [showBuyFires, setShowBuyFires] = useState(false);
   const [showReceiveFires, setShowReceiveFires] = useState(false);
   const [walletAddress, setWalletAddress] = useState(user?.wallet_address || null);
+  const [walletHistoryInitialTab, setWalletHistoryInitialTab] = useState('fires');
 
-  // Detectar query param para abrir modal de historial
+  // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
+    const open = params.get('open'); // 'send' | 'buy' | 'receive'
+    const initial = (tab === 'coins' || tab === 'fires') ? tab : 'fires';
+    setWalletHistoryInitialTab(initial);
+
+    if (open === 'send') {
+      setShowFiresHistory(false);
+      setShowSendFires(true);
+      return;
+    }
+    if (open === 'buy') {
+      setShowFiresHistory(false);
+      setShowBuyFires(true);
+      return;
+    }
+    if (open === 'receive') {
+      setShowFiresHistory(false);
+      setShowReceiveFires(true);
+      return;
+    }
+
     if (tab === 'fires' || tab === 'coins') {
       setShowFiresHistory(true);
     }
@@ -339,12 +360,13 @@ const Profile = () => {
         onClose={() => setShowPasswordModal(false)} 
       />
       
-      <FiresHistoryModal 
-        isOpen={showFiresHistory} 
+      <WalletHistoryModal 
+        isOpen={showFiresHistory}
         onClose={() => setShowFiresHistory(false)}
         onOpenSend={() => setShowSendFires(true)}
         onOpenBuy={() => setShowBuyFires(true)}
         onOpenReceive={() => setShowReceiveFires(true)}
+        initialTab={walletHistoryInitialTab}
       />
       
       <SendFiresModal 

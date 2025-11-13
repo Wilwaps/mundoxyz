@@ -167,6 +167,31 @@ const Layout = () => {
       <WalletHistoryModal 
         isOpen={showWalletHistoryModal}
         onClose={() => setShowWalletHistoryModal(false)}
+        onOpenSend={() => {
+          setShowWalletHistoryModal(false);
+          if (location.pathname !== '/profile') {
+            navigate('/profile?tab=fires&open=send');
+          } else {
+            // Si ya estamos en perfil, forzar recarga del query para que el efecto se dispare
+            navigate('/profile?tab=fires&open=send', { replace: true });
+          }
+        }}
+        onOpenBuy={() => {
+          setShowWalletHistoryModal(false);
+          if (location.pathname !== '/profile') {
+            navigate('/profile?tab=fires&open=buy');
+          } else {
+            navigate('/profile?tab=fires&open=buy', { replace: true });
+          }
+        }}
+        onOpenReceive={() => {
+          setShowWalletHistoryModal(false);
+          if (location.pathname !== '/profile') {
+            navigate('/profile?tab=fires&open=receive');
+          } else {
+            navigate('/profile?tab=fires&open=receive', { replace: true });
+          }
+        }}
         initialTab={walletHistoryInitialTab}
       />
 
