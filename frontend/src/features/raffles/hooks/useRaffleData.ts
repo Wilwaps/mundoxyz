@@ -444,7 +444,9 @@ export const useRaffle = (code: string) => {
     // Data
     raffle: raffleQuery.data?.raffle,
     numbers: numbersQuery.data || [],
-    userNumbers: userNumbersQuery.data || [],
+    userNumbers: (raffleQuery.data?.userNumbers && raffleQuery.data.userNumbers.length > 0)
+      ? raffleQuery.data.userNumbers
+      : (userNumbersQuery.data || []),
     stats: raffleQuery.data?.stats,
     winner,
     

@@ -342,6 +342,7 @@ CREATE TABLE IF NOT EXISTS raffles (
   starts_at TIMESTAMP,
   ends_at TIMESTAMP,
   drawn_at TIMESTAMP,
+  finished_at TIMESTAMP,
   
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),

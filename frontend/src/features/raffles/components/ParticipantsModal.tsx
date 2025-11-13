@@ -262,6 +262,9 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                             {participant.numbers.length} número(s)
                           </p>
                         </div>
+                        <div className="mt-2 text-xs text-accent break-words">
+                          {participant.numbers.join(', ')}
+                        </div>
                       </div>
                     ))
                   )}

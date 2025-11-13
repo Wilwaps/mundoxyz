@@ -33,6 +33,7 @@ import { useSocket } from '../../../contexts/SocketContext';
 import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
+import ParticipantsModal from '../components/ParticipantsModal';
 import { RaffleStatus, RaffleMode, NumberState, DrawMode } from '../types';
 import { formatDate, formatCurrency } from '../../../utils/format';
 
@@ -49,6 +50,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'numbers' | 'info' | 'winners'>('numbers');
   const refreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -398,6 +400,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const totalNumbers = raffle?.numbersRange || 0;
   const availableNumbers = totalNumbers - soldNumbers - reservedNumbers;
   const progress = totalNumbers > 0 ? Math.round((soldNumbers / totalNumbers) * 100) : 0;
+  const participantsCount = raffle?.mode === RaffleMode.PRIZE
+    ? (raffleData.stats?.totalParticipants ?? (Array.isArray(numbers) ? Array.from(new Set((numbers || []).filter((n:any)=> n.state==='sold' && n.ownerId).map((n:any)=> n.ownerId))).length : 0))
+    : soldNumbers;
   
   const stats = {
     totalNumbers,
@@ -625,9 +630,12 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             <div className="text-xs text-text/60 mb-1">Total</div>
             <div className="text-xl font-bold text-text">{stats.totalNumbers}</div>
           </div>
-          <div className="bg-glass rounded-xl p-4">
-            <div className="text-xs text-text/60 mb-1">Vendidos</div>
-            <div className="text-xl font-bold text-green-400">{stats.soldNumbers}</div>
+          <div 
+            className={`bg-glass rounded-xl p-4 ${raffle.mode === RaffleMode.PRIZE ? 'cursor-pointer hover:bg-glass/80' : ''}`}
+            onClick={raffle.mode === RaffleMode.PRIZE ? () => setShowParticipantsModal(true) : undefined}
+          >
+            <div className="text-xs text-text/60 mb-1">{raffle.mode === RaffleMode.PRIZE ? 'Participantes' : 'Vendidos'}</div>
+            <div className="text-xl font-bold text-green-400">{raffle.mode === RaffleMode.PRIZE ? participantsCount : stats.soldNumbers}</div>
           </div>
           <div className="bg-glass rounded-xl p-4">
             <div className="text-xs text-text/60 mb-1">Reservados</div>
@@ -650,6 +658,11 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           <div className="bg-glass rounded-xl p-4">
             <div className="text-xs text-text/60 mb-1">Mis Números</div>
             <div className="text-xl font-bold text-accent">{stats.myNumbers}</div>
+            {Array.isArray(raffleData.userNumbers) && raffleData.userNumbers.length > 0 && (
+              <div className="mt-2 text-xs text-accent/90 break-words">
+                {raffleData.userNumbers.join(', ')}
+              </div>
+            )}
           </div>
           {raffle?.status === RaffleStatus.FINISHED && winner && (
             <div className="bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-300/10 border border-amber-400/40 rounded-xl p-4 flex flex-col gap-2">
@@ -750,6 +763,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 <NumberGrid
                   numbers={numbers || []}
                   totalNumbers={raffle.numbersRange}
+                  userNumbers={raffleData.userNumbers || []}
                   selectedNumbers={selectedNumbers}
                   onNumberClick={handleNumberClick}
                   disabled={raffle.status !== RaffleStatus.ACTIVE}
@@ -946,6 +960,14 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           }}
         />
       </div>
+      {showParticipantsModal && code && (
+        <ParticipantsModal
+          raffleCode={code}
+          raffleMode={raffle.mode}
+          isHost={user?.id === raffle.hostId}
+          onClose={() => setShowParticipantsModal(false)}
+        />
+      )}
     </motion.div>
   );
 };
