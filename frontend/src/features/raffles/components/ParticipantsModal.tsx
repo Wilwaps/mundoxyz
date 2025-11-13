@@ -57,6 +57,7 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
   };
 
   const isPrizeMode = raffleMode === 'prize';
+  const showHostRequests = isPrizeMode && !!data?.requests;
 
   return (
     <motion.div
@@ -81,7 +82,7 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-text">
-                {isPrizeMode && isHost ? 'Solicitudes de Compra' : 'Participantes'}
+                {showHostRequests ? 'Solicitudes de Compra' : 'Participantes'}
               </h2>
               <p className="text-sm text-text/60">Rifa #{raffleCode}</p>
             </div>
@@ -113,8 +114,8 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
 
           {data && !isLoading && (
             <>
-              {/* Vista PRIZE como host: Solicitudes */}
-              {isPrizeMode && isHost && data.requests && (
+              {/* Vista PRIZE host: Solicitudes (detectado por respuesta del backend) */}
+              {showHostRequests && (
                 <div className="space-y-3">
                   {data.requests.length === 0 ? (
                     <div className="text-center py-12">

@@ -5,12 +5,13 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api';
 import type { ParticipantsResponse } from '../types';
+import { API_ENDPOINTS } from '../constants';
 
 export const useParticipants = (raffleCode: string, enabled = true) => {
   return useQuery<ParticipantsResponse>({
     queryKey: ['raffle-participants', raffleCode],
     queryFn: async () => {
-      const response = await api.get(`/api/raffles/v2/${raffleCode}/participants`);
+      const response = await api.get(API_ENDPOINTS.PARTICIPANTS(raffleCode));
       return response.data;
     },
     enabled: enabled && !!raffleCode,

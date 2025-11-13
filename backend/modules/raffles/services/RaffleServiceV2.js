@@ -2010,16 +2010,16 @@ class RaffleServiceV2 {
 
         return {
           requests: result.rows.map(row => ({
-              requestId: row.id,
-              buyerProfile: row.buyer_profile,
-              requestData: row.request_data,
-              status: row.status,
-              username: row.username,
-              displayName: row.display_name,
-              createdAt: row.created_at
-            })),
-            totalRequests: result.rows.length
-          };
+            requestId: row.id,
+            buyerProfile: row.buyer_profile || {},
+            requestData: row.request_data || {},
+            status: row.status,
+            numbers: row.numbers || [],
+            telegramUsername: row.username || null,
+            createdAt: row.created_at
+          })),
+          totalRequests: result.rows.length
+        };
         }
  else {
           // Usuario normal ve solo nombres públicos aprobados

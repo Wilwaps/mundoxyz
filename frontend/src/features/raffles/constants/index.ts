@@ -178,6 +178,7 @@ export const API_ENDPOINTS = {
   RESERVE: (code: string, idx: number) => `/${code}/numbers/${idx}/reserve`,
   RELEASE: (code: string, idx: number) => `/${code}/numbers/${idx}/release`,
   PURCHASE: (code: string, idx: number) => `/${code}/numbers/${idx}/purchase`,
+  PARTICIPANTS: (code: string) => `/${code}/participants`,
   
   // Estadísticas
   STATS: (code: string) => `/${code}/stats`,
