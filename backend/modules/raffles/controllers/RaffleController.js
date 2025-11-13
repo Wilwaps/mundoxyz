@@ -40,7 +40,8 @@ class RaffleController {
       const { code, requestId } = req.params;
       const hostId = req.user.id;
       
-      const result = await raffleService.approvePaymentRequest(parseInt(requestId), hostId);
+      // requestId es un UUID en raffle_requests.id, no debe parsearse como entero
+      const result = await raffleService.approvePaymentRequest(requestId, hostId);
       
       res.json({
         success: true,
@@ -65,7 +66,8 @@ class RaffleController {
       const { reason } = req.body;
       const hostId = req.user.id;
       
-      const result = await raffleService.rejectPaymentRequest(parseInt(requestId), hostId, reason);
+      // requestId es un UUID en raffle_requests.id, no debe parsearse como entero
+      const result = await raffleService.rejectPaymentRequest(requestId, hostId, reason);
       
       res.json({
         success: true,
