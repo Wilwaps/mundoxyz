@@ -332,6 +332,11 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                   </div>
                 )}
                 
+                <div>
+                  <span className="text-text/60">Números:</span>
+                  <p className="text-text font-medium">{(selectedRequest.numbers || []).join(', ') || '-'}</p>
+                </div>
+                
                 {selectedRequest.requestData.paymentProofBase64 && (
                   <div>
                     <span className="text-text/60 block mb-2">Comprobante:</span>

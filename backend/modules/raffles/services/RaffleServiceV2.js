@@ -968,6 +968,23 @@ class RaffleServiceV2 {
             method,
             reference
           });
+          // Emitir evento para actualizar la grilla en tiempo real (reservado)
+          try {
+            if (global.io && raffle.code) {
+              const payload = {
+                raffleCode: raffle.code,
+                numberIdx,
+                userId,
+                timestamp: new Date().toISOString()
+              };
+              const roomColon = `raffle:${raffle.code}`;
+              const roomHyphen = `raffle-${raffle.code}`; // compatibilidad legacy
+              global.io.to(roomColon).emit('raffle:number_reserved', payload);
+              global.io.to(roomHyphen).emit('raffle:number_reserved', payload);
+            }
+          } catch (e) {
+            logger.warn('[RaffleServiceV2] No se pudo emitir evento raffle:number_reserved', { error: e?.message });
+          }
           // No marcar sold; no finalizar rifa aún
         }
       }
