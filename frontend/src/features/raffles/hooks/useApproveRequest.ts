@@ -4,7 +4,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
-import api from '../api';
+import { approvePurchaseRequest } from '../api';
 
 interface ApproveRequestParams {
   code: string;
@@ -22,10 +22,9 @@ export const useApproveRequest = () => {
 
   return useMutation<ApproveRequestResponse, Error, ApproveRequestParams>({
     mutationFn: async ({ code, requestId }) => {
-      const response = await api.post(
-        `/api/raffles/v2/${code}/requests/${requestId}/approve`
-      );
-      return response.data;
+      // Usar capa API centralizada para evitar duplicar el prefijo /api/raffles/v2
+      const data = await approvePurchaseRequest(code, requestId) as ApproveRequestResponse;
+      return data;
     },
     onSuccess: (data, variables) => {
       // Invalidar queries relacionadas
