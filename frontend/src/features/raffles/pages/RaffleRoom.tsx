@@ -606,6 +606,16 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   )}
                 </AnimatePresence>
               </div>
+
+              {raffle.mode === RaffleMode.PRIZE && user?.id === raffle.hostId && (
+                <button
+                  onClick={() => setShowParticipantsModal(true)}
+                  className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
+                  title="Participantes"
+                >
+                  <Users className="w-5 h-5 text-text" />
+                </button>
+              )}
               
               {user?.id === raffle.hostId && (
                 <button

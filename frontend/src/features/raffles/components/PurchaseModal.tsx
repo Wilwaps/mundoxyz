@@ -198,9 +198,9 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         buyerName: paymentData.fullName,
         buyerDocument: normalizedDocument,
         buyerPhone: normalizedPhone,
-        buyerEmail: paymentData.email,
+        ...(paymentData.email?.trim() ? { buyerEmail: paymentData.email.trim() } : {}),
         paymentMethod: paymentData.paymentMethod as PaymentMethod,
-        paymentReference: normalizedReference
+        ...(needsReference ? { paymentReference: normalizedReference } : {})
       };
       
       for (const idx of selectedNumbers) {
@@ -454,7 +454,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 </button>
                 <button
                   onClick={processPrizePurchase}
-                  disabled={isProcessing || !paymentData.paymentMethod || !paymentData.referenceNumber}
+                  disabled={
+                    isProcessing ||
+                    !paymentData.paymentMethod ||
+                    ((paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK) && !paymentData.referenceNumber)
+                  }
                   className="flex-1 py-2.5 btn-primary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isProcessing ? (
