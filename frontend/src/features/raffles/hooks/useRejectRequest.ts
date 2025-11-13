@@ -4,7 +4,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
-import api from '../api';
+import { rejectPurchaseRequest } from '../api';
 
 interface RejectRequestParams {
   code: string;
@@ -23,11 +23,9 @@ export const useRejectRequest = () => {
 
   return useMutation<RejectRequestResponse, Error, RejectRequestParams>({
     mutationFn: async ({ code, requestId, reason }) => {
-      const response = await api.post(
-        `/api/raffles/v2/${code}/requests/${requestId}/reject`,
-        { reason }
-      );
-      return response.data;
+      // Usar capa API centralizada para evitar duplicar el prefijo /api/raffles/v2
+      const data = await rejectPurchaseRequest(code, requestId, reason) as RejectRequestResponse;
+      return data;
     },
     onSuccess: (data, variables) => {
       // Invalidar queries relacionadas
