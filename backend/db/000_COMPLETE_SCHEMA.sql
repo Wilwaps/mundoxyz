@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS raffles (
   started_at TIMESTAMP,
   ends_at TIMESTAMP,
   ended_at TIMESTAMP,
+  finished_at TIMESTAMP,
   updated_at TIMESTAMP DEFAULT NOW(),
   CONSTRAINT check_scheduled_draw_date CHECK (
     (draw_mode != 'scheduled') OR 
