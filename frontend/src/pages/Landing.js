@@ -142,7 +142,7 @@ const Landing = () => {
               transition={{ delay: 0.2 }}
             >
               <Sparkles size={16} />
-              <span>Plataforma de Juegos Multijugador</span>
+              <span>MiniApp de Juegos en Telegram</span>
             </motion.div>
 
             <h1 className="hero-title">
@@ -151,8 +151,8 @@ const Landing = () => {
             </h1>
 
             <p className="hero-description">
-              Únete a una comunidad vibrante donde cada partida cuenta. 
-              Disfruta de Bingo, Rifas y más juegos mientras construyes tu economía personal.
+              MiniApp de Telegram donde cada partida cuenta. 
+              Juega Bingo, Rifas y Duelos con coins y fires mientras construyes tu economía dentro de la plataforma.
             </p>
 
             <div className="hero-features">
@@ -331,7 +331,7 @@ const Landing = () => {
                     <li><CheckCircle size={16} /> Hasta 10 cartones por partida</li>
                     <li><CheckCircle size={16} /> Chat en tiempo real</li>
                     <li><CheckCircle size={16} /> Premios automáticos 70/20/10</li>
-                    <li><CheckCircle size={16} /> Auto-canto con XP 400+</li>
+                    <li><CheckCircle size={16} /> Auto-canto inteligente para que no pierdas ningún premio</li>
                   </ul>
                   {stats && (
                     <div className="game-stat">
@@ -357,12 +357,12 @@ const Landing = () => {
                 </div>
                 <div className="game-card-body">
                   <p className="game-description">
-                    Crea tu propia rifa o compra números. Gana premios físicos 
-                    o digitales con un sistema 100% justo y auditable.
+                    Crea tu propia rifa o compra números en rifas existentes. Gana premios en fires, coins 
+                    o premios físicos/digitales con un sistema 100% justo y auditable.
                   </p>
                   <ul className="game-features">
                     <li><CheckCircle size={16} /> Crea rifas personalizadas</li>
-                    <li><CheckCircle size={16} /> Compra con coins o fires</li>
+                    <li><CheckCircle size={16} /> Compra con coins o fires (según la rifa)</li>
                     <li><CheckCircle size={16} /> Premios físicos o digitales</li>
                     <li><CheckCircle size={16} /> Sistema transparente</li>
                   </ul>
@@ -393,7 +393,7 @@ const Landing = () => {
                     <li><CheckCircle size={16} /> Partidas de 2-5 minutos</li>
                     <li><CheckCircle size={16} /> Sistema de revanchas</li>
                     <li><CheckCircle size={16} /> Modo coins o fires</li>
-                    <li><CheckCircle size={16} /> Gana XP por victoria</li>
+                    <li><CheckCircle size={16} /> Gana recompensas dentro de la economía de la app</li>
                   </ul>
                   {stats && (
                     <div className="game-stat">
@@ -440,7 +440,7 @@ const Landing = () => {
                   </div>
                   <div className="currency-feature">
                     <CheckCircle size={18} />
-                    <span>Compra en el market</span>
+                    <span>Úsalas en rifas, bingo y duelos</span>
                   </div>
                 </div>
                 <div className="currency-desc">
@@ -463,23 +463,23 @@ const Landing = () => {
                 <div className="currency-features">
                   <div className="currency-feature">
                     <CheckCircle size={18} />
-                    <span>Supply limitado y controlado</span>
+                    <span>Supply controlado dentro de la plataforma</span>
                   </div>
                   <div className="currency-feature">
                     <CheckCircle size={18} />
-                    <span>Valor real en el tiempo</span>
+                    <span>Moneda premium para modos avanzados</span>
                   </div>
                   <div className="currency-feature">
                     <CheckCircle size={18} />
-                    <span>Acceso a premios especiales</span>
+                    <span>Acceso a rifas y premios especiales</span>
                   </div>
                   <div className="currency-feature">
                     <CheckCircle size={18} />
-                    <span>Crece con la comunidad</span>
+                    <span>Crece con la actividad de la comunidad</span>
                   </div>
                 </div>
                 <div className="currency-desc">
-                  Tu inversión en la plataforma tiene valor real
+                  Pensada para los jugadores que quieren participar en los retos y premios más grandes
                 </div>
               </div>
             </div>
@@ -521,8 +521,8 @@ const Landing = () => {
                 <div className="step-icon">
                   <Gift size={40} />
                 </div>
-                <h3>Recibe tu Regalo</h3>
-                <p>Coins y Fires de bienvenida para empezar a jugar de inmediato.</p>
+                <h3>Configura tu Billetera</h3>
+                <p>Aprende cómo funcionan coins y fires y empieza a usarlas en tus juegos.</p>
               </div>
 
               <div className="step-arrow">→</div>
@@ -608,7 +608,7 @@ const Landing = () => {
               <div className="final-cta-benefits">
                 <span><CheckCircle size={16} /> Sin tarjeta de crédito</span>
                 <span><CheckCircle size={16} /> Registro en 10 segundos</span>
-                <span><CheckCircle size={16} /> Regalo de bienvenida incluido</span>
+                <span><CheckCircle size={16} /> MiniApp integrada en Telegram</span>
               </div>
             </div>
           </div>
