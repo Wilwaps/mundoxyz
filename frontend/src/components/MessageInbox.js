@@ -14,36 +14,30 @@ const MessageInbox = () => {
   useEffect(() => {
     if (user) {
       loadMessages();
-      
-      // TEMPORALMENTE DESACTIVADO - Estaba causando interferencia con rifas
-      // El polling a /api/bingo/v2/messages estaba ejecutándose en todas las páginas
-      // TODO: Crear endpoint genérico de mensajes o activar solo en páginas de bingo
-      // const interval = setInterval(loadMessages, 30000);
+      // Opcional: habilitar polling si se requiere actualización periódica
+      // const interval = setInterval(loadMessages, 60000);
       // return () => clearInterval(interval);
     }
   }, [user]);
 
   const loadMessages = async () => {
     try {
-      // Solo cargar mensajes si estamos en una página de bingo
-      // Para evitar errores 404 y llamadas innecesarias
-      const isInBingoPage = window.location.pathname.includes('/bingo');
-      if (!isInBingoPage) {
-        return; // No cargar mensajes fuera de bingo
+      const [listRes, unreadRes] = await Promise.all([
+        fetch(`${API_URL}/api/messages`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        }),
+        fetch(`${API_URL}/api/messages/unread-count`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        })
+      ]);
+
+      if (listRes.ok) {
+        const data = await listRes.json();
+        setMessages(data.messages || []);
       }
-      
-      const response = await fetch(`${API_URL}/api/bingo/v2/messages`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMessages(data.messages || []);
-          setUnreadCount(data.unread_count || 0);
-        }
+      if (unreadRes.ok) {
+        const data = await unreadRes.json();
+        setUnreadCount(data.unread || 0);
       }
     } catch (err) {
       // Silenciar errores para no contaminar la consola
@@ -53,17 +47,10 @@ const MessageInbox = () => {
 
   const markAsRead = async (messageId) => {
     try {
-      await fetch(`${API_URL}/api/bingo/v2/messages/${messageId}/read`, {
+      await fetch(`${API_URL}/api/messages/${messageId}/read`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      
-      // Update local state
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, is_read: true } : msg
-      ));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Error marking message as read:', err);
@@ -72,20 +59,10 @@ const MessageInbox = () => {
 
   const deleteMessage = async (messageId) => {
     try {
-      await fetch(`${API_URL}/api/bingo/v2/messages/${messageId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      // Update local state
-      const messageToDelete = messages.find(m => m.id === messageId);
+      // No hay endpoint de borrado en /api/messages
+      // Marcamos como leído y lo ocultamos del listado local
+      await markAsRead(messageId);
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-      
-      if (!messageToDelete?.is_read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
     } catch (err) {
       console.error('Error deleting message:', err);
     }
@@ -121,7 +98,7 @@ const MessageInbox = () => {
       {/* Inbox Button */}
       <button 
         className="inbox-button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { const next = !isOpen; setIsOpen(next); if (next) loadMessages(); }}
       >
         📬
         {unreadCount > 0 && (
@@ -190,11 +167,14 @@ const MessageInbox = () => {
                     
                     {message.metadata && (
                       <div className="message-metadata">
-                        {message.metadata.room_code && (
-                          <span>Sala: #{message.metadata.room_code}</span>
+                        {message.metadata.raffleCode && (
+                          <span>Rifa: #{message.metadata.raffleCode}</span>
                         )}
-                        {message.metadata.prize && (
-                          <span>Premio: {message.metadata.prize}</span>
+                        {message.metadata.winningNumber && (
+                          <span>Número ganador: {message.metadata.winningNumber}</span>
+                        )}
+                        {(message.metadata.prizeAmount !== undefined) && (
+                          <span>Premio: {message.metadata.prizeAmount} {message.metadata.currency === 'fires' ? '🔥' : message.metadata.currency === 'coins' ? '🪙' : ''}</span>
                         )}
                       </div>
                     )}
