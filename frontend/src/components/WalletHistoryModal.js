@@ -95,7 +95,7 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
   };
 
   // Determinar si una transacción es un débito (debe mostrar signo negativo)
-  const isDebitTransaction = (type) => {
+  const isDebitTransaction = (type, amount) => {
     const debitTypes = [
       'transfer_out',
       'game_bet',
@@ -103,6 +103,8 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
       'commission',
       'raffle_cost',
       'raffle_number_purchase',
+      'raffle_creation_fee',
+      'raffle_prize_fire_payment_out',
       'market_redeem',
       'fire_burn',
       'bingo_card_purchase',
@@ -116,13 +118,16 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
         typeStr.includes('burn') || typeStr.includes('spend') ||
         typeStr.includes('purchase')) return true;
     
+    // Fallback: usar signo del monto si el tipo no es conocido
+    const amt = parseFloat(amount);
+    if (!isNaN(amt) && amt < 0) return true;
     return false;
   };
 
   // Formatear el monto con el signo correcto
   const formatAmount = (amount, type) => {
     const value = Math.abs(parseFloat(amount));
-    const isDebit = isDebitTransaction(type);
+    const isDebit = isDebitTransaction(type, amount);
     const sign = isDebit ? '-' : '+';
     return `${sign}${value.toFixed(2)}`;
   };
@@ -266,7 +271,7 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
                     <div className="flex items-center gap-3">
                       {/* Icon */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        isDebitTransaction(tx.type) ? 'bg-red-400/20' : 'bg-green-400/20'
+                        isDebitTransaction(tx.type, tx.amount) ? 'bg-red-400/20' : 'bg-green-400/20'
                       }`}>
                         {getTransactionIcon(tx.type)}
                       </div>
@@ -275,7 +280,7 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium">{getTransactionLabel(tx.type)}</span>
-                          <span className={`font-bold ${isDebitTransaction(tx.type) ? 'text-red-400' : 'text-green-400'}`}>
+                          <span className={`font-bold ${isDebitTransaction(tx.type, tx.amount) ? 'text-red-400' : 'text-green-400'}`}>
                             {formatAmount(tx.amount, tx.type)} {getCurrencyIcon()}
                           </span>
                         </div>

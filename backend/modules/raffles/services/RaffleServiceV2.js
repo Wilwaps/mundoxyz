@@ -817,16 +817,17 @@ class RaffleServiceV2 {
         // 6. Registrar transacción
         await dbQuery(
           `INSERT INTO wallet_transactions 
-           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
-           VALUES ($1, 'debit', $2, $3, $4, $5, $6, $7)`,
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+           VALUES ($1, 'raffle_number_purchase', $2, $3, $4, $5, $6, $7, $8)`,
           [
-            wallet.id,  // ✅ FIX: usar wallet.id (INTEGER), no userId (UUID)
+            wallet.id,
             currency,
-            cost,
+            -cost,
             currentBalance,
             currentBalance - cost,
             `Compra número ${numberIdx} en rifa ${raffle.code}`,
-            `raffle_${raffle.code}_num_${numberIdx}`
+            `raffle_${raffle.code}_num_${numberIdx}`,
+            raffle.host_id
           ]
         );
         
@@ -902,7 +903,7 @@ class RaffleServiceV2 {
              VALUES ($1, 'raffle_prize_fire_payment_out', 'fires', $2, $3, $4, $5, $6, $7)`,
             [
               buyerWallet.id,
-              price,
+              -price,
               buyerWallet.fires_balance,
               buyerWallet.fires_balance - price,
               `Pago de número ${numberIdx} en rifa ${raffle.code} (PRIZE → host)`,
@@ -1361,54 +1362,70 @@ class RaffleServiceV2 {
         
         // 3. COMISIÓN A LA PLATAFORMA (solo modo FIRES)
         if (platformCommission > 0 && effectiveMode === RaffleMode.FIRES) {
-          // Obtener o crear usuario de la plataforma
-          const platformUserResult = await client.query(
-            `SELECT id FROM users WHERE tg_id = $1`,
-            [PLATFORM_TELEGRAM_ID]
-          );
-          
-          if (platformUserResult.rows.length > 0) {
-            const platformUserId = platformUserResult.rows[0].id;
-            const platformWalletResult = await client.query(
-              `SELECT id, fires_balance FROM wallets WHERE user_id = $1`,
-              [platformUserId]
+          // Intentar acreditar a la wallet del rol 'tote'
+          let targetWallet = null;
+          try {
+            const toteRes = await client.query(
+              `SELECT w.id, w.fires_balance, u.id as user_id
+               FROM wallets w 
+               JOIN users u ON u.id = w.user_id 
+               JOIN user_roles ur ON ur.user_id = u.id 
+               JOIN roles r ON r.id = ur.role_id 
+               WHERE r.name = 'tote' 
+               LIMIT 1 FOR UPDATE`
             );
-            
-            if (platformWalletResult.rows.length > 0) {
-              const platformWallet = platformWalletResult.rows[0];
-              const platformBalanceBefore = platformWallet.fires_balance;
-              
-              await client.query(
-                `UPDATE wallets
-                 SET fires_balance = fires_balance + $1
-                 WHERE user_id = $2`,
-                [platformCommission, platformUserId]
-              );
-              
-              await client.query(
-                `INSERT INTO wallet_transactions
-                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
-                 VALUES ($1, 'raffle_platform_commission', $2, $3, $4, $5, $6, $7)`,
-                [
-                  platformWallet.id,
-                  'fires',
-                  platformCommission,
-                  platformBalanceBefore,
-                  platformBalanceBefore + platformCommission,
-                  `Comisión de rifa ${raffle.code} (10% del pot)`,
-                  `raffle_commission_${raffle.code}`
-                ]
-              );
-              
-              logger.info('[RaffleServiceV2] Comisión acreditada a la plataforma', {
-                platformUserId,
-                commission: platformCommission
-              });
+            if (toteRes.rows.length > 0) {
+              targetWallet = toteRes.rows[0];
             }
-          } else {
-            logger.warn('[RaffleServiceV2] Usuario de plataforma no encontrado', {
-              telegramId: PLATFORM_TELEGRAM_ID
+          } catch (e) {}
+
+          // Fallback: usuario plataforma por TG_ID
+          if (!targetWallet) {
+            const platformUserResult = await client.query(
+              `SELECT id FROM users WHERE tg_id = $1`,
+              [PLATFORM_TELEGRAM_ID]
+            );
+            if (platformUserResult.rows.length > 0) {
+              const platformUserId = platformUserResult.rows[0].id;
+              const platformWalletResult = await client.query(
+                `SELECT id, fires_balance, $1::uuid as user_id FROM wallets WHERE user_id = $1 LIMIT 1`,
+                [platformUserId]
+              );
+              if (platformWalletResult.rows.length > 0) {
+                targetWallet = platformWalletResult.rows[0];
+              }
+            }
+          }
+
+          if (targetWallet) {
+            const before = parseFloat(targetWallet.fires_balance || 0);
+            await client.query(
+              `UPDATE wallets
+               SET fires_balance = fires_balance + $1
+               WHERE id = $2`,
+              [platformCommission, targetWallet.id]
+            );
+            await client.query(
+              `INSERT INTO wallet_transactions
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+               VALUES ($1, 'raffle_platform_commission', $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                targetWallet.id,
+                'fires',
+                platformCommission,
+                before,
+                before + platformCommission,
+                `Comisión de rifa ${raffle.code} (10% del pot)`,
+                `raffle_commission_${raffle.code}`,
+                raffle.host_id
+              ]
+            );
+            logger.info('[RaffleServiceV2] Comisión acreditada (tote/plataforma)', {
+              walletId: targetWallet.id,
+              commission: platformCommission
             });
+          } else {
+            logger.warn('[RaffleServiceV2] No se encontró wallet destino para comisión de plataforma');
           }
         }
       }
