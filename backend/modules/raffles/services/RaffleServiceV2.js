@@ -1052,7 +1052,7 @@ class RaffleServiceV2 {
       
       // Obtener datos de la rifa
       const raffleResult = await client.query(
-        `SELECT r.*, rc.company_name
+        `SELECT r.*, r.mode as raffle_mode, rc.company_name
          FROM raffles r
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.id = $1`,
@@ -1064,6 +1064,9 @@ class RaffleServiceV2 {
       }
       
       const raffle = raffleResult.rows[0];
+      
+      // Soporte retrocompatible: usar raffle.mode si raffle_mode no existe en BD
+      const effectiveMode = raffle.raffle_mode || raffle.mode;
       
       // Solo finalizar si está activa
       if (raffle.status !== RaffleStatus.ACTIVE) {
@@ -1118,7 +1121,7 @@ class RaffleServiceV2 {
       let hostReward = 0;
       let platformCommission = 0;
       
-      if (raffle.raffle_mode === RaffleMode.FIRES) {
+      if (effectiveMode === RaffleMode.FIRES) {
         // Modo FIRES: Split 70% ganador, 20% host, 10% plataforma
         const totalPot = raffle.pot_fires || 0;
         winnerPrize = Math.floor(totalPot * 0.7);
@@ -1131,15 +1134,15 @@ class RaffleServiceV2 {
           hostReward,
           platformCommission
         });
-      } else if (raffle.raffle_mode === RaffleMode.COINS) {
+      } else if (effectiveMode === RaffleMode.COINS) {
         // Modo COINS: 100% al ganador (sin split)
         winnerPrize = raffle.pot_coins || 0;
-      } else if (raffle.raffle_mode === RaffleMode.PRIZE) {
+      } else if (effectiveMode === RaffleMode.PRIZE) {
         // Modo PRIZE: No hay premio en moneda virtual
         logger.info('[RaffleServiceV2] Modo PRIZE - Sin premio en moneda virtual');
       }
       
-      const currency = raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins';
+      const currency = effectiveMode === RaffleMode.FIRES ? 'fires' : 'coins';
       const balanceField = currency === 'fires' ? 'fires_balance' : 'coins_balance';
         
       // Acreditar premios y comisiones
@@ -1184,7 +1187,7 @@ class RaffleServiceV2 {
         }
         
         // 2. RECOMPENSA AL HOST (solo modo FIRES)
-        if (hostReward > 0 && raffle.raffle_mode === RaffleMode.FIRES) {
+        if (hostReward > 0 && effectiveMode === RaffleMode.FIRES) {
           const hostWalletResult = await client.query(
             `SELECT id, fires_balance FROM wallets WHERE user_id = $1`,
             [raffle.host_id]
@@ -1224,7 +1227,7 @@ class RaffleServiceV2 {
         }
         
         // 3. COMISIÓN A LA PLATAFORMA (solo modo FIRES)
-        if (platformCommission > 0 && raffle.raffle_mode === RaffleMode.FIRES) {
+        if (platformCommission > 0 && effectiveMode === RaffleMode.FIRES) {
           // Obtener o crear usuario de la plataforma
           const platformUserResult = await client.query(
             `SELECT id FROM users WHERE tg_id = $1`,
@@ -1277,6 +1280,35 @@ class RaffleServiceV2 {
         }
       }
       
+      // Guardar mensajes en buzón para todos los participantes
+      try {
+        const prizeAmountTotal = effectiveMode === RaffleMode.FIRES 
+          ? (raffle.pot_fires || 0) 
+          : (effectiveMode === RaffleMode.COINS ? (raffle.pot_coins || 0) : 0);
+        for (const participant of participants) {
+          const isWinner = participant.owner_id === winner.owner_id;
+          const title = `Resultado de rifa ${raffle.code}`;
+          const content = isWinner
+            ? `🎉 ¡Felicidades! Ganaste la rifa ${raffle.code}. Número ganador: #${winningNumber}. Premio total del pote: ${prizeAmountTotal} ${effectiveMode === RaffleMode.FIRES ? '🔥' : effectiveMode === RaffleMode.COINS ? '🪙' : ''}`
+            : `La rifa ${raffle.code} finalizó. Ganador: @${winner.username} con el número #${winningNumber}. Pote: ${prizeAmountTotal} ${effectiveMode === RaffleMode.FIRES ? '🔥' : effectiveMode === RaffleMode.COINS ? '🪙' : ''}`;
+          const metadata = {
+            type: 'raffle_finished',
+            raffleCode: raffle.code,
+            winningNumber,
+            isWinner,
+            prizeAmount: prizeAmountTotal,
+            currency
+          };
+          await client.query(
+            `INSERT INTO bingo_v2_messages (user_id, category, title, content, metadata)
+             VALUES ($1, 'system', $2, $3, $4)`,
+            [participant.owner_id, title, content, JSON.stringify(metadata)]
+          );
+        }
+      } catch (msgErr) {
+        logger.error('[RaffleServiceV2] Error guardando mensajes de rifa', msgErr);
+      }
+      
       // Actualizar estado de la rifa
       await client.query(
         `UPDATE raffles
@@ -1297,7 +1329,7 @@ class RaffleServiceV2 {
         winnerUsername: winner.username,
         winnerDisplayName,
         winningNumber,
-        prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
+        prize: effectiveMode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins
       });
       
       // Emitir evento WebSocket (si está disponible)
@@ -1311,8 +1343,8 @@ class RaffleServiceV2 {
             displayName: winnerDisplayName
           },
           winningNumber,
-          prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
-          currency: raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins'
+          prize: effectiveMode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+          currency: effectiveMode === RaffleMode.FIRES ? 'fires' : 'coins'
         };
 
         global.io.to(roomName).emit('raffle:finished', winnerPayload);
@@ -1323,8 +1355,8 @@ class RaffleServiceV2 {
           winnerUsername: winner.username,
           winnerDisplayName,
           winningNumber,
-          prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
-          currency: raffle.raffle_mode === RaffleMode.FIRES ? 'fires' : 'coins'
+          prize: effectiveMode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+          currency: effectiveMode === RaffleMode.FIRES ? 'fires' : 'coins'
         });
         
         // Notificar a cada participante individualmente
@@ -1336,9 +1368,10 @@ class RaffleServiceV2 {
             isWinner,
             winner: winner.username,
             winningNumber,
-            prize: raffle.raffle_mode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+            prize: effectiveMode === RaffleMode.FIRES ? raffle.pot_fires : raffle.pot_coins,
+            currency: effectiveMode === RaffleMode.FIRES ? 'fires' : 'coins',
             message: isWinner
-              ? `🎉 ¡Felicidades! Ganaste la rifa ${raffle.code}. Premio: ${raffle.pot_fires || raffle.pot_coins} ${raffle.raffle_mode === RaffleMode.FIRES ? '🔥' : '🪙'}`
+              ? `🎉 ¡Felicidades! Ganaste la rifa ${raffle.code}. Premio: ${raffle.pot_fires || raffle.pot_coins} ${effectiveMode === RaffleMode.FIRES ? '🔥' : '🪙'}`
               : `La rifa ${raffle.code} finalizó. Ganador: @${winner.username}`
           });
         }

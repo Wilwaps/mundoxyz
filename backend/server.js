@@ -32,6 +32,7 @@ const debugXpRoutes = require('./routes/debug-xp');
 const telegramWebhookRoutes = require('./routes/telegram-webhook');
 const rafflesV2Routes = require('./modules/raffles/routes');
 const experienceRoutes = require('./routes/experience');
+const messagesRoutes = require('./routes/messages');
 
 // Create Express app
 const app = express();
@@ -254,6 +255,7 @@ app.use('/api/debug-xp', debugXpRoutes);
 app.use('/api/telegram', telegramWebhookRoutes);
 app.use('/api/raffles/v2', rafflesV2Routes);
 app.use('/api/experience', experienceRoutes);
+app.use('/api/messages', messagesRoutes);
 
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
