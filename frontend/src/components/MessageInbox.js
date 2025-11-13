@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import API_URL from '../config/api';
 import './MessageInbox.css';
 import GiftClaimButton from './gifts/GiftClaimButton';
@@ -10,6 +11,7 @@ const MessageInbox = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('all'); // all, system, friends
   const { user } = useAuth();
+  const { socket } = useSocket();
 
   useEffect(() => {
     if (user) {
@@ -19,6 +21,26 @@ const MessageInbox = () => {
       // return () => clearInterval(interval);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNotification = (payload) => {
+      // Refrescar contador real desde API (evita desincronización)
+      fetch(`${API_URL}/api/messages/unread-count`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+        .then(r => r.ok ? r.json() : { unread: null })
+        .then(data => {
+          if (typeof data.unread === 'number') setUnreadCount(data.unread);
+        })
+        .catch(() => {});
+      if (isOpen) loadMessages();
+    };
+    socket.on('notification', handleNotification);
+    return () => {
+      socket.off('notification', handleNotification);
+    };
+  }, [socket, isOpen]);
 
   const loadMessages = async () => {
     try {

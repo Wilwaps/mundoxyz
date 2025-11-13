@@ -85,6 +85,15 @@ io.on('connection', (socket) => {
   
   // Get userId from socket handshake
   const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+  // Join personal user room to receive direct notifications
+  if (userId) {
+    try {
+      socket.join(`user_${userId}`);
+      logger.info(`Socket ${socket.id} joined personal room user_${userId}`);
+    } catch (e) {
+      logger.warn('Failed to join personal room', { userId, error: e?.message });
+    }
+  }
   
   // Initialize TicTacToe socket handlers
   const { initTicTacToeSocket } = require('./socket/tictactoe');
