@@ -127,10 +127,10 @@ app.set('io', io);
 let dbReady = false;
 let redisReady = false;
 
-// Trust proxy - Always enable in production (Railway, Heroku, etc.)
-// This is required for rate limiting and getting correct client IPs
-app.set('trust proxy', true);
-logger.info('Trust proxy enabled');
+// Trust proxy - restrict to first proxy (required behind Railway/Heroku) to avoid permissive setting
+// This satisfies express-rate-limit security checks and ensures correct client IPs
+app.set('trust proxy', 1);
+logger.info('Trust proxy enabled (1 hop)');
 
 // Security middleware
 app.use(helmet({

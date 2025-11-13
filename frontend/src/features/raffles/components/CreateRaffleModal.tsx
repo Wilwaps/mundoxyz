@@ -272,6 +272,10 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
           logoBase64: logoBase64 || undefined
         } : undefined
       };
+      // En modo Premio, no enviar entryPrice (backend lo prohíbe)
+      if (payload.mode === RaffleMode.PRIZE) {
+        delete payload.entryPrice;
+      }
       
       const result = await createRaffle.mutateAsync(payload);
       toast.success('¡Rifa creada exitosamente!');

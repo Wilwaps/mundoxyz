@@ -3,7 +3,7 @@
  * Modal para comprar números en una rifa
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -43,6 +43,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const hasSubmittedRef = useRef(false);
   
   // Para modo premio
   const [paymentData, setPaymentData] = useState({
@@ -66,9 +67,9 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   // Validar balance
   const hasBalance = raffle?.mode === 'prize' || userBalance >= totalCost;
   
-  // Manejar cierre con liberación
+  // Manejar cierre con liberación (evitar liberar en PRIZE: host decide)
   const handleClose = async () => {
-    if (selectedNumbers.length > 0 && !isProcessing) {
+    if (raffle?.mode !== 'prize' && selectedNumbers.length > 0 && !isProcessing && !hasSubmittedRef.current) {
       try {
         // Liberar cada número individualmente
         for (const idx of selectedNumbers) {
@@ -136,8 +137,9 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       toast.error('Por favor selecciona un método de pago');
       return;
     }
-    
-    if (!paymentData.referenceNumber) {
+    // Referencia solo requerida para MOBILE y BANK
+    const needsReference = paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK;
+    if (needsReference && !paymentData.referenceNumber) {
       toast.error('Por favor ingresa el número de referencia');
       return;
     }
@@ -181,6 +183,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       }
       
       toast.success('¡Solicitud enviada! El organizador revisará tu pago pronto');
+      hasSubmittedRef.current = true; // Evitar liberar después del envío
       onSuccess();
     } catch (error) {
       // El error ya se maneja en el hook
@@ -277,39 +280,81 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 Información de Pago
               </h3>
               
+              {/* Datos bancarios del host */}
+              {raffle?.prizeMeta?.bankingInfo && (
+                <div className="bg-glass/50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-text">Datos bancarios del organizador</p>
+                    <button
+                      type="button"
+                      className="text-xs px-2 py-1 rounded bg-glass hover:bg-glass/80 text-text/80"
+                      onClick={() => {
+                        const b = raffle.prizeMeta.bankingInfo;
+                        const all = `Titular: ${b.accountHolder}\nBanco: ${b.bankName}\nCuenta: ${b.accountNumber}\nTipo: ${b.accountType}\nTeléfono: ${b.phone}`;
+                        navigator.clipboard.writeText(all);
+                        toast.success('Datos bancarios copiados');
+                      }}
+                    >Copiar todo</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center justify-between gap-2 bg-glass/40 rounded px-3 py-2">
+                      <span className="text-text/80">Titular: <span className="text-text font-medium">{raffle.prizeMeta.bankingInfo.accountHolder}</span></span>
+                      <button className="text-xs px-2 py-1 rounded bg-dark/40" onClick={() => {navigator.clipboard.writeText(raffle.prizeMeta.bankingInfo.accountHolder); toast.success('Titular copiado');}}>Copiar</button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-glass/40 rounded px-3 py-2">
+                      <span className="text-text/80">Banco: <span className="text-text font-medium">{raffle.prizeMeta.bankingInfo.bankName}</span></span>
+                      <button className="text-xs px-2 py-1 rounded bg-dark/40" onClick={() => {navigator.clipboard.writeText(raffle.prizeMeta.bankingInfo.bankName); toast.success('Banco copiado');}}>Copiar</button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-glass/40 rounded px-3 py-2">
+                      <span className="text-text/80">Cuenta: <span className="text-text font-medium">{raffle.prizeMeta.bankingInfo.accountNumber}</span></span>
+                      <button className="text-xs px-2 py-1 rounded bg-dark/40" onClick={() => {navigator.clipboard.writeText(raffle.prizeMeta.bankingInfo.accountNumber); toast.success('Cuenta copiada');}}>Copiar</button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-glass/40 rounded px-3 py-2">
+                      <span className="text-text/80">Tipo: <span className="text-text font-medium capitalize">{raffle.prizeMeta.bankingInfo.accountType}</span></span>
+                      <button className="text-xs px-2 py-1 rounded bg-dark/40" onClick={() => {navigator.clipboard.writeText(raffle.prizeMeta.bankingInfo.accountType); toast.success('Tipo copiado');}}>Copiar</button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-glass/40 rounded px-3 py-2">
+                      <span className="text-text/80">Teléfono: <span className="text-text font-medium">{raffle.prizeMeta.bankingInfo.phone}</span></span>
+                      <button className="text-xs px-2 py-1 rounded bg-dark/40" onClick={() => {navigator.clipboard.writeText(raffle.prizeMeta.bankingInfo.phone); toast.success('Teléfono copiado');}}>Copiar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Métodos de pago disponibles */}
               <div>
                 <label className="block text-sm text-text/80 mb-2">
                   Método de Pago *
                 </label>
                 <div className="space-y-2">
-                  {raffle.paymentMethods?.map((method: any) => (
+                  {[
+                    { id: PaymentMethod.CASH, label: 'Efectivo', type: 'cash' },
+                    { id: PaymentMethod.MOBILE, label: 'Pago Móvil', type: 'transfer' },
+                    { id: PaymentMethod.BANK, label: 'Transferencia Bancaria', type: 'transfer' },
+                    ...(raffle?.allowFiresPayment ? [{ id: PaymentMethod.FIRES, label: 'Fuegos', type: 'fires' } as const] : [])
+                  ].map((m) => (
                     <label
-                      key={method.id}
-                      className={`flex items-start gap-3 p-3 bg-glass/50 rounded-lg cursor-pointer transition-all ${
-                        paymentData.paymentMethod === method.id
-                          ? 'ring-2 ring-accent bg-accent/10'
-                          : 'hover:bg-glass'
-                      }`}
+                      key={m.id}
+                      className={`flex items-start gap-3 p-3 bg-glass/50 rounded-lg cursor-pointer transition-all ${paymentData.paymentMethod === m.id ? 'ring-2 ring-accent bg-accent/10' : 'hover:bg-glass'}`}
                     >
                       <input
                         type="radio"
-                        value={method.id}
-                        checked={paymentData.paymentMethod === method.id}
+                        value={m.id}
+                        checked={paymentData.paymentMethod === m.id}
                         onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value})}
                         className="mt-1"
                       />
                       <div className="flex-1">
-                        <p className="font-medium text-text">{method.type === 'transfer' ? 'Transferencia' : 'Efectivo'}</p>
-                        {method.type === 'transfer' && (
+                        <p className="font-medium text-text">{m.label}</p>
+                        {m.type === 'transfer' && raffle?.prizeMeta?.bankingInfo && (
                           <div className="mt-1 text-sm text-text/80">
-                            <p>Banco: {method.bankName}</p>
-                            <p>Cuenta: {method.accountNumber}</p>
-                            <p>Titular: {method.accountHolder}</p>
+                            <p>Banco: {raffle.prizeMeta.bankingInfo.bankName}</p>
+                            <p>Cuenta: {raffle.prizeMeta.bankingInfo.accountNumber}</p>
+                            <p>Titular: {raffle.prizeMeta.bankingInfo.accountHolder}</p>
                           </div>
                         )}
-                        {method.instructions && (
-                          <p className="mt-1 text-xs text-text/60">{method.instructions}</p>
+                        {m.id === PaymentMethod.FIRES && (
+                          <p className="mt-1 text-xs text-text/60">Pagarás con fuegos. Se transferirá directamente al organizador.</p>
                         )}
                       </div>
                     </label>
@@ -328,6 +373,9 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                   placeholder="Ej: 1234567890"
                   className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+                <p className="text-xs text-text/50 mt-1">
+                  Requerido solo para Pago Móvil o Transferencia. No es necesario para Efectivo o Fuegos.
+                </p>
               </div>
               
               <div>

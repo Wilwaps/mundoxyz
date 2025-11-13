@@ -641,6 +641,14 @@ class RaffleServiceV2 {
     const dbQuery = client?.query || query;
     
     try {
+      // Log estado actual antes de intentar liberar (para diagnóstico)
+      const currentResult = await dbQuery(
+        `SELECT state, owner_id, reserved_by, reserved_until
+         FROM raffle_numbers
+         WHERE raffle_id = $1 AND number_idx = $2`,
+        [raffleId, numberIdx]
+      );
+
       const result = await dbQuery(
         `UPDATE raffle_numbers
          SET state = $1, owner_id = NULL, reserved_by = NULL,
@@ -652,9 +660,20 @@ class RaffleServiceV2 {
       );
       
       if (result.rows.length === 0) {
+        const snapshot = currentResult.rows[0] || null;
+        logger.warn('[RaffleServiceV2] No se pudo liberar número (sin filas afectadas)', {
+          raffleId,
+          numberIdx,
+          userId,
+          currentState: snapshot?.state,
+          currentOwner: snapshot?.owner_id,
+          currentReservedBy: snapshot?.reserved_by,
+          currentReservedUntil: snapshot?.reserved_until
+        });
         throw { 
           code: ErrorCodes.UNAUTHORIZED, 
-          status: 403 
+          status: 403,
+          message: 'No autorizado para liberar este número o ya no está reservado' 
         };
       }
       
@@ -750,9 +769,9 @@ class RaffleServiceV2 {
         cost = raffle.entry_price_coin || 10;
         currency = 'coins';
       }
-      // Modo PRIZE se maneja diferente (aprobación manual)
+      // Modo PRIZE se maneja diferente (aprobación manual o pago con fuegos al host)
       
-      // 4. Si es modo fires/coins, validar y cobrar
+      // 4. Procesamiento de pago
       if (raffle.raffle_mode !== RaffleMode.PRIZE) {
         // Obtener balance del usuario
         const walletResult = await dbQuery(
@@ -826,19 +845,131 @@ class RaffleServiceV2 {
           currency,
           newBalance: currentBalance - cost
         });
+        
+        // Marcar número como SOLD
+        await dbQuery(
+          `UPDATE raffle_numbers
+           SET state = $1,
+               owner_id = $2,
+               purchased_at = NOW(),
+               reserved_by = NULL,
+               reserved_until = NULL
+           WHERE raffle_id = $3 AND number_idx = $4`,
+          [NumberState.SOLD, userId, raffleId, numberIdx]
+        );
+      } else {
+        // PRIZE MODE: dos variantes
+        const allowFiresPayment = !!raffle.allow_fires_payment;
+        const method = paymentData?.paymentMethod;
+        const reference = paymentData?.paymentReference || paymentData?.reference;
+        const buyerProfile = {
+          displayName: paymentData?.buyerName || null,
+          fullName: paymentData?.buyerName || null,
+          phone: paymentData?.buyerPhone || null,
+          email: paymentData?.buyerEmail || null,
+          idNumber: paymentData?.buyerDocument || null
+        };
+
+        if (allowFiresPayment && method === 'fires') {
+          // Transferencia directa de fuegos del comprador al host
+          const walletsResult = await dbQuery(
+            `SELECT w.id, w.fires_balance, u.id as uid
+             FROM wallets w JOIN users u ON u.id = w.user_id
+             WHERE w.user_id = ANY($1::uuid[]) FOR UPDATE`,
+            [[userId, raffle.host_id]]
+          );
+          const buyerWallet = walletsResult.rows.find(r => r.uid === userId);
+          const hostWallet = walletsResult.rows.find(r => r.uid === raffle.host_id);
+          if (!buyerWallet || !hostWallet) {
+            throw { code: ErrorCodes.WALLET_NOT_FOUND, status: 404, message: 'Wallet no encontrado (comprador u host)' };
+          }
+          const price = raffle.entry_price_fire || 0;
+          if (buyerWallet.fires_balance < price) {
+            throw { code: ErrorCodes.INSUFFICIENT_BALANCE, status: 400, message: 'Saldo de fuegos insuficiente' };
+          }
+          // Debitar comprador, acreditar host
+          await dbQuery(
+            `UPDATE wallets SET fires_balance = fires_balance - $1, total_fires_spent = total_fires_spent + $1 WHERE id = $2`,
+            [price, buyerWallet.id]
+          );
+          await dbQuery(
+            `UPDATE wallets SET fires_balance = fires_balance + $1, total_fires_earned = total_fires_earned + $1 WHERE id = $2`,
+            [price, hostWallet.id]
+          );
+          // Transacciones
+          await dbQuery(
+            `INSERT INTO wallet_transactions (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+             VALUES ($1, 'raffle_prize_fire_payment_out', 'fires', $2, $3, $4, $5, $6, $7)`,
+            [
+              buyerWallet.id,
+              price,
+              buyerWallet.fires_balance,
+              buyerWallet.fires_balance - price,
+              `Pago de número ${numberIdx} en rifa ${raffle.code} (PRIZE → host)`,
+              `raffle_${raffle.code}_num_${numberIdx}_fires_out`,
+              raffle.host_id
+            ]
+          );
+          await dbQuery(
+            `INSERT INTO wallet_transactions (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+             VALUES ($1, 'raffle_prize_fire_payment_in', 'fires', $2, $3, $4, $5, $6, $7)`,
+            [
+              hostWallet.id,
+              price,
+              hostWallet.fires_balance,
+              hostWallet.fires_balance + price,
+              `Ingreso por número ${numberIdx} en rifa ${raffle.code} (PRIZE de comprador)`,
+              `raffle_${raffle.code}_num_${numberIdx}_fires_in`,
+              userId
+            ]
+          );
+          // Marcar número como SOLD
+          await dbQuery(
+            `UPDATE raffle_numbers
+             SET state = $1,
+                 owner_id = $2,
+                 purchased_at = NOW(),
+                 reserved_by = NULL,
+                 reserved_until = NULL
+             WHERE raffle_id = $3 AND number_idx = $4`,
+            [NumberState.SOLD, userId, raffleId, numberIdx]
+          );
+          logger.info('[RaffleServiceV2] PRIZE con fuegos: transferido al host y vendido', {
+            raffleId,
+            numberIdx,
+            userId,
+            hostId: raffle.host_id,
+            price
+          });
+        } else {
+          // Crear solicitud de compra (PENDING) y mantener reserva hasta decisión del host
+          const requestData = {
+            paymentMethod: method || null,
+            reference: reference || null,
+            paymentProofBase64: paymentData?.paymentProofBase64 || null
+          };
+          await dbQuery(
+            `INSERT INTO raffle_requests (raffle_id, buyer_id, user_id, number_idx, status, request_type, request_data, buyer_profile)
+             VALUES ($1, $2, $2, $3, 'pending', 'approval', $4, $5)`,
+            [raffleId, userId, numberIdx, JSON.stringify(requestData), JSON.stringify(buyerProfile)]
+          );
+          // Congelar reserva sin expiración automática (reserved_until = NULL)
+          await dbQuery(
+            `UPDATE raffle_numbers
+             SET state = $1, owner_id = $2, reserved_by = $2, reserved_until = NULL
+             WHERE raffle_id = $3 AND number_idx = $4`,
+            [NumberState.RESERVED, userId, raffleId, numberIdx]
+          );
+          logger.info('[RaffleServiceV2] PRIZE: solicitud de compra creada y número reservado hasta decisión del host', {
+            raffleId,
+            numberIdx,
+            userId,
+            method,
+            reference
+          });
+          // No marcar sold; no finalizar rifa aún
+        }
       }
-      
-      // 8. Marcar número como SOLD
-      await dbQuery(
-        `UPDATE raffle_numbers
-         SET state = $1,
-             owner_id = $2,
-             purchased_at = NOW(),
-             reserved_by = NULL,
-             reserved_until = NULL
-         WHERE raffle_id = $3 AND number_idx = $4`,
-        [NumberState.SOLD, userId, raffleId, numberIdx]
-      );
       
       // Commit transacción
       await transactionClient.query('COMMIT');
@@ -860,14 +991,16 @@ class RaffleServiceV2 {
         }
       };
       
-      // ✅ NUEVO: Verificar si la rifa debe finalizarse automáticamente
-      setImmediate(async () => {
-        try {
-          await this.checkAndFinishRaffle(raffleId);
-        } catch (err) {
-          logger.error('[RaffleServiceV2] Error verificando finalización', err);
-        }
-      });
+      // ✅ Verificar finalización solo si no es PRIZE con solicitud pendiente
+      if (raffle.raffle_mode !== RaffleMode.PRIZE) {
+        setImmediate(async () => {
+          try {
+            await this.checkAndFinishRaffle(raffleId);
+          } catch (err) {
+            logger.error('[RaffleServiceV2] Error verificando finalización', err);
+          }
+        });
+      }
       
       return result;
       
@@ -1777,6 +1910,10 @@ class RaffleServiceV2 {
       startsAt: raffle.starts_at,
       endsAt: raffle.ends_at,
       finishedAt: raffle.finished_at,
+      allowFiresPayment: raffle.allow_fires_payment,
+      prizeImageBase64: raffle.prize_image_base64,
+      drawMode: raffle.draw_mode,
+      scheduledDrawAt: raffle.scheduled_draw_at,
       companyConfig: raffle.company_name ? {
         companyName: raffle.company_name,
         rifNumber: raffle.rif_number,

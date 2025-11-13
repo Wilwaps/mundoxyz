@@ -13,7 +13,7 @@
     "migrate:profile": "node backend/scripts/migrate-profile-fields.js",
     "test": "jest",
     "lint": "eslint backend/",
-    "postinstall": "cd frontend && npm install"
+    "postinstall": "cd frontend && npm install && npm run build"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",

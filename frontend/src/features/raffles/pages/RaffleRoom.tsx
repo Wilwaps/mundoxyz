@@ -51,6 +51,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [activeTab, setActiveTab] = useState<'numbers' | 'info' | 'winners'>('numbers');
   const refreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -649,12 +650,24 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             <div className="text-xs text-text/60 mb-1">Progreso</div>
             <div className="text-xl font-bold text-text">{stats.progress}%</div>
           </div>
-          <div className="bg-glass rounded-xl p-4">
-            <div className="text-xs text-text/60 mb-1">Pote Total</div>
-            <div className="text-xl font-bold text-fire-orange">
-              {raffle.mode === 'fires' ? '🔥' : '🪙'} {stats.totalPot}
+          {raffle.mode === RaffleMode.PRIZE ? (
+            <div 
+              className="bg-glass rounded-xl p-4 cursor-pointer hover:bg-glass/80"
+              onClick={() => setShowPrizeModal(true)}
+            >
+              <div className="text-xs text-text/60 mb-1">Premio</div>
+              <div className="text-sm font-semibold text-text line-clamp-2">
+                {raffle.prizeMeta?.prizeDescription || 'Premio'}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-glass rounded-xl p-4">
+              <div className="text-xs text-text/60 mb-1">Pote Total</div>
+              <div className="text-xl font-bold text-fire-orange">
+                {raffle.mode === 'fires' ? '🔥' : '🪙'} {stats.totalPot}
+              </div>
+            </div>
+          )}
           <div className="bg-glass rounded-xl p-4">
             <div className="text-xs text-text/60 mb-1">Mis Números</div>
             <div className="text-xl font-bold text-accent">{stats.myNumbers}</div>
@@ -944,6 +957,49 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           )}
         </AnimatePresence>
         
+        {/* Modal de imagen de premio */}
+        <AnimatePresence>
+          {showPrizeModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowPrizeModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="max-w-3xl w-full bg-dark rounded-2xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <h3 className="text-text font-semibold">Premio</h3>
+                  <button
+                    onClick={() => setShowPrizeModal(false)}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+                <div className="bg-black/40 p-4 flex items-center justify-center">
+                  {(() => {
+                    const base64 = raffle.prizeImageBase64;
+                    const fallback = raffle.prizeMeta?.prizeImages?.[0];
+                    const src = base64 ? `data:image/png;base64,${base64}` : (fallback || '');
+                    return src ? (
+                      <img src={src} alt="Premio" className="max-h-[70vh] max-w-full object-contain rounded-lg" />
+                    ) : (
+                      <div className="text-text/60">Sin imagen de premio</div>
+                    );
+                  })()}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Modal de compra */}
         <PurchaseModal
           isOpen={showPurchaseModal}

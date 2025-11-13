@@ -397,14 +397,19 @@ CREATE TABLE IF NOT EXISTS raffle_numbers (
   number_idx INTEGER NOT NULL,
   state VARCHAR(20) DEFAULT 'available' CHECK (state IN ('available', 'sold', 'reserved')),
   owner_id UUID REFERENCES users(id),
+  reserved_by UUID REFERENCES users(id),
+  reserved_until TIMESTAMPTZ,
   purchased_at TIMESTAMP,
   UNIQUE(raffle_id, number_idx)
 );
 
 CREATE INDEX IF NOT EXISTS idx_raffle_numbers_raffle ON raffle_numbers(raffle_id);
 CREATE INDEX IF NOT EXISTS idx_raffle_numbers_owner ON raffle_numbers(owner_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_numbers_reserved ON raffle_numbers(reserved_until) WHERE reserved_until IS NOT NULL;
 
 COMMENT ON TABLE raffle_numbers IS 'Números de cada rifa';
+COMMENT ON COLUMN raffle_numbers.reserved_by IS 'User ID que reservó temporalmente este número (NULL si no reservado)';
+COMMENT ON COLUMN raffle_numbers.reserved_until IS 'Expira la reserva (NULL si no reservado)';
 
 -- ============================================
 -- 12. RAFFLE_COMPANIES
@@ -470,6 +475,8 @@ CREATE TABLE IF NOT EXISTS raffle_requests (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   raffle_id INTEGER NOT NULL REFERENCES raffles(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  buyer_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  number_idx INTEGER,
   request_type VARCHAR(20) NOT NULL DEFAULT 'approval' CHECK (request_type IN ('approval', 'refund', 'cancel')),
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
   request_data JSONB DEFAULT '{}',
@@ -488,10 +495,15 @@ CREATE TABLE IF NOT EXISTS raffle_requests (
 
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_raffle ON raffle_requests(raffle_id);
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_user ON raffle_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_buyer ON raffle_requests(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_raffle_requests_raffle_number ON raffle_requests(raffle_id, number_idx);
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_status ON raffle_requests(status);
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_type ON raffle_requests(request_type);
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_reviewed_by ON raffle_requests(reviewed_by) WHERE reviewed_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_raffle_requests_created ON raffle_requests(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_raffle_request_pending_approved
+  ON raffle_requests(raffle_id, number_idx)
+  WHERE status IN ('pending','approved');
 
 COMMENT ON TABLE raffle_requests IS 'Solicitudes de aprobación para rifas premio (modo pago)';
 COMMENT ON COLUMN raffle_requests.payment_method IS 'Método de pago elegido por comprador: cash, bank, fire (migración 035)';
