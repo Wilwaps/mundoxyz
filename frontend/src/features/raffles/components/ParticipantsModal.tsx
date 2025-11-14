@@ -208,34 +208,43 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                       <div className="text-sm text-text/60 mb-4">
                         Total: {data.totalParticipants || data.participants.length} participante(s)
                       </div>
-                      {data.participants.map((participant, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-glass/50 rounded-lg p-4 border border-white/10"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold text-text">
-                                {participant.displayName}
-                              </h3>
-                              {participant.telegramUsername && (
+                      {data.participants.map((participant: any, idx: number) => {
+                        const displayName =
+                          participant.displayName ||
+                          participant.display_name ||
+                          participant.username ||
+                          'Participante';
+                        const username = participant.telegramUsername || participant.username;
+                        const numbers: number[] = participant.numbers || [];
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-glass/50 rounded-lg p-4 border border-white/10"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-semibold text-text">
+                                  {displayName}
+                                </h3>
+                                {username && (
+                                  <p className="text-sm text-text/60">
+                                    @{username}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
                                 <p className="text-sm text-text/60">
-                                  @{participant.telegramUsername}
+                                  {numbers.length} número(s)
                                 </p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-text/60">
-                                {participant.numbers.length} número(s)
-                              </p>
-                              <p className="text-xs text-accent">
-                                {participant.numbers.slice(0, 5).join(', ')}
-                                {participant.numbers.length > 5 && '...'}
-                              </p>
+                                <p className="text-xs text-accent">
+                                  {numbers.slice(0, 5).join(', ')}
+                                  {numbers.length > 5 && '...'}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </>
                   )}
                 </div>
@@ -250,24 +259,31 @@ const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                       <p className="text-text/60">Aún no hay participantes aprobados</p>
                     </div>
                   ) : (
-                    data.participants.map((participant: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="bg-glass/50 rounded-lg p-4 border border-white/10"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-text">
-                            {participant.displayName}
-                          </h3>
-                          <p className="text-sm text-text/60">
-                            {participant.numbers.length} número(s)
-                          </p>
+                    data.participants.map((participant: any, idx: number) => {
+                      const displayName =
+                        participant.displayName ||
+                        participant.display_name ||
+                        'Participante';
+                      const numbers: number[] = participant.numbers || [];
+                      return (
+                        <div
+                          key={idx}
+                          className="bg-glass/50 rounded-lg p-4 border border-white/10"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-text">
+                              {displayName}
+                            </h3>
+                            <p className="text-sm text-text/60">
+                              {numbers.length} número(s)
+                            </p>
+                          </div>
+                          <div className="mt-2 text-xs text-accent break-words">
+                            {numbers.join(', ')}
+                          </div>
                         </div>
-                        <div className="mt-2 text-xs text-accent break-words">
-                          {participant.numbers.join(', ')}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}

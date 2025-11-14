@@ -139,7 +139,22 @@ const createRaffleSchema = Joi.object({
       contactPhone: Joi.string().optional()
     }).required(),
     otherwise: Joi.optional()
-  })
+  }),
+  
+  allowFiresPayment: Joi.boolean().optional(),
+  
+  // Imagen del premio en base64 (puede venir como data URL o solo el payload)
+  prizeImageBase64: Joi.string().optional(),
+  
+  // Modo de sorteo
+  drawMode: Joi.string()
+    .valid('automatic', 'scheduled', 'manual')
+    .default('automatic'),
+  
+  // Fecha programada de sorteo (solo si drawMode = scheduled, se valida en capa de negocio)
+  scheduledDrawAt: Joi.date()
+    .iso()
+    .optional()
 });
 
 // Esquema para actualizar rifa
@@ -185,6 +200,7 @@ const updateRaffleSchema = Joi.object({
     primaryColor: Joi.string().pattern(/^#[0-9A-F]{6}$/i).optional(),
     secondaryColor: Joi.string().pattern(/^#[0-9A-F]{6}$/i).optional(),
     logoUrl: Joi.string().uri().optional(),
+    logoBase64: Joi.string().optional(),
     contactEmail: Joi.string().email().optional(),
     contactPhone: Joi.string().optional()
   }).optional()
