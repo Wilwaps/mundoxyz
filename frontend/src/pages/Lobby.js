@@ -43,7 +43,7 @@ const Lobby = () => {
     switch (type) {
       case 'tictactoe':
         // Redirigir al lobby de TicTacToe (tiene su propio modal inline)
-        navigate('/tictactoe');
+        navigate('/tictactoe/lobby');
         break;
       case 'bingo':
         setShowBingoModal(true);
@@ -65,24 +65,45 @@ const Lobby = () => {
     setIsJoining(true);
 
     try {
+      // 1) Intentar encontrar sala de juego (TicTacToe / Bingo) mediante sistema unificado
       const res = await fetch(`/api/rooms/find/${quickJoinCode}`);
       const data = await res.json();
 
-      if (!res.ok) {
-        if (data.code === 'ROOM_NOT_FOUND') {
+      if (res.ok) {
+        toast.success('¡Sala encontrada! Redirigiendo...');
+        navigate(data.redirect_url);
+        return;
+      }
+
+      // 2) Si no existe sala de juego pero el código es válido, intentar buscar una rifa
+      if (data.code === 'ROOM_NOT_FOUND') {
+        try {
+          const raffleRes = await fetch(`/api/raffles/v2/${quickJoinCode}`);
+          const raffleData = await raffleRes.json().catch(() => ({}));
+
+          if (raffleRes.ok && raffleData?.raffle) {
+            toast.success('Rifa encontrada, redirigiendo...');
+            navigate(`/raffles/${quickJoinCode}`);
+            return;
+          }
+
+          // Si tampoco es una rifa válida, mostrar error genérico de no encontrada
           toast.error('Sala no encontrada. Verifica el código');
-        } else if (data.code === 'ROOM_FINISHED') {
-          toast.error('Esta sala ya finalizó');
-        } else if (data.code === 'ROOM_CANCELLED') {
-          toast.error('Esta sala fue cancelada');
-        } else {
-          toast.error(data.error || 'Error al buscar sala');
+        } catch (innerErr) {
+          console.error('Error buscando rifa por código:', innerErr);
+          toast.error('Error al buscar sala o rifa');
         }
         return;
       }
 
-      toast.success('¡Sala encontrada! Redirigiendo...');
-      navigate(data.redirect_url);
+      // Otros estados específicos de salas de juego
+      if (data.code === 'ROOM_FINISHED') {
+        toast.error('Esta sala ya finalizó');
+      } else if (data.code === 'ROOM_CANCELLED') {
+        toast.error('Esta sala fue cancelada');
+      } else {
+        toast.error(data.error || 'Error al buscar sala');
+      }
     } catch (error) {
       console.error('Error en Quick Join:', error);
       toast.error('Error al buscar sala');

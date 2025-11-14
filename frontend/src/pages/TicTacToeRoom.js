@@ -439,7 +439,7 @@ const TicTacToeRoom = () => {
   
   const renderCell = (row, col) => {
     const value = board[row][col];
-    const isWinningCell = room?.winning_line && checkIfWinningCell(row, col);
+    const isWinningCell = room?.winning_line && value && checkIfWinningCell(row, col);
     
     return (
       <motion.button

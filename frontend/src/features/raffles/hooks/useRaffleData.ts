@@ -167,8 +167,6 @@ export const useReserveNumber = () => {
       queryClient.invalidateQueries({
         queryKey: RAFFLE_QUERY_KEYS.detail(variables.code)
       });
-      
-      toast.success(UI_TEXTS.SUCCESS.NUMBER_RESERVED);
     },
     onError: (error: any) => {
       console.error('[useReserveNumber] Error reservando:', error);
@@ -244,8 +242,6 @@ export const usePurchaseNumber = () => {
       
       // Invalidar balance del usuario
       queryClient.invalidateQueries({ queryKey: ['user', 'balance'] });
-      
-      toast.success(UI_TEXTS.SUCCESS.PURCHASE_COMPLETED);
     },
     onError: (error: any) => {
       console.error('[usePurchaseNumber] Error comprando:', error);
@@ -258,8 +254,29 @@ export const usePurchaseNumber = () => {
           window.location.href = '/raffles';
         }, 2000);
       } else {
-        const message = error.response?.data?.message || UI_TEXTS.ERRORS.PAYMENT_FAILED;
-        toast.error(message);
+        const data = error.response?.data;
+
+        if (data?.message === 'Validation error' && data.errors) {
+          let detailedMessage = '';
+
+          if (typeof data.errors === 'string') {
+            detailedMessage = data.errors;
+          } else if (Array.isArray(data.errors)) {
+            detailedMessage = data.errors.join(' | ');
+          } else {
+            const firstError = Object.values(data.errors)[0] as any;
+            if (Array.isArray(firstError)) {
+              detailedMessage = firstError[0];
+            } else if (typeof firstError === 'string') {
+              detailedMessage = firstError;
+            }
+          }
+
+          toast.error(detailedMessage || UI_TEXTS.ERRORS.PAYMENT_FAILED);
+        } else {
+          const message = data?.message || UI_TEXTS.ERRORS.PAYMENT_FAILED;
+          toast.error(message);
+        }
       }
     }
   });

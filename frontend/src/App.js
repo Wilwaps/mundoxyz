@@ -79,7 +79,7 @@ function App() {
             <Toaster
               position="top-center"
               toastOptions={{
-                duration: 4000,
+                duration: 2000,
                 style: {
                   background: '#121A2B',
                   color: '#E6EDF3',
@@ -119,7 +119,7 @@ function App() {
                   <Layout />
                 </ProtectedRoute>
               }>
-                <Route index element={<Navigate to="/games" replace />} />
+                <Route index element={<Navigate to="/lobby" replace />} />
                 <Route path="games" element={<Games />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="lobby" element={<Lobby />} />

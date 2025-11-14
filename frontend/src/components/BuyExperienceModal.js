@@ -11,7 +11,7 @@ const BuyExperienceModal = ({ isOpen, onClose, user }) => {
   const [amount, setAmount] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const queryClient = useQueryClient();
-  const { updateUser } = useAuth();
+  const { user: authUser, updateUser } = useAuth();
 
   // Mutation para comprar experiencia (debe estar antes del early return)
   const buyMutation = useMutation({
@@ -60,11 +60,14 @@ const BuyExperienceModal = ({ isOpen, onClose, user }) => {
       });
 
       // Actualizar usuario en contexto con nueva experiencia y balances
-      updateUser({
-        experience: data.newExperience,
-        coins_balance: data.newCoinsBalance,
-        fires_balance: data.newFiresBalance
-      });
+      if (authUser) {
+        updateUser({
+          ...authUser,
+          experience: data.newExperience,
+          coins_balance: data.newCoinsBalance,
+          fires_balance: data.newFiresBalance
+        });
+      }
 
       // Invalidar queries para actualizar balances
       queryClient.invalidateQueries(['header-balance']);

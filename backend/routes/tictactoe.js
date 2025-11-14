@@ -840,12 +840,14 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
         }
         
         // Actualizar pot con las nuevas apuestas
+        // IMPORTANTE: el pote de cada partida debe depender solo de las apuestas
+        // de esa partida, para evitar "crear" monedas/fuegos al acumular potes
         const newPotCoins = updatedRoom.mode === 'coins' 
-          ? parseFloat(updatedRoom.pot_coins) + (parseFloat(updatedRoom.bet_amount) * 2)
-          : parseFloat(updatedRoom.pot_coins);
+          ? parseFloat(updatedRoom.bet_amount) * 2
+          : 0;
         const newPotFires = updatedRoom.mode === 'fires'
-          ? parseFloat(updatedRoom.pot_fires) + (parseFloat(updatedRoom.bet_amount) * 2)
-          : parseFloat(updatedRoom.pot_fires);
+          ? parseFloat(updatedRoom.bet_amount) * 2
+          : 0;
         
         // CRÍTICO: Limpiar movimientos previos para evitar violación de unique constraint
         await client.query(

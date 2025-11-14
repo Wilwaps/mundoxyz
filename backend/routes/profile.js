@@ -315,28 +315,16 @@ router.get('/:userId/games', verifyToken, async (req, res) => {
   }
 });
 
-// Get user transactions with pagination
+// Get user transactions with pagination (always for the authenticated user)
 router.get('/:userId/transactions', verifyToken, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
     const { currency, limit = 25, offset = 0 } = req.query;
-
-    // Check permissions
-    const canView = 
-      req.user.id === userId ||
-      req.user.tg_id?.toString() === userId ||
-      req.user.username === userId ||
-      req.user.roles?.includes('admin') ||
-      req.user.roles?.includes('tote');
-
-    if (!canView) {
-      return res.status(403).json({ error: 'Cannot view this user\'s transactions' });
-    }
 
     // Get user's wallet
     const walletResult = await query(
       'SELECT id FROM wallets WHERE user_id = $1',
-      [req.user.id]
+      [userId]
     );
 
     if (walletResult.rows.length === 0) {
