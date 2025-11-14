@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import NumberGrid from '../components/NumberGrid';
+import ParticipantsModal from '../components/ParticipantsModal';
+import type { RaffleNumber, PrizeMeta } from '../types';
 
 interface PublicLandingData {
   raffle: {
@@ -34,6 +37,8 @@ interface PublicLandingData {
     createdAt: string;
     startsAt?: string;
     endsAt?: string;
+    prizeImageBase64?: string;
+    prizeMeta?: PrizeMeta;
   };
   company?: {
     name: string;
@@ -41,6 +46,7 @@ interface PublicLandingData {
     primaryColor: string;
     secondaryColor: string;
     logoUrl?: string;
+    logoBase64?: string;
     websiteUrl?: string;
   };
   stats: {
@@ -50,6 +56,7 @@ interface PublicLandingData {
     availableNumbers: number;
     progress: number;
   };
+  numbers: RaffleNumber[];
 }
 
 const RafflePublicLanding: React.FC = () => {
@@ -59,6 +66,8 @@ const RafflePublicLanding: React.FC = () => {
   const [data, setData] = useState<PublicLandingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   useEffect(() => {
     if (!code) return;
@@ -113,11 +122,17 @@ const RafflePublicLanding: React.FC = () => {
     );
   }
   
-  const { raffle, company, stats } = data;
+  const { raffle, company, stats, numbers } = data;
   
   // Colores personalizados de empresa o defaults
   const primaryColor = company?.primaryColor || '#8B5CF6';
   const secondaryColor = company?.secondaryColor || '#06B6D4';
+
+  const logoSrc = company?.logoBase64
+    ? (company.logoBase64.startsWith('data:image')
+        ? company.logoBase64
+        : `data:image/png;base64,${company.logoBase64}`)
+    : company?.logoUrl;
   
   return (
     <div 
@@ -129,42 +144,45 @@ const RafflePublicLanding: React.FC = () => {
       }}
     >
       <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 py-12">
-        {/* Header con Logo Empresa */}
+        {/* Header con Logo Empresa alineado a la izquierda */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="mb-12"
         >
-          {company?.logoUrl && (
-            <div className="mb-6">
-              <img
-                src={company.logoUrl}
-                alt={company.name}
-                className="h-24 w-auto mx-auto rounded-lg shadow-lg"
-              />
-            </div>
-          )}
-          
-          {company && (
-            <div className="mb-4">
-              <h3 
-                className="text-2xl font-bold mb-1"
-                style={{ color: primaryColor }}
-              >
-                {company.name}
-              </h3>
-              {company.rif && (
-                <p className="text-sm text-text/60">RIF: {company.rif}</p>
+          {(company || logoSrc) && (
+            <div className="flex items-center gap-4 mb-6">
+              {logoSrc && (
+                <div className="flex-shrink-0">
+                  <img
+                    src={logoSrc}
+                    alt={company?.name || 'Logo de empresa'}
+                    className="h-20 w-20 rounded-lg shadow-lg object-contain bg-dark/40"
+                  />
+                </div>
+              )}
+              {company && (
+                <div>
+                  <h3
+                    className="text-2xl font-bold mb-1"
+                    style={{ color: primaryColor }}
+                  >
+                    {company.name}
+                  </h3>
+                  {company.rif && (
+                    <p className="text-sm text-text/60">RIF: {company.rif}</p>
+                  )}
+                </div>
               )}
             </div>
           )}
-          
+
           <h1 className="text-4xl sm:text-5xl font-bold text-text mb-4">
             {raffle.name}
           </h1>
           
           {raffle.description && (
-            <p className="text-lg text-text/80 max-w-2xl mx-auto">
+            <p className="text-lg text-text/80 max-w-2xl">
               {raffle.description}
             </p>
           )}
@@ -228,6 +246,21 @@ const RafflePublicLanding: React.FC = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* Tablero de Números - solo lectura */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <NumberGrid
+            totalNumbers={stats.totalNumbers}
+            numbers={numbers || []}
+            userNumbers={[]}
+            disabled
+          />
+        </motion.div>
         
         {/* Información de la Rifa */}
         <motion.div
@@ -268,6 +301,31 @@ const RafflePublicLanding: React.FC = () => {
             )}
           </div>
         </motion.div>
+
+        {/* Botones de Premio y Participantes */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="flex flex-wrap gap-3 mb-8"
+        >
+          {raffle.mode === 'prize' && (
+            <button
+              type="button"
+              onClick={() => setShowPrizeModal(true)}
+              className="px-4 py-2 rounded-lg bg-glass text-text hover:bg-glass-lighter transition-colors text-sm font-medium"
+            >
+              Ver Premio
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowParticipantsModal(true)}
+            className="px-4 py-2 rounded-lg bg-glass text-text hover:bg-glass-lighter transition-colors text-sm font-medium"
+          >
+            Participantes
+          </button>
+        </motion.div>
         
         {/* Call to Action */}
         <motion.div
@@ -304,8 +362,59 @@ const RafflePublicLanding: React.FC = () => {
           )}
         </motion.div>
       </div>
+
+      {/* Modal de imagen de premio */}
+      {showPrizeModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowPrizeModal(false)}
+        >
+          <div
+            className="max-w-3xl w-full bg-dark rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-text font-semibold">Premio</h3>
+              <button
+                onClick={() => setShowPrizeModal(false)}
+                className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-text/80"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="bg-black/40 p-4 flex items-center justify-center">
+              {(() => {
+                const raw = raffle.prizeImageBase64 || '';
+                const fallback = (raffle.prizeMeta as PrizeMeta | undefined)?.prizeImages?.[0];
+                let src = '';
+                if (raw) {
+                  src = raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`;
+                } else if (fallback) {
+                  src = fallback;
+                }
+                return src ? (
+                  <img src={src} alt="Premio" className="max-h-[70vh] max-w-full object-contain rounded-lg" />
+                ) : (
+                  <div className="text-text/60">Sin imagen de premio</div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de participantes (público, sin acciones de host) */}
+      {showParticipantsModal && (
+        <ParticipantsModal
+          raffleCode={raffle.code}
+          raffleMode={raffle.mode}
+          isHost={false}
+          onClose={() => setShowParticipantsModal(false)}
+        />
+      )}
     </div>
   );
 };
 
 export default RafflePublicLanding;
+

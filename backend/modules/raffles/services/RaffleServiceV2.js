@@ -472,13 +472,14 @@ class RaffleServiceV2 {
           rc.company_name,
           rc.brand_color as primary_color,
           rc.secondary_color,
-          rc.logo_url
+          rc.logo_url,
+          rc.logo_base64
          FROM raffles r
          JOIN users u ON r.host_id = u.id
          LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          ${whereClause}
-         GROUP BY r.id, u.username, rc.company_name, rc.brand_color, rc.secondary_color, rc.logo_url
+         GROUP BY r.id, u.username, rc.company_name, rc.brand_color, rc.secondary_color, rc.logo_url, rc.logo_base64
          ORDER BY ${orderBy}
          LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
         params
@@ -517,6 +518,7 @@ class RaffleServiceV2 {
           rc.brand_color as primary_color,
           rc.secondary_color,
           rc.logo_url,
+          rc.logo_base64,
           rc.website_url
          FROM raffles r
          JOIN users u ON r.host_id = u.id
@@ -525,17 +527,17 @@ class RaffleServiceV2 {
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.code = $1
          GROUP BY r.id, u.username, wu.username, wu.display_name, rc.company_name, rc.rif_number, 
-                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.website_url`,
+                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.logo_base64, rc.website_url`,
         [code]
       );
-      
+
       if (result.rows.length === 0) {
         throw {
           code: ErrorCodes.RAFFLE_NOT_FOUND,
           status: 404
         };
       }
-      
+
       const raffle = this.formatRaffleResponse(result.rows[0]);
       
       // Obtener números si el usuario es dueño o admin
@@ -1718,6 +1720,7 @@ class RaffleServiceV2 {
           r.id, r.code, r.name, r.description, r.status, r.mode,
           r.numbers_range, r.entry_price_fire, r.entry_price_coin,
           r.pot_fires, r.pot_coins, r.created_at, r.starts_at, r.ends_at,
+          r.prize_meta, r.prize_image_base64,
           u.username as host_username,
           COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as numbers_sold,
           COUNT(CASE WHEN rn.state = 'reserved' THEN 1 END) as numbers_reserved,
@@ -1726,6 +1729,7 @@ class RaffleServiceV2 {
           rc.brand_color as primary_color,
           rc.secondary_color,
           rc.logo_url,
+          rc.logo_base64,
           rc.website_url
          FROM raffles r
          JOIN users u ON r.host_id = u.id
@@ -1733,7 +1737,7 @@ class RaffleServiceV2 {
          LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
          WHERE r.code = $1
          GROUP BY r.id, u.username, rc.company_name, rc.rif_number, 
-                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.website_url`,
+                  rc.brand_color, rc.secondary_color, rc.logo_url, rc.logo_base64, rc.website_url`,
         [code]
       );
       
@@ -1745,6 +1749,22 @@ class RaffleServiceV2 {
       }
       
       const raffle = result.rows[0];
+
+      // Obtener tablero de números (solo índice y estado, sin datos sensibles)
+      const numbersResult = await query(
+        `SELECT 
+           number_idx as idx,
+           state
+         FROM raffle_numbers
+         WHERE raffle_id = $1
+         ORDER BY number_idx`,
+        [raffle.id]
+      );
+
+      const numbers = numbersResult.rows.map(n => ({
+        idx: n.idx,
+        state: n.state
+      }));
       
       // Calcular estadísticas
       const totalNumbers = raffle.numbers_range;
@@ -1768,7 +1788,11 @@ class RaffleServiceV2 {
           potCoins: parseFloat(raffle.pot_coins || 0),
           createdAt: raffle.created_at,
           startsAt: raffle.starts_at,
-          endsAt: raffle.ends_at
+          endsAt: raffle.ends_at,
+          prizeImageBase64: raffle.prize_image_base64,
+          prizeMeta: raffle.prize_meta
+            ? (typeof raffle.prize_meta === 'string' ? JSON.parse(raffle.prize_meta) : raffle.prize_meta)
+            : null
         },
         company: raffle.company_name ? {
           name: raffle.company_name,
@@ -1776,6 +1800,7 @@ class RaffleServiceV2 {
           primaryColor: raffle.primary_color,
           secondaryColor: raffle.secondary_color,
           logoUrl: raffle.logo_url,
+          logoBase64: raffle.logo_base64,
           websiteUrl: raffle.website_url
         } : null,
         stats: {
@@ -1784,7 +1809,8 @@ class RaffleServiceV2 {
           reservedNumbers,
           availableNumbers,
           progress
-        }
+        },
+        numbers
       };
       
     } catch (error) {
@@ -2031,6 +2057,7 @@ class RaffleServiceV2 {
         primaryColor: raffle.primary_color,
         secondaryColor: raffle.secondary_color,
         logoUrl: raffle.logo_url,
+        logoBase64: raffle.logo_base64,
         websiteUrl: raffle.website_url
       } : null,
       prizeMeta: raffle.prize_meta 

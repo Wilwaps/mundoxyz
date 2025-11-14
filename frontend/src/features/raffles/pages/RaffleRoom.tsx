@@ -690,7 +690,10 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           {raffle.visibility === 'company' && (
             <div
               className="bg-glass rounded-xl p-4 cursor-pointer hover:bg-glass/80 flex flex-col gap-2"
-              onClick={() => navigate(`/raffles/public/${raffle.code}`)}
+              onClick={() => {
+                const url = `${window.location.origin}/raffles/public/${raffle.code}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }}
             >
               <div className="text-xs text-text/60 mb-1">Landing pública</div>
               <div className="text-sm font-semibold text-text line-clamp-2">
