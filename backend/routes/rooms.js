@@ -155,9 +155,28 @@ router.get('/active', verifyToken, async (req, res) => {
       ORDER BY r.created_at DESC
     `, [userId]);
     
+    // Rifas - donde el usuario es host o participante (números comprados/reservados)
+    const raffleRooms = await query(`
+      SELECT DISTINCT
+        r.code,
+        r.name,
+        r.mode,
+        r.status,
+        r.created_at,
+        'raffle' as game_type,
+        u.username as host_username
+      FROM raffles r
+      JOIN users u ON r.host_id = u.id
+      LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
+      WHERE (r.host_id = $1 OR rn.owner_id = $1 OR rn.reserved_by = $1)
+        AND r.status IN ('active', 'pending')
+      ORDER BY r.created_at DESC
+    `, [userId]);
+    
     const allRooms = [
       ...tictactoeRooms.rows,
       ...bingoRooms.rows,
+      ...raffleRooms.rows,
     ];
     
     logger.info('✅ Salas activas obtenidas', {
@@ -165,6 +184,7 @@ router.get('/active', verifyToken, async (req, res) => {
       totalRooms: allRooms.length,
       tictactoe: tictactoeRooms.rows.length,
       bingo: bingoRooms.rows.length,
+      raffle: raffleRooms.rows.length,
     });
     
     res.json({

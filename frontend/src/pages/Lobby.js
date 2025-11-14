@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader } from 'lucide-react';
+import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader, Trophy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -131,6 +131,9 @@ const Lobby = () => {
       case 'bingo':
         url = `/bingo/v2/room/${room.code}`;
         break;
+      case 'raffle':
+        url = `/raffles/${room.code}`;
+        break;
     }
     if (url) navigate(url);
   };
@@ -141,6 +144,8 @@ const Lobby = () => {
         return <Grid3x3 size={16} className="text-purple-400" />;
       case 'bingo':
         return <Gamepad2 size={16} className="text-blue-400" />;
+      case 'raffle':
+        return <Trophy size={16} className="text-amber-400" />;
       default:
         return <Globe size={16} />;
     }
@@ -152,6 +157,8 @@ const Lobby = () => {
         return 'TicTacToe';
       case 'bingo':
         return 'Bingo';
+      case 'raffle':
+        return 'Rifa';
       default:
         return 'Sala';
     }
