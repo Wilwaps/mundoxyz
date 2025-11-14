@@ -172,6 +172,7 @@ export const API_ENDPOINTS = {
   DETAIL: (code: string) => `/${code}`,
   UPDATE: (code: string) => `/${code}`,
   DELETE: (code: string) => `/${code}`,
+  SETTINGS: '/settings',
   
   // Números
   NUMBERS: (code: string) => `/${code}/numbers`,

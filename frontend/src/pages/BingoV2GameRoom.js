@@ -6,6 +6,7 @@ import BingoV2Card from '../components/bingo/BingoV2Card';
 import { Clock, LogOut, Repeat } from 'lucide-react';
 import API_URL from '../config/api';
 import './BingoV2GameRoom.css';
+import toast from 'react-hot-toast';
 
 const BingoV2GameRoom = () => {
   const { code } = useParams();
@@ -84,15 +85,21 @@ const BingoV2GameRoom = () => {
       });
 
       socket.on('bingo:error', (data) => {
-        console.warn('Bingo Error:', data.message);
-        // Mostrar mensaje más amigable según el error
-        if (data.message.includes('espera un momento')) {
-          // Ignorar errores de rate limiting si ya tenemos throttling en cliente
+        const message = data?.message || 'Error en Bingo';
+        console.warn('Bingo Error:', message);
+        if (message.includes('espera un momento')) {
           return;
-        } else if (data.message.includes('All numbers')) {
+        } else if (message.includes('All numbers')) {
           alert('¡Todos los números han sido cantados!');
+        } else if (message.toLowerCase().includes('experiencia')) {
+          const match = message.match(/(\d+)/);
+          const diff = match ? parseInt(match[1], 10) : null;
+          const text = Number.isFinite(diff)
+            ? `Todavía te faltan ${diff} puntos de experiencia para esta función`
+            : 'Todavía te falta experiencia para esta función';
+          toast.error(text);
         } else {
-          alert(data.message);
+          alert(message);
         }
       });
 

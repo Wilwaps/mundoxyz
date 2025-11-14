@@ -24,6 +24,7 @@ import BuyFiresModal from '../components/BuyFiresModal';
 import ReceiveFiresModal from '../components/ReceiveFiresModal';
 import MyDataModal from '../components/MyDataModal';
 import AdminRoomsManager from '../components/bingo/AdminRoomsManager';
+import * as raffleApi from '../features/raffles/api';
 
 const Profile = () => {
   const queryClient = useQueryClient();
@@ -38,6 +39,9 @@ const Profile = () => {
   const [showReceiveFires, setShowReceiveFires] = useState(false);
   const [walletAddress, setWalletAddress] = useState(user?.wallet_address || null);
   const [walletHistoryInitialTab, setWalletHistoryInitialTab] = useState('fires');
+  const [raffleSettings, setRaffleSettings] = useState({ prizeModeCostFires: 500, companyModeCostFires: 500 });
+  const [raffleSettingsLoading, setRaffleSettingsLoading] = useState(false);
+  const [raffleSettingsSaving, setRaffleSettingsSaving] = useState(false);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -67,6 +71,26 @@ const Profile = () => {
       setShowFiresHistory(true);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
+    const loadSettings = async () => {
+      try {
+        setRaffleSettingsLoading(true);
+        const data = await raffleApi.getRaffleSettings();
+        setRaffleSettings({
+          prizeModeCostFires: Number(data.prizeModeCostFires) || 0,
+          companyModeCostFires: Number(data.companyModeCostFires) || 0
+        });
+      } catch (error) {
+        console.error('Error loading raffle settings:', error);
+        toast.error('Error al cargar configuración de rifas');
+      } finally {
+        setRaffleSettingsLoading(false);
+      }
+    };
+    loadSettings();
+  }, [user?.id]);
 
   // Sync walletAddress when user changes
   React.useEffect(() => {
@@ -241,6 +265,78 @@ const Profile = () => {
       >
         <AdminRoomsManager />
       </motion.div>
+
+      {Array.isArray(user?.roles) && user.roles.includes('tote') && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Flame size={20} className="text-fire-orange" />
+            Configuración de Rifas
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-xs text-text/60 mb-1">Costo creación modo Premio (🔥)</div>
+              <input
+                type="number"
+                value={raffleSettings.prizeModeCostFires}
+                onChange={(e) =>
+                  setRaffleSettings((prev) => ({
+                    ...prev,
+                    prizeModeCostFires: Number(e.target.value)
+                  }))
+                }
+                min={0}
+                className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <div className="text-xs text-text/60 mb-1">Costo creación modo Empresa (🔥)</div>
+              <input
+                type="number"
+                value={raffleSettings.companyModeCostFires}
+                onChange={(e) =>
+                  setRaffleSettings((prev) => ({
+                    ...prev,
+                    companyModeCostFires: Number(e.target.value)
+                  }))
+                }
+                min={0}
+                className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                setRaffleSettingsSaving(true);
+                const sanitized = {
+                  prizeModeCostFires: Number(raffleSettings.prizeModeCostFires) || 0,
+                  companyModeCostFires: Number(raffleSettings.companyModeCostFires) || 0
+                };
+                const data = await raffleApi.updateRaffleSettings(sanitized);
+                setRaffleSettings({
+                  prizeModeCostFires: Number(data.prizeModeCostFires) || 0,
+                  companyModeCostFires: Number(data.companyModeCostFires) || 0
+                });
+                toast.success('Configuración de rifas actualizada');
+              } catch (error) {
+                console.error('Error updating raffle settings:', error);
+                toast.error('Error al actualizar configuración de rifas');
+              } finally {
+                setRaffleSettingsSaving(false);
+              }
+            }}
+            disabled={raffleSettingsLoading || raffleSettingsSaving}
+            className="w-full py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {raffleSettingsSaving ? 'Guardando...' : 'Guardar Configuración'}
+          </button>
+        </motion.div>
+      )}
 
       {/* Achievements */}
       {stats?.achievements?.length > 0 && (

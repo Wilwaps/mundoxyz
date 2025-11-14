@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const raffleController = require('../controllers/RaffleController');
-const { verifyToken, optionalAuth, adminAuth } = require('../../../middleware/auth');
+const { verifyToken, optionalAuth, adminAuth, requireTote } = require('../../../middleware/auth');
 const {
   validate,
   validateParams,
@@ -30,10 +30,13 @@ router.get(
   raffleController.listRaffles.bind(raffleController)
 );
 
-// Landing pública (sin auth, optimizado para empresas)
 router.get(
   '/public/:code',
   raffleController.getPublicLanding.bind(raffleController)
+);
+router.get(
+  '/settings',
+  raffleController.getSettings.bind(raffleController)
 );
 
 // Obtener detalle de rifa (público con info limitada)
@@ -66,6 +69,12 @@ router.get(
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)
  */
+router.patch(
+  '/settings',
+  verifyToken,
+  requireTote,
+  raffleController.updateSettings.bind(raffleController)
+);
 
 // Crear nueva rifa
 router.post(

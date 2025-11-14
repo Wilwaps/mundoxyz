@@ -206,7 +206,8 @@ function handleBingoV2Socket(io) {
     // Toggle auto-call
     socket.on('bingo:toggle_auto_call', async (data) => {
       try {
-        const { roomCode, userId, enable } = data;
+        const { roomCode, userId } = data;
+        const enable = typeof data.enable === 'boolean' ? data.enable : !!data.enabled;
         
         // Check user experience
         const userResult = await query(
@@ -216,9 +217,9 @@ function handleBingoV2Socket(io) {
         
         const userExp = userResult.rows[0]?.experience || 0;
         
-        if (enable && userExp < 400) {
+        if (enable && userExp < 500) {
           socket.emit('bingo:error', {
-            message: `Aún te falta ${400 - userExp} experiencia para activar este modo`
+            message: `Aún te falta ${500 - userExp} experiencia para activar este modo`
           });
           return;
         }

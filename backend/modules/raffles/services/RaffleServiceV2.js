@@ -63,13 +63,21 @@ class RaffleServiceV2 {
         });
         
       } else if (mode === RaffleMode.PRIZE || visibility === 'company') {
-        // Modo PRIZE o EMPRESA: 500 fuegos fijos
-        totalCost = SystemLimits.PRIZE_MODE_CREATION_COST; // 500
-        costDescription = `Costo creación rifa modo ${mode === RaffleMode.PRIZE ? 'PREMIO' : 'EMPRESA'} (${totalCost} fuegos)`;
+        // Modo PRIZE o EMPRESA: usar configuración dinámica desde raffle_settings
+        const { prizeModeCostFires, companyModeCostFires } = await this.getCreationCosts(dbClient);
+
+        if (visibility === 'company') {
+          totalCost = companyModeCostFires;
+          costDescription = `Costo creación rifa modo EMPRESA (${totalCost} fuegos)`;
+        } else {
+          totalCost = prizeModeCostFires;
+          costDescription = `Costo creación rifa modo PREMIO (${totalCost} fuegos)`;
+        }
         
         logger.info('[RaffleServiceV2] Costo modo PRIZE/EMPRESA calculado', {
           hostId,
           mode,
+          visibility,
           totalCost
         });
       }
@@ -281,6 +289,75 @@ class RaffleServiceV2 {
         dbClient.release();
       }
     }
+  }
+
+  async getCreationCosts(client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+
+    try {
+      const result = await dbQuery(
+        `SELECT prize_mode_cost_fires, company_mode_cost_fires
+         FROM raffle_settings
+         ORDER BY id DESC
+         LIMIT 1`
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          prizeModeCostFires: SystemLimits.PRIZE_MODE_CREATION_COST,
+          companyModeCostFires: SystemLimits.COMPANY_MODE_CREATION_COST
+        };
+      }
+
+      const row = result.rows[0];
+
+      const prizeModeCostFires = parseFloat(row.prize_mode_cost_fires || SystemLimits.PRIZE_MODE_CREATION_COST);
+      const companyModeCostFires = parseFloat(row.company_mode_cost_fires || SystemLimits.COMPANY_MODE_CREATION_COST);
+
+      return {
+        prizeModeCostFires,
+        companyModeCostFires
+      };
+    } catch (error) {
+      logger.error('[RaffleServiceV2] Error obteniendo configuración de costos de rifas', error);
+      // Fallback seguro en caso de error
+      return {
+        prizeModeCostFires: SystemLimits.PRIZE_MODE_CREATION_COST,
+        companyModeCostFires: SystemLimits.COMPANY_MODE_CREATION_COST
+      };
+    }
+  }
+
+  async updateCreationCosts(prizeModeCostFires, companyModeCostFires, updatedBy = null, client = null) {
+    const dbQuery = client ? client.query.bind(client) : query;
+
+    const prize = parseFloat(prizeModeCostFires);
+    const company = parseFloat(companyModeCostFires);
+
+    if (!Number.isFinite(prize) || prize < 0 || !Number.isFinite(company) || company < 0) {
+      throw new Error('Invalid raffle creation costs');
+    }
+
+    const result = await dbQuery(
+      `INSERT INTO raffle_settings (prize_mode_cost_fires, company_mode_cost_fires, updated_by, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       RETURNING prize_mode_cost_fires, company_mode_cost_fires, updated_at`,
+      [prize, company, updatedBy]
+    );
+
+    const row = result.rows[0];
+
+    logger.info('[RaffleServiceV2] Configuración de costos de rifas actualizada', {
+      updatedBy,
+      prizeModeCostFires: row.prize_mode_cost_fires,
+      companyModeCostFires: row.company_mode_cost_fires
+    });
+
+    return {
+      prizeModeCostFires: parseFloat(row.prize_mode_cost_fires),
+      companyModeCostFires: parseFloat(row.company_mode_cost_fires),
+      updatedAt: row.updated_at
+    };
   }
   
   /**

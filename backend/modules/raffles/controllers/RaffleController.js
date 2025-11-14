@@ -548,6 +548,50 @@ class RaffleController {
     }
   }
   
+  async getSettings(req, res) {
+    try {
+      const data = await raffleService.getCreationCosts();
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error) {
+      logger.error('[RaffleController] Error obteniendo configuración de rifas', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo configuración de rifas'
+      });
+    }
+  }
+
+  async updateSettings(req, res) {
+    try {
+      const { prizeModeCostFires, companyModeCostFires } = req.body || {};
+      const prize = parseFloat(prizeModeCostFires);
+      const company = parseFloat(companyModeCostFires);
+
+      if (!Number.isFinite(prize) || prize < 0 || !Number.isFinite(company) || company < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valores inválidos para costos de creación'
+        });
+      }
+
+      const data = await raffleService.updateCreationCosts(prize, company, req.user.id);
+      res.json({
+        success: true,
+        data,
+        message: 'Configuración de costos actualizada'
+      });
+    } catch (error) {
+      logger.error('[RaffleController] Error actualizando configuración de rifas', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error actualizando configuración de rifas'
+      });
+    }
+  }
+  
   /**
    * Landing pública (sin auth) - Optimizado para empresas
    * GET /api/raffles/v2/public/:code

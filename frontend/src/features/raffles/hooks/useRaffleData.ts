@@ -33,6 +33,14 @@ export const useRaffleList = (filters?: RaffleFilters) => {
   });
 };
 
+export const useRaffleSettings = () => {
+  return useQuery({
+    queryKey: ['raffles', 'settings'],
+    queryFn: () => api.getRaffleSettings(),
+    staleTime: 60000
+  });
+};
+
 /**
  * Hook para obtener detalle de rifa
  */

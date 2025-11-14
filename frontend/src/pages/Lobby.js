@@ -4,6 +4,7 @@ import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader } from 'lucide
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
 // Import modales existentes
@@ -32,6 +33,15 @@ const Lobby = () => {
     },
     enabled: !!user,
     refetchInterval: 10000 // Refrescar cada 10s
+  });
+
+  const { data: activeGames } = useQuery({
+    queryKey: ['active-games-lobby'],
+    queryFn: async () => {
+      const response = await axios.get('/api/games/active');
+      return response.data;
+    },
+    refetchInterval: 30000
   });
 
   const handleOpenSelectorModal = () => {
@@ -268,6 +278,84 @@ const Lobby = () => {
         </div>
       )}
 
+      {activeGames && (activeGames.tictactoe?.length > 0 || activeGames.bingo?.length > 0) && (
+        <div className="card-glass mt-6">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Gamepad2 size={20} className="text-accent" />
+            Partidas Activas
+          </h2>
+
+          {activeGames.tictactoe?.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold mb-2 text-violet">Salas de La Vieja</h3>
+              <div className="space-y-2">
+                {activeGames.tictactoe.map((room) => (
+                  <motion.div
+                    key={room.id}
+                    whileHover={{ x: 3 }}
+                    className="bg-glass-light p-3 rounded-lg cursor-pointer hover:bg-glass-hover transition-all"
+                    onClick={() => navigate(`/tictactoe/room/${room.code}`)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Sala {room.code}</span>
+                          <span className="text-xs text-text/60">Host: {room.host_username}</span>
+                        </div>
+                        <p className="text-xs text-text/60">
+                          Modo: {room.mode} • {room.player_o_username ? '2/2' : '1/2'} jugadores
+                        </p>
+                      </div>
+                      <div className="text-right text-xs">
+                        {room.mode === 'coins' && room.pot_coins > 0 && (
+                          <div className="text-accent">🪙 {room.pot_coins}</div>
+                        )}
+                        {room.mode === 'fires' && room.pot_fires > 0 && (
+                          <div className="text-fire-orange">🔥 {room.pot_fires}</div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeGames.bingo?.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2 text-accent">Salas de Bingo</h3>
+              <div className="space-y-2">
+                {activeGames.bingo.map((room) => (
+                  <motion.div
+                    key={room.id}
+                    whileHover={{ x: 3 }}
+                    className="bg-glass-light p-3 rounded-lg cursor-pointer hover:bg-glass-hover transition-all"
+                    onClick={() => navigate(`/bingo/v2/room/${room.code}`)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{room.name}</span>
+                          <span className="text-xs text-text/60">#{room.code}</span>
+                        </div>
+                        <p className="text-xs text-text/60">
+                          Host: {room.host_username} • {room.current_players}/{room.max_players} jugadores
+                        </p>
+                      </div>
+                      <div className="text-right text-xs">
+                        {room.total_pot > 0 && (
+                          <div className="text-fire-orange">🔥 {room.total_pot}</div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modal Selector de Tipo de Sala */}
       <AnimatePresence>
         {showSelectorModal && (
@@ -334,11 +422,11 @@ const Lobby = () => {
       {/* Modales de Creación */}
       {showBingoModal && (
         <BingoCreateRoomModal
-          isOpen={showBingoModal}
+          show={showBingoModal}
           onClose={() => setShowBingoModal(false)}
-          onSuccess={(room) => {
+          onSuccess={(code) => {
             setShowBingoModal(false);
-            navigate(`/bingo/v2/room/${room.code}`);
+            navigate(`/bingo/v2/room/${code}`);
           }}
         />
       )}

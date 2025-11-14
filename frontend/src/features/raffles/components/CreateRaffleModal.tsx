@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useCreateRaffle } from '../hooks/useRaffleData';
+import { useCreateRaffle, useRaffleSettings } from '../hooks/useRaffleData';
 import { CreateRaffleForm, RaffleMode, RaffleVisibility, DrawMode } from '../types';
 import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
@@ -44,6 +44,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
 }) => {
   const { user } = useAuth();
   const createRaffle = useCreateRaffle();
+  const raffleSettingsQuery = useRaffleSettings();
   
   const [step, setStep] = useState(1);
   const [isCompanyMode, setIsCompanyMode] = useState(false);
@@ -81,6 +82,9 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const prizeCreationCost = raffleSettingsQuery.data?.prizeModeCostFires ?? 500;
+  const companyCreationCost = raffleSettingsQuery.data?.companyModeCostFires ?? 500;
   
   // Validar campo individual
   const validateField = (field: string, value: any) => {
@@ -252,7 +256,9 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     
     // Verificar balance si es modo premio
     if (formData.mode === RaffleMode.PRIZE) {
-      const requiredFires = formData.visibility === 'company' ? 500 : 500;
+      const requiredFires = formData.visibility === 'company'
+        ? companyCreationCost
+        : prizeCreationCost;
       if ((user?.fires_balance || 0) < requiredFires) {
         toast.error(`Necesitas ${requiredFires} fuegos para crear una rifa en modo premio`);
         return;
@@ -791,7 +797,10 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     <div className="text-xs text-warning">
                       <p className="font-semibold">Costo de creación:</p>
                       <p>
-                        {formData.visibility === 'company' ? '3000' : '300'} fuegos
+                        {formData.visibility === 'company'
+                          ? companyCreationCost
+                          : prizeCreationCost}{' '}
+                        fuegos
                         (se deducen al crear)
                       </p>
                     </div>

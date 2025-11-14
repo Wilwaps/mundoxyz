@@ -256,6 +256,11 @@ export interface RaffleSocketEvents {
 }
 
 // Form Types
+export interface RaffleSettings {
+  prizeModeCostFires: number;
+  companyModeCostFires: number;
+}
+
 export interface CreateRaffleForm {
   name: string;
   description: string;

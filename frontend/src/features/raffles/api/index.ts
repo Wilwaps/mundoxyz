@@ -15,7 +15,8 @@ import {
   PurchaseResponse,
   RaffleNumber,
   PurchaseRequest,
-  RaffleStats
+  RaffleStats,
+  RaffleSettings
 } from '../types';
 import { API_ENDPOINTS } from '../constants';
 
@@ -91,6 +92,23 @@ export const updateRaffle = async (
 export const cancelRaffle = async (code: string): Promise<{ success: boolean }> => {
   const { data } = await api.delete(API_ENDPOINTS.DELETE(code));
   return data;
+};
+
+export const getRaffleSettings = async (): Promise<RaffleSettings> => {
+  const { data } = await api.get<{ success: boolean; data: RaffleSettings }>(
+    API_ENDPOINTS.SETTINGS
+  );
+  return data.data;
+};
+
+export const updateRaffleSettings = async (
+  settings: RaffleSettings
+): Promise<RaffleSettings> => {
+  const { data } = await api.patch<{ success: boolean; data: RaffleSettings }>(
+    API_ENDPOINTS.SETTINGS,
+    settings
+  );
+  return data.data;
 };
 
 /**

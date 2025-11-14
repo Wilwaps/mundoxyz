@@ -179,7 +179,16 @@ CREATE TABLE IF NOT EXISTS raffle_audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_raffle_audit_raffle ON raffle_audit_logs(raffle_id);
 
--- 9. TICTACTOE_ROOMS
+-- 9. RAFFLE_SETTINGS
+CREATE TABLE IF NOT EXISTS raffle_settings (
+  id SERIAL PRIMARY KEY,
+  prize_mode_cost_fires DECIMAL(10,2) NOT NULL DEFAULT 500 CHECK (prize_mode_cost_fires >= 0),
+  company_mode_cost_fires DECIMAL(10,2) NOT NULL DEFAULT 500 CHECK (company_mode_cost_fires >= 0),
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 10. TICTACTOE_ROOMS
 CREATE TABLE IF NOT EXISTS tictactoe_rooms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code VARCHAR(6) UNIQUE NOT NULL,
