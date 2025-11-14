@@ -35,21 +35,33 @@ const RafflesLobby: React.FC = () => {
   
   // Hook de filtros
   const { filters, updateFilter, clearFilters, applyFilters } = useRaffleFilters({
-    visibility: [RaffleVisibility.PUBLIC],
+    // Mostrar por defecto rifas públicas y de empresa, solo activas/pendientes
+    visibility: [RaffleVisibility.PUBLIC, RaffleVisibility.COMPANY],
     status: [RaffleStatus.ACTIVE, RaffleStatus.PENDING],
     sortBy: 'created',
     sortOrder: 'desc'
   });
   
   // Query de rifas con valores por defecto y auto-refresh
+  // Filtros efectivos: cuando hay término de búsqueda, permitir todos los estados
+  const effectiveFilters = useMemo(() => {
+    if (searchTerm.trim()) {
+      return {
+        ...filters,
+        status: undefined
+      };
+    }
+    return filters;
+  }, [filters, searchTerm]);
+
   const {
     data = { raffles: [], total: 0, page: 1, totalPages: 1 },
     isLoading,
     isRefetching,
     refetch
   } = useRaffleList({
-    ...filters,
-    search: searchTerm
+    ...effectiveFilters,
+    search: searchTerm || undefined
   });
   
   // Manejar búsqueda
