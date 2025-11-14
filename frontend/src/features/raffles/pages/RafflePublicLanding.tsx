@@ -309,7 +309,7 @@ const RafflePublicLanding: React.FC = () => {
           transition={{ delay: 0.35 }}
           className="flex flex-wrap gap-3 mb-8"
         >
-          {raffle.mode === 'prize' && (
+          {(raffle.prizeImageBase64 || raffle.prizeMeta) && (
             <button
               type="button"
               onClick={() => setShowPrizeModal(true)}
