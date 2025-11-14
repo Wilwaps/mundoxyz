@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePurchaseNumber, useReleaseNumber } from '../hooks/useRaffleData';
 import { RaffleMode, PaymentMethod } from '../types';
+import { processImage } from '../utils/imageHelpers';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -147,23 +148,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsProcessing(true);
     
     try {
-      // Crear FormData para enviar imagen
-      const formData = new FormData();
-      formData.append('code', raffle.code);
-      formData.append('numbers', JSON.stringify(selectedNumbers));
-      formData.append('paymentData', JSON.stringify({
-        fullName: paymentData.fullName,
-        cedula: paymentData.cedula,
-        phone: paymentData.phone,
-        email: paymentData.email,
-        paymentMethod: paymentData.paymentMethod,
-        referenceNumber: paymentData.referenceNumber
-      }));
-      
-      if (paymentData.proofImage) {
-        formData.append('proofImage', paymentData.proofImage);
-      }
-      
       // Normalizar datos para cumplir con Joi en backend
       // - Phone: aceptar '0412-xxxxxxx' convirtiendo a '+58xxxxxxxxxx'
       // - Documento: quitar guiones y mayúsculas sin espacios (p.ej. 'V-12345678' -> 'V12345678')
@@ -193,14 +177,26 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         .toUpperCase()
         .replace(/\s+/g, '');
 
+      // Si hay imagen de comprobante, convertirla a base64
+      let paymentProofBase64: string | undefined;
+      if (paymentData.proofImage) {
+        const result = await processImage(paymentData.proofImage, 5);
+        if (result.error) {
+          toast.error(result.error);
+        } else {
+          paymentProofBase64 = result.base64;
+        }
+      }
+
       // Comprar cada número con datos de pago
-      const form = {
+      const form: any = {
         buyerName: paymentData.fullName,
         buyerDocument: normalizedDocument,
         buyerPhone: normalizedPhone,
         ...(paymentData.email?.trim() ? { buyerEmail: paymentData.email.trim() } : {}),
         paymentMethod: paymentData.paymentMethod as PaymentMethod,
-        ...(needsReference ? { paymentReference: normalizedReference } : {})
+        ...(needsReference ? { paymentReference: normalizedReference } : {}),
+        ...(paymentProofBase64 ? { paymentProofBase64 } : {})
       };
       
       for (const idx of selectedNumbers) {

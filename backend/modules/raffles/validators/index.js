@@ -237,7 +237,11 @@ const purchaseNumberSchema = Joi.object({
     .optional()
     .messages({
       'string.pattern.base': 'Documento de identidad inválido'
-    })
+    }),
+  
+  // Comprobante de pago en base64 (opcional)
+  paymentProofBase64: Joi.string()
+    .optional()
 });
 
 // Esquema para filtros de búsqueda

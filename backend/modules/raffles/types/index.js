@@ -71,7 +71,7 @@ const SocketEvents = {
 // Límites del sistema
 const SystemLimits = {
   MIN_NUMBERS: 10,
-  MAX_NUMBERS: 1000,
+  MAX_NUMBERS: 10000,
   DEFAULT_NUMBERS: 100,
   MIN_PRICE_FIRES: 1,
   MAX_PRICE_FIRES: 10000,

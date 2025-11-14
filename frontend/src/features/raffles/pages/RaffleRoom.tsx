@@ -687,6 +687,30 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               </div>
             )}
           </div>
+          {raffle.visibility === 'company' && (
+            <div
+              className="bg-glass rounded-xl p-4 cursor-pointer hover:bg-glass/80 flex flex-col gap-2"
+              onClick={() => navigate(`/raffles/public/${raffle.code}`)}
+            >
+              <div className="text-xs text-text/60 mb-1">Landing pública</div>
+              <div className="text-sm font-semibold text-text line-clamp-2">
+                Comparte la página empresarial de esta rifa
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const shareUrl = `${window.location.origin}/raffles/public/${code}`;
+                  navigator.clipboard.writeText(shareUrl);
+                  toast.success('Enlace de la landing copiado');
+                }}
+                className="mt-2 inline-flex items-center gap-2 px-3 py-1 text-xs rounded-full bg-accent/20 text-accent hover:bg-accent/30"
+              >
+                <Share2 className="w-3 h-3" />
+                Copiar enlace público
+              </button>
+            </div>
+          )}
           {raffle?.status === RaffleStatus.FINISHED && winner && (
             <div className="bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-300/10 border border-amber-400/40 rounded-xl p-4 flex flex-col gap-2">
               <div className="flex items-center gap-2 text-amber-200">
@@ -995,9 +1019,14 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 </div>
                 <div className="bg-black/40 p-4 flex items-center justify-center">
                   {(() => {
-                    const base64 = raffle.prizeImageBase64;
+                    const raw = raffle.prizeImageBase64 || '';
                     const fallback = raffle.prizeMeta?.prizeImages?.[0];
-                    const src = base64 ? `data:image/png;base64,${base64}` : (fallback || '');
+                    let src = '';
+                    if (raw) {
+                      src = raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`;
+                    } else if (fallback) {
+                      src = fallback;
+                    }
                     return src ? (
                       <img src={src} alt="Premio" className="max-h-[70vh] max-w-full object-contain rounded-lg" />
                     ) : (
