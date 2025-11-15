@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader, Trophy } from 'lucide-react';
+import { Plus, Users, Globe, X, Gamepad2, Grid3x3, Search, Loader, Trophy, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -17,6 +17,8 @@ const Lobby = () => {
   const [showBingoModal, setShowBingoModal] = useState(false);
   const [quickJoinCode, setQuickJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [showHowToEarnModal, setShowHowToEarnModal] = useState(false);
+  const [howToStep, setHowToStep] = useState(0);
 
   // Obtener salas activas del usuario
   const { data: myRooms, isLoading: loadingRooms } = useQuery({
@@ -232,6 +234,29 @@ const Lobby = () => {
         </div>
       </div>
 
+      {/* How to earn money card */}
+      <motion.div
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => {
+          setShowHowToEarnModal(true);
+          setHowToStep(0);
+        }}
+        className="card-glass mb-6 cursor-pointer hover:bg-glass-hover transition-all border border-accent/40"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-fire-orange/20 flex items-center justify-center">
+            <span className="text-2xl">🔥</span>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-text">¿Cómo ganar dinero?</h2>
+            <p className="text-sm text-text/60">
+              Te explicamos en 4 pasos cómo recargar fuegos, jugar para ganar y luego retirar tu premio.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* My Active Rooms */}
       {user && (
         <div className="card-glass">
@@ -437,6 +462,259 @@ const Lobby = () => {
           }}
         />
       )}
+
+      {/* Modal: Cómo ganar dinero */}
+      <AnimatePresence>
+        {showHowToEarnModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowHowToEarnModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="w-full max-w-3xl card-glass relative overflow-hidden max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowHowToEarnModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/40 hover:bg-black/60 transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="p-6 border-b border-white/10">
+                <h2 className="text-2xl font-bold text-text mb-1">Cómo ganar dinero con MundoXYZ</h2>
+                <p className="text-sm text-text/60">
+                  Sigue este recorrido rápido: deposita fuegos, juega para multiplicarlos y luego canjea tu premio.
+                </p>
+              </div>
+
+              <div className="p-6 pt-4 flex flex-col gap-4">
+                {/* Indicadores de pasos */}
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  {[0, 1, 2, 3].map((step) => (
+                    <button
+                      key={step}
+                      onClick={() => setHowToStep(step)}
+                      className={`h-2 rounded-full transition-all ${
+                        howToStep === step ? 'w-10 bg-accent' : 'w-2 bg-white/20'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <div className="relative overflow-hidden min-h-[220px]">
+                  <AnimatePresence mode="wait">
+                    {howToStep === 0 && (
+                      <motion.div
+                        key="intro"
+                        initial={{ x: 80, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -80, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="grid md:grid-cols-2 gap-6 items-center"
+                      >
+                        <div>
+                          <h3 className="text-xl font-bold mb-2">Paso 1 · Bienvenido al juego del dinero</h3>
+                          <p className="text-sm text-text/70 mb-3">
+                            En MundoXYZ conviertes tu tiempo y tu diversión en fuegos <span className="text-fire-orange">🔥</span>.
+                            Los fuegos son tu moneda premium: los usas para entrar a partidas, rifas y experiencias, y luego puedes
+                            canjearlos por dinero real.
+                          </p>
+                          <ul className="text-sm text-text/70 space-y-1">
+                            <li>• 💰 <strong>Monedas</strong>: puntos suaves para jugar y progresar.</li>
+                            <li>• 🔥 <strong>Fuegos</strong>: la moneda con la que puedes ganar y retirar dinero.</li>
+                          </ul>
+                        </div>
+                        <div className="hidden md:flex items-center justify-center">
+                          <div className="w-48 h-48 rounded-3xl bg-gradient-to-br from-fire-orange/60 via-amber-400/40 to-violet/50 flex items-center justify-center shadow-2xl">
+                            <div className="text-center">
+                              <div className="text-5xl mb-2">🔥</div>
+                              <p className="text-sm font-semibold text-text/90">Juega, gana y canjea</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {howToStep === 1 && (
+                      <motion.div
+                        key="deposit"
+                        initial={{ x: 80, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -80, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="grid md:grid-cols-2 gap-6 items-start"
+                      >
+                        <div>
+                          <h3 className="text-xl font-bold mb-2">Paso 2 · Deposita fuegos</h3>
+                          <p className="text-sm text-text/70 mb-3">
+                            Para ganar dinero primero necesitas fuegos en tu wallet.
+                            Los puedes recargar fácil con pago bancario o recibirlos de otros jugadores.
+                          </p>
+                          <ul className="text-sm text-text/70 space-y-2">
+                            <li>
+                              <strong>Desde tu Perfil:</strong>
+                              <br />
+                              1. Abre el menú y entra a <span className="font-semibold">Perfil</span>.
+                              <br />
+                              2. Toca la tarjeta de <span className="font-semibold">🔥 Fuegos</span>.
+                              <br />
+                              3. En el historial, pulsa <span className="font-semibold">COMPRAR</span>.
+                              <br />
+                              4. Copia los datos bancarios, haz el pago e ingresa el monto y la referencia.
+                              <br />
+                              5. Un administrador aprueba tu compra y los fuegos aparecen en tu balance.
+                            </li>
+                            <li>
+                              <strong>También puedes recibir fuegos</strong> de otros usuarios:
+                              comparte tu dirección de billetera desde la opción <span className="font-semibold">Recibir</span>.
+                            </li>
+                          </ul>
+                        </div>
+                        <div className="hidden md:flex items-center justify-center">
+                          <div className="glass-panel p-4 rounded-2xl space-y-3 w-full max-w-xs">
+                            <p className="text-xs text-text/60">Ejemplo de flujo:</p>
+                            <div className="text-sm">
+                              <p>1. Perfil → 🔥 Fuegos</p>
+                              <p>2. Botón <span className="font-semibold">COMPRAR</span></p>
+                              <p>3. Enviar pago bancario</p>
+                              <p>4. Cargar referencia</p>
+                              <p>5. Esperar aprobación ✅</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {howToStep === 2 && (
+                      <motion.div
+                        key="play"
+                        initial={{ x: 80, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -80, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="grid md:grid-cols-2 gap-6 items-start"
+                      >
+                        <div>
+                          <h3 className="text-xl font-bold mb-2">Paso 3 · Juega y multiplica</h3>
+                          <p className="text-sm text-text/70 mb-3">
+                            Con fuegos en tu balance, ya puedes entrar a salas y rifas donde el pozo crece con cada jugador.
+                            Si ganas, te llevas el premio en fuegos o monedas, según el juego.
+                          </p>
+                          <ul className="text-sm text-text/70 space-y-2">
+                            <li>• En este Lobby verás tus salas activas y partidas abiertas.</li>
+                            <li>• Crea tus propias salas de <strong>TicTacToe</strong> o entra a <strong>Bingo</strong> y <strong>Rifas</strong>.</li>
+                            <li>• Cada sala muestra el pozo 💰/🔥 y el estado del juego.</li>
+                            <li>• Cuando ganas, tu wallet se actualiza automáticamente y verás la transacción en el historial.</li>
+                          </ul>
+                        </div>
+                        <div className="hidden md:flex items-center justify-center">
+                          <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+                            <div className="glass-panel p-3 rounded-xl">
+                              <p className="text-xs text-text/60 mb-1">Ejemplo:</p>
+                              <p className="text-sm font-semibold">Sala TicTacToe</p>
+                              <p className="text-xs text-text/60">Pozo: 200 🔥</p>
+                            </div>
+                            <div className="glass-panel p-3 rounded-xl">
+                              <p className="text-xs text-text/60 mb-1">Ejemplo:</p>
+                              <p className="text-sm font-semibold">Bingo en vivo</p>
+                              <p className="text-xs text-text/60">Premio en fuegos</p>
+                            </div>
+                            <div className="glass-panel p-3 rounded-xl col-span-2">
+                              <p className="text-xs text-text/60 mb-1">Resultado:</p>
+                              <p className="text-sm font-semibold text-green-400">Premio acreditado en tu wallet ✅</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {howToStep === 3 && (
+                      <motion.div
+                        key="withdraw"
+                        initial={{ x: 80, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -80, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="grid md:grid-cols-2 gap-6 items-start"
+                      >
+                        <div>
+                          <h3 className="text-xl font-bold mb-2">Paso 4 · Retira tu dinero</h3>
+                          <p className="text-sm text-text/70 mb-3">
+                            Cuando acumules suficientes fuegos puedes solicitar un canje a dinero real.
+                            El equipo revisa tu solicitud y te paga por transferencia bancaria.
+                          </p>
+                          <ul className="text-sm text-text/70 space-y-2">
+                            <li>• Actualmente el canje se coordina directamente con el equipo (Tote) usando los datos de tu cuenta.</li>
+                            <li>• El mínimo habitual para canjear es de <strong>100 fuegos</strong>.</li>
+                            <li>• Se aplica una comisión del <strong>5%</strong> sobre el monto que quieres retirar.</li>
+                            <li>• Una vez aprobado, verás el movimiento en tu historial y recibirás el pago en tu banco.</li>
+                          </ul>
+                        </div>
+                        <div className="hidden md:flex items-center justify-center">
+                          <div className="glass-panel p-4 rounded-2xl space-y-3 w-full max-w-xs">
+                            <p className="text-xs text-text/60">Resumen de canje:</p>
+                            <ul className="text-xs text-text/70 space-y-1">
+                              <li>• Solicitas 100 🔥</li>
+                              <li>• Comisión 5% (5 🔥)</li>
+                              <li>• Total descontado: 105 🔥</li>
+                              <li>• Recibes el equivalente en tu cuenta bancaria 💵</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Controles de navegación */}
+                <div className="flex items-center justify-between mt-2">
+                  <button
+                    onClick={() => setHowToStep((prev) => Math.max(0, prev - 1))}
+                    disabled={howToStep === 0}
+                    className="px-3 py-2 text-sm rounded-lg bg-glass hover:bg-glass-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <ChevronLeft size={16} />
+                    Atrás
+                  </button>
+                  <span className="text-xs text-text/60">
+                    Paso {howToStep + 1} de 4
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (howToStep < 3) {
+                        setHowToStep((prev) => Math.min(3, prev + 1));
+                      } else {
+                        setShowHowToEarnModal(false);
+                      }
+                    }}
+                    className="px-4 py-2 text-sm rounded-lg bg-accent text-white hover:bg-accent/90 flex items-center gap-2"
+                  >
+                    {howToStep < 3 ? (
+                      <>
+                        Siguiente
+                        <ChevronRight size={16} />
+                      </>
+                    ) : (
+                      <>
+                        ¡Listo!
+                        <Check size={16} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
