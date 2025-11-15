@@ -158,11 +158,11 @@ const RoleManagementDropdown = ({ user, onRolesUpdated }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-72 card-glass border border-text/20 shadow-xl z-50"
+            className="absolute right-0 bottom-full mb-2 w-72 card-glass border border-text/20 shadow-xl z-50"
           >
             {/* Header */}
             <div className="p-3 border-b border-text/10">

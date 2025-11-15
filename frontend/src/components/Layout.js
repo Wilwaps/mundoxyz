@@ -101,7 +101,7 @@ const Layout = () => {
                 onClick={() => setShowBuyExperienceModal(true)}
                 title="Comprar experiencia"
               >
-                <span className="text-sm">🪙</span>
+                <span className="text-sm">💰</span>
                 <span className="text-xs font-semibold">{displayCoins.toFixed(2)}</span>
               </div>
               <div 

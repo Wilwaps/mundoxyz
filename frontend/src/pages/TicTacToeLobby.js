@@ -191,7 +191,7 @@ const TicTacToeLobby = () => {
             <div>
               <h3 className="font-bold text-violet">¡Tienes una sala activa!</h3>
               <p className="text-sm text-text/80">
-                Sala {activeRoom.code} • {activeRoom.mode === 'coins' ? '🪙' : '🔥'} {activeRoom.bet_amount} • 
+                Sala {activeRoom.code} • {activeRoom.mode === 'coins' ? '💰' : '🔥'} {activeRoom.bet_amount} • 
                 Estado: {activeRoom.status === 'waiting' ? 'Esperando' : activeRoom.status === 'ready' ? 'Listo' : 'Jugando'}
               </p>
               {activeRoom.opponent && (
@@ -273,7 +273,7 @@ const TicTacToeLobby = () => {
                 : 'glass-panel text-text/60 hover:bg-white/10'
             }`}
           >
-            🪙 Coins
+            💰 Coins
           </button>
           <button
             onClick={() => setModeFilter('fires')}
@@ -463,7 +463,7 @@ const TicTacToeLobby = () => {
                       placeholder="1-1000 Coins"
                     />
                     <div className="mt-2 text-xs text-text/60">
-                      Balance: {balance?.coins_balance?.toFixed(2) || '0.00'} 🪙
+                      Balance: {balance?.coins_balance?.toFixed(2) || '0.00'} 💰
                     </div>
                   </div>
                 ) : (

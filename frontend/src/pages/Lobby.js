@@ -315,7 +315,7 @@ const Lobby = () => {
                       </div>
                       <div className="text-right text-xs">
                         {room.mode === 'coins' && room.pot_coins > 0 && (
-                          <div className="text-accent">🪙 {room.pot_coins}</div>
+                          <div className="text-accent">💰 {room.pot_coins}</div>
                         )}
                         {room.mode === 'fires' && room.pot_fires > 0 && (
                           <div className="text-fire-orange">🔥 {room.pot_fires}</div>

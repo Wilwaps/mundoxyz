@@ -18,8 +18,8 @@ const Landing = () => {
   useEffect(() => {
     fetchPublicStats();
     
-    // Actualizar stats cada 30 segundos
-    const interval = setInterval(fetchPublicStats, 30000);
+    // Actualizar stats cada 600 segundos (10 minutos)
+    const interval = setInterval(fetchPublicStats, 600000);
     return () => clearInterval(interval);
   }, []);
 
@@ -258,7 +258,7 @@ const Landing = () => {
                     <div className="economy-value">
                       <AnimatedNumber 
                         value={stats.economy.totalCoinsCirculation} 
-                        suffix=" 🪙"
+                        suffix=" 💰"
                         decimals={0}
                       />
                     </div>
@@ -422,7 +422,7 @@ const Landing = () => {
               <div className="currency-card currency-card-coins">
                 <div className="currency-header">
                   <Coins size={48} />
-                  <h3>🪙 COINS</h3>
+                  <h3>💰 COINS</h3>
                   <span className="currency-type">Moneda Suave</span>
                 </div>
                 <div className="currency-features">

@@ -516,7 +516,7 @@ const TicTacToeRoom = () => {
               <h1 className="text-2xl font-bold text-text">Sala {code}</h1>
               <div className="flex items-center gap-4 mt-2">
                 <span className="text-sm text-text/60">
-                  Modo: {room?.mode === 'coins' ? '🪙 Coins' : '🔥 Fires'}
+                  Modo: {room?.mode === 'coins' ? '💰 Coins' : '🔥 Fires'}
                 </span>
                 <span className="text-sm text-text/60">
                   Apuesta: {room?.bet_amount}
@@ -529,7 +529,7 @@ const TicTacToeRoom = () => {
                   <div className="inline-block p-2 rounded-lg bg-violet/10 border border-violet/30">
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold">
-                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 💰` : `${room?.pot_fires || 0} 🔥`}
                       </span>
                       <span className="text-xs text-text/60">(Esperando oponente)</span>
                     </div>
@@ -540,7 +540,7 @@ const TicTacToeRoom = () => {
                   <div className="inline-block p-3 rounded-lg bg-success/10 border border-success/30">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-success mb-1">
-                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 💰` : `${room?.pot_fires || 0} 🔥`}
                       </div>
                       <div className="text-xs text-text/60 flex items-center gap-1 justify-center">
                         <span>Host: {room?.bet_amount}</span>
@@ -560,7 +560,7 @@ const TicTacToeRoom = () => {
                     <div className="text-center">
                       <div className="text-xs font-semibold text-violet mb-1">PREMIO TOTAL</div>
                       <div className="text-3xl font-bold">
-                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 🪙` : `${room?.pot_fires || 0} 🔥`}
+                        {room?.mode === 'coins' ? `${room?.pot_coins || 0} 💰` : `${room?.pot_fires || 0} 🔥`}
                       </div>
                     </div>
                   </motion.div>
@@ -817,7 +817,7 @@ const TicTacToeRoom = () => {
                         </h2>
                         <p className="text-text/80 mb-4">
                           Has ganado {room?.mode === 'coins' 
-                            ? `${room?.prize_coins || 0} 🪙` 
+                            ? `${room?.prize_coins || 0} 💰` 
                             : `${room?.prize_fires || 0} 🔥`}
                         </p>
                       </>
@@ -841,7 +841,7 @@ const TicTacToeRoom = () => {
                     </h2>
                     <p className="text-text/80 mb-4">
                       Cada jugador recupera {room?.mode === 'coins' 
-                        ? `${(room?.prize_coins || 0) / 2} 🪙` 
+                        ? `${(room?.prize_coins || 0) / 2} 💰` 
                         : `${(room?.prize_fires || 0) / 2} 🔥`}
                     </p>
                   </>

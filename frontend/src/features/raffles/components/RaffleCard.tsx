@@ -50,14 +50,14 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
   const price = raffle.mode === 'fires' 
     ? `${raffle.entryPriceFire} 🔥`
     : raffle.mode === 'coins'
-    ? `${raffle.entryPriceCoin} 🪙`
+    ? `${raffle.entryPriceCoin} 💰`
     : 'Premio';
   
   // Formatear pote
   const pot = raffle.mode === 'fires'
     ? `${raffle.potFires.toFixed(0)} 🔥`
     : raffle.mode === 'coins'
-    ? `${raffle.potCoins.toFixed(0)} 🪙`
+    ? `${raffle.potCoins.toFixed(0)} 💰`
     : 'Ver Premio';
   
   // Determinar color de estado

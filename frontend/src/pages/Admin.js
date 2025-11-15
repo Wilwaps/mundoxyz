@@ -135,7 +135,7 @@ const AdminStats = () => {
           <div className="flex justify-between items-center">
             <span className="text-text/60">Total Coins en Circulación</span>
             <span className="font-bold text-accent">
-              🪙 {Number(stats?.economy?.total_coins_circulation || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              💰 {Number(stats?.economy?.total_coins_circulation || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -147,7 +147,7 @@ const AdminStats = () => {
           <div className="flex justify-between items-center">
             <span className="text-text/60">Promedio Coins/Usuario</span>
             <span className="font-bold text-text">
-              🪙 {Number(stats?.economy?.avg_coins_balance || 0).toFixed(2)}
+              💰 {Number(stats?.economy?.avg_coins_balance || 0).toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -243,7 +243,7 @@ const AdminUsers = () => {
               </div>
               <div className="flex items-start gap-3">
                 <div className="text-right">
-                  <div className="text-sm text-accent">🪙 {user.coins_balance || 0}</div>
+                  <div className="text-sm text-accent">💰 {user.coins_balance || 0}</div>
                   <div className="text-sm text-fire-orange">🔥 {user.fires_balance || 0}</div>
                 </div>
                 <RoleManagementDropdown 
