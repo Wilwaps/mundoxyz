@@ -151,8 +151,8 @@ const Landing = () => {
             </h1>
 
             <p className="hero-description">
-              MiniApp de Telegram donde cada partida cuenta. 
-              Juega Bingo, Rifas y Duelos con coins y fires mientras construyes tu economía dentro de la plataforma.
+              MiniApp de Telegram donde cada partida cuenta.
+              Descubre bingo, rifas públicas y rifas de empresa con coins y fires, y convierte el juego en una economía viva para tu comunidad.
             </p>
 
             <div className="hero-features">
@@ -353,18 +353,18 @@ const Landing = () => {
                 </div>
                 <div className="game-card-header game-header-raffle">
                   <div className="game-icon">🎁</div>
-                  <h3>Rifas con Premios Reales</h3>
+                  <h3>Rifas para Comunidades y Empresas</h3>
                 </div>
                 <div className="game-card-body">
                   <p className="game-description">
-                    Crea tu propia rifa o compra números en rifas existentes. Gana premios en fires, coins 
-                    o premios físicos/digitales con un sistema 100% justo y auditable.
+                    Organiza rifas públicas para tu comunidad o rifas de empresa para tus clientes. Entrega premios en fires, coins 
+                    o recompensas físicas/digitales con un sistema 100% justo y auditable.
                   </p>
                   <ul className="game-features">
-                    <li><CheckCircle size={16} /> Crea rifas personalizadas</li>
-                    <li><CheckCircle size={16} /> Compra con coins o fires (según la rifa)</li>
-                    <li><CheckCircle size={16} /> Premios físicos o digitales</li>
-                    <li><CheckCircle size={16} /> Sistema transparente</li>
+                    <li><CheckCircle size={16} /> Crea rifas públicas y rifas de empresa</li>
+                    <li><CheckCircle size={16} /> Lanza campañas y sorteos para tu comunidad o clientes</li>
+                    <li><CheckCircle size={16} /> Compra números con coins o fires (según la rifa)</li>
+                    <li><CheckCircle size={16} /> Premios físicos o digitales con sistema transparente</li>
                   </ul>
                   {stats && (
                     <div className="game-stat">

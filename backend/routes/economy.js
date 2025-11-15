@@ -3,6 +3,7 @@ const router = express.Router();
 const { query, transaction } = require('../db');
 const { verifyToken, requireAdmin, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const telegramService = require('../services/telegramService');
 
 // Get user balance
 router.get('/balance', verifyToken, async (req, res) => {
@@ -642,16 +643,36 @@ router.post('/request-fires', verifyToken, async (req, res) => {
       [user_id, parsedAmount, bank_reference]
     );
 
+    const request = result.rows[0];
+
     logger.info('Fire request created', { 
-      requestId: result.rows[0].id, 
+      requestId: request.id, 
       userId: user_id, 
       amount: parsedAmount 
     });
 
+    try {
+      const message = `
+🔥 <b>Nueva Solicitud de Compra de Fuegos</b>
+
+👤 <b>Usuario:</b> ${req.user.username}
+🔥 <b>Monto:</b> ${request.amount} fuegos
+🧾 <b>Referencia:</b> <code>${request.reference}</code>
+📅 <b>Fecha:</b> ${new Date(request.created_at).toLocaleString('es-ES', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+      })}
+      `.trim();
+
+      await telegramService.sendAdminMessage(message);
+    } catch (notifyError) {
+      logger.error('Error sending Telegram notification for fire request:', notifyError);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Solicitud de fuegos enviada. Será revisada por un administrador.',
-      request: result.rows[0]
+      request
     });
 
   } catch (error) {
