@@ -478,7 +478,7 @@ const Lobby = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="w-full max-w-3xl card-glass relative overflow-hidden max-h-[90vh]"
+              className="w-full max-w-3xl card-glass relative max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -495,7 +495,7 @@ const Lobby = () => {
                 </p>
               </div>
 
-              <div className="p-6 pt-4 flex flex-col gap-4">
+              <div className="p-6 pt-4 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
                 {/* Indicadores de pasos */}
                 <div className="flex items-center justify-center gap-3 mb-2">
                   {[0, 1, 2, 3].map((step) => (

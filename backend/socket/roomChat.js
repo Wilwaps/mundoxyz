@@ -19,7 +19,7 @@ async function validateUserInRoom(roomType, roomCode, userId) {
           SELECT 1 FROM tictactoe_rooms 
           WHERE code = $1 
           AND (player_x_id = $2 OR player_o_id = $2)
-          AND status IN ('waiting', 'playing')
+          AND status IN ('waiting', 'ready', 'playing', 'finished')
         `;
         break;
         

@@ -3,6 +3,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatMessage from './ChatMessage';
 import { Send } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const RoomChatTab = ({ roomType, roomCode }) => {
   const [messages, setMessages] = useState([]);
@@ -25,6 +26,11 @@ const RoomChatTab = ({ roomType, roomCode }) => {
 
       socket.on('room:error', (data) => {
         console.error('Room chat error:', data.message);
+        if (data?.message) {
+          toast.error(data.message);
+        } else {
+          toast.error('Error en el chat de sala');
+        }
       });
 
       return () => {
@@ -34,6 +40,11 @@ const RoomChatTab = ({ roomType, roomCode }) => {
       };
     }
   }, [socket]);
+
+  useEffect(() => {
+    setMessages([]);
+    setInputMessage('');
+  }, [roomType, roomCode]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
