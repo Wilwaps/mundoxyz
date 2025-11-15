@@ -52,6 +52,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const refreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [timeToDrawMs, setTimeToDrawMs] = useState<number | null>(null);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -60,6 +61,21 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const winner = raffleData.winner;
   const isLoading = raffleData.isLoading;
   const error = raffleData.error;
+  
+  useEffect(() => {
+    if (!raffle || raffle.drawMode !== 'scheduled' || !raffle.scheduledDrawAt) {
+      setTimeToDrawMs(null);
+      return;
+    }
+    const target = new Date(raffle.scheduledDrawAt).getTime();
+    const update = () => {
+      const diff = target - Date.now();
+      setTimeToDrawMs(diff > 0 ? diff : 0);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [raffle?.drawMode, raffle?.scheduledDrawAt]);
   
   // Debounced refetch para evitar múltiples actualizaciones simultáneas
   const debouncedRefetch = useCallback(() => {
@@ -124,6 +140,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       socket.on('raffle:status_changed', handleStatusChanged);
       socket.on('raffle:winner_drawn', handleWinnerDrawn);
       socket.on('raffle:cancelled', handleRaffleCancelled);
+      socket.on('raffle:all_sold', handleAllSold);
+      socket.on('raffle:drawing_scheduled', handleDrawingScheduled);
+      socket.on('raffle:draw_cancelled', handleDrawCancelled);
       
       return () => {
         socket.emit('raffle:leave_room', { code });
@@ -133,6 +152,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
         socket.off('raffle:status_changed');
         socket.off('raffle:winner_drawn');
         socket.off('raffle:cancelled');
+        socket.off('raffle:all_sold');
+        socket.off('raffle:drawing_scheduled');
+        socket.off('raffle:draw_cancelled');
       };
     }
   }, [socket, code]);
@@ -197,6 +219,27 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       navigate('/raffles');
     }, 3000);
   }, [navigate]);
+  
+  const handleAllSold = useCallback((data: any) => {
+    console.log('Raffle all sold:', data);
+    if (data.code && data.code !== raffle?.code) return;
+    toast.success(data.message || '¡Todos los números vendidos!');
+    raffleData.forceRefresh();
+  }, [raffle?.code, raffleData]);
+  
+  const handleDrawingScheduled = useCallback((data: any) => {
+    console.log('Raffle drawing scheduled:', data);
+    if (data.code && data.code !== raffle?.code) return;
+    toast('El sorteo programado está en curso...', { icon: '🎰' });
+    raffleData.forceRefresh();
+  }, [raffle?.code, raffleData]);
+  
+  const handleDrawCancelled = useCallback((data: any) => {
+    console.log('Raffle scheduled draw cancelled:', data);
+    if (data.code && data.code !== raffle?.code) return;
+    toast.error(data.message || 'No se pudo realizar el sorteo programado');
+    raffleData.forceRefresh();
+  }, [raffle?.code, raffleData]);
   
   // Manejar selección de números
   const handleNumberClick = (number: number) => {
@@ -415,6 +458,23 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     myNumbers: raffleData.userNumbers?.length || 0
   };
   
+  const formatTimeToDraw = (ms: number | null) => {
+    if (ms === null) return '';
+    if (ms <= 0) return '¡En cualquier momento!';
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const hh = hours.toString().padStart(2, '0');
+    const mm = minutes.toString().padStart(2, '0');
+    const ss = seconds.toString().padStart(2, '0');
+    if (days > 0) {
+      return `${days}d ${hh}:${mm}:${ss}`;
+    }
+    return `${hh}:${mm}:${ss}`;
+  };
+  
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark via-dark to-dark/95 flex items-center justify-center">
@@ -503,6 +563,16 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                     <Trophy className="w-4 h-4" />
                     <span>Código: {raffle.code}</span>
                   </div>
+                  {raffle.drawMode === 'scheduled' && raffle.scheduledDrawAt && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        {timeToDrawMs !== null
+                          ? `Sorteo en ${formatTimeToDraw(timeToDrawMs)}`
+                          : `Sorteo programado para ${formatDate(raffle.scheduledDrawAt)}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

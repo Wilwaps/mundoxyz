@@ -103,10 +103,13 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         
       case 'numbersRange':
         const num = parseInt(value);
+        const maxNumbers = (isCompanyMode || formData.visibility === RaffleVisibility.COMPANY)
+          ? RAFFLE_LIMITS.MAX_NUMBERS_COMPANY
+          : RAFFLE_LIMITS.MAX_NUMBERS_NORMAL;
         if (num < RAFFLE_LIMITS.MIN_NUMBERS) {
           newErrors.numbersRange = `Mínimo ${RAFFLE_LIMITS.MIN_NUMBERS} números`;
-        } else if (num > RAFFLE_LIMITS.MAX_NUMBERS) {
-          newErrors.numbersRange = `Máximo ${RAFFLE_LIMITS.MAX_NUMBERS} números`;
+        } else if (num > maxNumbers) {
+          newErrors.numbersRange = `Máximo ${maxNumbers} números`;
         } else {
           delete newErrors.numbersRange;
         }
@@ -351,7 +354,9 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 value={formData.numbersRange}
                 onChange={(e) => updateField('numbersRange', parseInt(e.target.value))}
                 min={RAFFLE_LIMITS.MIN_NUMBERS}
-                max={RAFFLE_LIMITS.MAX_NUMBERS}
+                max={(isCompanyMode || formData.visibility === RaffleVisibility.COMPANY)
+                  ? RAFFLE_LIMITS.MAX_NUMBERS_COMPANY
+                  : RAFFLE_LIMITS.MAX_NUMBERS_NORMAL}
                 className={`w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent ${
                   errors.numbersRange ? 'ring-2 ring-red-500' : ''
                 }`}

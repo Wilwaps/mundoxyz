@@ -47,14 +47,21 @@ const createRaffleSchema = Joi.object({
       'any.only': 'Visibilidad inválida'
     }),
     
-  numbersRange: Joi.number()
-    .integer()
-    .min(SystemLimits.MIN_NUMBERS)
-    .max(SystemLimits.MAX_NUMBERS)
+  numbersRange: Joi.when('visibility', {
+    is: RaffleVisibility.COMPANY,
+    then: Joi.number()
+      .integer()
+      .min(SystemLimits.MIN_NUMBERS)
+      .max(SystemLimits.MAX_NUMBERS_COMPANY),
+    otherwise: Joi.number()
+      .integer()
+      .min(SystemLimits.MIN_NUMBERS)
+      .max(SystemLimits.MAX_NUMBERS_NORMAL)
+  })
     .default(SystemLimits.DEFAULT_NUMBERS)
     .messages({
       'number.min': `Mínimo ${SystemLimits.MIN_NUMBERS} números`,
-      'number.max': `Máximo ${SystemLimits.MAX_NUMBERS} números`
+      'number.max': `Cantidad de números fuera de los límites permitidos`
     }),
     
   entryPrice: Joi.number()
