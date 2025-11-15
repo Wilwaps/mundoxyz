@@ -111,7 +111,24 @@ router.patch('/welcome/events/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    const allowedFields = ['name', 'message', 'coins_amount', 'fires_amount', 'duration_hours', 'max_claims', 'priority'];
+    const allowedFields = [
+      'name',
+      'message',
+      'coins_amount',
+      'fires_amount',
+      'duration_hours',
+      'max_claims',
+      'priority',
+      'event_type',
+      'recurrence',
+      'target_segment',
+      'min_user_level',
+      'max_per_user',
+      'cooldown_hours',
+      'require_claim',
+      'auto_send',
+      'expires_hours'
+    ];
     const updateFields = [];
     const values = [];
     let paramCount = 1;

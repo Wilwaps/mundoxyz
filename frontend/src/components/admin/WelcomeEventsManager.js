@@ -12,6 +12,8 @@ const WelcomeEventsManager = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const queryClient = useQueryClient();
 
+  const [editEventData, setEditEventData] = useState(null);
+
   const [eventData, setEventData] = useState({
     name: '',
     message: '',
@@ -118,6 +120,23 @@ const WelcomeEventsManager = () => {
     }
   });
 
+  const updateEventMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const response = await axios.patch(`/api/admin/welcome/events/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('✅ Evento actualizado');
+      setShowConfigModal(false);
+      setSelectedEvent(null);
+      setEditEventData(null);
+      queryClient.invalidateQueries(['admin-welcome-events']);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar evento');
+    }
+  });
+
   const handleDeleteEvent = (eventId, eventName) => {
     if (window.confirm(`¿Estás seguro de eliminar el evento "${eventName}"? Esta acción no se puede deshacer.`)) {
       deleteEventMutation.mutate(eventId);
@@ -127,6 +146,29 @@ const WelcomeEventsManager = () => {
   const handleCreateEvent = (e) => {
     e.preventDefault();
     createEventMutation.mutate(eventData);
+  };
+
+  const handleUpdateEvent = (e) => {
+    e.preventDefault();
+    if (!selectedEvent || !editEventData) return;
+
+    const payload = {
+      name: editEventData.name,
+      message: editEventData.message,
+      coins_amount: editEventData.coins_amount,
+      fires_amount: editEventData.fires_amount,
+      event_type: editEventData.event_type,
+      target_segment: editEventData.target_segment,
+      max_claims: editEventData.max_claims,
+      max_per_user: editEventData.max_per_user,
+      cooldown_hours: editEventData.cooldown_hours,
+      require_claim: editEventData.require_claim,
+      auto_send: editEventData.auto_send,
+      expires_hours: editEventData.expires_hours,
+      priority: editEventData.priority
+    };
+
+    updateEventMutation.mutate({ id: selectedEvent.id, data: payload });
   };
 
   const getEventTypeLabel = (type) => {
@@ -318,6 +360,21 @@ const WelcomeEventsManager = () => {
                       <button
                         onClick={() => {
                           setSelectedEvent(event);
+                          setEditEventData({
+                            name: event.name || '',
+                            message: event.message || '',
+                            coins_amount: Number(event.coins_amount) || 0,
+                            fires_amount: Number(event.fires_amount) || 0,
+                            event_type: event.event_type || 'manual',
+                            target_segment: event.target_segment || { type: 'all' },
+                            max_claims: event.max_claims ?? null,
+                            max_per_user: event.max_per_user ?? 1,
+                            cooldown_hours: event.cooldown_hours ?? null,
+                            require_claim: event.require_claim !== undefined ? event.require_claim : true,
+                            auto_send: event.auto_send !== undefined ? event.auto_send : false,
+                            expires_hours: event.expires_hours ?? 72,
+                            priority: event.priority ?? 0
+                          });
                           setShowConfigModal(true);
                         }}
                         className="px-3 py-1 bg-accent/20 text-accent rounded text-sm hover:bg-accent/30"
@@ -598,6 +655,181 @@ const WelcomeEventsManager = () => {
                     disabled={createEventMutation.isLoading}
                   >
                     {createEventMutation.isLoading ? 'Creando...' : 'Crear Evento'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showConfigModal && selectedEvent && editEventData && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="card-glass w-full max-w-2xl my-8"
+            >
+              <h3 className="text-xl font-bold mb-4">⚙️ Editar Evento</h3>
+
+              <form onSubmit={handleUpdateEvent} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nombre del Evento *</label>
+                  <input
+                    type="text"
+                    value={editEventData.name}
+                    onChange={(e) => setEditEventData({ ...editEventData, name: e.target.value })}
+                    className="input-glass w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Mensaje</label>
+                  <textarea
+                    value={editEventData.message}
+                    onChange={(e) => setEditEventData({ ...editEventData, message: e.target.value })}
+                    className="input-glass w-full"
+                    rows="3"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">🪙 Coins</label>
+                    <input
+                      type="number"
+                      value={editEventData.coins_amount}
+                      onChange={(e) => setEditEventData({ ...editEventData, coins_amount: parseInt(e.target.value) || 0 })}
+                      className="input-glass w-full"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">🔥 Fires</label>
+                    <input
+                      type="number"
+                      value={editEventData.fires_amount}
+                      onChange={(e) => setEditEventData({ ...editEventData, fires_amount: parseInt(e.target.value) || 0 })}
+                      className="input-glass w-full"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Tipo de Evento</label>
+                    <select
+                      value={editEventData.event_type}
+                      onChange={(e) => setEditEventData({ ...editEventData, event_type: e.target.value })}
+                      className="input-glass w-full"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="first_login">Primer Ingreso</option>
+                      <option value="daily">Diario</option>
+                      <option value="weekly">Semanal</option>
+                      <option value="comeback">Regreso</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Segmento</label>
+                    <select
+                      value={editEventData.target_segment?.type || 'all'}
+                      onChange={(e) => {
+                        const newSegment = { ...editEventData.target_segment, type: e.target.value };
+                        if (e.target.value === 'existing_users') {
+                          newSegment.registered_before = new Date().toISOString();
+                        }
+                        setEditEventData({ ...editEventData, target_segment: newSegment });
+                      }}
+                      className="input-glass w-full"
+                    >
+                      <option value="all">Todos</option>
+                      <option value="first_time">Primera Vez</option>
+                      <option value="inactive">Inactivos</option>
+                      <option value="low_balance">Saldo Bajo</option>
+                      <option value="existing_users">Solo Usuarios Existentes</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Max Claims</label>
+                    <input
+                      type="number"
+                      value={editEventData.max_claims ?? ''}
+                      onChange={(e) => setEditEventData({ ...editEventData, max_claims: e.target.value ? parseInt(e.target.value) : null })}
+                      className="input-glass w-full"
+                      placeholder="Ilimitado"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Max x Usuario</label>
+                    <input
+                      type="number"
+                      value={editEventData.max_per_user ?? ''}
+                      onChange={(e) => setEditEventData({ ...editEventData, max_per_user: e.target.value ? parseInt(e.target.value) : null })}
+                      className="input-glass w-full"
+                      placeholder="1"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Expira (hrs)</label>
+                    <input
+                      type="number"
+                      value={editEventData.expires_hours}
+                      onChange={(e) => setEditEventData({ ...editEventData, expires_hours: parseInt(e.target.value) || 72 })}
+                      className="input-glass w-full"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!editEventData.require_claim}
+                      onChange={(e) => setEditEventData({ ...editEventData, require_claim: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Requiere aceptación</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!editEventData.auto_send}
+                      onChange={(e) => setEditEventData({ ...editEventData, auto_send: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Envío automático</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowConfigModal(false);
+                      setSelectedEvent(null);
+                      setEditEventData(null);
+                    }}
+                    className="flex-1 bg-gray-600 text-text py-3 px-6 rounded-lg hover:bg-gray-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 btn-primary"
+                    disabled={updateEventMutation.isLoading}
+                  >
+                    {updateEventMutation.isLoading ? 'Guardando...' : 'Guardar Cambios'}
                   </button>
                 </div>
               </form>
