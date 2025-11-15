@@ -142,7 +142,7 @@ class GiftService {
 
     await client.query(
       `INSERT INTO bingo_v2_messages 
-       (user_id, category, title, message, metadata, is_read)
+       (user_id, category, title, content, metadata, is_read)
        VALUES ($1, 'system', $2, $3, $4, false)`,
       [
         userId,
@@ -465,7 +465,7 @@ class GiftService {
             // Crear mensaje en bandeja para que usuario acepte
             await client.query(
               `INSERT INTO bingo_v2_messages 
-               (user_id, category, title, message, metadata, is_read)
+               (user_id, category, title, content, metadata, is_read)
                VALUES ($1, 'system', $2, $3, $4, false)`,
               [
                 userId,
@@ -559,10 +559,16 @@ class GiftService {
               [event.id, userId, coinsAmount, firesAmount]
             );
 
+            // Actualizar contador de claims del evento
+            await client.query(
+              'UPDATE welcome_events SET claimed_count = claimed_count + 1 WHERE id = $1',
+              [event.id]
+            );
+
             // Crear mensaje informativo en buzón
             await client.query(
               `INSERT INTO bingo_v2_messages 
-               (user_id, category, title, message, metadata, is_read)
+               (user_id, category, title, content, metadata, is_read)
                VALUES ($1, 'system', $2, $3, $4, false)`,
               [
                 userId,

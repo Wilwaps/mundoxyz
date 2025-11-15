@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
+import { useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import API_URL from '../config/api';
 import './MessageInbox.css';
 import GiftClaimButton from './gifts/GiftClaimButton';
@@ -12,6 +14,40 @@ const MessageInbox = () => {
   const [filter, setFilter] = useState('all'); // all, system, friends
   const { user } = useAuth();
   const { socket } = useSocket();
+  const queryClient = useQueryClient();
+
+  const handleAcceptWelcome = async (message) => {
+    try {
+      if (!message?.metadata?.event_id) return;
+
+      const res = await fetch(`${API_URL}/api/welcome/accept`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ event_id: message.metadata.event_id })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al reclamar bienvenida');
+      }
+
+      toast.success(`🎉 Bienvenida reclamada: +${data.coins_received || 0}🪙 +${data.fires_received || 0}🔥`);
+
+      await markAsRead(message.id);
+      setMessages(prev => prev.filter(m => m.id !== message.id));
+
+      // Refrescar wallet y estadísticas relacionadas
+      queryClient.invalidateQueries(['wallet-balance']);
+      queryClient.invalidateQueries(['user-wallet']);
+      queryClient.invalidateQueries(['admin-stats']);
+    } catch (err) {
+      toast.error(err.message || 'Error al reclamar bienvenida');
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -199,6 +235,19 @@ const MessageInbox = () => {
                           <span>Premio: {message.metadata.prizeAmount} {message.metadata.currency === 'fires' ? '🔥' : message.metadata.currency === 'coins' ? '🪙' : ''}</span>
                         )}
                       </div>
+                    )}
+
+                    {/* Botón para reclamar eventos de bienvenida que requieren aceptación */}
+                    {message.metadata?.type === 'welcome_event' && message.metadata.event_id && (
+                      <button
+                        className="btn-primary w-full mt-3"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAcceptWelcome(message);
+                        }}
+                      >
+                        🎁 Aceptar Bienvenida
+                      </button>
                     )}
                     
                     {/* Gift Claim Button */}

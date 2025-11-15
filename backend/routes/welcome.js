@@ -181,6 +181,12 @@ router.post('/accept', verifyToken, async (req, res) => {
         [event.id, userId, `db:${userId}`, coinsAmount, firesAmount, req.ip]
       );
 
+      // Actualizar contador de claims del evento
+      await client.query(
+        'UPDATE welcome_events SET claimed_count = claimed_count + 1 WHERE id = $1',
+        [event.id]
+      );
+
       // Record in event history
       await client.query(
         `INSERT INTO welcome_event_history (event_id, action, actor_id, payload)

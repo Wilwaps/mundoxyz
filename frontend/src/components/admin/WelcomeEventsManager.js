@@ -284,7 +284,7 @@ const WelcomeEventsManager = () => {
                           <span className="font-semibold text-fire-orange">{event.fires_amount}</span>
                         </div>
                         <div className="text-text/60">
-                          👥 {event.claimed_count || 0} {event.max_claims ? `/ ${event.max_claims}` : ''} claims
+                          👥 {event.total_claims || 0} {event.max_claims ? `/ ${event.max_claims}` : ''} claims
                         </div>
                         <div className="text-text/60">
                           🎯 {getTargetSegmentLabel(event.target_segment)}
