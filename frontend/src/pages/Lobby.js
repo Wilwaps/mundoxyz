@@ -478,7 +478,7 @@ const Lobby = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="w-full max-w-3xl card-glass relative max-h-[90vh] flex flex-col"
+              className="w-full max-w-3xl card-glass relative max-h-[90vh] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -488,14 +488,14 @@ const Lobby = () => {
                 <X size={20} />
               </button>
 
-              <div className="p-6 border-b border-white/10">
-                <h2 className="text-2xl font-bold text-text mb-1">Cómo ganar dinero con MundoXYZ</h2>
+              <div className="px-4 py-2 border-b border-white/10 shrink-0">
+                <h2 className="text-lg font-bold text-text mb-1">Cómo ganar dinero con MundoXYZ</h2>
                 <p className="text-sm text-text/60">
                   Sigue este recorrido rápido: deposita fuegos, juega para multiplicarlos y luego canjea tu premio.
                 </p>
               </div>
 
-              <div className="p-6 pt-4 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-5 flex flex-col gap-4">
                 {/* Indicadores de pasos */}
                 <div className="flex items-center justify-center gap-3 mb-2">
                   {[0, 1, 2, 3].map((step) => (
