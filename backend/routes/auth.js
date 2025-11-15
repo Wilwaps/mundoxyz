@@ -647,19 +647,58 @@ router.post('/logout', async (req, res) => {
 });
 
 // Helper function to find or create Telegram user
+async function generateUniqueUsernameForTelegram(baseUsername, client) {
+  let candidateBase = String(baseUsername || '').trim();
+  if (!candidateBase) {
+    candidateBase = 'tg_user';
+  }
+  const maxLen = 100;
+  if (candidateBase.length > maxLen) {
+    candidateBase = candidateBase.slice(0, maxLen);
+  }
+  let suffix = 0;
+  while (true) {
+    const rawCandidate = suffix === 0 ? candidateBase : `${candidateBase}_${suffix}`;
+    const candidate = rawCandidate.length > maxLen ? rawCandidate.slice(0, maxLen) : rawCandidate;
+    const existing = await client.query('SELECT 1 FROM users WHERE username = $1', [candidate]);
+    if (existing.rows.length === 0) {
+      return candidate;
+    }
+    suffix += 1;
+  }
+}
+
 async function findOrCreateTelegramUser(telegramData) {
   try {
     return await transaction(async (client) => {
-      // Check if user exists
       const existingUser = await client.query(
-        'SELECT id FROM users WHERE tg_id = $1',
+        'SELECT id, username FROM users WHERE tg_id = $1',
         [telegramData.id]
       );
 
       if (existingUser.rows.length > 0) {
         const userId = existingUser.rows[0].id;
-        
-        // Update user info
+        let usernameToSet = null;
+        if (telegramData.username) {
+          const newUsername = String(telegramData.username).trim();
+          if (newUsername && newUsername !== existingUser.rows[0].username) {
+            const conflict = await client.query(
+              'SELECT 1 FROM users WHERE username = $1 AND id != $2',
+              [newUsername, userId]
+            );
+            if (conflict.rows.length === 0) {
+              usernameToSet = newUsername;
+            } else {
+              logger.warn('Telegram username conflict for existing user, keeping current username', {
+                tgId: telegramData.id,
+                userId,
+                newUsername,
+                currentUsername: existingUser.rows[0].username
+              });
+            }
+          }
+        }
+
         await client.query(
           'UPDATE users SET ' +
           'username = COALESCE($2, username), ' +
@@ -669,7 +708,7 @@ async function findOrCreateTelegramUser(telegramData) {
           'WHERE id = $1',
           [
             userId,
-            telegramData.username,
+            usernameToSet,
             telegramData.first_name + (telegramData.last_name ? ' ' + telegramData.last_name : ''),
             telegramData.photo_url
           ]
@@ -678,7 +717,15 @@ async function findOrCreateTelegramUser(telegramData) {
         return userId;
       }
 
-      // Create new user
+      const baseUsernameFromTelegram = telegramData.username ? String(telegramData.username).trim() : '';
+      if (!baseUsernameFromTelegram) {
+        logger.warn('Telegram user without username, generating fallback', {
+          tgId: telegramData.id
+        });
+      }
+      const baseUsername = baseUsernameFromTelegram || `tg_${telegramData.id}`;
+      const safeUsername = await generateUniqueUsernameForTelegram(baseUsername, client);
+
       const newUser = await client.query(
         'INSERT INTO users (id, tg_id, username, display_name, avatar_url, first_seen_at, last_seen_at) ' +
         'VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) ' +
@@ -686,7 +733,7 @@ async function findOrCreateTelegramUser(telegramData) {
         [
           uuidv4(),
           telegramData.id,
-          telegramData.username,
+          safeUsername,
           telegramData.first_name + (telegramData.last_name ? ' ' + telegramData.last_name : ''),
           telegramData.photo_url
         ]
@@ -694,14 +741,12 @@ async function findOrCreateTelegramUser(telegramData) {
 
       const userId = newUser.rows[0].id;
 
-      // Create auth identity
       await client.query(
         'INSERT INTO auth_identities (user_id, provider, provider_uid) ' +
         'VALUES ($1, $2, $3)',
         [userId, 'telegram', String(telegramData.id)]
       );
 
-      // Create wallet with initial balance
       const initialCoins = config.features.economyDevAutoSeed ? config.features.economyDevSeedCoins : 0;
       const initialFires = config.features.economyDevAutoSeed ? config.features.economyDevSeedFires : 0;
 
@@ -711,7 +756,6 @@ async function findOrCreateTelegramUser(telegramData) {
         [userId, initialCoins, initialFires]
       );
 
-      // Assign default role
       const roleResult = await client.query(
         'SELECT id FROM roles WHERE name = $1',
         ['user']
@@ -724,7 +768,6 @@ async function findOrCreateTelegramUser(telegramData) {
         );
       }
 
-      // Check if user is Tote and assign role
       if (String(telegramData.id) === config.telegram.toteId) {
         const toteRoleResult = await client.query(
           'SELECT id FROM roles WHERE name = $1',
@@ -742,10 +785,9 @@ async function findOrCreateTelegramUser(telegramData) {
       logger.info('New Telegram user created', { 
         userId, 
         tgId: telegramData.id, 
-        username: telegramData.username 
+        username: safeUsername 
       });
 
-      // Procesar eventos de first_login para usuario nuevo de Telegram
       const giftService = require('../services/giftService');
       setImmediate(async () => {
         try {
