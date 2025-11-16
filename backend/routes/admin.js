@@ -529,6 +529,55 @@ router.get('/users', adminAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/users/:userId/reset-credentials
+ * Reinicia la contraseña y la respuesta de seguridad de un usuario,
+ * para que vuelva a pasar por el flujo de "primera contraseña + pregunta de seguridad".
+ * Solo accesible por usuarios con rol 'tote' (o admin a través de requireTote).
+ */
+router.post('/users/:userId/reset-credentials', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validar que el usuario existe
+    const userResult = await query('SELECT id, username, tg_id, email FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = userResult.rows[0];
+
+    await transaction(async (client) => {
+      // 1) Limpiar hash de contraseña en auth_identities (provider = 'email')
+      await client.query(
+        "UPDATE auth_identities SET password_hash = NULL WHERE user_id = $1 AND provider = 'email'",
+        [userId]
+      );
+
+      // 2) Limpiar respuesta de seguridad
+      await client.query(
+        'UPDATE users SET security_answer = NULL, updated_at = NOW() WHERE id = $1',
+        [userId]
+      );
+    });
+
+    logger.info('Admin reset user credentials', {
+      targetUserId: userId,
+      targetUsername: user.username,
+      byUserId: req.user?.id,
+      byUsername: req.user?.username
+    });
+
+    res.json({
+      success: true,
+      message: 'Credenciales reiniciadas. El usuario deberá establecer una nueva contraseña y pregunta de seguridad.'
+    });
+  } catch (error) {
+    logger.error('Error resetting user credentials:', error);
+    res.status(500).json({ error: 'Error al reiniciar credenciales' });
+  }
+});
+
 // ============================================
 // GESTIÓN DE ROLES (SOLO TOTE)
 // ============================================

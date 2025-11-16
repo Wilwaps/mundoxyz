@@ -892,15 +892,22 @@ section {
   .currency-comparison {
     grid-template-columns: 1fr;
     gap: 2rem;
+    justify-items: center;
   }
-  
+
   .currency-divider {
     flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 260px;
+    gap: 1rem;
   }
-  
+
   .divider-line {
-    width: 60px;
+    width: 90px;
     height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-color), transparent);
   }
   
   .security-content {

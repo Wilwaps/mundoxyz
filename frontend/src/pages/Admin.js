@@ -185,7 +185,7 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const queryClient = useQueryClient();
-  
+
   const { data: users } = useQuery({
     queryKey: ['admin-users', search, selectedRole],
     queryFn: async () => {
@@ -197,12 +197,21 @@ const AdminUsers = () => {
     }
   });
 
-  const handleGrantRole = async (userId, role) => {
+  const handleResetCredentials = async (userId, username) => {
+    const confirmed = window.confirm(
+      `¿Reiniciar clave y pregunta de seguridad para ${username || 'este usuario'}?` +
+      '\n\nEl usuario deberá establecer una nueva contraseña y configurar de nuevo su pregunta de seguridad.'
+    );
+
+    if (!confirmed) return;
+
     try {
-      await axios.post('/api/roles/grant', { user_id: userId, role });
-      toast.success(`Rol ${role} otorgado exitosamente`);
+      await axios.post(`/api/admin/users/${userId}/reset-credentials`);
+      toast.success('Credenciales reiniciadas correctamente');
+      // Refrescar lista de usuarios por si en el futuro mostramos flags relacionados
+      queryClient.invalidateQueries(['admin-users']);
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Error al otorgar rol');
+      toast.error(error.response?.data?.error || 'Error al reiniciar credenciales');
     }
   };
 
@@ -242,17 +251,26 @@ const AdminUsers = () => {
                 <div className="text-xs text-text/60">@{user.username} • ID: {user.tg_id}</div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="text-right">
+                <div className="text-right mr-2">
                   <div className="text-sm text-accent">💰 {user.coins_balance || 0}</div>
                   <div className="text-sm text-fire-orange">🔥 {user.fires_balance || 0}</div>
                 </div>
-                <RoleManagementDropdown 
-                  user={user} 
-                  onRolesUpdated={() => {
-                    // Refrescar la lista de usuarios
-                    queryClient.invalidateQueries(['admin-users']);
-                  }}
-                />
+                <div className="flex flex-col items-end gap-2">
+                  <RoleManagementDropdown 
+                    user={user} 
+                    onRolesUpdated={() => {
+                      // Refrescar la lista de usuarios
+                      queryClient.invalidateQueries(['admin-users']);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetCredentials(user.id, user.username)}
+                    className="px-3 py-1 rounded-full text-xs bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
+                  >
+                    Reiniciar clave
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
