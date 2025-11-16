@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Send, Download, ShoppingBag, Gift, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, RefreshCw, Coins, Flame } from 'lucide-react';
 import axios from 'axios';
@@ -30,6 +30,14 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
     refetchInterval: 5000, // Refetch cada 5 segundos cuando el modal está abierto
     refetchIntervalInBackground: false
   });
+
+  // Sincronizar pestaña inicial cuando cambia initialTab o se abre el modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const normalized = initialTab === 'coins' ? 'coins' : 'fires';
+    setActiveTab(normalized);
+    setPage(0);
+  }, [initialTab, isOpen]);
 
   const transactions = data?.transactions || [];
   const total = data?.total || 0;

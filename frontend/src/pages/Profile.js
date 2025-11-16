@@ -180,7 +180,10 @@ const Profile = () => {
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className="glass-panel p-4 text-center cursor-pointer"
-            onClick={handleRefreshBalance}
+            onClick={() => {
+              setWalletHistoryInitialTab('coins');
+              setShowFiresHistory(true);
+            }}
           >
             <Coins className="w-8 h-8 mx-auto mb-2 text-accent" />
             <div className="text-2xl font-bold text-accent">{user?.coins_balance || 0}</div>
@@ -190,7 +193,10 @@ const Profile = () => {
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className="glass-panel p-4 text-center cursor-pointer"
-            onClick={() => setShowFiresHistory(true)}
+            onClick={() => {
+              setWalletHistoryInitialTab('fires');
+              setShowFiresHistory(true);
+            }}
           >
             <Flame className="w-8 h-8 mx-auto mb-2 text-fire-orange" />
             <div className="text-2xl font-bold text-fire-orange">{user?.fires_balance || 0}</div>
