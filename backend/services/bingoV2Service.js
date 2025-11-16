@@ -1468,7 +1468,18 @@ class BingoV2Service {
       }[reason] || reason;
 
       for (const player of playersResult.rows) {
-        if (player.total_spent <= 0) continue;
+        const spentRaw = player.total_spent;
+        const spent = parseFloat(spentRaw);
+
+        if (!Number.isFinite(spent) || spent <= 0) {
+          logger.error('Invalid total_spent value for refund', {
+            roomId,
+            playerId: player.id,
+            userId: player.user_id,
+            total_spent: spentRaw
+          });
+          continue;
+        }
 
         // Get wallet balance before refund
         const walletBefore = await dbQuery(
@@ -1482,7 +1493,7 @@ class BingoV2Service {
           `UPDATE wallets 
            SET ${currencyColumn} = ${currencyColumn} + $1
            WHERE user_id = $2`,
-          [player.total_spent, player.user_id]
+          [spent, player.user_id]
         );
 
         // ✅ CRITICAL: Registrar transacción de reembolso
@@ -1493,9 +1504,9 @@ class BingoV2Service {
            FROM wallets w WHERE w.user_id = $7`,
           [
             currency,
-            player.total_spent,
+            spent,
             balanceBefore,
-            balanceBefore + player.total_spent,
+            balanceBefore + spent,
             `Reembolso Bingo - ${reasonText} - Sala #${room.code}`,
             `bingo:${room.code}:refund`,
             player.user_id
@@ -1510,7 +1521,7 @@ class BingoV2Service {
             roomId,
             player.id,
             player.user_id,
-            player.total_spent,
+            spent,
             room.currency_type,
             reason,
             refundedBy,
@@ -1524,18 +1535,18 @@ class BingoV2Service {
            VALUES ($1, 'system', 'Reembolso de Bingo', $2, $3)`,
           [
             player.user_id,
-            `Sala #${room.code} cancelada: ${reasonText}. Reembolso: ${player.total_spent} ${currencyEmoji} ${room.currency_type}`,
+            `Sala #${room.code} cancelada: ${reasonText}. Reembolso: ${spent} ${currencyEmoji} ${room.currency_type}`,
             JSON.stringify({
               room_code: room.code,
               room_id: roomId,
-              refund_amount: player.total_spent,
+              refund_amount: spent,
               currency: room.currency_type,
               reason
             })
           ]
         );
 
-        totalRefunded += parseFloat(player.total_spent);
+        totalRefunded += spent;
       }
 
       // Update room status

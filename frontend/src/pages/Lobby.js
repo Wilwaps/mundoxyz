@@ -470,7 +470,7 @@ const Lobby = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
             onClick={() => setShowHowToEarnModal(false)}
           >
             <motion.div
@@ -495,7 +495,7 @@ const Lobby = () => {
                 </p>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-5 flex flex-col gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-5 flex flex-col gap-4 scrollbar-thin">
                 {/* Indicadores de pasos */}
                 <div className="flex items-center justify-center gap-3 mb-2">
                   {[0, 1, 2, 3].map((step) => (
