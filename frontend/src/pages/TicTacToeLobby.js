@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle, ArrowRight } from 'lucide-react';
+import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle, ArrowRight, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -18,6 +18,7 @@ const TicTacToeLobby = () => {
   });
   const [modeFilter, setModeFilter] = useState('all');
   const [joinCode, setJoinCode] = useState('');
+  const [showHelpModal, setShowHelpModal] = useState(false);
   
   // Fetch active room (para reconexión)
   const { data: activeRoomData } = useQuery({
@@ -178,6 +179,16 @@ const TicTacToeLobby = () => {
         <p className="text-center text-text/60">
           Duelos rápidos de 3 en raya • 15 seg por turno • Sin comisión
         </p>
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowHelpModal(true)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-xs text-text/80 transition-colors"
+          >
+            <Info size={14} className="text-accent" />
+            <span>Cómo crear y usar salas de La Vieja</span>
+          </button>
+        </div>
       </div>
       
       {/* Active Room Alert */}
@@ -542,8 +553,101 @@ const TicTacToeLobby = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Help Modal - Lobby La Vieja */}
+      <AnimatePresence>
+        {showHelpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowHelpModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
+              className="w-full max-w-2xl card-glass max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                    <Info size={18} className="text-accent" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm md:text-base font-bold text-text">Cómo crear salas de La Vieja</h2>
+                    <p className="text-[11px] md:text-xs text-text/60">Guía rápida desde este lobby para crear partidas justas.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="px-2 py-1 rounded-lg bg-glass hover:bg-glass-hover text-xs text-text/70"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin scroll-touch-y text-xs md:text-sm text-text/80 space-y-4">
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">1. Desde dónde se crean las salas</h3>
+                  <p>
+                    Usa el botón <span className="font-semibold">"Crear Sala"</span> de arriba. Desde aquí defines cómo será el duelo:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>
+                      <span className="font-semibold">Modo:</span> elige entre 💰 <span className="font-semibold">Coins</span> o 🔥 <span className="font-semibold">Fires</span>.
+                    </li>
+                    <li>
+                      <span className="font-semibold">Apuesta:</span> si juegas con coins, defines cuántas pondrá cada jugador. En fires la apuesta es fija de 1 fuego.
+                    </li>
+                    <li>
+                      <span className="font-semibold">Visibilidad:</span> pública (aparece en la lista) o privada (solo con código).
+                    </li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">2. Qué pasa al crear la sala</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Se descuenta tu apuesta de la wallet y se crea una sala nueva con un código de 6 dígitos.</li>
+                    <li>La sala aparece en este lobby si es pública, o puedes compartir el código si es privada.</li>
+                    <li>Cuando otro jugador entra, el sistema arma el pozo con las dos apuestas.</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">3. Unirse usando código o lista</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Desde el campo <span className="font-semibold">"Código de sala"</span> puedes entrar directo si te compartieron el código.</li>
+                    <li>También puedes unirte tocando cualquier sala pública de la lista de abajo.</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">4. Estados de la sala</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><span className="font-semibold">Esperando:</span> estás tú solo, esperando rival.</li>
+                    <li><span className="font-semibold">Listo:</span> ambos jugadores dentro; el invitado marca "Estoy listo".</li>
+                    <li><span className="font-semibold">Jugando:</span> partida en curso con turnos de 15 segundos.</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">5. Buenas prácticas</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Crea salas públicas para encontrar rivales rápido, y privadas para jugar solo con amigos.</li>
+                    <li>Antes de apostar alto, revisa tu balance de coins/fires.</li>
+                    <li>Si una sala se queda colgada, puedes pedir al admin/tote que la cierre para reembolsar apuestas.</li>
+                  </ul>
+                </section>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-
 export default TicTacToeLobby;

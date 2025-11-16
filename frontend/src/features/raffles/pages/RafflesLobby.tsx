@@ -16,7 +16,8 @@ import {
   Grid3x3,
   List,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import RaffleCard from '../components/RaffleCard';
@@ -32,6 +33,7 @@ const RafflesLobby: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   
   // Hook de filtros
   const { filters, updateFilter, clearFilters, applyFilters } = useRaffleFilters({
@@ -113,15 +115,29 @@ const RafflesLobby: React.FC = () => {
               </p>
             </div>
             {user && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowCreateModal(true)}
-                className="btn-primary px-6 py-3 flex items-center gap-2 whitespace-nowrap"
-              >
-                <Plus size={20} />
-                Crear Rifa
-              </motion.button>
+              <div className="flex items-center gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowHelpModal(true)}
+                  className="px-3 py-2 rounded-lg bg-glass/60 hover:bg-glass text-xs text-text/80 flex items-center gap-2"
+                  type="button"
+                >
+                  <Info size={16} className="text-accent" />
+                  <span>Cómo crear rifas</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowCreateModal(true)}
+                  className="btn-primary px-6 py-3 flex items-center gap-2 whitespace-nowrap"
+                  type="button"
+                >
+                  <Plus size={20} />
+                  Crear Rifa
+                </motion.button>
+              </div>
             )}
           </div>
           
@@ -430,6 +446,88 @@ const RafflesLobby: React.FC = () => {
           )}
         </AnimatePresence>
         
+        {/* Modal de ayuda - Lobby de Rifas */}
+        <AnimatePresence>
+          {showHelpModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowHelpModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="w-full max-w-3xl bg-dark rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
+                      <Info className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-text">Cómo crear rifas desde este lobby</h3>
+                      <p className="text-[11px] md:text-xs text-text/60">
+                        Guía para configurar una rifa sólida antes de entrar a la sala.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowHelpModal(false)}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-xs text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="p-4 pt-3 pb-5 space-y-4 text-xs md:text-sm text-text/80 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">1. Abrir el creador de rifas</h4>
+                    <p>
+                      Pulsa el botón <span className="font-semibold">"Crear Rifa"</span>. Se abrirá un asistente con varios pasos:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li><span className="font-semibold">Modo:</span> define si el premio es en 🔥 fires, 🪙 monedas o un premio físico/servicio.</li>
+                      <li><span className="font-semibold">Rango de números:</span> cuántos números tendrá la rifa (100, 500, 1000...).</li>
+                      <li><span className="font-semibold">Precio por número:</span> cuánto paga cada jugador por número.</li>
+                      <li><span className="font-semibold">Visibilidad:</span> pública, privada o empresarial (con landing especial).</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">2. Qué ves en la lista de rifas</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Cada tarjeta muestra nombre, estado, pote actual y número de participantes.</li>
+                      <li>Las rifas públicas y empresariales se listan por defecto; puedes filtrarlas por estado y modo.</li>
+                      <li>Desde aquí entras a la sala de cada rifa para comprar números y ver detalles.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">3. Filtros y orden</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Usa los filtros de estado, modo y orden para priorizar rifas activas, próximas o con mayor pote.</li>
+                      <li>El buscador permite localizar rifas por nombre o código.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">4. Buenas prácticas al crear rifas</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Elige un rango de números razonable para el tamaño de tu comunidad.</li>
+                      <li>Define precios que sean atractivos pero sostenibles para el premio que ofreces.</li>
+                      <li>Describe bien el premio en el proceso de creación para generar confianza.</li>
+                    </ul>
+                  </section>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Modal de Creación */}
         <CreateRaffleModal
           isOpen={showCreateModal}

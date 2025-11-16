@@ -153,6 +153,12 @@
     border-radius: 9999px;
   }
 
+  .scroll-touch-y {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

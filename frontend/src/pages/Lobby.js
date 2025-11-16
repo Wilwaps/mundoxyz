@@ -495,7 +495,7 @@ const Lobby = () => {
                 </p>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-scroll px-4 pt-3 pb-5 flex flex-col gap-4 scrollbar-thin">
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-5 flex flex-col gap-4 scrollbar-thin scroll-touch-y">
                 {/* Indicadores de pasos */}
                 <div className="flex items-center justify-center gap-3 mb-2">
                   {[0, 1, 2, 3].map((step) => (
