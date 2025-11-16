@@ -470,7 +470,7 @@ const Lobby = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-sm"
             onClick={() => setShowHowToEarnModal(false)}
           >
             <motion.div
@@ -478,7 +478,7 @@ const Lobby = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="w-full max-w-3xl card-glass relative max-h-[90vh] flex flex-col overflow-hidden"
+              className="w-full h-full md:h-auto max-w-3xl card-glass relative md:max-h-[90vh] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -490,7 +490,7 @@ const Lobby = () => {
 
               <div className="px-4 py-2 border-b border-white/10 shrink-0">
                 <h2 className="text-lg font-bold text-text mb-1">Cómo ganar dinero con MundoXYZ</h2>
-                <p className="text-sm text-text/60">
+                <p className="text-xs md:text-sm text-text/60">
                   Sigue este recorrido rápido: deposita fuegos, juega para multiplicarlos y luego canjea tu premio.
                 </p>
               </div>
@@ -521,13 +521,13 @@ const Lobby = () => {
                         className="grid md:grid-cols-2 gap-6 items-center"
                       >
                         <div>
-                          <h3 className="text-xl font-bold mb-2">Paso 1 · Bienvenido al juego del dinero</h3>
-                          <p className="text-sm text-text/70 mb-3">
+                          <h3 className="text-lg md:text-xl font-bold mb-2">Paso 1 · Bienvenido al juego del dinero</h3>
+                          <p className="text-xs md:text-sm text-text/70 mb-3">
                             En MundoXYZ conviertes tu tiempo y tu diversión en fuegos <span className="text-fire-orange">🔥</span>.
                             Los fuegos son tu moneda premium: los usas para entrar a partidas, rifas y experiencias, y luego puedes
                             canjearlos por dinero real.
                           </p>
-                          <ul className="text-sm text-text/70 space-y-1">
+                          <ul className="text-xs md:text-sm text-text/70 space-y-1">
                             <li>• 💰 <strong>Monedas</strong>: puntos suaves para jugar y progresar.</li>
                             <li>• 🔥 <strong>Fuegos</strong>: la moneda con la que puedes ganar y retirar dinero.</li>
                           </ul>
@@ -553,12 +553,12 @@ const Lobby = () => {
                         className="grid md:grid-cols-2 gap-6 items-start"
                       >
                         <div>
-                          <h3 className="text-xl font-bold mb-2">Paso 2 · Deposita fuegos</h3>
-                          <p className="text-sm text-text/70 mb-3">
+                          <h3 className="text-lg md:text-xl font-bold mb-2">Paso 2 · Deposita fuegos</h3>
+                          <p className="text-xs md:text-sm text-text/70 mb-3">
                             Para ganar dinero primero necesitas fuegos en tu wallet.
                             Los puedes recargar fácil con pago bancario o recibirlos de otros jugadores.
                           </p>
-                          <ul className="text-sm text-text/70 space-y-2">
+                          <ul className="text-xs md:text-sm text-text/70 space-y-2">
                             <li>
                               <strong>Desde tu Perfil:</strong>
                               <br />
@@ -603,12 +603,12 @@ const Lobby = () => {
                         className="grid md:grid-cols-2 gap-6 items-start"
                       >
                         <div>
-                          <h3 className="text-xl font-bold mb-2">Paso 3 · Juega y multiplica</h3>
-                          <p className="text-sm text-text/70 mb-3">
+                          <h3 className="text-lg md:text-xl font-bold mb-2">Paso 3 · Juega y multiplica</h3>
+                          <p className="text-xs md:text-sm text-text/70 mb-3">
                             Con fuegos en tu balance, ya puedes entrar a salas y rifas donde el pozo crece con cada jugador.
                             Si ganas, te llevas el premio en fuegos o monedas, según el juego.
                           </p>
-                          <ul className="text-sm text-text/70 space-y-2">
+                          <ul className="text-xs md:text-sm text-text/70 space-y-2">
                             <li>• En este Lobby verás tus salas activas y partidas abiertas.</li>
                             <li>• Crea tus propias salas de <strong>TicTacToe</strong> o entra a <strong>Bingo</strong> y <strong>Rifas</strong>.</li>
                             <li>• Cada sala muestra el pozo 💰/🔥 y el estado del juego.</li>
@@ -646,12 +646,12 @@ const Lobby = () => {
                         className="grid md:grid-cols-2 gap-6 items-start"
                       >
                         <div>
-                          <h3 className="text-xl font-bold mb-2">Paso 4 · Retira tu dinero</h3>
-                          <p className="text-sm text-text/70 mb-3">
+                          <h3 className="text-lg md:text-xl font-bold mb-2">Paso 4 · Retira tu dinero</h3>
+                          <p className="text-xs md:text-sm text-text/70 mb-3">
                             Cuando acumules suficientes fuegos puedes solicitar un canje a dinero real.
                             El equipo revisa tu solicitud y te paga por transferencia bancaria.
                           </p>
-                          <ul className="text-sm text-text/70 space-y-2">
+                          <ul className="text-xs md:text-sm text-text/70 space-y-2">
                             <li>• Actualmente el canje se coordina directamente con el equipo (Tote) usando los datos de tu cuenta.</li>
                             <li>• El mínimo habitual para canjear es de <strong>100 fuegos</strong>.</li>
                             <li>• Se aplica una comisión del <strong>5%</strong> sobre el monto que quieres retirar.</li>
