@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import API_URL from '../config/api';
 import './BingoV2WaitingRoom.css';
@@ -23,6 +23,7 @@ const BingoV2WaitingRoom = () => {
   const [closingRoom, setClosingRoom] = useState(false);
   const [currentCards, setCurrentCards] = useState(0);
   const [pendingCards, setPendingCards] = useState(1);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   useEffect(() => {
     loadRoomDetails();
@@ -352,12 +353,24 @@ const BingoV2WaitingRoom = () => {
   return (
     <div className="bingo-v2-waiting-room">
       <div className="room-header">
-        <h1>Sala de Espera</h1>
-        <div className="room-info">
-          <span>Código: <strong>{room.code}</strong></span>
-          <span>Host: <strong>{room.host_name}</strong></span>
+        <div>
+          <h1>Sala de Espera</h1>
+          <div className="room-info">
+            <span>Código: <strong>{room.code}</strong></span>
+            <span>Host: <strong>{room.host_name}</strong></span>
+          </div>
         </div>
-        <button className="leave-button" onClick={handleLeaveRoom}>Salir</button>
+        <div className="room-header-actions">
+          <button
+            type="button"
+            className="help-button"
+            onClick={() => setShowHelpModal(true)}
+          >
+            <Info size={16} />
+            <span>Cómo funciona esta sala</span>
+          </button>
+          <button className="leave-button" onClick={handleLeaveRoom}>Salir</button>
+        </div>
       </div>
 
       <div className="room-content">
@@ -499,6 +512,82 @@ const BingoV2WaitingRoom = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de ayuda: cómo funciona esta sala de Bingo */}
+      {showHelpModal && (
+        <div className="modal-overlay" onClick={() => setShowHelpModal(false)}>
+          <div className="help-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="help-modal-header">
+              <div className="help-modal-header-left">
+                <div className="help-modal-icon">
+                  <Info size={18} />
+                </div>
+                <div>
+                  <h2>Cómo funciona esta sala de Bingo</h2>
+                  <p>Guía rápida para crear la sala, comprar cartones y empezar la partida.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(false)}
+                className="help-modal-close"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="help-modal-body">
+              <section>
+                <h3>1. Crear una sala de Bingo</h3>
+                <p>
+                  Desde el lobby de Bingo eliges <strong>crear sala</strong> y defines la configuración:
+                </p>
+                <ul>
+                  <li><strong>Modo:</strong> cantidad de números del cartón (75 / 90, etc.).</li>
+                  <li><strong>Victoria:</strong> patrón que gana (línea, cartón lleno, figura especial).</li>
+                  <li><strong>Precio por cartón:</strong> cuántas monedas/fuegos cuesta cada cartón.</li>
+                  <li><strong>Máx. jugadores y cartones:</strong> límites por sala y por jugador.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>2. Qué ves en esta sala de espera</h3>
+                <ul>
+                  <li><strong>Configuración:</strong> resumen de modo, patrón, precio y límites.</li>
+                  <li><strong>Pozo acumulado:</strong> crece con cada cartón vendido.</li>
+                  <li><strong>Jugadores:</strong> lista de quién está dentro, sus cartones y si están listos.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>3. Comprar y ajustar cartones</h3>
+                <ul>
+                  <li>Usa los botones <strong>+</strong> y <strong>-</strong> para elegir cuántos cartones quieres.</li>
+                  <li>El sistema muestra el <strong>costo total</strong> antes de confirmar.</li>
+                  <li>Al aplicar cambios se descuenta de tu wallet y se actualiza el pozo.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>4. Listo para jugar</h3>
+                <ul>
+                  <li>Cuando tengas tus cartones, pulsa <strong>"Marcar como Listo"</strong>.</li>
+                  <li>El host ve quién está listo y puede iniciar la partida cuando haya jugadores suficientes.</li>
+                  <li>Si cambias la cantidad de cartones, deberás marcarte listo de nuevo.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>5. Cerrar sala (host)</h3>
+                <ul>
+                  <li>El host puede cerrar la sala cuando los jugadores se retiran o no se completa.</li>
+                  <li>Al cerrar, el sistema <strong>reembolsa</strong> automáticamente a los participantes.</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal para comprar cartones */}
       {showBuyCardsModal && (

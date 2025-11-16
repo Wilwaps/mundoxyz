@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
   X, Circle, Trophy, Clock, Users, Coins, Flame, 
-  ChevronLeft, RefreshCw, AlertCircle, Zap 
+  ChevronLeft, RefreshCw, AlertCircle, Zap, Info
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -37,6 +37,7 @@ const TicTacToeRoom = () => {
     opponentDisconnected: false,
     disconnectTimeout: null
   });
+  const [showHelpModal, setShowHelpModal] = useState(false);
   
   // Reset states when room code changes (for rematch navigation)
   useEffect(() => {
@@ -511,7 +512,7 @@ const TicTacToeRoom = () => {
         </button>
         
         <div className="card-glass p-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-text">Sala {code}</h1>
               <div className="flex items-center gap-4 mt-2">
@@ -568,15 +569,26 @@ const TicTacToeRoom = () => {
               </div>
             </div>
             
-            {/* Timer */}
-            {room?.status === 'playing' && (
-              <div className={`flex flex-col items-center ${timeLeft <= 5 ? 'animate-pulse' : ''}`}>
-                <Clock size={24} className={timeLeft <= 5 ? 'text-error' : 'text-text/60'} />
-                <span className={`text-2xl font-bold ${timeLeft <= 5 ? 'text-error' : 'text-text'}`}>
-                  {timeLeft}s
-                </span>
-              </div>
-            )}
+            {/* Help + Timer */}
+            <div className="flex flex-col items-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(true)}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-glass hover:bg-glass-hover text-xs text-text/80 transition-colors"
+              >
+                <Info size={14} className="text-accent" />
+                <span>Cómo funciona esta sala</span>
+              </button>
+
+              {room?.status === 'playing' && (
+                <div className={`flex flex-col items-center ${timeLeft <= 5 ? 'animate-pulse' : ''}`}>
+                  <Clock size={24} className={timeLeft <= 5 ? 'text-error' : 'text-text/60'} />
+                  <span className={`text-2xl font-bold ${timeLeft <= 5 ? 'text-error' : 'text-text'}`}>
+                    {timeLeft}s
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -906,6 +918,95 @@ const TicTacToeRoom = () => {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Help Modal - Cómo crear y usar salas de La Vieja */}
+      <AnimatePresence>
+        {showHelpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowHelpModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
+              className="w-full max-w-2xl card-glass relative max-h-[90vh] flex flex-col overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                    <Info size={18} className="text-accent" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm md:text-base font-bold text-text">Cómo funcionan las salas de La Vieja</h2>
+                    <p className="text-[11px] md:text-xs text-text/60">Guía rápida para crear una sala justa y divertida.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="px-2 py-1 rounded-lg bg-glass hover:bg-glass-hover text-xs text-text/70"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin text-xs md:text-sm text-text/80 space-y-4">
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">1. Crear una sala desde el Lobby</h3>
+                  <p>
+                    En el Lobby de La Vieja toca <span className="font-semibold">"Crear Sala"</span>. Allí eliges cómo se va a jugar:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>
+                      <span className="font-semibold">Modo:</span> 
+                      <span> 💰 Coins o 🔥 Fires. En modo fires la apuesta es fija de 1 fuego (1 Bs).</span>
+                    </li>
+                    <li>
+                      <span className="font-semibold">Apuesta:</span> define cuántas monedas pone cada jugador. El premio es el pozo de ambos.
+                    </li>
+                    <li>
+                      <span className="font-semibold">Visibilidad:</span> pública (otros la ven en el Lobby) o privada (solo con código).
+                    </li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">2. Flujo de una sala</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Creas la sala y se descuenta tu apuesta de la wallet.</li>
+                    <li>Tu amigo u otro jugador entra con el código o desde el listado público.</li>
+                    <li>Cuando ambos entran, el sistema arma el pozo con las dos apuestas.</li>
+                    <li>El invitado marca <span className="font-semibold">"Estoy listo"</span> y el host puede iniciar.</li>
+                    <li>La partida tiene <span className="font-semibold">15 segundos por turno</span>. Si alguien se queda sin jugar, pierde por tiempo.</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">3. Premios y revanchas</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>El ganador recibe el pozo completo (sin comisión) en la misma moneda de la apuesta.</li>
+                    <li>En empate, cada jugador recupera su apuesta.</li>
+                    <li>Después de terminar, puedes pedir <span className="font-semibold">revancha</span> en la misma sala, sin crear una nueva.</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-1">
+                  <h3 className="font-semibold text-text">4. Buenas prácticas</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Antes de crear una sala grande, revisa bien tu balance de coins/fires.</li>
+                    <li>Usa salas privadas cuando quieras jugar solo con amigos o hacer retos específicos.</li>
+                    <li>Si una sala se queda sin oponente, puedes cerrarla desde administración para reembolsar.</li>
+                  </ul>
+                </section>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

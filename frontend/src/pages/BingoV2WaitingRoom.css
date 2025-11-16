@@ -47,6 +47,38 @@
   transform: scale(1.05);
 }
 
+.room-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.help-button svg {
+  flex-shrink: 0;
+}
+
+.help-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+}
+
 .room-content {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -176,6 +208,98 @@
   padding: 30px;
   max-width: 500px;
   width: 90%;
+}
+
+/* Help modal - reutiliza la overlay pero con un cuerpo más oscuro y vidrio moderno */
+.help-modal-content {
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.18), rgba(15,23,42,0.95));
+  border-radius: 20px;
+  padding: 20px 24px;
+  max-width: 700px;
+  width: 100%;
+  color: #ffffff;
+  box-shadow: 0 22px 55px rgba(0,0,0,0.75);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.help-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.help-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.help-modal-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #67e8f9 0%, #a855f7 50%, #f97316 100%);
+  color: #0b1120;
+}
+
+.help-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.help-modal-header p {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.75);
+}
+
+.help-modal-close {
+  border: none;
+  background: rgba(15,23,42,0.75);
+  color: rgba(255,255,255,0.8);
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.help-modal-close:hover {
+  background: rgba(15,23,42,0.95);
+}
+
+.help-modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  font-size: 0.85rem;
+}
+
+.help-modal-body section {
+  margin-bottom: 16px;
+}
+
+.help-modal-body h3 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.help-modal-body p {
+  margin: 0 0 4px;
+}
+
+.help-modal-body ul {
+  margin: 4px 0 0;
+  padding-left: 1rem;
+}
+
+.help-modal-body li {
+  margin-bottom: 4px;
 }
 
 .modal-content h2 {

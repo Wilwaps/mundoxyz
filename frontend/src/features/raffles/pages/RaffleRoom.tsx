@@ -53,6 +53,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [timeToDrawMs, setTimeToDrawMs] = useState<number | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -579,6 +580,16 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             
             {/* Acciones */}
             <div className="flex gap-2">
+              {/* Ayuda */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowHelpModal(true)}
+                className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
+                title="Cómo funciona esta rifa"
+              >
+                <Info className="w-5 h-5 text-accent" />
+              </motion.button>
               {/* Botón elegir ganador manual - Solo host, modo manual, todos vendidos */}
               {user?.id === raffle.hostId &&
                 raffle.drawMode === 'manual' &&
@@ -1064,6 +1075,111 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           )}
         </AnimatePresence>
         
+        {/* Modal de ayuda: cómo funciona esta rifa */}
+        <AnimatePresence>
+          {showHelpModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowHelpModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="w-full max-w-3xl bg-dark rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
+                      <Info className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-text">Cómo funcionan las rifas</h3>
+                      <p className="text-[11px] md:text-xs text-text/60">
+                        Guía rápida para crear tu rifa y entender esta sala.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowHelpModal(false)}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-xs text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="p-4 pt-3 pb-5 space-y-4 text-xs md:text-sm text-text/80 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">1. Crear una rifa desde el Lobby</h4>
+                    <p>
+                      En la página de <span className="font-semibold">Rifas Activas</span> pulsa <span className="font-semibold">"Crear Rifa"</span>. 
+                      El asistente te guía paso a paso:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>
+                        <span className="font-semibold">Modo:</span> elige si el premio es en 🔥 fires, 🪙 monedas o un premio físico/servicio.
+                      </li>
+                      <li>
+                        <span className="font-semibold">Rango de números:</span> cuántos números tendrá la rifa (ej. 100, 500, 1000).
+                      </li>
+                      <li>
+                        <span className="font-semibold">Precio por número:</span> cuánto paga cada jugador por número (en fires o coins).
+                      </li>
+                      <li>
+                        <span className="font-semibold">Visibilidad:</span> pública, privada o empresarial (landing especial para tu marca).
+                      </li>
+                      <li>
+                        <span className="font-semibold">Modo de sorteo:</span> automático, programado o manual, según cómo quieras elegir al ganador.
+                      </li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">2. Qué muestra esta sala</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li><span className="font-semibold">Encabezado:</span> nombre, estado, código de la rifa y tiempo para el sorteo.</li>
+                      <li><span className="font-semibold">Estadísticas:</span> números totales, vendidos, reservados, disponibles y pote acumulado.</li>
+                      <li><span className="font-semibold">Grilla de números:</span> cada casilla representa un número que puede estar disponible, reservado o vendido.</li>
+                      <li><span className="font-semibold">Mis números:</span> resume los números que ya compraste.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">3. Cómo comprar números</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Haz clic sobre los números disponibles para seleccionarlos (hasta 50 por compra).</li>
+                      <li>La barra flotante muestra cuántos números llevas y el <span className="font-semibold">total a pagar</span>.</li>
+                      <li>Al pulsar <span className="font-semibold">"Comprar"</span>, el sistema los reserva y luego confirma el pago desde tu wallet.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">4. Rol del organizador</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Puede cancelar la rifa si es necesario; la plataforma reembolsa a todos los compradores.</li>
+                      <li>En modo manual, el host puede pulsar <span className="font-semibold">"Elegir Ganador"</span> cuando todos los números estén vendidos.</li>
+                      <li>En rifas empresariales, puede compartir la <span className="font-semibold">landing pública</span> para vender más rápido.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-1">
+                    <h4 className="font-semibold text-text">5. Buenas prácticas</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Elige un rango de números acorde al tamaño de tu comunidad.</li>
+                      <li>Define precios justos y comunica claramente el premio y las condiciones.</li>
+                      <li>Evita cancelar rifas activas salvo que sea estrictamente necesario.</li>
+                    </ul>
+                  </section>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Modal de imagen de premio */}
         <AnimatePresence>
           {showPrizeModal && (
