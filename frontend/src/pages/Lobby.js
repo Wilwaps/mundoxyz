@@ -532,7 +532,7 @@ const Lobby = () => {
                             <li>• 🔥 <strong>Fuegos</strong>: la moneda con la que puedes ganar y retirar dinero.</li>
                           </ul>
                         </div>
-                        <div className="hidden md:flex items-center justify-center">
+                        <div className="flex items-center justify-center mt-4 md:mt-0 md:flex">
                           <div className="w-48 h-48 rounded-3xl bg-gradient-to-br from-fire-orange/60 via-amber-400/40 to-violet/50 flex items-center justify-center shadow-2xl">
                             <div className="text-center">
                               <div className="text-5xl mb-2">🔥</div>
@@ -578,7 +578,7 @@ const Lobby = () => {
                             </li>
                           </ul>
                         </div>
-                        <div className="hidden md:flex items-center justify-center">
+                        <div className="flex items-center justify-center mt-4 md:mt-0 md:flex">
                           <div className="glass-panel p-4 rounded-2xl space-y-3 w-full max-w-xs">
                             <p className="text-xs text-text/60">Ejemplo de flujo:</p>
                             <div className="text-sm">
@@ -615,7 +615,7 @@ const Lobby = () => {
                             <li>• Cuando ganas, tu wallet se actualiza automáticamente y verás la transacción en el historial.</li>
                           </ul>
                         </div>
-                        <div className="hidden md:flex items-center justify-center">
+                        <div className="flex items-center justify-center mt-4 md:mt-0 md:flex">
                           <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
                             <div className="glass-panel p-3 rounded-xl">
                               <p className="text-xs text-text/60 mb-1">Ejemplo:</p>
