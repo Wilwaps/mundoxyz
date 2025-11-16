@@ -180,7 +180,7 @@ const BingoLobby = () => {
       {/* Header */}
       <div className="glass-effect sticky top-0 z-40 border-b border-white/10">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/games')}
@@ -194,7 +194,7 @@ const BingoLobby = () => {
               </h1>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 justify-end">
               <button
                 type="button"
                 onClick={() => setShowHelpModal(true)}
@@ -321,14 +321,14 @@ const BingoLobby = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-sm"
             onClick={() => setShowHelpModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 10 }}
-              className="w-full max-w-2xl bg-gradient-to-br from-purple-900/90 via-indigo-900/95 to-blue-900/95 rounded-2xl border border-white/15 shadow-2xl overflow-hidden flex flex-col"
+              className="w-full h-full md:h-auto max-w-2xl bg-gradient-to-br from-purple-900/90 via-indigo-900/95 to-blue-900/95 rounded-none md:rounded-2xl border border-white/15 shadow-2xl overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">

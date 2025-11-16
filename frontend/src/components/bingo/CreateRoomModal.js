@@ -7,8 +7,8 @@ const CreateRoomModal = ({ show, onClose, onSuccess }) => {
   const [config, setConfig] = useState({
     mode: '75',
     pattern_type: 'line',
-    card_cost: 100,
-    currency_type: 'coins',
+    card_cost: 1,
+    currency_type: 'fires',
     max_players: 30,
     max_cards_per_player: 10,
     is_public: true

@@ -127,7 +127,8 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
 
   // Formatear el monto con el signo correcto
   const formatAmount = (amount, type) => {
-    const value = Math.abs(parseFloat(amount));
+    const parsed = parseFloat(amount);
+    const value = Number.isFinite(parsed) ? Math.abs(parsed) : 0;
     const isDebit = isDebitTransaction(type, amount);
     const sign = isDebit ? '-' : '+';
     return `${sign}${value.toFixed(2)}`;
@@ -293,7 +294,11 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
                             {formatDate(tx.created_at)}
                           </span>
                           <span className="text-xs text-text/40">
-                            Balance: {parseFloat(tx.balance_after).toFixed(2)} {getCurrencyIcon()}
+                            {(() => {
+                              const parsed = parseFloat(tx.balance_after);
+                              const balanceValue = Number.isFinite(parsed) ? parsed : 0;
+                              return `Balance: ${balanceValue.toFixed(2)} ${getCurrencyIcon()}`;
+                            })()}
                           </span>
                         </div>
                       </div>

@@ -333,7 +333,14 @@ router.get('/stats', adminAuth, async (req, res) => {
           AVG(fires_balance) as avg_fires_balance
         FROM wallets
       `);
-      stats.economy = economyStats.rows[0];
+
+      const row = economyStats.rows[0] || {};
+      stats.economy = {
+        total_coins_circulation: parseFloat(row.total_coins_circulation) || 0,
+        total_fires_circulation: parseFloat(row.total_fires_circulation) || 0,
+        avg_coins_balance: parseFloat(row.avg_coins_balance) || 0,
+        avg_fires_balance: parseFloat(row.avg_fires_balance) || 0
+      };
     } catch (economyStatsError) {
       logger.warn('Error fetching economy stats, using defaults:', economyStatsError.message);
       stats.economy = {
