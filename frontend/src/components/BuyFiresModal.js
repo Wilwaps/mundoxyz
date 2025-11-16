@@ -202,6 +202,7 @@ Pago`;
                 {errors.amount && (
                   <p className="text-xs text-red-400 mt-1">{errors.amount}</p>
                 )}
+                <p className="text-xs text-text/40 mt-1">1 fuego = 1 Bs</p>
               </div>
 
               {/* Bank Reference Input */}

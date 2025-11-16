@@ -130,7 +130,7 @@ const Login = () => {
                     disabled={loading}
                     className="w-full btn-secondary"
                   >
-                    {loading ? 'Iniciando...' : 'Iniciar Sesión (Dev)'}
+                    {loading ? 'Iniciando...' : 'Iniciar Sesión'}
                   </button>
                 </form>
                 

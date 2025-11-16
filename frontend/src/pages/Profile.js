@@ -42,6 +42,7 @@ const Profile = () => {
   const [raffleSettings, setRaffleSettings] = useState({ prizeModeCostFires: 500, companyModeCostFires: 500 });
   const [raffleSettingsLoading, setRaffleSettingsLoading] = useState(false);
   const [raffleSettingsSaving, setRaffleSettingsSaving] = useState(false);
+  const [forceSecuritySetup, setForceSecuritySetup] = useState(false);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -454,6 +455,16 @@ const Profile = () => {
       <PasswordChangeModal 
         isOpen={showPasswordModal} 
         onClose={() => setShowPasswordModal(false)} 
+        onFirstPasswordSet={() => {
+          // Solo forzar flujo si es usuario con Telegram vinculado y sin respuesta de seguridad
+          if (user?.tg_id && !user?.security_answer) {
+            setShowPasswordModal(false);
+            setForceSecuritySetup(true);
+            setShowMyData(true);
+          } else {
+            setShowPasswordModal(false);
+          }
+        }}
       />
       
       <WalletHistoryModal 
@@ -492,7 +503,15 @@ const Profile = () => {
 
       <MyDataModal
         isOpen={showMyData}
-        onClose={() => setShowMyData(false)}
+        onClose={() => {
+          setShowMyData(false);
+          setForceSecuritySetup(false);
+        }}
+        forceSecuritySetup={forceSecuritySetup}
+        onSecuritySetupCompleted={() => {
+          setForceSecuritySetup(false);
+          setShowMyData(false);
+        }}
       />
     </div>
   );

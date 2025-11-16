@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import TelegramLinkModal from './TelegramLinkModal';
 import PasswordRequiredModal from './PasswordRequiredModal';
 
-const MyDataModal = ({ isOpen, onClose }) => {
+const MyDataModal = ({ isOpen, onClose, forceSecuritySetup = false, onSecuritySetupCompleted }) => {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
@@ -60,6 +60,14 @@ const MyDataModal = ({ isOpen, onClose }) => {
       setHasChanges(false);
     }
   }, [isOpen]); // ✅ Solo cuando isOpen cambia, NO cuando user cambia
+
+  // Cuando se fuerza configuración de seguridad, abrir pestaña Seguridad en modo edición
+  useEffect(() => {
+    if (isOpen && forceSecuritySetup && user && !user.security_answer) {
+      setActiveTab('security');
+      setEditingSecurityAnswer(true);
+    }
+  }, [isOpen, forceSecuritySetup, user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -206,6 +214,9 @@ const MyDataModal = ({ isOpen, onClose }) => {
       // Actualizar usuario
       await refreshUser();
       queryClient.invalidateQueries(['user-stats', user.id]);
+      if (typeof onSecuritySetupCompleted === 'function') {
+        onSecuritySetupCompleted();
+      }
       
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error al actualizar respuesta de seguridad');
@@ -215,6 +226,10 @@ const MyDataModal = ({ isOpen, onClose }) => {
   };
 
   const handleClose = () => {
+    if (forceSecuritySetup && !user?.security_answer) {
+      toast.error('Debes configurar tu respuesta de seguridad para continuar');
+      return;
+    }
     if (hasChanges) {
       if (window.confirm('¿Deseas salir sin guardar los cambios?')) {
         setHasChanges(false);

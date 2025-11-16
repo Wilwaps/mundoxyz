@@ -6,6 +6,7 @@
 const openaiService = require('../services/openai');
 const { query } = require('../db');
 const logger = require('../utils/logger');
+const telegramService = require('../services/telegramService');
 
 // Rate limiting simple en memoria (por usuario)
 const userRateLimits = new Map();
@@ -47,6 +48,14 @@ function checkRateLimit(userId) {
   return true;
 }
 
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 module.exports = (io, socket) => {
   /**
    * Enviar mensaje al bot Ron
@@ -54,14 +63,15 @@ module.exports = (io, socket) => {
   socket.on('ron:chat_message', async (data) => {
     try {
       const { userId, message } = data;
+      const trimmedMessage = message ? message.trim() : '';
       
       // Validaciones básicas
-      if (!userId || !message || !message.trim()) {
+      if (!userId || !trimmedMessage) {
         return socket.emit('ron:error', { message: 'Datos inválidos' });
       }
       
       // Validar longitud del mensaje
-      if (message.length > 500) {
+      if (trimmedMessage.length > 500) {
         return socket.emit('ron:error', { 
           message: 'Mensaje muy largo (máximo 500 caracteres)' 
         });
@@ -76,7 +86,7 @@ module.exports = (io, socket) => {
       
       // Obtener username del usuario
       const userResult = await query(
-        'SELECT username FROM users WHERE id = $1',
+        'SELECT id, username, tg_id, email FROM users WHERE id = $1',
         [userId]
       );
       
@@ -84,31 +94,83 @@ module.exports = (io, socket) => {
         return socket.emit('ron:error', { message: 'Usuario no encontrado' });
       }
       
-      const username = userResult.rows[0].username;
+      const user = userResult.rows[0];
+      const username = user.username;
+      const tgId = user.tg_id;
+      const email = user.email;
       
       logger.info('🤖 Ron chat message received', {
         userId,
         username,
-        messageLength: message.length
+        messageLength: trimmedMessage.length
       });
       
       // Emitir mensaje del usuario de vuelta (confirmación)
       socket.emit('ron:user_message', {
         userId,
         username,
-        message: message.trim(),
+        message: trimmedMessage,
         timestamp: new Date().toISOString(),
         isBot: false
       });
       
+      // Comando /queja: enviar queja vía Telegram y responder sin usar OpenAI
+      if (trimmedMessage.toLowerCase().startsWith('/queja')) {
+        const complaintText = trimmedMessage.slice('/queja'.length).trim();
+        
+        if (!complaintText) {
+          return socket.emit('ron:error', { 
+            message: 'Escribe tu queja después de /queja, por ejemplo: /queja No pude entrar a la sala de Bingo.' 
+          });
+        }
+        
+        const now = new Date();
+        const complaintMessage = [
+          '⚠️ <b>Nueva queja desde Ron</b>',
+          '',
+          `<b>Usuario:</b> ${escapeHtml(username)} (ID: ${userId})`,
+          `<b>Telegram ID:</b> ${tgId ? `<code>${tgId}</code>` : 'no vinculado'}`,
+          email ? `<b>Email:</b> ${escapeHtml(email)}` : null,
+          `<b>Fecha:</b> ${now.toLocaleString('es-ES')}`,
+          '',
+          '<b>Mensaje:</b>',
+          escapeHtml(complaintText)
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        try {
+          const sent = await telegramService.sendAdminMessage(complaintMessage);
+          if (!sent) {
+            logger.warn('Failed to send complaint via Telegram', { userId, username });
+          }
+        } catch (err) {
+          logger.error('Error sending complaint via Telegram', {
+            error: err.message,
+            userId,
+            username
+          });
+        }
+
+        socket.emit('ron:bot_response', {
+          username: 'Ron',
+          message: 'He enviado tu queja al equipo de MundoXYZ. Gracias por avisar, la revisarán lo antes posible.',
+          timestamp: new Date().toISOString(),
+          isBot: true,
+          tokensUsed: 0
+        });
+
+        return;
+      }
+      
       // Guardar mensaje en historial (OpenAI Service)
-      await openaiService.addMessage(userId, username, message.trim(), false);
+      await openaiService.addMessage(userId, username, trimmedMessage, false);
       
       // Indicar que Ron está escribiendo
       socket.emit('ron:typing', { isTyping: true });
       
       // Obtener respuesta de OpenAI
-      const response = await openaiService.chat(userId, message.trim());
+      const response = await openaiService.chat(userId, trimmedMessage);
       
       // Ron terminó de escribir
       socket.emit('ron:typing', { isTyping: false });

@@ -140,6 +140,18 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(34, 211, 238, 0.3) rgba(255, 255, 255, 0.05);
   }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.6);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(34, 211, 238, 0.7);
+    border-radius: 9999px;
+  }
 
   .scrollbar-hide {
     -ms-overflow-style: none;

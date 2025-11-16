@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
-const PasswordChangeModal = ({ isOpen, onClose }) => {
+const PasswordChangeModal = ({ isOpen, onClose, onFirstPasswordSet }) => {
   const { user } = useAuth();
   const [hasPassword, setHasPassword] = useState(null); // null = checking, true/false = result
   const [formData, setFormData] = useState({
@@ -96,6 +96,8 @@ const PasswordChangeModal = ({ isOpen, onClose }) => {
 
     if (!validate()) return;
 
+    const isFirstPassword = hasPassword === false;
+
     setLoading(true);
     try {
       await axios.put('/api/auth/change-password', formData);
@@ -103,7 +105,11 @@ const PasswordChangeModal = ({ isOpen, onClose }) => {
       toast.success(message);
       setFormData({ current_password: '', new_password: '', new_password_confirm: '' });
       setHasPassword(true); // Ahora tiene contraseña
-      onClose();
+      if (isFirstPassword && typeof onFirstPasswordSet === 'function') {
+        onFirstPasswordSet();
+      } else {
+        onClose();
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error al cambiar contraseña');
     } finally {
