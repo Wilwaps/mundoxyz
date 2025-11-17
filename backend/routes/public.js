@@ -62,37 +62,68 @@ router.get('/stats', async (req, res) => {
         (SELECT COUNT(*) FROM tictactoe_rooms WHERE status = 'in_progress') as active_tictactoe
     `);
 
-    // Construir respuesta
+    // Normalizar y proteger contra valores NaN o nulos
+    const ecoRow = economyStats.rows[0] || {};
+    const totalFiresRaw = parseFloat(ecoRow.total_fires_circulation);
+    const totalCoinsRaw = parseFloat(ecoRow.total_coins_circulation);
+    const usersWithBalanceRaw = parseInt(ecoRow.total_users_with_balance);
+
+    const totalFires = Number.isFinite(totalFiresRaw) ? totalFiresRaw : 0;
+    const totalCoins = Number.isFinite(totalCoinsRaw) ? totalCoinsRaw : 0;
+    const usersWithBalance = Number.isFinite(usersWithBalanceRaw) ? usersWithBalanceRaw : 0;
+
+    const totalUsersRaw = parseInt(totalUsers.rows[0]?.total_users);
+    const activeUsersRaw = parseInt(activeUsers.rows[0]?.active_users_7d);
+    const totalUsersCount = Number.isFinite(totalUsersRaw) ? totalUsersRaw : 0;
+    const activeUsersCount = Number.isFinite(activeUsersRaw) ? activeUsersRaw : 0;
+
+    const gamesRow = gamesPlayed.rows[0] || {};
+    const bingoGamesRaw = parseInt(gamesRow.bingo_games);
+    const rafflesGamesRaw = parseInt(gamesRow.raffles_finished);
+    const tictactoeGamesRaw = parseInt(gamesRow.tictactoe_games);
+    const bingoGames = Number.isFinite(bingoGamesRaw) ? bingoGamesRaw : 0;
+    const rafflesGames = Number.isFinite(rafflesGamesRaw) ? rafflesGamesRaw : 0;
+    const tictactoeGames = Number.isFinite(tictactoeGamesRaw) ? tictactoeGamesRaw : 0;
+
+    const activeGamesRow = activeGames.rows[0] || {};
+    const activeBingoRaw = parseInt(activeGamesRow.active_bingo);
+    const activeRafflesRaw = parseInt(activeGamesRow.active_raffles);
+    const activeTictactoeRaw = parseInt(activeGamesRow.active_tictactoe);
+    const activeBingo = Number.isFinite(activeBingoRaw) ? activeBingoRaw : 0;
+    const activeRaffles = Number.isFinite(activeRafflesRaw) ? activeRafflesRaw : 0;
+    const activeTictactoe = Number.isFinite(activeTictactoeRaw) ? activeTictactoeRaw : 0;
+
+    const prizesRow = prizesDistributed.rows[0] || {};
+    const totalPrizesRaw = parseFloat(prizesRow.total_prizes_fires);
+    const totalPrizes = Number.isFinite(totalPrizesRaw) ? totalPrizesRaw : 0;
+
+    // Construir respuesta con valores ya normalizados
     const stats = {
       economy: {
-        totalFiresCirculation: parseFloat(economyStats.rows[0].total_fires_circulation).toFixed(2),
-        totalCoinsCirculation: parseFloat(economyStats.rows[0].total_coins_circulation).toFixed(2),
-        usersWithBalance: parseInt(economyStats.rows[0].total_users_with_balance)
+        totalFiresCirculation: totalFires.toFixed(2),
+        totalCoinsCirculation: totalCoins.toFixed(2),
+        usersWithBalance
       },
       users: {
-        total: parseInt(totalUsers.rows[0].total_users),
-        active7Days: parseInt(activeUsers.rows[0].active_users_7d)
+        total: totalUsersCount,
+        active7Days: activeUsersCount
       },
       games: {
         playedLast30Days: {
-          bingo: parseInt(gamesPlayed.rows[0].bingo_games),
-          raffles: parseInt(gamesPlayed.rows[0].raffles_finished),
-          tictactoe: parseInt(gamesPlayed.rows[0].tictactoe_games),
-          total: parseInt(gamesPlayed.rows[0].bingo_games) + 
-                 parseInt(gamesPlayed.rows[0].raffles_finished) + 
-                 parseInt(gamesPlayed.rows[0].tictactoe_games)
+          bingo: bingoGames,
+          raffles: rafflesGames,
+          tictactoe: tictactoeGames,
+          total: bingoGames + rafflesGames + tictactoeGames
         },
         activeNow: {
-          bingo: parseInt(activeGames.rows[0].active_bingo),
-          raffles: parseInt(activeGames.rows[0].active_raffles),
-          tictactoe: parseInt(activeGames.rows[0].active_tictactoe),
-          total: parseInt(activeGames.rows[0].active_bingo) + 
-                 parseInt(activeGames.rows[0].active_raffles) + 
-                 parseInt(activeGames.rows[0].active_tictactoe)
+          bingo: activeBingo,
+          raffles: activeRaffles,
+          tictactoe: activeTictactoe,
+          total: activeBingo + activeRaffles + activeTictactoe
         }
       },
       prizes: {
-        distributedLast30Days: parseFloat(prizesDistributed.rows[0].total_prizes_fires).toFixed(2)
+        distributedLast30Days: totalPrizes.toFixed(2)
       }
     };
 
