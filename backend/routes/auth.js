@@ -9,6 +9,7 @@ const { generateToken, generateRefreshToken, verifyToken } = require('../middlew
 const logger = require('../utils/logger');
 const config = require('../config/config');
 const { hashSecurityAnswer, compareSecurityAnswer, validateSecurityAnswer } = require('../utils/security');
+const telegramGroupRewardsService = require('../services/telegramGroupRewardsService');
 
 // Helper to sanitize IP into a valid PostgreSQL inet or null
 function getClientIp(req) {
@@ -43,6 +44,13 @@ router.post('/login-telegram', async (req, res) => {
     
     if (!userId) {
       return res.status(500).json({ error: 'Failed to create user' });
+    }
+
+    // Acreditar recompensas pendientes por mensajes en grupo de Telegram
+    try {
+      await telegramGroupRewardsService.creditPendingRewardsForUser(userId);
+    } catch (error) {
+      logger.error('Error crediting Telegram group rewards on login-telegram:', error);
     }
 
     // Generate tokens
@@ -180,6 +188,13 @@ router.post('/login-email', async (req, res) => {
 
       logger.info('login-email admin user ensured', { userId });
 
+      // Acreditar recompensas pendientes por mensajes en grupo de Telegram
+      try {
+        await telegramGroupRewardsService.creditPendingRewardsForUser(userId);
+      } catch (error) {
+        logger.error('Error crediting Telegram group rewards on admin login-email:', error);
+      }
+
       // Generate tokens and session
       const token = generateToken(userId);
       const refreshToken = generateRefreshToken(userId);
@@ -274,6 +289,18 @@ router.post('/login-email', async (req, res) => {
     }
 
     const userId = row.id;
+
+    // Acreditar recompensas pendientes por mensajes en grupo de Telegram
+    let tgGroupRewards = { credited: 0 };
+    try {
+      const rewardResult = await telegramGroupRewardsService.creditPendingRewardsForUser(userId);
+      if (rewardResult && typeof rewardResult.credited === 'number') {
+        tgGroupRewards.credited = rewardResult.credited;
+      }
+    } catch (error) {
+      logger.error('Error crediting Telegram group rewards on login-email:', error);
+    }
+
     const token = generateToken(userId);
     const refreshToken = generateRefreshToken(userId);
 
@@ -290,6 +317,9 @@ router.post('/login-email', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
+    const baseCoinsBalance = parseFloat(row.coins_balance || 0);
+    const coinsBalanceWithRewards = baseCoinsBalance + (tgGroupRewards.credited || 0);
+
     const payload = {
       success: true,
       token,
@@ -299,7 +329,7 @@ router.post('/login-email', async (req, res) => {
         username: row.username,
         email: row.email,
         wallet_id: row.wallet_id,
-        coins_balance: parseFloat(row.coins_balance || 0),
+        coins_balance: coinsBalanceWithRewards,
         fires_balance: parseFloat(row.fires_balance || 0),
         experience: row.experience || 0,
         total_games_played: row.total_games_played || 0,
@@ -510,6 +540,13 @@ router.post('/login-telegram-widget', async (req, res) => {
     
     if (!userId) {
       return res.status(500).json({ error: 'Failed to create user' });
+    }
+
+    // Acreditar recompensas pendientes por mensajes en grupo de Telegram
+    try {
+      await telegramGroupRewardsService.creditPendingRewardsForUser(userId);
+    } catch (error) {
+      logger.error('Error crediting Telegram group rewards on login-telegram-widget:', error);
     }
 
     // Generate tokens

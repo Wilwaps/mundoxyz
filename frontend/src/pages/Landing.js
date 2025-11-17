@@ -41,9 +41,20 @@ const Landing = () => {
     const [displayValue, setDisplayValue] = useState(0);
 
     useEffect(() => {
-      if (!value) return;
-      
-      const numValue = parseFloat(value);
+      // Normalizar valores nulos o vacíos a 0
+      if (value === null || value === undefined || value === '') {
+        setDisplayValue(0);
+        return;
+      }
+
+      const numValue = typeof value === 'number' ? value : parseFloat(value);
+
+      // Proteger contra NaN o infinitos
+      if (!Number.isFinite(numValue)) {
+        setDisplayValue(0);
+        return;
+      }
+
       const duration = 2000;
       const steps = 60;
       const increment = numValue / steps;
@@ -51,7 +62,9 @@ const Landing = () => {
 
       const timer = setInterval(() => {
         current += increment;
-        if (current >= numValue) {
+
+        // Manejar tanto incrementos positivos como negativos de forma segura
+        if ((increment >= 0 && current >= numValue) || (increment < 0 && current <= numValue)) {
           setDisplayValue(numValue);
           clearInterval(timer);
         } else {
@@ -62,9 +75,11 @@ const Landing = () => {
       return () => clearInterval(timer);
     }, [value]);
 
+    const safeValue = Number.isFinite(displayValue) ? displayValue : 0;
+
     return (
       <span>
-        {displayValue.toLocaleString('es-ES', { 
+        {safeValue.toLocaleString('es-ES', { 
           maximumFractionDigits: decimals,
           minimumFractionDigits: decimals 
         })}

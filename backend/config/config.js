@@ -45,7 +45,10 @@ const config = {
     authMaxSkewSec: parseInt(process.env.TELEGRAM_AUTH_MAX_SKEW_SEC || '86400', 10),
     replayTtlSec: parseInt(process.env.TELEGRAM_REPLAY_TTL_SEC || '120', 10),
     allowUnverifiedInit: process.env.ALLOW_UNVERIFIED_TG_INIT === 'true',
-    webappUrl: process.env.PUBLIC_WEBAPP_URL || 'http://localhost:3000'
+    webappUrl: process.env.PUBLIC_WEBAPP_URL || 'http://localhost:3000',
+    groupId: parseInt(process.env.TELEGRAM_GROUP_ID || '0', 10),
+    groupCoinsPerMessage: parseInt(process.env.TELEGRAM_GROUP_COINS_PER_MESSAGE || '1', 10),
+    groupMaxCoinsPerDay: parseInt(process.env.TELEGRAM_GROUP_MAX_COINS_PER_DAY || '100', 10)
   },
   
   security: {

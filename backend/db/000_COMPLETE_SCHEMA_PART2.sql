@@ -221,6 +221,28 @@ CREATE TABLE IF NOT EXISTS migrations (
 
 CREATE INDEX IF NOT EXISTS idx_migrations_filename ON migrations(filename);
 
+-- 23. TELEGRAM_GROUP_DAILY_REWARDS
+CREATE TABLE IF NOT EXISTS telegram_group_daily_rewards (
+  id SERIAL PRIMARY KEY,
+  tg_id BIGINT NOT NULL,
+  activity_date DATE NOT NULL,
+  messages_count INTEGER NOT NULL DEFAULT 0,
+  coins_earned DECIMAL(20,2) NOT NULL DEFAULT 0,
+  coins_claimed DECIMAL(20,2) NOT NULL DEFAULT 0,
+  last_message_at TIMESTAMP,
+  last_claimed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  CHECK (coins_earned >= 0),
+  CHECK (coins_claimed >= 0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tg_group_rewards_tg_date
+  ON telegram_group_daily_rewards (tg_id, activity_date);
+
+CREATE INDEX IF NOT EXISTS idx_tg_group_rewards_tg
+  ON telegram_group_daily_rewards (tg_id);
+
 -- FUNCIONES
 CREATE OR REPLACE FUNCTION generate_room_code() RETURNS VARCHAR(6) AS $$
 DECLARE

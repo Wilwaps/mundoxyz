@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { query } = require('../db');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+const telegramGroupRewardsService = require('../services/telegramGroupRewardsService');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -165,6 +166,15 @@ if (!token) {
       `Puedes copiar tu ID para vinculación manual en MundoXYZ.`,
       { parse_mode: 'Markdown' }
     );
+  });
+
+  // Track all messages in official Telegram group for daily rewards
+  bot.on('message', async (msg) => {
+    try {
+      await telegramGroupRewardsService.handleGroupMessage(msg);
+    } catch (error) {
+      logger.error('Error handling Telegram group reward message:', error);
+    }
   });
 
   // Error handling
