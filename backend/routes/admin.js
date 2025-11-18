@@ -591,21 +591,37 @@ async function scrapeBcvRate(pair) {
       }
     });
     const html = response.data || '';
+    const lowerHtml = typeof html === 'string' ? html.toLowerCase() : '';
+    const dolarIndex = lowerHtml.indexOf('id="dolar"');
+    let snippet = null;
+    if (dolarIndex !== -1) {
+      const start = Math.max(0, dolarIndex - 200);
+      const end = Math.min(html.length, dolarIndex + 400);
+      snippet = html.slice(start, end);
+    }
 
-    // Extraer específicamente el valor numérico del bloque del dólar oficial (div id="dolar" y div.centrado)
     const dolarMatch = html.match(
       /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*centrado[^"']*["'][^>]*>\s*<strong>\s*([0-9.,]+)\s*<\\/strong>/i
     );
 
     if (!dolarMatch) {
-      logger.warn('FIAT BCV scraping: no rate match in dolar block');
+      logger.warn('FIAT BCV scraping: no rate match in dolar block', {
+        pair,
+        url,
+        snippet
+      });
       return null;
     }
 
     const raw = dolarMatch[1].replace(/\./g, '').replace(/,/g, '.');
     const rate = parseFloat(raw);
     if (!Number.isFinite(rate) || rate <= 0) {
-      logger.warn('FIAT BCV scraping: invalid rate after parse', { raw });
+      logger.warn('FIAT BCV scraping: invalid rate after parse', {
+        pair,
+        url,
+        raw,
+        snippet
+      });
       return null;
     }
 
@@ -617,9 +633,27 @@ async function scrapeBcvRate(pair) {
       ['bcv', pair, rate, null, false, capturedAt]
     );
 
-    return insertRes.rows[0] || null;
+    const row = insertRes.rows[0] || null;
+    logger.info('FIAT BCV scraping: inserted fiat_rate', {
+      pair,
+      url,
+      raw,
+      rate,
+      capturedAt,
+      rowId: row?.id
+    });
+
+    return row;
   } catch (error) {
-    logger.error('Error scraping BCV rate:', error);
+    logger.error('Error scraping BCV rate:', {
+      message: error?.message || String(error),
+      code: error?.code,
+      responseStatus: error?.response?.status,
+      responseDataSnippet:
+        typeof error?.response?.data === 'string'
+          ? error.response.data.slice(0, 500)
+          : undefined
+    });
     return null;
   }
 }
