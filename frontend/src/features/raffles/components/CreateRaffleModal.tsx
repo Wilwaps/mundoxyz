@@ -1064,7 +1064,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   <div className="flex justify-between text-sm mt-2">
                     <span className="text-warning font-semibold">Costo creación:</span>
                     <span className="text-warning font-bold">
-                      {formData.visibility === 'company' ? '3000' : '300'} 🔥
+                      {formData.visibility === 'company' ? companyCreationCost : prizeCreationCost} 🔥
                     </span>
                   </div>
                 </div>
@@ -1092,7 +1092,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   <p className="font-semibold mb-1">Todo listo para crear tu rifa</p>
                   <p className="text-text/80">
                     Al confirmar se creará la rifa y {formData.mode === RaffleMode.PRIZE
-                      ? `se deducirán ${formData.visibility === 'company' ? '3000' : '300'} fuegos de tu cuenta`
+                      ? `se deducirán ${formData.visibility === 'company' ? companyCreationCost : prizeCreationCost} fuegos de tu cuenta`
                       : 'estará disponible inmediatamente'}
                   </p>
                 </div>
