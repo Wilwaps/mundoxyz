@@ -76,7 +76,11 @@ const createRaffleSchema = Joi.object({
         then: Joi.number()
           .min(SystemLimits.MIN_PRICE_COINS)
           .max(SystemLimits.MAX_PRICE_COINS),
-        otherwise: Joi.forbidden()
+        otherwise: Joi.when('mode', {
+          is: RaffleMode.PRIZE,
+          then: Joi.number().optional(),
+          otherwise: Joi.forbidden()
+        })
       })
     })
     .messages({
@@ -116,20 +120,12 @@ const createRaffleSchema = Joi.object({
       prizeValue: Joi.number().positive().optional(),
       prizeImages: Joi.array().items(Joi.string().uri()).optional(),
       bankingInfo: Joi.object({
-        accountHolder: Joi.string().required().messages({
-          'any.required': 'El nombre del titular es requerido'
-        }),
-        bankName: Joi.string().required().messages({
-          'any.required': 'El nombre del banco es requerido'
-        }),
-        accountNumber: Joi.string().required().messages({
-          'any.required': 'El número de cuenta es requerido'
-        }),
-        accountType: Joi.string().valid('ahorro', 'corriente').default('ahorro'),
-        phone: Joi.string().required().messages({
-          'any.required': 'El teléfono de contacto es requerido'
-        })
-      }).required()
+        accountHolder: Joi.string().optional(),
+        bankName: Joi.string().optional(),
+        accountNumber: Joi.string().optional(),
+        accountType: Joi.string().valid('ahorro', 'corriente').optional(),
+        phone: Joi.string().optional()
+      }).optional()
     }).required(),
     otherwise: Joi.object().optional()
   }),

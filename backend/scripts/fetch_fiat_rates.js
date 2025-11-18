@@ -46,9 +46,11 @@ async function fetchBcvRate(pair) {
     const html = res.data || '';
 
     // Extraer específicamente el valor numérico del bloque del dólar oficial (div id="dolar" y div.centrado)
-    const dolarMatch = html.match(
-      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*centrado[^"']*["'][^>]*>\s*<strong>\s*([0-9.,]+)\s*<\\/strong>/i
+    const dolarRegex = new RegExp(
+      '<div[^>]*id=["\']dolar["\'][^>]*>[\\s\\S]*?<div[^>]*class=["\'][^"\']*centrado[^"\']*["\'][^>]*>\\s*<strong>\\s*([0-9.,]+)\\s*<\\/strong>',
+      'i'
     );
+    const dolarMatch = html.match(dolarRegex);
 
     if (!dolarMatch) {
       console.warn('[FIAT] No se pudo encontrar tasa BCV en el bloque dolar. Ajusta el parser en fetchBcvRate().');
