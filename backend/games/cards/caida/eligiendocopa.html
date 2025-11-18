@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elegir forma de la copa</title>
+  <style>
+    :root {
+      /* Variables base de la copa */
+      --cup-width: 260px;   /* ancho total de la copa */
+      --bowl-height: 110px; /* altura de la parte superior */
+      --liquid-fill: 60;    /* % de llenado de la copa (0–100) */
+      --stem-height: 70px;  /* altura del tallo */
+      --stem-width: 14;     /* % del ancho total */
+      --base-height: 20px;  /* altura de la base */
+      --base-width: 60;     /* % del ancho total */
+      /* Rotaciones (en grados) */
+      --bowl-rotate: 0deg;
+      --stem-rotate: 0deg;
+      --base-rotate: 0deg;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #020617;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+
+    .wrap {
+      text-align: center;
+      padding: 24px;
+      max-width: 880px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #cbd5f5;
+    }
+
+    .cup-frame {
+      padding: 24px 18px 18px;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at top, #0f172a, #020617 60%, #000 100%);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,0.75),
+        inset 0 0 0 1px rgba(148,163,184,0.4);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cup-shape {
+      width: var(--cup-width);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cup-bowl {
+      position: relative;
+      width: 100%;
+      height: var(--bowl-height);
+      border-radius: 999px 999px 40px 40px;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,0.55), transparent 55%),
+        linear-gradient(180deg, #fecaca 0%, #ef4444 55%, #7f1d1d 100%);
+      box-shadow:
+        0 0 0 2px rgba(127, 29, 29, 0.95),
+        0 8px 18px rgba(0,0,0,0.7);
+      overflow: hidden;
+      transform-origin: 50% 80%;
+      transform: rotate(var(--bowl-rotate));
+    }
+
+    .cup-liquid {
+      position: absolute;
+      inset-inline: 6%;
+      bottom: 0;
+      height: calc(var(--bowl-height) * (var(--liquid-fill) / 100));
+      border-radius: 999px 999px 32px 32px;
+      background:
+        radial-gradient(circle at 30% 10%, rgba(240,249,255,0.7), transparent 55%),
+        linear-gradient(180deg, #38bdf8 0%, #0ea5e9 55%, #0369a1 100%);
+      box-shadow:
+        0 0 0 1px rgba(30, 64, 175, 0.7),
+        inset 0 2px 4px rgba(15, 23, 42, 0.6);
+    }
+
+    .cup-stem {
+      width: calc(var(--cup-width) * (var(--stem-width) / 100));
+      height: var(--stem-height);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #111827, #020617);
+      box-shadow:
+        0 -1px 0 rgba(248, 250, 252, 0.4),
+        0 8px 14px rgba(0,0,0,0.75);
+      transform-origin: 50% 0%;
+      transform: rotate(var(--stem-rotate));
+    }
+
+    .cup-base {
+      width: calc(var(--cup-width) * (var(--base-width) / 100));
+      height: var(--base-height);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #020617, #020617);
+      box-shadow:
+        0 -1px 0 rgba(248, 250, 252, 0.16),
+        0 6px 14px rgba(0,0,0,0.85);
+      transform-origin: 50% 50%;
+      transform: rotate(var(--base-rotate));
+    }
+
+    .dimensions {
+      font-size: 13px;
+      color: #e5e7eb;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(148,163,184,0.5);
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .dimensions span strong {
+      color: #a5f3fc;
+    }
+
+    .controls {
+      margin-top: 18px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #020617;
+      border-radius: 10px;
+      padding: 8px 12px;
+      border: 1px solid rgba(55,65,81,0.9);
+      font-size: 13px;
+      color: #e5e7eb;
+    }
+
+    .controls input[type="range"] {
+      width: 180px;
+      accent-color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Elegir forma de la copa</h1>
+
+    <div class="cup-frame">
+      <div class="cup-shape">
+        <div class="cup-bowl">
+          <div class="cup-liquid" id="cup-liquid"></div>
+        </div>
+        <div class="cup-stem"></div>
+        <div class="cup-base"></div>
+      </div>
+
+      <div class="dimensions" id="dimensions">
+        <span><strong>Boca:</strong> <span id="dim-bowl-width">260</span>×<span id="dim-bowl-height">110</span> px</span>
+        <span><strong>Líquido:</strong> <span id="dim-liquid-height">66</span> px (<span id="dim-liquid-percent">60</span>%)</span>
+        <span><strong>Tallo:</strong> <span id="dim-stem-width">36</span>×<span id="dim-stem-height">70</span> px</span>
+        <span><strong>Base:</strong> <span id="dim-base-width">156</span>×<span id="dim-base-height">20</span> px</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label>
+        Ancho total
+        <input type="range" id="width" min="180" max="360" value="260" />
+      </label>
+      <label>
+        Altura de la boca
+        <input type="range" id="bowlHeight" min="70" max="150" value="110" />
+      </label>
+      <label>
+        Nivel de líquido (%)
+        <input type="range" id="liquid" min="10" max="95" value="60" />
+      </label>
+      <label>
+        Altura del tallo
+        <input type="range" id="stemHeight" min="20" max="130" value="70" />
+      </label>
+      <label>
+        Ancho del tallo (%)
+        <input type="range" id="stemWidth" min="6" max="26" value="14" />
+      </label>
+      <label>
+        Ancho de la base (%)
+        <input type="range" id="baseWidth" min="30" max="90" value="60" />
+      </label>
+      <label>
+        Altura de la base
+        <input type="range" id="baseHeight" min="8" max="36" value="20" />
+      </label>
+      <label>
+        Rotar boca (°)
+        <input type="range" id="bowlRotate" min="0" max="360" value="0" />
+      </label>
+      <label>
+        Rotar tallo (°)
+        <input type="range" id="stemRotate" min="-25" max="25" value="0" />
+      </label>
+      <label>
+        Rotar base (°)
+        <input type="range" id="baseRotate" min="-25" max="25" value="0" />
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const rootStyle = document.documentElement.style;
+
+    const widthInput = document.getElementById('width');
+    const bowlHeightInput = document.getElementById('bowlHeight');
+    const liquidInput = document.getElementById('liquid');
+    const stemHeightInput = document.getElementById('stemHeight');
+    const stemWidthInput = document.getElementById('stemWidth');
+    const baseWidthInput = document.getElementById('baseWidth');
+    const baseHeightInput = document.getElementById('baseHeight');
+    const bowlRotateInput = document.getElementById('bowlRotate');
+    const stemRotateInput = document.getElementById('stemRotate');
+    const baseRotateInput = document.getElementById('baseRotate');
+
+    const dimBowlWidth = document.getElementById('dim-bowl-width');
+    const dimBowlHeight = document.getElementById('dim-bowl-height');
+    const dimLiquidHeight = document.getElementById('dim-liquid-height');
+    const dimLiquidPercent = document.getElementById('dim-liquid-percent');
+    const dimStemWidth = document.getElementById('dim-stem-width');
+    const dimStemHeight = document.getElementById('dim-stem-height');
+    const dimBaseWidth = document.getElementById('dim-base-width');
+    const dimBaseHeight = document.getElementById('dim-base-height');
+
+    function updateCopa() {
+      const widthVal = Number(widthInput.value);
+      const bowlHeightVal = Number(bowlHeightInput.value);
+      const liquidPercent = Number(liquidInput.value); // 0–100
+      const stemHeightVal = Number(stemHeightInput.value);
+      const stemWidthPercent = Number(stemWidthInput.value);
+      const baseWidthPercent = Number(baseWidthInput.value);
+      const baseHeightVal = Number(baseHeightInput.value);
+      const bowlRotateVal = Number(bowlRotateInput.value);
+      const stemRotateVal = Number(stemRotateInput.value);
+      const baseRotateVal = Number(baseRotateInput.value);
+
+      rootStyle.setProperty('--cup-width', widthVal + 'px');
+      rootStyle.setProperty('--bowl-height', bowlHeightVal + 'px');
+      rootStyle.setProperty('--liquid-fill', liquidPercent);
+      rootStyle.setProperty('--stem-height', stemHeightVal + 'px');
+      rootStyle.setProperty('--stem-width', stemWidthPercent);
+      rootStyle.setProperty('--base-width', baseWidthPercent);
+      rootStyle.setProperty('--base-height', baseHeightVal + 'px');
+      rootStyle.setProperty('--bowl-rotate', bowlRotateVal + 'deg');
+      rootStyle.setProperty('--stem-rotate', stemRotateVal + 'deg');
+      rootStyle.setProperty('--base-rotate', baseRotateVal + 'deg');
+
+      const stemWidthPx = Math.max(0, widthVal * stemWidthPercent / 100);
+      const baseWidthPx = Math.max(0, widthVal * baseWidthPercent / 100);
+      const liquidHeightPx = Math.max(0, bowlHeightVal * liquidPercent / 100);
+
+      dimBowlWidth.textContent = widthVal.toFixed(0);
+      dimBowlHeight.textContent = bowlHeightVal.toFixed(0);
+      dimLiquidHeight.textContent = liquidHeightPx.toFixed(0);
+      dimLiquidPercent.textContent = liquidPercent.toFixed(0);
+      dimStemWidth.textContent = stemWidthPx.toFixed(0);
+      dimStemHeight.textContent = stemHeightVal.toFixed(0);
+      dimBaseWidth.textContent = baseWidthPx.toFixed(0);
+      dimBaseHeight.textContent = baseHeightVal.toFixed(0);
+    }
+
+    widthInput.addEventListener('input', updateCopa);
+    bowlHeightInput.addEventListener('input', updateCopa);
+    liquidInput.addEventListener('input', updateCopa);
+    stemHeightInput.addEventListener('input', updateCopa);
+    stemWidthInput.addEventListener('input', updateCopa);
+    baseWidthInput.addEventListener('input', updateCopa);
+    baseHeightInput.addEventListener('input', updateCopa);
+    bowlRotateInput.addEventListener('input', updateCopa);
+    stemRotateInput.addEventListener('input', updateCopa);
+    baseRotateInput.addEventListener('input', updateCopa);
+
+    updateCopa();
+  </script>
+</body>
+</html>

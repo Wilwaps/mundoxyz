@@ -30,6 +30,7 @@ import { CreateRaffleForm, RaffleMode, RaffleVisibility, DrawMode } from '../typ
 import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 import { processImage } from '../utils/imageHelpers';
+import InsufficientFiresModal from '../../../components/InsufficientFiresModal';
 
 interface CreateRaffleModalProps {
   isOpen: boolean;
@@ -82,6 +83,8 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showInsufficientFiresModal, setShowInsufficientFiresModal] = useState(false);
+  const [missingFires, setMissingFires] = useState(0);
 
   const prizeCreationCost = raffleSettingsQuery.data?.prizeModeCostFires ?? 500;
   const companyCreationCost = raffleSettingsQuery.data?.companyModeCostFires ?? 500;
@@ -263,6 +266,14 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         ? companyCreationCost
         : prizeCreationCost;
       if ((user?.fires_balance || 0) < requiredFires) {
+        const current = user?.fires_balance || 0;
+        const missing = requiredFires - current;
+        if (missing > 0) {
+          setMissingFires(missing);
+        } else {
+          setMissingFires(requiredFires);
+        }
+        setShowInsufficientFiresModal(true);
         toast.error(`Necesitas ${requiredFires} fuegos para crear una rifa en modo premio`);
         return;
       }
@@ -1092,9 +1103,9 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         
       default:
         return null;
-    }
-  };
-  
+      }
+    };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -1194,6 +1205,12 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
             </div>
             </motion.div>
           </motion.div>
+
+          <InsufficientFiresModal
+            isOpen={showInsufficientFiresModal}
+            onClose={() => setShowInsufficientFiresModal(false)}
+            missingFires={missingFires}
+          />
         </>
       )}
     </AnimatePresence>

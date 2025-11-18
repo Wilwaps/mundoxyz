@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle, ArrowRight, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import InsufficientFiresModal from '../components/InsufficientFiresModal';
 
 const TicTacToeLobby = () => {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ const TicTacToeLobby = () => {
   const [modeFilter, setModeFilter] = useState('all');
   const [joinCode, setJoinCode] = useState('');
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showInsufficientFiresModal, setShowInsufficientFiresModal] = useState(false);
+  const [missingFires, setMissingFires] = useState(0);
   const isAdminOrTote = !!(user && (user.roles?.includes('admin') || user.roles?.includes('tote')));
   
   // Fetch active room (para reconexión)
@@ -166,8 +169,11 @@ const TicTacToeLobby = () => {
       }
     } else if (createForm.mode === 'fires') {
       const firesBalance = parseFloat(balance?.fires_balance || 0);
-      if (firesBalance < 1) {
-        toast.error(`No tienes suficientes fires. Balance actual: ${firesBalance.toFixed(2)} 🔥`);
+      const required = 1;
+      if (firesBalance < required) {
+        const missing = required - firesBalance;
+        setMissingFires(missing > 0 ? missing : required);
+        setShowInsufficientFiresModal(true);
         return;
       }
     }
@@ -756,6 +762,12 @@ const TicTacToeLobby = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <InsufficientFiresModal
+        isOpen={showInsufficientFiresModal}
+        onClose={() => setShowInsufficientFiresModal(false)}
+        missingFires={missingFires}
+      />
     </div>
   );
 };

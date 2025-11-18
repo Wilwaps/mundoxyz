@@ -600,9 +600,11 @@ async function scrapeBcvRate(pair) {
       snippet = html.slice(start, end);
     }
 
-    const dolarMatch = html.match(
-      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*centrado[^"']*["'][^>]*>\s*<strong>\s*([0-9.,]+)\s*<\\/strong>/i
+    const dolarRegex = new RegExp(
+      '<div[^>]*id=["\']dolar["\'][^>]*>[\\s\\S]*?<div[^>]*class=["\'][^"\']*centrado[^"\']*["\'][^>]*>\\s*<strong>\\s*([0-9.,]+)\\s*<\\/strong>',
+      'i'
     );
+    const dolarMatch = html.match(dolarRegex);
 
     if (!dolarMatch) {
       logger.warn('FIAT BCV scraping: no rate match in dolar block', {
