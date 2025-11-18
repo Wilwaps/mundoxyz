@@ -579,7 +579,7 @@ const TicTacToeLobby = () => {
                         ...createForm,
                         bet_amount: parseInt(e.target.value) || 1
                       })}
-                      className="w-full p-3 rounded-lg bg-dark border border-white/10 focus:border-accent text-text"
+                      className="w-full p-3 rounded-lg bg-dark border border-white/10 focus:border-accent text-black"
                       placeholder="1-1000 Coins"
                     />
                     <div className="mt-2 text-xs text-text/60">

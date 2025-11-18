@@ -4,7 +4,7 @@ const FiresHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRecei
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
       <div
         className="w-full max-w-lg bg-dark rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}

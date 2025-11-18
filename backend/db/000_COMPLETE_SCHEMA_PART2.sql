@@ -243,6 +243,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_tg_group_rewards_tg_date
 CREATE INDEX IF NOT EXISTS idx_tg_group_rewards_tg
   ON telegram_group_daily_rewards (tg_id);
 
+-- 24. TELEGRAM_LINK_SESSIONS
+CREATE TABLE IF NOT EXISTS telegram_link_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  link_token VARCHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_link_token ON telegram_link_sessions(link_token);
+CREATE INDEX IF NOT EXISTS idx_telegram_link_user_id ON telegram_link_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_link_expires ON telegram_link_sessions(expires_at) WHERE used = FALSE;
+
 -- FUNCIONES
 CREATE OR REPLACE FUNCTION generate_room_code() RETURNS VARCHAR(6) AS $$
 DECLARE

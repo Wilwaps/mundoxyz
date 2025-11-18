@@ -86,7 +86,17 @@ function checkWinner(board) {
  */
 async function distributePrizes(room, query) {
   const currency = room.mode; // 'coins' o 'fires'
-  const potTotal = parseFloat(room.mode === 'coins' ? room.pot_coins : room.pot_fires);
+  const rawPot = room.mode === 'coins' ? room.pot_coins : room.pot_fires;
+  const potTotal = parseFloat(rawPot);
+
+  if (!Number.isFinite(potTotal) || potTotal <= 0) {
+    logger.warn('Invalid potTotal in distributePrizes', {
+      roomId: room.id,
+      mode: room.mode,
+      rawPot
+    });
+    return;
+  }
   
   // Sin comisión - 100% al ganador o 50% c/u en empate
   if (room.winner_id) {
@@ -99,15 +109,18 @@ async function distributePrizes(room, query) {
     
     if (walletResult.rows.length > 0) {
       const wallet = walletResult.rows[0];
-      const balanceBefore = parseFloat(wallet.balance);
+      const safeBalanceBefore = parseFloat(wallet.balance);
+      const balanceBefore = Number.isFinite(safeBalanceBefore) ? safeBalanceBefore : 0;
       const balanceAfter = balanceBefore + potTotal;
+
+      const balanceColumn = currency === 'fires' ? 'fires_balance' : 'coins_balance';
+      const totalEarnedColumn = currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned';
       
       // Actualizar balance
       await query(
         `UPDATE wallets 
-         SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = $1,
-             ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} = 
-             ${currency === 'fires' ? 'total_fires_earned' : 'total_coins_earned'} + $2,
+         SET ${balanceColumn} = $1,
+             ${totalEarnedColumn} = ${totalEarnedColumn} + $2,
              updated_at = NOW()
          WHERE user_id = $3`,
         [balanceAfter, potTotal, room.winner_id]
@@ -157,13 +170,16 @@ async function distributePrizes(room, query) {
       
       if (walletResult.rows.length > 0) {
         const wallet = walletResult.rows[0];
-        const balanceBefore = parseFloat(wallet.balance);
+        const safeBalanceBefore = parseFloat(wallet.balance);
+        const balanceBefore = Number.isFinite(safeBalanceBefore) ? safeBalanceBefore : 0;
         const balanceAfter = balanceBefore + refund;
+
+        const balanceColumn = currency === 'fires' ? 'fires_balance' : 'coins_balance';
         
         // Actualizar balance
         await query(
           `UPDATE wallets 
-           SET ${currency === 'fires' ? 'fires_balance' : 'coins_balance'} = $1,
+           SET ${balanceColumn} = $1,
                updated_at = NOW()
            WHERE user_id = $2`,
           [balanceAfter, playerId]
@@ -270,7 +286,8 @@ async function refundBet(client, userId, mode, amount, roomCode, reason) {
     throw new Error(`Wallet not found for user ${userId}`);
   }
   
-  const currentBalance = parseFloat(walletResult.rows[0][column]);
+  const rawBalance = parseFloat(walletResult.rows[0][column]);
+  const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
   const newBalance = currentBalance + amount;
   
   // Actualizar balance

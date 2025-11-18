@@ -3,6 +3,9 @@ const logger = require('../utils/logger');
 const RoomCodeService = require('./roomCodeService');
 const BingoCardGenerator = require('../utils/bingoCardGenerator');
 
+// ID de la plataforma/Tote en Telegram (usado como fallback para comisiones)
+const PLATFORM_TELEGRAM_ID = '1417856820';
+
 class BingoV2Service {
   /**
    * Generate a unique room code
@@ -1128,7 +1131,8 @@ class BingoV2Service {
       );
 
       const room = roomResult.rows[0];
-      const totalPot = parseFloat(room.total_pot);
+      const totalPotRaw = room.total_pot;
+      const totalPot = parseFloat(totalPotRaw) || 0;
 
       // Calculate distribution (70% winner, 20% host, 10% platform)
       const winnerPrize = totalPot * 0.7;
@@ -1171,8 +1175,8 @@ class BingoV2Service {
           winnerPrize,
           balanceBefore,
           balanceBefore + winnerPrize,
-          `Premio Bingo - Sala #${room.code}`,
-          `bingo:${room.code}`,
+          'Premio Bingo - Sala #' + room.code,
+          'bingo:' + room.code,
           winnerUserId
         ]
       );
@@ -1214,8 +1218,8 @@ class BingoV2Service {
             hostPrize,
             hostBalanceBefore,
             hostBalanceBefore + hostPrize,
-            `Recompensa Host - Sala #${room.code}`,
-            `bingo:${room.code}`,
+            'Recompensa Host - Sala #' + room.code,
+            'bingo:' + room.code,
             room.host_id
           ]
         );
@@ -1235,6 +1239,99 @@ class BingoV2Service {
            WHERE user_id = $2`,
           [hostPrize, winnerUserId]
         );
+      }
+
+      // 10% commission to platform/Tote
+      if (platformFee > 0) {
+        const balanceField = currencyColumn;
+        let targetWallet = null;
+
+        try {
+          const toteRes = await dbQuery(
+            `SELECT w.id, w.${balanceField} AS balance, u.id as user_id
+             FROM wallets w 
+             JOIN users u ON u.id = w.user_id 
+             JOIN user_roles ur ON ur.user_id = u.id 
+             JOIN roles r ON r.id = ur.role_id 
+             WHERE r.name = 'tote' 
+             LIMIT 1 FOR UPDATE`
+          );
+
+          if (toteRes.rows.length > 0) {
+            targetWallet = toteRes.rows[0];
+          }
+        } catch (e) {
+          logger.warn('[BingoV2Service] Error buscando wallet de tote para comisión', e);
+        }
+
+        if (!targetWallet) {
+          try {
+            const platformUserResult = await dbQuery(
+              `SELECT id FROM users WHERE tg_id = $1`,
+              [PLATFORM_TELEGRAM_ID]
+            );
+
+            if (platformUserResult.rows.length > 0) {
+              const platformUserId = platformUserResult.rows[0].id;
+              const platformWalletResult = await dbQuery(
+                `SELECT id, ${balanceField} AS balance FROM wallets WHERE user_id = $1 LIMIT 1`,
+                [platformUserId]
+              );
+
+              if (platformWalletResult.rows.length > 0) {
+                targetWallet = platformWalletResult.rows[0];
+              }
+            }
+          } catch (e) {
+            logger.warn('[BingoV2Service] Error buscando wallet de plataforma por tg_id', e);
+          }
+        }
+
+        if (targetWallet) {
+          const safeBefore = parseFloat(targetWallet.balance || 0);
+          const before = Number.isFinite(safeBefore) ? safeBefore : 0;
+          const after = before + platformFee;
+
+          try {
+            await dbQuery(
+              `UPDATE wallets
+               SET ${balanceField} = $1
+               WHERE id = $2`,
+              [after, targetWallet.id]
+            );
+
+            await dbQuery(
+              `INSERT INTO wallet_transactions
+               (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+               VALUES ($1, 'bingo_platform_fee', $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                targetWallet.id,
+                currency,
+                platformFee,
+                before,
+                after,
+                'Comisión de Bingo sala #' + room.code + ' (10% del pot)',
+                'bingo_commission_' + room.code,
+                room.host_id
+              ]
+            );
+
+            logger.info('[BingoV2Service] Comisión de plataforma acreditada', {
+              roomId,
+              walletId: targetWallet.id,
+              platformFee,
+              currency
+            });
+          } catch (e) {
+            logger.error('[BingoV2Service] Error acreditando comisión de plataforma', e);
+          }
+        } else {
+          logger.warn('[BingoV2Service] No se encontró wallet destino para comisión de plataforma', {
+            roomId,
+            currency,
+            platformFee
+          });
+        }
       }
 
       // Give experience to all other players

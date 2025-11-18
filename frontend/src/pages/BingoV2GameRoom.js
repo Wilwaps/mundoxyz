@@ -22,6 +22,7 @@ const BingoV2GameRoom = () => {
   const [showNumbersBoard, setShowNumbersBoard] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [winner, setWinner] = useState(null);
+  const [prizes, setPrizes] = useState(null);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isCallingNumber, setIsCallingNumber] = useState(false);
@@ -75,6 +76,7 @@ const BingoV2GameRoom = () => {
       socket.on('bingo:game_over', (data) => {
         console.log('🎉 GAME OVER EVENT RECEIVED:', data);
         setWinner(data.winner);
+        setPrizes(data.prizes || null);
         setShowWinnerModal(true);
         
         // CRITICAL FIX: Actualizar estado de sala para permitir nueva ronda
@@ -514,6 +516,11 @@ const BingoV2GameRoom = () => {
   if (!room) return <div className="error">Sala no encontrada</div>;
 
   const isHost = room.host_id === user?.id;
+  const isWinnerUser = winner?.userId === user?.id;
+  const winnerPrize = prizes?.winnerPrize ?? 0;
+  const hostPrize = prizes?.hostPrize ?? 0;
+  const myPrizeAmount = (isWinnerUser ? winnerPrize : 0) + (isHost ? hostPrize : 0);
+  const currencyEmoji = room.currency_type === 'coins' ? '🪙' : '🔥';
 
   return (
     <div className="bingo-v2-game-room">
@@ -618,14 +625,36 @@ const BingoV2GameRoom = () => {
       {showWinnerModal && winner && (
         <div className="winner-modal-overlay">
           <div className="winner-modal">
-            <div className="celebration-animation">🎉🎊🎉</div>
+            <div className="celebration-animation">🎉</div>
             <h1>¡BINGO!</h1>
             <h2>Ganador: {winner.username}</h2>
             <p>Patrón completado: {winner.pattern}</p>
             
             <div className="prize-info">
-              <h3>Premios Distribuidos</h3>
-              <p>Pozo total: {room.total_pot} {room.currency_type}</p>
+              {isWinnerUser || isHost ? (
+                <>
+                  <h3>Tu premio</h3>
+                  <p>
+                    Has recibido
+                    {" "}
+                    <strong>
+                      {myPrizeAmount.toFixed(2)} {currencyEmoji} {room.currency_type}
+                    </strong>
+                    {isWinnerUser && isHost && ' (ganador + host)'}
+                    {isWinnerUser && !isHost && ' como ganador'}
+                    {!isWinnerUser && isHost && ' como host'}
+                    .
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>Juego finalizado</h3>
+                  <p>
+                    Esta vez el premio fue para <strong>{winner.username}</strong>.
+                    Tu participación suma experiencia para las próximas rondas 💪
+                  </p>
+                </>
+              )}
             </div>
             
             {/* Timer Countdown */}
