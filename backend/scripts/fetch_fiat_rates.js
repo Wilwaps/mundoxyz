@@ -45,14 +45,17 @@ async function fetchBcvRate(pair) {
     });
     const html = res.data || '';
 
-    // Heurística simple: buscar algo parecido a "USD" seguido de un número
-    const match = html.match(/USD[^0-9]*([0-9.,]+)/i);
-    if (!match) {
-      console.warn('[FIAT] No se pudo encontrar tasa BCV en el HTML. Ajusta el parser en fetchBcvRate().');
+    // Extraer específicamente el bloque del dólar oficial (id="dolar") y su valor en <strong>
+    const dolarMatch = html.match(
+      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<span>\s*USD\s*<\\/span>[\s\S]*?<strong>\s*([0-9.,]+)\s*<\\/strong>/i
+    );
+
+    if (!dolarMatch) {
+      console.warn('[FIAT] No se pudo encontrar tasa BCV en el bloque dolar. Ajusta el parser en fetchBcvRate().');
       return null;
     }
 
-    const raw = match[1].replace(/\./g, '').replace(/,/g, '.');
+    const raw = dolarMatch[1].replace(/\./g, '').replace(/,/g, '.');
     const rate = parseFloat(raw);
     if (!Number.isFinite(rate) || rate <= 0) {
       console.warn('[FIAT] Tasa BCV inválida después de parsear:', raw);

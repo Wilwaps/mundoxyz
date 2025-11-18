@@ -592,13 +592,17 @@ async function scrapeBcvRate(pair) {
     });
     const html = response.data || '';
 
-    const match = html.match(/USD[^0-9]*([0-9.,]+)/i);
-    if (!match) {
-      logger.warn('FIAT BCV scraping: no rate match in HTML');
+    // Extraer específicamente el bloque del dólar oficial
+    const dolarMatch = html.match(
+      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<span>\s*USD\s*<\\/span>[\s\S]*?<strong>\s*([0-9.,]+)\s*<\\/strong>/i
+    );
+
+    if (!dolarMatch) {
+      logger.warn('FIAT BCV scraping: no rate match in dolar block');
       return null;
     }
 
-    const raw = match[1].replace(/\./g, '').replace(/,/g, '.');
+    const raw = dolarMatch[1].replace(/\./g, '').replace(/,/g, '.');
     const rate = parseFloat(raw);
     if (!Number.isFinite(rate) || rate <= 0) {
       logger.warn('FIAT BCV scraping: invalid rate after parse', { raw });
