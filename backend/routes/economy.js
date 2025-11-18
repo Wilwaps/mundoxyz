@@ -4,6 +4,7 @@ const { query, transaction } = require('../db');
 const { verifyToken, requireAdmin, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const telegramService = require('../services/telegramService');
+const fiatRateService = require('../services/fiatRateService');
 
 // Get user balance
 router.get('/balance', verifyToken, async (req, res) => {
@@ -153,6 +154,17 @@ router.get('/supply/txs', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching supply transactions:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Get current FIAT context (BCV, Binance, MundoXYZ)
+router.get('/fiat-context', async (req, res) => {
+  try {
+    const ctx = await fiatRateService.getOperationalContext();
+    res.json(ctx);
+  } catch (error) {
+    logger.error('Error fetching FIAT context:', error);
+    res.status(500).json({ error: 'Failed to fetch FIAT context' });
   }
 });
 
@@ -619,7 +631,6 @@ router.post('/request-fires', verifyToken, async (req, res) => {
     const { amount, bank_reference } = req.body;
     const user_id = req.user.id;
 
-    // Validaciones
     if (!amount || !bank_reference) {
       return res.status(400).json({ error: 'Monto y referencia bancaria son requeridos' });
     }
@@ -629,26 +640,65 @@ router.post('/request-fires', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Monto inválido' });
     }
 
-    // Validar que la referencia solo contenga números
     if (!/^\d+$/.test(bank_reference)) {
       return res.status(400).json({ error: 'La referencia bancaria debe contener solo números' });
     }
 
-    // Crear solicitud
-    const result = await query(
-      `INSERT INTO fire_requests 
-       (user_id, amount, status, reference, created_at, updated_at)
-       VALUES ($1, $2, 'pending', $3, NOW(), NOW())
-       RETURNING id, amount, status, reference, created_at`,
-      [user_id, parsedAmount, bank_reference]
-    );
+    const operationalContext = await fiatRateService.getOperationalContext();
 
-    const request = result.rows[0];
+    const txResult = await transaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO fire_requests 
+         (user_id, amount, status, reference, created_at, updated_at)
+         VALUES ($1, $2, 'pending', $3, NOW(), NOW())
+         RETURNING id, amount, status, reference, created_at`,
+        [user_id, parsedAmount, bank_reference]
+      );
 
-    logger.info('Fire request created', { 
-      requestId: request.id, 
-      userId: user_id, 
-      amount: parsedAmount 
+      const request = insertResult.rows[0];
+
+      if (operationalContext && operationalContext.operationalRate) {
+        const op = operationalContext.operationalRate;
+        const tokensAmount = parsedAmount;
+        const usdtAmount = tokensAmount / 300;
+        const vesAmount = usdtAmount * op.rate;
+
+        let rateSource = op.baseSource;
+        if (!rateSource && operationalContext.binanceRate) {
+          rateSource = operationalContext.binanceRate.source;
+        }
+        if (!rateSource && operationalContext.bcvRate) {
+          rateSource = operationalContext.bcvRate.source;
+        }
+        if (!rateSource) {
+          rateSource = 'mundoxyz';
+        }
+
+        await client.query(
+          `INSERT INTO fiat_valuations 
+           (operation_type, operation_id, tokens_amount, usdt_amount, ves_amount, rate_source, rate_value, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            'fire_request',
+            request.id,
+            tokensAmount,
+            usdtAmount,
+            vesAmount,
+            rateSource,
+            op.rate
+          ]
+        );
+      }
+
+      return { request, operationalContext };
+    });
+
+    const { request, operationalContext: ctx } = txResult;
+
+    logger.info('Fire request created', {
+      requestId: request.id,
+      userId: user_id,
+      amount: parsedAmount
     });
 
     try {
@@ -672,7 +722,15 @@ router.post('/request-fires', verifyToken, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Solicitud de fuegos enviada. Será revisada por un administrador.',
-      request
+      request,
+      fiat: ctx && ctx.operationalRate
+        ? {
+            rate_source: ctx.operationalRate.baseSource,
+            rate_mxyz: ctx.operationalRate.rate,
+            margin_percent: ctx.operationalRate.marginPercent,
+            age_minutes: ctx.operationalRate.ageMinutes
+          }
+        : null
     });
 
   } catch (error) {
@@ -811,11 +869,11 @@ router.put('/fire-requests/:id/approve', adminAuth, async (req, res) => {
         [request.amount, wallet.id]
       );
 
-      // Registrar en wallet_transactions
-      await client.query(
+      const walletTxResult = await client.query(
         `INSERT INTO wallet_transactions 
          (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
-         VALUES ($1, 'fire_purchase', 'fires', $2, $3, $4, $5, $6)`,
+         VALUES ($1, 'fire_purchase', 'fires', $2, $3, $4, $5, $6)
+         RETURNING id`,
         [
           wallet.id,
           request.amount,
@@ -825,6 +883,91 @@ router.put('/fire-requests/:id/approve', adminAuth, async (req, res) => {
           request.reference
         ]
       );
+
+      const walletTransactionId = walletTxResult.rows[0]?.id || null;
+
+      let valuation = null;
+
+      try {
+        const valuationRes = await client.query(
+          `SELECT * FROM fiat_valuations 
+           WHERE operation_type = $1 AND operation_id = $2 
+           ORDER BY id DESC LIMIT 1`,
+          ['fire_request', id]
+        );
+        valuation = valuationRes.rows[0] || null;
+      } catch (valuationError) {
+        logger.error('Error fetching fiat valuation for fire_request:', valuationError);
+      }
+
+      if (!valuation) {
+        try {
+          const ctx = await fiatRateService.getOperationalContext(client);
+          if (ctx && ctx.operationalRate) {
+            const op = ctx.operationalRate;
+            const tokensAmount = parseFloat(request.amount);
+            const usdtAmount = tokensAmount / 300;
+            const vesAmount = usdtAmount * op.rate;
+
+            let rateSource = op.baseSource;
+            if (!rateSource && ctx.binanceRate) {
+              rateSource = ctx.binanceRate.source;
+            }
+            if (!rateSource && ctx.bcvRate) {
+              rateSource = ctx.bcvRate.source;
+            }
+            if (!rateSource) {
+              rateSource = 'mundoxyz';
+            }
+
+            const insertValRes = await client.query(
+              `INSERT INTO fiat_valuations 
+               (operation_type, operation_id, tokens_amount, usdt_amount, ves_amount, rate_source, rate_value, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+               RETURNING *`,
+              [
+                'fire_request',
+                id,
+                tokensAmount,
+                usdtAmount,
+                vesAmount,
+                rateSource,
+                op.rate
+              ]
+            );
+            valuation = insertValRes.rows[0] || null;
+          }
+        } catch (fallbackError) {
+          logger.error('Error creating fallback fiat valuation for fire_request:', fallbackError);
+        }
+      }
+
+      if (walletTransactionId && valuation) {
+        const tokensAmount = valuation.tokens_amount;
+        const usdtAmount = valuation.usdt_amount;
+        const vesAmount = valuation.ves_amount;
+
+        const metadata = {
+          operation_type: 'fire_request',
+          fire_request_id: id,
+          reference: request.reference
+        };
+
+        await client.query(
+          `INSERT INTO fiat_operations 
+           (wallet_transaction_id, user_id, direction, fiat_amount_ves, usdt_equivalent, tokens_amount, status, metadata, created_by, created_at, updated_at)
+           VALUES ($1, $2, 'in', $3, $4, $5, 'approved', $6, $7, NOW(), NOW())`,
+          [
+            walletTransactionId,
+            request.user_id,
+            vesAmount,
+            usdtAmount,
+            tokensAmount,
+            JSON.stringify(metadata),
+            reviewer_id
+          ]
+        );
+      }
 
       // Registrar en supply_txs
       await client.query(

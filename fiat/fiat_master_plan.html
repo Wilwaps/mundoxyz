@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>MundoXYZ – Plan Maestro FIAT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #020617;
+      --bg-elevated: #020617;
+      --bg-soft: #020617;
+      --border-subtle: #1f2937;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.12);
+      --accent-warn: #f97316;
+      --accent-aux: #38bdf8;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-pill: 999px;
+      --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.65);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 52%, #000 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 1160px;
+      display: grid;
+      gap: 22px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    h1 {
+      font-size: clamp(28px, 3.1vw, 36px);
+      letter-spacing: -0.04em;
+      font-weight: 650;
+    }
+
+    .subtitle {
+      max-width: 720px;
+      color: var(--text-soft);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .layout-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 880px) {
+      .layout-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(17,24,39,0.98));
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .chip {
+      border-radius: var(--radius-pill);
+      padding: 4px 10px;
+      font-size: 11px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      font-size: 10px;
+      color: var(--text-soft);
+    }
+
+    .tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    /* Taxonomías */
+    .taxonomy-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 720px) {
+      .taxonomy-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .taxonomy-column {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(31,41,55,0.95);
+      background: rgba(15,23,42,0.96);
+      padding: 10px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .taxonomy-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .taxonomy-list {
+      list-style: none;
+      display: grid;
+      gap: 6px;
+    }
+
+    .taxonomy-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .taxonomy-item-title {
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .taxonomy-item-caption {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    /* Esquema FIAT (resumen) */
+    .schema-section {
+      display: grid;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .schema-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 880px) {
+      .schema-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .schema-card {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(31,41,55,0.95);
+      background: rgba(15,23,42,0.98);
+      padding: 10px 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .schema-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .schema-body {
+      font-size: 11px;
+      color: var(--text-soft);
+      line-height: 1.5;
+    }
+
+    .schema-key {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    /* Organigramas / nodos */
+    .org-section {
+      display: grid;
+      gap: 14px;
+    }
+
+    .org-root {
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(31,41,55,0.9);
+      background: radial-gradient(circle at top, rgba(34,197,94,0.09), rgba(15,23,42,0.98));
+      padding: 14px 16px 13px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .org-root-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .org-root-main {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .org-columns {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 880px) {
+      .org-columns {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .org-node {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(31,41,55,0.9);
+      background: rgba(15,23,42,0.98);
+      padding: 10px 11px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .org-node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .org-node-title {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .org-node-chip {
+      border-radius: var(--radius-pill);
+      padding: 3px 7px;
+      font-size: 10px;
+      border: 1px solid rgba(148,163,184,0.5);
+      color: var(--text-soft);
+    }
+
+    .org-node-body {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .org-node-links {
+      margin-top: 4px;
+      display: grid;
+      gap: 3px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .org-link-dot {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--accent);
+      margin-right: 5px;
+    }
+
+    /* Roadmap */
+    .roadmap-section {
+      display: grid;
+      gap: 12px;
+    }
+
+    .roadmap-lanes {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr);
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 880px) {
+      .roadmap-lanes {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .lane {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(31,41,55,0.95);
+      background: rgba(15,23,42,0.98);
+      padding: 10px 12px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .lane-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .lane-phase {
+      border-radius: var(--radius-pill);
+      padding: 3px 7px;
+      font-size: 10px;
+      border: 1px solid rgba(56,189,248,0.5);
+      color: #e0f2fe;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .lane-phase-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #38bdf8;
+    }
+
+    .lane-steps {
+      list-style: none;
+      display: grid;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .lane-step {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      color: var(--text-soft);
+    }
+
+    .lane-step-index {
+      width: 17px;
+      height: 17px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .lane-step-body {
+      font-size: 11px;
+    }
+
+    .lane-step-body strong {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    /* Capas transversales */
+    .layers-section {
+      display: grid;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .layers-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 880px) {
+      .layers-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .layer-card {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(31,41,55,0.95);
+      background: rgba(15,23,42,0.98);
+      padding: 10px 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .layer-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .layer-body {
+      font-size: 11px;
+      color: var(--text-soft);
+      line-height: 1.5;
+    }
+
+    .layer-body strong {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="eyebrow">
+        <span class="eyebrow-dot"></span>
+        MundoXYZ · Plan Maestro FIAT
+      </div>
+      <h1>Taxonomía, organigrama técnico y roadmap de implementación FIAT</h1>
+      <p class="subtitle">
+        Vista de alto nivel para entender <strong>qué</strong> estamos integrando (taxonomías), <strong>cómo</strong> se distribuyen
+        las responsabilidades (organigramas lógicos) y <strong>en qué orden</strong> se activa el plugin FIAT dentro del
+        ecosistema MundoXYZ.
+      </p>
+    </header>
+
+    <section class="layout-main">
+      <!-- Taxonomías -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">Taxonomía de dominios y entidades</div>
+          <div class="chip">
+            <span class="chip-dot"></span>
+            Lenguaje común de negocio
+          </div>
+        </div>
+        <div class="taxonomy-grid">
+          <div class="taxonomy-column">
+            <div class="taxonomy-label">Dominios principales</div>
+            <ul class="taxonomy-list">
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">Economía interna</div>
+                <div class="taxonomy-item-caption">Tokens, Coins, Fuegos, wallets, transacciones internas.</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">Capa FIAT</div>
+                <div class="taxonomy-item-caption">Tasas BCV, Binance P2P, tasa operativa MundoXYZ (Binance - 5%).</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">On/Off-Ramp</div>
+                <div class="taxonomy-item-caption">Depósitos y retiros en VES/USDT vinculados a Fuegos y tokens.</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">Experiencia de usuario</div>
+                <div class="taxonomy-item-caption">Wallet, modales de compra/venta, historial e inbox.</div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="taxonomy-column">
+            <div class="taxonomy-label">Entidades clave</div>
+            <ul class="taxonomy-list">
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">fiat_rates</div>
+                <div class="taxonomy-item-caption">Fuente (BCV/Binance/MundoXYZ), par, tasa, margen, timestamp.</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">fiat_operational_config</div>
+                <div class="taxonomy-item-caption">Parámetros del plugin FIAT: margen 5%, fuentes activas, flags.</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">fiat_valuations / fiat_snapshots</div>
+                <div class="taxonomy-item-caption">Snapshot FIAT por operación (tokens, USDT, VES, fuente/tasa usada).</div>
+              </li>
+              <li class="taxonomy-item">
+                <div class="taxonomy-item-title">fiat_operations</div>
+                <div class="taxonomy-item-caption">Depósitos/retiros FIAT y compras de Fuegos vinculadas a wallets.</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Organigrama técnico -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">Organigrama lógico de módulos</div>
+          <div class="chip">
+            <span class="chip-dot"></span>
+            Nodos y responsabilidades
+          </div>
+        </div>
+        <div class="org-section">
+          <div class="org-root">
+            <div class="org-root-title">Nodo raíz</div>
+            <div class="org-root-main">Plugin FIAT MundoXYZ</div>
+            <div class="tag" style="margin-top:6px;">
+              <span class="tag-dot"></span>
+              Orquestador entre tasas externas y economía interna
+            </div>
+          </div>
+
+          <div class="org-columns">
+            <div class="org-node">
+              <div class="org-node-header">
+                <div class="org-node-title">Módulo de tasas</div>
+                <div class="org-node-chip">fiatRateService + cron</div>
+              </div>
+              <div class="org-node-body">
+                Consulta, normaliza y persiste tasas BCV/Binance. Calcula la tasa operativa MundoXYZ (Binance - 5%) y la publica
+                al resto del sistema.
+              </div>
+              <div class="org-node-links">
+                <div><span class="org-link-dot"></span>Escribe en: <strong>fiat_rates</strong>, <strong>fiat_operational_config</strong>.</div>
+                <div><span class="org-link-dot"></span>Leen de él: economía interna, UI de wallet, panel admin.</div>
+              </div>
+            </div>
+
+            <div class="org-node">
+              <div class="org-node-header">
+                <div class="org-node-title">Módulo de economía</div>
+                <div class="org-node-chip">economyService</div>
+              </div>
+              <div class="org-node-body">
+                Aplica las tasas a operaciones concretas: solicitudes de Fuegos, depósitos VES, retiros FIAT; genera snapshots
+                FIAT congruentes con el peg 300:1.
+              </div>
+              <div class="org-node-links">
+                <div><span class="org-link-dot"></span>Escribe en: <strong>fiat_valuations</strong>, <strong>fiat_operations</strong>, wallets.</div>
+                <div><span class="org-link-dot"></span>Consume: <strong>fiatRateService</strong> y wallets de usuario.</div>
+              </div>
+            </div>
+
+            <div class="org-node">
+              <div class="org-node-header">
+                <div class="org-node-title">Módulo de experiencia</div>
+                <div class="org-node-chip">UI · Wallet &amp; Admin</div>
+              </div>
+              <div class="org-node-body">
+                Muestra al usuario final y al administrador el valor FIAT: peg 300:1, equivalentes en VES, panel de tasas y
+                detalle de cada operación con su snapshot.
+              </div>
+              <div class="org-node-links">
+                <div><span class="org-link-dot"></span>Front: wallet, modales de Fuegos, historiales e inbox.</div>
+                <div><span class="org-link-dot"></span>Backoffice: panel de tasas y consola de operaciones FIAT.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">Esquema FIAT y checklist técnico</div>
+        <div class="chip">
+          <span class="chip-dot"></span>
+          Tablas propuestas y puntos de integración
+        </div>
+      </div>
+      <div class="schema-section">
+        <div class="schema-grid">
+          <div class="schema-card">
+            <div class="schema-title">Tablas FIAT sugeridas</div>
+            <div class="schema-body">
+              <span class="schema-key">fiat_rates.</span> source (bcv/binance/mxyz), pair (USD/VES), rate (NUMERIC),
+              spread_vs_bcv, is_degraded (bool), captured_at, created_at, updated_at. Índices por fuente y fecha
+              (<code>(source, captured_at DESC)</code>).
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">fiat_operational_config.</span> margin_percent (ej. 5), max_rate_age_minutes,
+              is_enabled, shadow_mode_enabled, created_at, updated_at. Una sola fila activa para el entorno.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">fiat_valuations / fiat_snapshots.</span> operation_type (request_fires, deposit_ves,
+              withdraw_ves, etc.), operation_id (FK), tokens_amount, usdt_amount, ves_amount, rate_source, rate_value,
+              created_at. Relacionada 1:1 con la operación de negocio.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">fiat_operations.</span> wallet_transaction_id (FK), direction (in/out),
+              fiat_amount_ves, usdt_equivalent, tokens_amount, status (pending/approved/rejected), created_at,
+              created_by. Índices por fecha y por usuario.
+            </div>
+          </div>
+
+          <div class="schema-card">
+            <div class="schema-title">Checklist de implementación backend</div>
+            <div class="schema-body">
+              <span class="schema-key">Migraciones y schema maestro.</span> Crear migraciones SQL para las tablas FIAT y
+              actualizar el archivo de <em>schema maestro</em>, respetando la regla de mantenerlo siempre alineado con los
+              cambios de DB.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">fiatRateService + cron.</span> Servicio Node que inserta en <code>fiat_rates</code> y
+              actualiza <code>fiat_operational_config</code> usando el scraper existente (Analicer) o su equivalente en Node.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">Integración en economyService.</span> Extender los endpoints
+              <code>/api/economy/*</code> (especialmente <code>request-fires</code>) para crear snapshots FIAT,
+              registrar <code>fiat_operations</code> y usar siempre la tasa MundoXYZ (Binance - 5%) desde un único punto.
+            </div>
+          </div>
+        </div>
+
+        <div class="schema-grid">
+          <div class="schema-card">
+            <div class="schema-title">Checklist de implementación frontend</div>
+            <div class="schema-body">
+              <span class="schema-key">Wallet y modales.</span> Actualizar la vista de wallet y los modales de Fuegos para
+              mostrar peg 300:1 y equivalentes FIAT (USDT/VES) basados en snapshots, sin exponer complejidad técnica al
+              usuario final.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">Historiales e inbox.</span> Incluir, cuando aplique, el valor FIAT de referencia en
+              líneas de historial e inbox, apoyándose siempre en los datos de <code>fiat_valuations</code> y no en la tasa
+              actual.
+            </div>
+          </div>
+
+          <div class="schema-card">
+            <div class="schema-title">Checklist admin, pruebas y despliegue</div>
+            <div class="schema-body">
+              <span class="schema-key">Vistas admin FIAT.</span> Panel de tasas (BCV/Binance/MundoXYZ), panel de
+              <code>fiat_operations</code> y controles para marcar tasas "degradadas" o desactivar temporalmente el plugin.
+            </div>
+            <div class="schema-body">
+              <span class="schema-key">Pruebas y rollout.</span> Escenarios automatizados y manuales con plugin ON/OFF,
+              despliegue inicial en <em>staging</em>, activación en <em>shadow mode</em> en producción y <em>rollout</em> gradual
+              una vez validados los saldos y las conciliaciones.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Roadmap y orden de implementación -->
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">Roadmap de implementación · Orden recomendado</div>
+        <div class="chip">
+          <span class="chip-dot"></span>
+          Activación gradual del plugin FIAT
+        </div>
+      </div>
+      <div class="roadmap-section">
+        <div class="roadmap-lanes">
+          <div class="lane">
+            <div class="lane-label">Fase 1 · Fundaciones técnicas</div>
+            <div class="lane-phase">
+              <span class="lane-phase-dot"></span>
+              Esquema, migraciones y tasas básicas
+            </div>
+            <ul class="lane-steps">
+              <li class="lane-step">
+                <div class="lane-step-index">1</div>
+                <div class="lane-step-body">
+                  <strong>Definir taxonomía en schema maestro.</strong> Incorporar tablas <code>fiat_rates</code>,
+                  <code>fiat_operational_config</code>, <code>fiat_valuations</code> y <code>fiat_operations</code>.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">2</div>
+                <div class="lane-step-body">
+                  <strong>Crear migraciones y scripts Node.js (pg).</strong> Asegurar versión del schema maestro actualizada y
+                  scripts de ejecución independientes (similar a migraciones previas).
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">3</div>
+                <div class="lane-step-body">
+                  <strong>Integrar scraper de tasas.</strong> Conectar con la lógica existente (Analicer) para obtener tasas BCV y
+                  Binance P2P y persistirlas vía <code>fiatRateService</code>.
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="lane">
+            <div class="lane-label">Fase 2 · Motor FIAT de negocio</div>
+            <div class="lane-phase">
+              <span class="lane-phase-dot" style="background:#22c55e;"></span>
+              Aplicación de tasas a Fuegos y on/off-ramp
+            </div>
+            <ul class="lane-steps">
+              <li class="lane-step">
+                <div class="lane-step-index">4</div>
+                <div class="lane-step-body">
+                  <strong>Extender economyService.</strong> Al registrar solicitudes de Fuegos o depósitos VES, generar un
+                  <em>snapshot FIAT</em> (tokens, USDT, VES y fuente de tasa) y guardarlo en
+                  <code>fiat_valuations</code>.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">5</div>
+                <div class="lane-step-body">
+                  <strong>Centralizar la tasa operativa.</strong> Implementar funciones únicas para obtener la tasa MundoXYZ
+                  (Binance - 5%) y evitar cálculos duplicados en rutas y servicios.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">6</div>
+                <div class="lane-step-body">
+                  <strong>Registrar operaciones FIAT.</strong> Cada acreditación/importante de Fuegos o tokens vinculada a VES/USDT
+                  crea una fila en <code>fiat_operations</code> enlazada a <code>wallet_transactions</code>.
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="roadmap-lanes">
+          <div class="lane">
+            <div class="lane-label">Fase 3 · Experiencia de usuario</div>
+            <div class="lane-phase">
+              <span class="lane-phase-dot" style="background:#f97316;"></span>
+              Wallet, modales y comunicación
+            </div>
+            <ul class="lane-steps">
+              <li class="lane-step">
+                <div class="lane-step-index">7</div>
+                <div class="lane-step-body">
+                  <strong>Actualizar la UI de wallet.</strong> Mostrar el peg 300:1, la tasa MundoXYZ y equivalentes aproximados
+                  en VES para Fuegos/tokens, sin ruido técnico innecesario.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">8</div>
+                <div class="lane-step-body">
+                  <strong>Enriquecer modales de Fuegos.</strong> Incluir el resumen FIAT en "Comprar Fuegos" y en historiales,
+                  apoyándose siempre en los snapshots guardados.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">9</div>
+                <div class="lane-step-body">
+                  <strong>Notificaciones coherentes.</strong> Ajustar inbox/Telegram para que los mensajes incluyan Fuegos, USDT y
+                  VES según la tasa MundoXYZ del momento de la operación.
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="lane">
+            <div class="lane-label">Fase 4 · Panel admin y control</div>
+            <div class="lane-phase">
+              <span class="lane-phase-dot" style="background:#a855f7;"></span>
+              Observabilidad y gobernanza
+            </div>
+            <ul class="lane-steps">
+              <li class="lane-step">
+                <div class="lane-step-index">10</div>
+                <div class="lane-step-body">
+                  <strong>Panel de tasas FIAT.</strong> Vista admin con últimas tasas BCV/Binance/MundoXYZ, histórico básico y
+                  control del margen operativo (5%).
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">11</div>
+                <div class="lane-step-body">
+                  <strong>Consola de operaciones FIAT.</strong> Listado de depósitos/retiros con su snapshot FIAT y vínculo a
+                  <code>wallet_transactions</code> para facilitar auditoría.
+                </div>
+              </li>
+              <li class="lane-step">
+                <div class="lane-step-index">12</div>
+                <div class="lane-step-body">
+                  <strong>Revisión de riesgos y ajustes.</strong> Usar la data histórica para validar el margen del 5%, ajustar
+                  políticas y documentar procedimientos operativos estándar.
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">Capas transversales para una implementación robusta</div>
+        <div class="chip">
+          <span class="chip-dot"></span>
+          Flags, fallbacks, monitoreo y control de riesgo
+        </div>
+      </div>
+      <div class="layers-section">
+        <div class="layers-grid">
+          <div class="layer-card">
+            <div class="layer-label">Activación y flags</div>
+            <div class="layer-body">
+              <strong>Feature flags de entorno.</strong> Variables como <code>FIAT_PLUGIN_ENABLED</code> y
+              <code>FIAT_SHADOW_MODE</code> permiten activar el plugin sólo en <em>staging</em> o en <em>modo sombra</em> en
+              producción (se calculan snapshots FIAT pero no afectan aún la experiencia del usuario) hasta validar estabilidad.
+            </div>
+          </div>
+
+          <div class="layer-card">
+            <div class="layer-label">Resiliencia y fallbacks de tasas</div>
+            <div class="layer-body">
+              <strong>TTL y degradación controlada.</strong> Las tasas en <code>fiat_rates</code> tienen una vida útil máxima; si
+              Binance falla se usa la última tasa válida marcada como "degradada" en la UI admin. Si BCV y Binance fallan, el
+              plugin se desactiva automáticamente y se vuelve al comportamiento 100% interno hasta resolver el incidente.
+            </div>
+          </div>
+        </div>
+
+        <div class="layers-grid">
+          <div class="layer-card">
+            <div class="layer-label">Observabilidad y alertas</div>
+            <div class="layer-body">
+              <strong>Logs y métricas específicas FIAT.</strong> Registro estructurado en <code>fiatRateService</code> y
+              <code>economyService</code> (último scrape, tasas aplicadas, errores). Métricas como spread BCV/Binance, número de
+              fallos consecutivos y volumen FIAT diario alimentan alertas cuando el sistema se queda sin tasas recientes o el
+              spread supera umbrales definidos.
+            </div>
+          </div>
+
+          <div class="layer-card">
+            <div class="layer-label">Seguridad y límites</div>
+            <div class="layer-body">
+              <strong>Protección de credenciales y límites operativos.</strong> API keys, proxies y accesos DB viven en
+              variables de entorno, nunca en código. Endpoints sensibles (depósitos/retiros) tienen validaciones fuertes de
+              montos, referencias bancarias y, cuando aplique, límites diarios por usuario para reducir riesgo operativo.
+            </div>
+          </div>
+        </div>
+
+        <div class="layers-grid">
+          <div class="layer-card">
+            <div class="layer-label">Pruebas y despliegue</div>
+            <div class="layer-body">
+              <strong>Path de despliegue controlado.</strong> Suite de pruebas unitarias e integradas (plugin encendido y
+              apagado), entorno de <em>staging</em> con datos cercanos a producción y plan de <em>rollback</em> claro si se detecta
+              alguna anomalía en las operaciones FIAT o en los saldos de usuarios.
+            </div>
+          </div>
+
+          <div class="layer-card">
+            <div class="layer-label">Datos y conciliación</div>
+            <div class="layer-body">
+              <strong>Conciliación periódica.</strong> Jobs que comparan <code>fiat_operations</code>,
+              <code>wallet_transactions</code> y registros bancarios externos. Reportes de discrepancias para revisión manual y
+              ajustes, asegurando consistencia entre la economía interna, el plug-in FIAT y el mundo real.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Documento visual de planificación FIAT · No productivo · Versión 1.0</span>
+      <span>MundoXYZ · Tokens 300:1 anclados a USDT, FIAT sobre tasas BCV/Binance + margen 5%.</span>
+    </footer>
+  </main>
+</body>
+</html>

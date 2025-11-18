@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>MundoXYZ – Marco FIAT y Estabilidad del Token</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-elevated: #111827;
+      --bg-soft: #020617;
+      --border-subtle: #1f2937;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.12);
+      --accent-warn: #f97316;
+      --accent-bcv: #3b82f6;
+      --accent-binance: #eab308;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --radius-lg: 18px;
+      --radius-sm: 10px;
+      --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.65);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 52%, #000 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 1120px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    h1 {
+      font-size: clamp(28px, 3.2vw, 36px);
+      letter-spacing: -0.04em;
+      font-weight: 650;
+    }
+
+    .subtitle {
+      max-width: 640px;
+      color: var(--text-soft);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .grid-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 880px) {
+      .grid-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(17,24,39,0.98));
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    }
+
+    /* Peg principal */
+    .peg-value {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+
+    .peg-number {
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.06em;
+    }
+
+    .peg-label {
+      font-size: 13px;
+      color: var(--text-soft);
+      line-height: 1.35;
+    }
+
+    .peg-caption {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .peg-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.15);
+      border: 1px solid rgba(45, 212, 191, 0.3);
+      color: #a5f3fc;
+    }
+
+    .pill-outline {
+      background: rgba(15, 23, 42, 0.8);
+      border-color: rgba(148, 163, 184, 0.35);
+      color: var(--text-muted);
+    }
+
+    /* Tarjeta tasas */
+    .rates-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    @media (max-width: 720px) {
+      .rates-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .rate-item {
+      background: radial-gradient(circle at top, rgba(15,23,42,0.9), rgba(15,23,42,0.95));
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(30,64,175,0.45);
+      padding: 10px 12px 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .rate-item.binance { border-color: rgba(202, 138, 4, 0.7); }
+    .rate-item.mxyz { border-style: dashed; border-color: rgba(148, 163, 184, 0.8); }
+
+    .rate-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+    .rate-label.bcv { color: var(--accent-bcv); }
+    .rate-label.bin { color: var(--accent-binance); }
+    .rate-label.mxyz { color: var(--text-muted); }
+
+    .rate-value {
+      margin-top: 6px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+    }
+
+    .rate-sub {
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-top: 3px;
+    }
+
+    .rate-bar {
+      margin-top: 9px;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(30, 64, 175, 0.26);
+      overflow: hidden;
+    }
+
+    .rate-bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #22c55e, #a3e635);
+    }
+
+    .rate-bar-fill.bcv { width: 75%; }
+    .rate-bar-fill.bin { width: 100%; background: linear-gradient(90deg,#fbbf24,#f97316); }
+    .rate-bar-fill.mxyz { width: 95%; background: linear-gradient(90deg,#22c55e,#16a34a); }
+
+    .rate-footnote {
+      font-size: 10px;
+      color: var(--text-soft);
+      margin-top: 8px;
+    }
+
+    /* Flujo de valor */
+    .flow-card {
+      margin-top: 6px;
+      display: grid;
+      grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 880px) {
+      .flow-card { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: radial-gradient(circle at left, rgba(34,197,94,0.18), rgba(15,23,42,0.9));
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      border: 1px solid rgba(34,197,94,0.45);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .node {
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(148,163,184,0.45);
+      background: rgba(15,23,42,0.98);
+      min-width: 120px;
+    }
+
+    .node-token { border-color: rgba(34,197,94,0.6); }
+    .node-usdt { border-color: rgba(56,189,248,0.7); }
+    .node-ves { border-color: rgba(250,204,21,0.8); }
+
+    .node-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); }
+    .node-main { font-size: 15px; margin-top: 4px; font-weight: 600; }
+    .node-sub { font-size: 11px; color: var(--text-soft); margin-top: 2px; }
+
+    .arrow {
+      font-size: 16px;
+      color: var(--text-muted);
+      opacity: 0.9;
+    }
+
+    .flow-notes {
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.7;
+    }
+
+    .flow-notes strong { color: var(--text-main); font-weight: 550; }
+
+    /* Beneficios */
+    .benefits {
+      margin-top: 18px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(55,65,81,0.9);
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.16), rgba(15,23,42,0.96));
+      padding: 14px 16px 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.3fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 880px) {
+      .benefits { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .benefits-title { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+
+    .benefits-list { list-style: none; display: grid; gap: 6px; font-size: 12px; }
+
+    .benefit-item { display: flex; gap: 8px; }
+    .benefit-bullet { width: 7px; height: 7px; border-radius: 999px; margin-top: 5px; background: var(--accent); }
+
+    .legend { font-size: 11px; color: var(--text-soft); display: grid; gap: 4px; }
+
+    .legend-row { display: flex; gap: 6px; align-items: center; }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 999px; }
+    .swatch-bcv { background: var(--accent-bcv); }
+    .swatch-bin { background: var(--accent-binance); }
+    .swatch-mxyz { background: linear-gradient(90deg,#22c55e,#16a34a); }
+
+    /* UI mock: flujo de compra de Fuegos */
+    .ui-section {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 880px) {
+      .ui-section {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .ui-card-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .ui-wallet-actions {
+      background: radial-gradient(circle at top left, rgba(248,250,252,0.04), rgba(15,23,42,0.96));
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(55,65,81,0.9);
+      padding: 14px 16px 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .ui-wallet-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-ghost,
+    .btn-primary-ui,
+    .btn-outline-ui {
+      border-radius: 999px;
+      padding: 7px 13px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      cursor: default;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary-ui {
+      background: linear-gradient(135deg,#22c55e,#16a34a);
+      color: #020617;
+      border-color: rgba(34,197,94,0.9);
+      box-shadow: 0 10px 25px rgba(34,197,94,0.35);
+    }
+
+    .btn-outline-ui {
+      background: rgba(15,23,42,0.95);
+      color: var(--text-main);
+      border-color: rgba(148,163,184,0.7);
+    }
+
+    .btn-ghost {
+      background: rgba(15,23,42,0.85);
+      color: var(--text-soft);
+      border-color: rgba(55,65,81,0.8);
+    }
+
+    .btn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #f97316;
+    }
+
+    .ui-wallet-note {
+      font-size: 11px;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+
+    .ui-modal-mock {
+      background: radial-gradient(circle at top, rgba(248,250,252,0.04), rgba(15,23,42,0.98));
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(55,65,81,0.9);
+      padding: 14px 16px 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .ui-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .ui-modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .ui-badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(248,250,252,0.04);
+      border: 1px solid rgba(148,163,184,0.45);
+    }
+
+    .ui-steps {
+      display: grid;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .ui-step-label { font-weight: 500; color: var(--text-main); }
+
+    .ui-fields-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: 8px;
+      margin-top: 3px;
+    }
+
+    @media (max-width: 720px) {
+      .ui-fields-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .ui-field {
+      border-radius: 10px;
+      border: 1px solid rgba(55,65,81,0.9);
+      background: rgba(15,23,42,0.85);
+      padding: 8px 9px;
+    }
+
+    .ui-field-label {
+      font-size: 10px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 3px;
+    }
+
+    .ui-field-value {
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .ui-modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .ui-modal-actions .btn-outline-ui,
+    .ui-modal-actions .btn-primary-ui {
+      flex: 1;
+      justify-content: center;
+    }
+
+    .ui-password-note {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    /* Plugin FIAT: antes vs después */
+    .delta-section {
+      margin-top: 26px;
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(55,65,81,0.9);
+      background: radial-gradient(circle at top, rgba(248,250,252,0.05), rgba(15,23,42,0.98));
+      padding: 18px 18px 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .delta-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .delta-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+    }
+
+    .delta-subtitle {
+      font-size: 11px;
+      color: var(--text-soft);
+      max-width: 420px;
+    }
+
+    .delta-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
+      gap: 10px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 880px) {
+      .delta-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .delta-col-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .delta-col {
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(51,65,85,0.9);
+      background: rgba(15,23,42,0.95);
+      padding: 10px 11px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .delta-row-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .delta-row-body {
+      font-size: 11px;
+      color: var(--text-soft);
+      line-height: 1.5;
+    }
+
+    .delta-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      font-size: 10px;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    .delta-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    footer {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="eyebrow">
+        <span class="eyebrow-dot"></span>
+        <span>Resumen ejecutivo – Marco FIAT</span>
+      </div>
+      <h1>MundoXYZ: Estabilidad del Token con Doble Realidad Venezolana</h1>
+      <p class="subtitle">
+        El ecosistema opera con un peg estricto de <strong>300 tokens internos = 1&nbsp;USDT</strong>, mientras convive con
+        dos referencias en VES: la tasa oficial del BCV y el precio real de mercado en Binance P2P.
+        Esta vista sintetiza cómo protegemos ese peg y cómo traducimos el valor a bolívares sin comprometer la estabilidad.
+      </p>
+    </header>
+
+    <section class="grid-main">
+      <!-- Peg principal -->
+      <article class="card">
+        <div class="card-header">
+          <div class="card-title">Peg del protocolo</div>
+          <div class="chip">
+            <span class="chip-dot"></span>
+            Peg activo 24/7
+          </div>
+        </div>
+
+        <div class="peg-value">
+          <div class="peg-number">300</div>
+          <div class="peg-label">
+            tokens internos<br />
+            = 1&nbsp;USDT
+          </div>
+        </div>
+
+        <p class="peg-caption">
+          La estabilidad no la define el bolívar. La define la capacidad de la plataforma de honrar <strong>300:1</strong>
+          contra USDT mediante emisión y quema controladas.
+        </p>
+
+        <div class="peg-pill-row">
+          <span class="pill">Unidad económica estable: USDT</span>
+          <span class="pill pill-outline">Tokens se emiten/queman vs USDT, nunca vs VES</span>
+        </div>
+        <div class="peg-pill-row">
+          <span class="pill pill-outline">Usuarios ven su saldo en tokens, USDT y VES estimados</span>
+        </div>
+      </article>
+
+      <!-- Tasas de referencia -->
+      <article class="card">
+        <div class="card-header">
+          <div class="card-title">Tasas USD &rarr; VES hoy (ejemplo)</div>
+          <div class="chip">Datos de mercado y política de margen</div>
+        </div>
+
+        <div class="rates-grid">
+          <div class="rate-item">
+            <div class="rate-label bcv">BCV – Tasa oficial</div>
+            <div class="rate-value">Bs&nbsp;240,00</div>
+            <div class="rate-sub">1&nbsp;USDT &asymp; 240&nbsp;VES</div>
+            <div class="rate-bar">
+              <div class="rate-bar-fill bcv"></div>
+            </div>
+            <div class="rate-footnote">Referencia regulatoria. No se usa para pagos a comercios.</div>
+          </div>
+
+          <div class="rate-item binance">
+            <div class="rate-label bin">Binance P2P – Mercado real</div>
+            <div class="rate-value">Bs&nbsp;320,00</div>
+            <div class="rate-sub">1&nbsp;USDT &asymp; 320&nbsp;VES</div>
+            <div class="rate-bar">
+              <div class="rate-bar-fill bin"></div>
+            </div>
+            <div class="rate-footnote">
+              2.&ordm; anuncio, &ge;100 órdenes mensuales &mdash; evita precios promocionados e inflados.
+            </div>
+          </div>
+
+          <div class="rate-item mxyz">
+            <div class="rate-label mxyz">Tasa operativa MundoXYZ</div>
+            <div class="rate-value">Bs&nbsp;304,00</div>
+            <div class="rate-sub">1&nbsp;USDT &asymp; 304&nbsp;VES (Binance - 5&nbsp;% margen)</div>
+            <div class="rate-bar">
+              <div class="rate-bar-fill mxyz"></div>
+            </div>
+            <div class="rate-footnote">La plataforma aplica un margen del 5&nbsp;% sobre la tasa de Binance para cubrir riesgo y costos operativos.</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Flujo de valor -->
+    <section class="card" style="margin-top: 4px;">
+      <div class="card-header">
+        <div class="card-title">Cómo fluye el valor en el ecosistema</div>
+        <div class="chip">Tokens → USDT → VES</div>
+      </div>
+
+      <div class="flow-card">
+        <div class="flow-diagram">
+          <div class="node node-token">
+            <div class="node-title">Saldo usuario</div>
+            <div class="node-main">3.000 tokens</div>
+            <div class="node-sub">Unidad interna del juego &amp; economía</div>
+          </div>
+
+          <div class="arrow">&#x279E;</div>
+
+          <div class="node node-usdt">
+            <div class="node-title">Peg fijo</div>
+            <div class="node-main">10&nbsp;USDT</div>
+            <div class="node-sub">3.000 / 300 = 10</div>
+          </div>
+
+          <div class="arrow">&#x279E;</div>
+
+          <div class="node node-ves">
+            <div class="node-title">Valor en VES (operativo)</div>
+            <div class="node-main">Bs&nbsp;3.040</div>
+            <div class="node-sub">10 × 304 (MundoXYZ, 5&nbsp;% por debajo de Binance)</div>
+          </div>
+        </div>
+
+        <div class="flow-notes">
+          <p>
+            <strong>Regla clave:</strong> todo parte de USDT. El sistema nunca recalcula el valor del token en función del
+            bolívar. Primero se convierte a USDT vía peg 300:1 y luego a VES usando la tasa de mercado (Binance P2P) con un
+            margen operativo explícito del 5&nbsp;% a favor de la plataforma.
+          </p>
+          <p style="margin-top: 10px;">
+            <strong>Implicación para ejecutivos:</strong> la contabilidad interna se mantiene estable en USDT, mientras que
+            la traducción a VES refleja el mercado local y reconoce explícitamente un margen del 5&nbsp;% destinado a cubrir
+            volatilidad, liquidez y costos operativos.
+          </p>
+        </div>
+      </div>
+
+      <div class="benefits">
+        <div>
+          <div class="benefits-title">Beneficios estratégicos</div>
+          <ul class="benefits-list">
+            <li class="benefit-item">
+              <span class="benefit-bullet"></span>
+              <span><strong>Estabilidad predecible:</strong> el usuario sabe que 300 tokens siempre equivalen a 1&nbsp;USDT, sin importar la inflación del bolívar.</span>
+            </li>
+            <li class="benefit-item">
+              <span class="benefit-bullet"></span>
+              <span><strong>Atracción de comercios:</strong> las liquidaciones en VES se referencian a la tasa real de Binance, pero con una política de margen del 5&nbsp;% clara y predecible.</span>
+            </li>
+            <li class="benefit-item">
+              <span class="benefit-bullet"></span>
+              <span><strong>Gobernanza clara:</strong> el peg se gestiona vía reservas en USDT y mecanismos de emisión / quema; el margen del 5&nbsp;% se define como política económica explícita, no discrecional.</span>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <div class="benefits-title">Lectura de la gráfica</div>
+          <div class="legend">
+            <div class="legend-row">
+              <span class="legend-swatch swatch-bcv"></span>
+              <span><strong>BCV:</strong> referencia oficial para reporting, sin impacto directo sobre el peg.</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-swatch swatch-bin"></span>
+              <span><strong>Binance P2P:</strong> tasa operativa, captura el valor real que percibe el comerciante.</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-swatch swatch-mxyz"></span>
+              <span><strong>MundoXYZ:</strong> tasa operativa con margen del 5&nbsp;% sobre Binance P2P, alineada con la gestión de riesgo del protocolo.</span>
+            </div>
+            <p style="margin-top: 6px;">
+              Esta separación conceptual permite explicar, en una sola diapositiva, cómo se concilia la realidad regulatoria
+              con la realidad de mercado sin sacrificar la confianza en el token.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- UI de compra de Fuegos (vista ejecutiva) -->
+    <section class="ui-section">
+      <div>
+        <div class="ui-card-title">Punto de entrada en la interfaz</div>
+        <div class="ui-wallet-actions">
+          <div class="ui-wallet-note">
+            Desde la billetera el usuario accede a tres acciones principales sobre Fuegos. La arquitectura visual prioriza
+            <strong>Comprar</strong> como acción primaria, manteniendo <strong>Enviar</strong> y <strong>Recibir</strong> como
+            alternativas siempre visibles.
+          </div>
+          <div class="ui-wallet-buttons">
+            <button class="btn-outline-ui">
+              <span class="btn-dot"></span>
+              Enviar Fuegos
+            </button>
+            <button class="btn-primary-ui">
+              Comprar Fuegos
+            </button>
+            <button class="btn-ghost">
+              Recibir Fuegos
+            </button>
+          </div>
+          <p class="ui-wallet-note" style="margin-top: 6px;">
+            En la aplicación real, estos botones abren modales específicos (`send`, `buy`, `receive`) preservando el mismo
+            lenguaje visual minimalista mostrado aquí.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div class="ui-card-title">Flujo del modal "Comprar Fuegos"</div>
+        <div class="ui-modal-mock">
+          <div class="ui-modal-header">
+            <div>
+              <div class="ui-modal-title">Comprar Fuegos</div>
+              <div style="font-size: 11px; color: var(--text-soft);">Pago bancario verificado manualmente</div>
+            </div>
+            <div class="ui-badge">Confirmación por contraseña</div>
+          </div>
+
+          <div class="ui-steps">
+            <div>
+              <span class="ui-step-label">1. Copiar datos bancarios</span>
+              <div class="ui-wallet-note">Botón secundario: "Copiar Datos Bancarios" para minimizar errores de digitación.</div>
+            </div>
+            <div>
+              <span class="ui-step-label">2. Ingresar monto y referencia</span>
+              <div class="ui-fields-row">
+                <div class="ui-field">
+                  <div class="ui-field-label">Cantidad de Fuegos</div>
+                  <div class="ui-field-value">Ej: 100</div>
+                </div>
+                <div class="ui-field">
+                  <div class="ui-field-label">Referencia bancaria</div>
+                  <div class="ui-field-value">Solo números del comprobante</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <span class="ui-step-label">3. Confirmar y enviar solicitud</span>
+              <div class="ui-modal-actions">
+                <button class="btn-outline-ui">Cancelar</button>
+                <button class="btn-primary-ui">Enviar Solicitud</button>
+              </div>
+              <div class="ui-password-note">
+                Antes de enviar, el sistema abre un modal de <strong>Confirmar Contraseña</strong> para validar la identidad del
+                usuario (PasswordRequiredModal).
+              </div>
+            </div>
+            <div>
+              <span class="ui-step-label">4. Revisión por administrador</span>
+              <div class="ui-wallet-note">La solicitud pasa a una cola administrativa; el usuario recibe una notificación al ser aprobada.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="delta-section">
+      <div class="delta-header">
+        <div class="delta-title">Activación del plugin FIAT · Antes vs Después</div>
+        <div class="delta-subtitle">
+          El plugin FIAT no cambia el peg (300 tokens = 1 USDT). Añade una capa de tasas BCV/Binance y valoración en VES, tanto
+          para el usuario final como para la operación interna y la auditoría.
+        </div>
+      </div>
+
+      <div class="delta-grid">
+        <div>
+          <div class="delta-col-title">Antes · Estado actual</div>
+          <div class="delta-col">
+            <div class="delta-row-label">Base de datos</div>
+            <div class="delta-row-body">
+              No hay tablas dedicadas a tasas BCV/Binance ni a snapshots FIAT. Las solicitudes de Fuegos se entienden en Bs,
+              pero sin un registro estructurado de la tasa usada.
+            </div>
+
+            <div class="delta-row-label">Backend · Economía</div>
+            <div class="delta-row-body">
+              El endpoint <code>/api/economy/request-fires</code> valida montos y referencias bancarias, pero no integra un
+              motor FIAT con fuentes oficiales y de mercado.
+            </div>
+
+            <div class="delta-row-label">Wallet &amp; modales</div>
+            <div class="delta-row-body">
+              La UI de compra de Fuegos muestra un valor fijo (1 fuego = 1 Bs) sin visibilidad de peg 300:1 ni de tasas BCV /
+              Binance / MundoXYZ.
+            </div>
+
+            <div class="delta-row-label">Admin &amp; revisión</div>
+            <div class="delta-row-body">
+              El administrador revisa solicitudes de forma manual, con foco en referencia y monto de Fuegos, pero sin panel
+              dedicado de tasas ni equivalentes USDT/VES por operación.
+            </div>
+
+            <div class="delta-row-label">Auditoría &amp; notificaciones</div>
+            <div class="delta-row-body">
+              Las notificaciones hablan en términos de Fuegos, sin detallar el valor de referencia FIAT usado al momento de la
+              operación.
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="delta-col-title">Después · Con plugin FIAT</div>
+          <div class="delta-col">
+            <div class="delta-row-label">Base de datos</div>
+            <div class="delta-row-body">
+              Nuevas tablas de <strong>tasas</strong> (BCV, Binance P2P, MundoXYZ) y de <strong>snapshots FIAT</strong> por
+              operación (depósitos VES, compras de Fuegos, retiros), alineadas con el schema maestro.
+              <div class="delta-tag"><span class="delta-dot"></span>trazabilidad por operación</div>
+            </div>
+
+            <div class="delta-row-label">Backend · Economía</div>
+            <div class="delta-row-body">
+              Servicios que obtienen la tasa BCV y Binance P2P, calculan la tasa operativa MundoXYZ (Binance - 5%) y la
+              aplican en <code>/api/economy/request-fires</code> y en la cola de aprobación de depósitos FIAT.
+            </div>
+
+            <div class="delta-row-label">Wallet &amp; modales</div>
+            <div class="delta-row-body">
+              La billetera muestra el peg 300:1 y el equivalente aproximado en VES. El modal "Comprar Fuegos" presenta la
+              conversión a VES usando la tasa MundoXYZ vigente, manteniendo el diseño actual.
+            </div>
+
+            <div class="delta-row-label">Admin &amp; revisión</div>
+            <div class="delta-row-body">
+              Panel con tasas BCV/Binance/MundoXYZ en tiempo casi real y detalle FIAT por solicitud (Fuegos, USDT y VES de
+              referencia), agilizando la aprobación y la conciliación.
+            </div>
+
+            <div class="delta-row-label">Auditoría &amp; notificaciones</div>
+            <div class="delta-row-body">
+              Cada acreditación de Fuegos se registra también como operación FIAT (USDT/VES). Las notificaciones al usuario
+              pueden incluir: Fuegos acreditados, USDT equivalentes y VES según la tasa MundoXYZ del momento.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Ejemplo numérico ilustrativo (240 / 320 / 304 VES por USDT). Los valores reales se actualizan desde BCV, Binance y la política de margen de MundoXYZ.</span>
+      <span>MundoXYZ · Marco FIAT v1.0</span>
+    </footer>
+  </main>
+</body>
+</html>

@@ -299,6 +299,20 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
                         {tx.description && (
                           <p className="text-xs text-text/60 truncate">{tx.description}</p>
                         )}
+                        {tx.fiat_amount_ves != null && (
+                          <p className="text-xs text-text/50 mt-0.5">
+                            {(() => {
+                              const ves = parseFloat(tx.fiat_amount_ves);
+                              const usdt = tx.usdt_equivalent != null ? parseFloat(tx.usdt_equivalent) : null;
+                              const safeVes = Number.isFinite(ves) ? ves : 0;
+                              const vesText = safeVes.toFixed(2);
+                              if (usdt != null && Number.isFinite(usdt)) {
+                                return `Snapshot FIAT: ${vesText} Bs (≈ ${usdt.toFixed(2)} USDT)`;
+                              }
+                              return `Snapshot FIAT: ${vesText} Bs`;
+                            })()}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-text/40">
                             {formatDate(tx.created_at)}

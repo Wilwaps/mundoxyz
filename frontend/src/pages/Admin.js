@@ -897,6 +897,328 @@ const AdminRedemptions = () => {
   );
 };
 
+// Admin FIAT monitoring component
+const AdminFiat = () => {
+  const {
+    data: ratesData,
+    isLoading: loadingRates,
+    error: errorRates
+  } = useQuery({
+    queryKey: ['admin-fiat-rates'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/fiat/rates', {
+        params: { limit: 60 }
+      });
+      return response.data;
+    },
+    refetchInterval: 15000
+  });
+
+  const {
+    data: opsData,
+    isLoading: loadingOps,
+    error: errorOps
+  } = useQuery({
+    queryKey: ['admin-fiat-operations'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/fiat/operations', {
+        params: { limit: 50 }
+      });
+      return response.data;
+    },
+    refetchInterval: 15000
+  });
+
+  const { data: fiatContext } = useQuery({
+    queryKey: ['economy-fiat-context'],
+    queryFn: async () => {
+      const response = await axios.get('/api/economy/fiat-context');
+      return response.data;
+    },
+    refetchInterval: 15000
+  });
+
+  const rates = ratesData?.rates || [];
+  const operations = opsData?.operations || [];
+
+  const getLatest = (source) => {
+    return rates.find((r) => r.source === source) || null;
+  };
+
+  const latestBcv = getLatest('bcv');
+  const latestBinance = getLatest('binance');
+  const latestMxyz = getLatest('mundoxyz');
+
+  const bcvRate = latestBcv ? parseFloat(latestBcv.rate) : null;
+  const binanceRate = latestBinance ? parseFloat(latestBinance.rate) : null;
+  const mxyzRate = latestMxyz ? parseFloat(latestMxyz.rate) : null;
+
+  let inferredMargin = null;
+  if (binanceRate && mxyzRate && binanceRate > 0) {
+    inferredMargin = (1 - mxyzRate / binanceRate) * 100;
+  }
+
+  const pegFires = 300;
+  const pegUsdt = 1;
+  const pegVes = mxyzRate && Number.isFinite(mxyzRate) ? mxyzRate : null;
+
+  const configFiat = fiatContext?.config || null;
+  const isDegradedCtx = fiatContext?.isDegraded ?? null;
+  const usedFallbackCtx = fiatContext?.usedFallback ?? null;
+
+  return (
+    <div className="p-4 space-y-6">
+      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+        <DollarSign size={20} className="text-accent" />
+        FIAT / Tasas y Operaciones
+      </h2>
+      <p className="text-sm text-text/60 mb-4">
+        Monitoreo del plugin FIAT: tasas BCV, Binance P2P y tasa operativa MundoXYZ (Binance - margen) con peg
+        fijo de 300 fuegos = 1 USDT.
+      </p>
+
+      {/* Plugin FIAT config overview */}
+      <div className="card-glass p-4">
+        <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
+          <Shield size={16} className="text-accent" />
+          Estado del Plugin FIAT
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-text/70">
+          <div>
+            <div className="text-text/50">Habilitado</div>
+            <div className="font-semibold">
+              {configFiat ? (configFiat.is_enabled ? 'Sí' : 'No') : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Shadow mode</div>
+            <div className="font-semibold">
+              {configFiat ? (configFiat.shadow_mode_enabled ? 'Sí' : 'No') : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">TTL tasas (min)</div>
+            <div className="font-semibold">
+              {configFiat?.max_rate_age_minutes ?? 30}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Contexto degradado</div>
+            <div className="font-semibold">
+              {isDegradedCtx == null ? '—' : isDegradedCtx ? 'Sí' : 'No'}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Usando fallback (BCV)</div>
+            <div className="font-semibold">
+              {usedFallbackCtx == null ? '—' : usedFallbackCtx ? 'Sí' : 'No'}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Margen config (%)</div>
+            <div className="font-semibold">
+              {configFiat?.margin_percent != null
+                ? parseFloat(configFiat.margin_percent).toFixed(2)
+                : '—'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card-glass p-4">
+          <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
+              $</span>
+            BCV (USD/VES)
+          </h3>
+          <div className="text-2xl font-bold">
+            {bcvRate ? bcvRate.toFixed(2) : '—'} <span className="text-sm text-text/60">Bs</span>
+          </div>
+          {latestBcv && (
+            <p className="text-xs text-text/50 mt-2">
+              Capturado: {new Date(latestBcv.captured_at).toLocaleString('es-ES')}
+            </p>
+          )}
+        </div>
+
+        <div className="card-glass p-4">
+          <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
+              $</span>
+            Binance P2P (USD/VES)
+          </h3>
+          <div className="text-2xl font-bold">
+            {binanceRate ? binanceRate.toFixed(2) : '—'} <span className="text-sm text-text/60">Bs</span>
+          </div>
+          {latestBinance && (
+            <p className="text-xs text-text/50 mt-2">
+              Capturado: {new Date(latestBinance.captured_at).toLocaleString('es-ES')}
+            </p>
+          )}
+        </div>
+
+        <div className="card-glass p-4">
+          <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
+              $</span>
+            MundoXYZ (Operativa)
+          </h3>
+          <div className="text-2xl font-bold">
+            {mxyzRate ? mxyzRate.toFixed(2) : '—'} <span className="text-sm text-text/60">Bs</span>
+          </div>
+          <p className="text-xs text-text/50 mt-2">
+            Peg: {pegFires} fuegos = {pegUsdt.toFixed(2)} USDT
+            {pegVes && Number.isFinite(pegVes) && (
+              <>
+                {' '}
+                (≈ {pegVes.toFixed(2)} Bs)
+              </>
+            )}
+          </p>
+          {inferredMargin && Number.isFinite(inferredMargin) && (
+            <p className="text-xs text-text/50 mt-1">
+              Margen vs Binance ≈ {Math.abs(inferredMargin).toFixed(2)}%
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Loading / error states */}
+      {(loadingRates || loadingOps) && (
+        <div className="flex items-center gap-2 text-sm text-text/60">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent" />
+          <span>Cargando datos FIAT...</span>
+        </div>
+      )}
+      {(errorRates || errorOps) && (
+        <div className="card-glass bg-error/10 border border-error/40 p-3 text-xs text-error">
+          Error cargando datos FIAT. Revisa logs y conectividad a BCV/Binance.
+        </div>
+      )}
+
+      {/* Rates table */}
+      <div className="card-glass p-4 overflow-x-auto">
+        <h3 className="text-sm font-semibold text-text/70 mb-3 flex items-center gap-2">
+          <TrendingUp size={16} className="text-accent" />
+          Últimas tasas capturadas
+        </h3>
+        {rates.length === 0 ? (
+          <p className="text-xs text-text/60 py-2">No hay tasas registradas aún.</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="text-text/50 border-b border-glass">
+              <tr>
+                <th className="text-left py-2 pr-2">Fuente</th>
+                <th className="text-left py-2 pr-2">Par</th>
+                <th className="text-right py-2 pr-2">Tasa</th>
+                <th className="text-right py-2 pr-2">Spread vs BCV</th>
+                <th className="text-right py-2 pr-2">Degradada</th>
+                <th className="text-right py-2 pl-2">Capturada</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rates.map((r) => {
+                const spread = r.spread_vs_bcv != null ? parseFloat(r.spread_vs_bcv) : null;
+                return (
+                  <tr key={r.id} className="border-b border-glass/40 last:border-b-0">
+                    <td className="py-1.5 pr-2 capitalize">{r.source}</td>
+                    <td className="py-1.5 pr-2">{r.pair}</td>
+                    <td className="py-1.5 pr-2 text-right">{parseFloat(r.rate).toFixed(4)}</td>
+                    <td className="py-1.5 pr-2 text-right">
+                      {spread != null && Number.isFinite(spread) ? spread.toFixed(4) : '—'}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right">
+                      {r.is_degraded ? 'Sí' : 'No'}
+                    </td>
+                    <td className="py-1.5 pl-2 text-right text-text/50">
+                      {new Date(r.captured_at).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Operations table */}
+      <div className="card-glass p-4 overflow-x-auto">
+        <h3 className="text-sm font-semibold text-text/70 mb-3 flex items-center gap-2">
+          <Activity size={16} className="text-accent" />
+          Operaciones FIAT recientes
+        </h3>
+        {operations.length === 0 ? (
+          <p className="text-xs text-text/60 py-2">No hay operaciones FIAT registradas.</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="text-text/50 border-b border-glass">
+              <tr>
+                <th className="text-left py-2 pr-2">Usuario</th>
+                <th className="text-left py-2 pr-2">Dirección</th>
+                <th className="text-left py-2 pr-2">Estado</th>
+                <th className="text-right py-2 pr-2">Tokens</th>
+                <th className="text-right py-2 pr-2">USDT</th>
+                <th className="text-right py-2 pr-2">Bs</th>
+                <th className="text-right py-2 pl-2">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operations.map((op) => {
+                const tokens = op.tokens_amount != null ? parseFloat(op.tokens_amount) : null;
+                const usdt = op.usdt_equivalent != null ? parseFloat(op.usdt_equivalent) : null;
+                const ves = op.fiat_amount_ves != null ? parseFloat(op.fiat_amount_ves) : null;
+                return (
+                  <tr key={op.id} className="border-b border-glass/40 last:border-b-0">
+                    <td className="py-1.5 pr-2">{op.username || '—'}</td>
+                    <td className="py-1.5 pr-2 capitalize">{op.direction}</td>
+                    <td className="py-1.5 pr-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide ${
+                          op.status === 'approved'
+                            ? 'bg-success/20 text-success'
+                            : op.status === 'pending'
+                            ? 'bg-warning/20 text-warning'
+                            : 'bg-error/20 text-error'
+                        }`}
+                      >
+                        {op.status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-2 text-right">
+                      {tokens != null && Number.isFinite(tokens) ? tokens.toFixed(2) : '—'}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right">
+                      {usdt != null && Number.isFinite(usdt) ? usdt.toFixed(4) : '—'}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right">
+                      {ves != null && Number.isFinite(ves) ? ves.toFixed(2) : '—'}
+                    </td>
+                    <td className="py-1.5 pl-2 text-right text-text/50">
+                      {new Date(op.created_at).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Main Admin Component
 const Admin = () => {
   const { isAdmin } = useAuth();
@@ -966,6 +1288,17 @@ const Admin = () => {
             <Repeat size={18} />
             Canjes
           </NavLink>
+          <NavLink
+            to="/admin/fiat"
+            className={({ isActive }) => 
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+              }`
+            }
+          >
+            <DollarSign size={18} />
+            FIAT
+          </NavLink>
         </div>
       </nav>
 
@@ -976,6 +1309,7 @@ const Admin = () => {
         <Route path="welcome" element={<AdminWelcome />} />
         <Route path="fire-requests" element={<AdminFireRequests />} />
         <Route path="redemptions" element={<AdminRedemptions />} />
+        <Route path="fiat" element={<AdminFiat />} />
       </Routes>
     </div>
   );

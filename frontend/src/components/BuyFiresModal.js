@@ -16,11 +16,37 @@ const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
   const [errors, setErrors] = useState({});
   const [copiedBank, setCopiedBank] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [fiatContext, setFiatContext] = useState(null);
 
   const bankData = `0102 Venezuela
 20827955
 0412-225.00.16
 Pago`;
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const fetchFiatContext = async () => {
+      try {
+        const res = await axios.get('/api/economy/fiat-context');
+        if (!cancelled) {
+          setFiatContext(res.data);
+        }
+      } catch (error) {
+        // No mostrar error al usuario final; solo log opcional para diagnóstico
+        // eslint-disable-next-line no-console
+        console.error('Error fetching FIAT context', error);
+      }
+    };
+
+    fetchFiatContext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -109,6 +135,27 @@ Pago`;
       handleClose();
     }
   };
+
+  let fiatPreview = null;
+  if (fiatContext && fiatContext.operationalRate && formData.amount) {
+    const parsed = parseFloat(formData.amount);
+    if (!isNaN(parsed) && parsed > 0) {
+      const tokens = parsed;
+      const usdt = tokens / 300;
+      const rate = parseFloat(fiatContext.operationalRate.rate);
+      if (Number.isFinite(rate) && rate > 0) {
+        const ves = usdt * rate;
+        fiatPreview = {
+          tokens,
+          usdt,
+          ves,
+          rate,
+          baseSource: fiatContext.operationalRate.baseSource,
+          marginPercent: fiatContext.operationalRate.marginPercent
+        };
+      }
+    }
+  }
 
   return (
     <>
@@ -202,7 +249,17 @@ Pago`;
                 {errors.amount && (
                   <p className="text-xs text-red-400 mt-1">{errors.amount}</p>
                 )}
-                <p className="text-xs text-text/40 mt-1">1 fuego = 1 Bs</p>
+                {fiatPreview ? (
+                  <p className="text-xs text-text/40 mt-1">
+                    Aproximado: {fiatPreview.ves.toFixed(2)} Bs (≈ {fiatPreview.usdt.toFixed(2)} USDT a{' '}
+                    {fiatPreview.rate.toFixed(2)} Bs/USDT MundoXYZ)
+                  </p>
+                ) : (
+                  <p className="text-xs text-text/40 mt-1">
+                    El valor en Bs se calcula con la tasa MundoXYZ (Binance P2P - 5%) vigente al registrar tu
+                    solicitud.
+                  </p>
+                )}
               </div>
 
               {/* Bank Reference Input */}

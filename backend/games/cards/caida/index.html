@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Caída / Ronda – Juego de cartas</title>
+  <style>
+    :root {
+      --background-base: #0b1020;
+      --background-elevated: #111827;
+      --background-soft: #020617;
+      --border-subtle: #1f2937;
+      --accent-primary: #22c55e;
+      --accent-primary-soft: rgba(34, 197, 94, 0.12);
+      --accent-warning: #f97316;
+      --accent-bcv: #3b82f6;
+      --accent-binance: #eab308;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --radius-lg: 18px;
+      --radius-sm: 10px;
+      --radius-pill: 999px;
+      --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.65);
+      --bg-body: radial-gradient(circle at top, #1e293b 0, #020617 52%, #000 100%);
+      --bg-card: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(17,24,39,0.98));
+      --bg-rate-item: radial-gradient(circle at top, rgba(15,23,42,0.9), rgba(15,23,42,0.95));
+      --page-max-width: 1120px;
+      --body-padding-y: 32px;
+      --body-padding-x: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-body);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: var(--page-max-width);
+      margin: 0 auto;
+      padding: var(--body-padding-y) var(--body-padding-x);
+    }
+
+    header.hero {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .hero-eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-eyebrow-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent-primary);
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.2);
+    }
+
+    .hero-title {
+      font-size: clamp(28px, 3.2vw, 36px);
+      letter-spacing: -0.04em;
+      font-weight: 650;
+      background: linear-gradient(120deg, #22c55e, #a3e635, #22c55e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-subtitle {
+      max-width: 640px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .hero-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background: rgba(15, 118, 110, 0.15);
+      border: 1px solid rgba(45, 212, 191, 0.3);
+      color: #a5f3fc;
+    }
+
+    .pill-outline {
+      background: rgba(15, 23, 42, 0.8);
+      border-color: rgba(148, 163, 184, 0.35);
+      color: var(--text-muted);
+    }
+
+    .layout-main {
+      display: grid;
+      grid-template-columns: 1.4fr 1.6fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 880px) {
+      .layout-main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(34,197,94,0.08), transparent 58%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .card-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-soft);
+      margin-bottom: 6px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    .card-lead {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .steps {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .step-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--accent-primary);
+      background: rgba(15,23,42,0.95);
+    }
+
+    .step-body strong {
+      color: var(--text-main);
+    }
+
+    .step-body {
+      color: var(--text-muted);
+    }
+
+    .substeps {
+      margin-top: 6px;
+      padding-left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--text-soft);
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .tag {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148,163,184,0.5);
+      color: var(--text-soft);
+      background: rgba(15,23,42,0.9);
+    }
+
+    .tag-primary {
+      border-color: rgba(34,197,94,0.75);
+      color: var(--accent-primary);
+      background: rgba(34,197,94,0.08);
+    }
+
+    .plays-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .play-item {
+      padding: 10px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(51,65,85,0.9);
+      background: radial-gradient(circle at top, rgba(15,23,42,0.9), rgba(15,23,42,0.98));
+      display: grid;
+      grid-template-columns: 1.3fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    @media (max-width: 640px) {
+      .play-item {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .play-main-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .play-description {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .play-points {
+      justify-self: flex-end;
+      text-align: right;
+    }
+
+    .points-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(34,197,94,0.55);
+      background: var(--accent-primary-soft);
+      font-size: 11px;
+      color: var(--accent-primary);
+    }
+
+    .points-value {
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: -0.02em;
+    }
+
+    .rules-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .rules-list li strong {
+      color: var(--text-main);
+    }
+
+    .footer-note {
+      margin-top: 22px;
+      font-size: 12px;
+      color: var(--text-soft);
+      text-align: center;
+    }
+
+    /* Vista previa de cartas estilo baraja española (foto inspirada) */
+    .cards-preview {
+      margin-top: 24px;
+      margin-bottom: 22px;
+      padding: 14px 16px 8px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: radial-gradient(circle at top, #f9fafb 0, #e5e7eb 30%, #d1d5db 60%, #9ca3af 100%);
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.75);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 18px;
+      overflow-x: auto;
+    }
+
+    .playing-card {
+      width: 120px;
+      aspect-ratio: 3 / 5;
+      background: #f9fafb;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.8);
+      padding: 9px 8px;
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .playing-card-inner {
+      position: relative;
+      flex: 1;
+      border-radius: 9px;
+      border: 1px solid #111827;
+      padding: 6px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .card-badge {
+      position: absolute;
+      top: 6px;
+      left: 9px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .card-badge-bottom {
+      top: auto;
+      bottom: 6px;
+      left: auto;
+      right: 9px;
+      transform: rotate(180deg);
+    }
+
+    .card-art {
+      width: 82%;
+      height: 82%;
+      position: relative;
+    }
+
+    /* Carta 1: estilo oro con león y estandartes simplificados */
+    .card-art-coin::before,
+    .card-art-coin::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+    }
+
+    .card-art-coin::before {
+      margin: auto;
+      width: 68px;
+      height: 68px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #fde68a, #facc15 40%, #c2410c 100%);
+      border: 3px solid #b45309;
+      box-shadow: 0 0 0 3px #fef3c7;
+    }
+
+    .card-art-coin::after {
+      top: auto;
+      bottom: 0;
+      height: 26px;
+      background: linear-gradient(90deg, #b91c1c, #f97316, #b91c1c);
+      border-radius: 12px 12px 0 0;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-coin-lion {
+      position: absolute;
+      bottom: 4px;
+      left: 8px;
+      right: 8px;
+      height: 18px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #b45309, #f97316, #b45309);
+      box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .card-coin-lion::before {
+      content: "♛";
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-56%);
+      font-size: 14px;
+      color: #fef3c7;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Cartas 11: caballos simplificados con silueta */
+    .card-art-horse {
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #fefce8, #e7e5e4 50%, #d6d3d1 100%);
+      box-shadow: inset 0 0 0 2px #78350f;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-horse-body {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      width: 64px;
+      height: 34px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #fbbf24, #f97316);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-horse-neck {
+      position: absolute;
+      bottom: 26px;
+      left: 34px;
+      width: 20px;
+      height: 30px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #facc15, #ea580c);
+      transform: rotate(-10deg);
+    }
+
+    .card-horse-rider {
+      position: absolute;
+      bottom: 30px;
+      left: 24px;
+      width: 30px;
+      height: 26px;
+      border-radius: 10px;
+      background: linear-gradient(120deg, #1d4ed8, #22c55e);
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.8);
+    }
+
+    .card-horse-rider::before {
+      content: "";
+      position: absolute;
+      bottom: 100%;
+      left: 7px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #fee2e2;
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.8);
+    }
+
+    .card-horse-coin {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #fef3c7, #facc15, #b45309);
+      box-shadow: 0 0 0 2px #fbbf24;
+    }
+
+    .card-horse-coin::before {
+      content: "✺";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #7c2d12;
+    }
+
+    .card-label {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+
+    /* Sistema genérico de cartas (data-palo, data-valor) */
+    .es-cards-showcase {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .es-cards-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .es-card {
+      width: 86px;
+      aspect-ratio: 3 / 5;
+      background: #fdfdfb;
+      border-radius: 10px;
+      border: 1px solid #d4d4d4;
+      padding: 5px 5px 4px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.7);
+    }
+
+    .es-card-info {
+      font-size: 9px;
+      line-height: 1.15;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      color: #111827;
+    }
+
+    .es-card-info-bottom {
+      align-items: flex-end;
+      transform: rotate(180deg);
+      align-self: flex-end;
+    }
+
+    .es-valor {
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .es-palo-letra {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6b7280;
+    }
+
+    .es-suit-icon {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      margin-top: 1px;
+    }
+
+    .es-symbols-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      justify-items: center;
+      align-items: center;
+      padding: 4px 2px;
+      gap: 1px;
+    }
+
+    .es-symbol {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+    }
+
+    /* Colores por palo */
+    .es-card[data-palo="oros"] .es-suit-icon,
+    .es-card[data-palo="oros"] .es-symbol {
+      background: radial-gradient(circle at 30% 30%, #fef3c7, #facc15 55%, #b45309 100%);
+    }
+
+    .es-card[data-palo="copas"] .es-suit-icon,
+    .es-card[data-palo="copas"] .es-symbol {
+      background: radial-gradient(circle at 30% 30%, #fee2e2, #ef4444 55%, #7f1d1d 100%);
+    }
+
+    .es-card[data-palo="espadas"] .es-suit-icon,
+    .es-card[data-palo="espadas"] .es-symbol {
+      background: radial-gradient(circle at 30% 30%, #e0f2fe, #0ea5e9 55%, #0f172a 100%);
+    }
+
+    .es-card[data-palo="bastos"] .es-suit-icon,
+    .es-card[data-palo="bastos"] .es-symbol {
+      background: linear-gradient(180deg, #7c2d12, #451a03);
+      border-radius: 10px;
+    }
+
+    /* Patrones de distribución para valores numéricos (1–5) */
+    .es-card[data-valor="1"] .es-symbols-grid {
+      grid-template-rows: repeat(5, 1fr);
+    }
+    .es-card[data-valor="1"] .es-symbol:nth-child(1) {
+      grid-row: 3;
+      grid-column: 2;
+    }
+
+    .es-card[data-valor="2"] .es-symbol:nth-child(1) {
+      grid-row: 2;
+      grid-column: 2;
+    }
+    .es-card[data-valor="2"] .es-symbol:nth-child(2) {
+      grid-row: 4;
+      grid-column: 2;
+    }
+
+    .es-card[data-valor="3"] .es-symbol:nth-child(1) {
+      grid-row: 1;
+      grid-column: 2;
+    }
+    .es-card[data-valor="3"] .es-symbol:nth-child(2) {
+      grid-row: 3;
+      grid-column: 2;
+    }
+    .es-card[data-valor="3"] .es-symbol:nth-child(3) {
+      grid-row: 5;
+      grid-column: 2;
+    }
+
+    .es-card[data-valor="4"] .es-symbol:nth-child(1) {
+      grid-row: 2;
+      grid-column: 1;
+    }
+    .es-card[data-valor="4"] .es-symbol:nth-child(2) {
+      grid-row: 2;
+      grid-column: 3;
+    }
+    .es-card[data-valor="4"] .es-symbol:nth-child(3) {
+      grid-row: 4;
+      grid-column: 1;
+    }
+    .es-card[data-valor="4"] .es-symbol:nth-child(4) {
+      grid-row: 4;
+      grid-column: 3;
+    }
+
+    .es-card[data-valor="5"] .es-symbol:nth-child(1) {
+      grid-row: 1;
+      grid-column: 1;
+    }
+    .es-card[data-valor="5"] .es-symbol:nth-child(2) {
+      grid-row: 1;
+      grid-column: 3;
+    }
+    .es-card[data-valor="5"] .es-symbol:nth-child(3) {
+      grid-row: 3;
+      grid-column: 2;
+    }
+    .es-card[data-valor="5"] .es-symbol:nth-child(4) {
+      grid-row: 5;
+      grid-column: 1;
+    }
+    .es-card[data-valor="5"] .es-symbol:nth-child(5) {
+      grid-row: 5;
+      grid-column: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-dot"></span>
+        Juego de cartas · Azar y estrategia
+      </div>
+      <h1 class="hero-title">Caída / Ronda – Guía completa</h1>
+      <p class="hero-subtitle">
+        Aprende paso a paso a jugar este clásico juego de cartas de baraja española. 
+        Objetivo: alcanzar 24 puntos combinando cantos, caídas y acumulación de cartas.
+      </p>
+      <div class="hero-stats">
+        <span class="pill">2–4 jugadores</span>
+        <span class="pill pill-outline">Objetivo: 24 puntos</span>
+        <span class="pill pill-outline">Baraja española (sin 8 ni 9)</span>
+      </div>
+    </header>
+
+    <section class="cards-preview" aria-label="Ejemplo de cartas de baraja española">
+      <div class="playing-card" aria-label="As de Oros estilizado">
+        <div class="playing-card-inner">
+          <span class="card-badge">1</span>
+          <span class="card-badge card-badge-bottom">1</span>
+          <div class="card-art card-art-coin">
+            <div class="card-coin-lion"></div>
+          </div>
+          <span class="card-label">oros</span>
+        </div>
+      </div>
+
+      <div class="playing-card" aria-label="Caballo de Bastos estilizado">
+        <div class="playing-card-inner">
+          <span class="card-badge">11</span>
+          <span class="card-badge card-badge-bottom">11</span>
+          <div class="card-art card-art-horse">
+            <div class="card-horse-body"></div>
+            <div class="card-horse-neck"></div>
+            <div class="card-horse-rider"></div>
+          </div>
+          <span class="card-label">bastos</span>
+        </div>
+      </div>
+
+      <div class="playing-card" aria-label="Caballo de Oros estilizado">
+        <div class="playing-card-inner">
+          <span class="card-badge">11</span>
+          <span class="card-badge card-badge-bottom">11</span>
+          <div class="card-art card-art-horse">
+            <div class="card-horse-body"></div>
+            <div class="card-horse-neck"></div>
+            <div class="card-horse-rider"></div>
+            <div class="card-horse-coin"></div>
+          </div>
+          <span class="card-label">oros</span>
+        </div>
+      </div>
+    </section>
+
+    <main class="layout-main">
+      <div class="column">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-eyebrow">Introducción</div>
+            <h2 class="card-title">¿De qué trata el juego?</h2>
+            <p class="card-lead">
+              En este juego de cartas el objetivo principal es alcanzar <strong>24 puntos</strong>.
+              Los puntos se obtienen mediante:
+            </p>
+            <ul class="rules-list">
+              <li><strong>Cantos o jugadas especiales:</strong> combinaciones de cartas con valor de puntos.</li>
+              <li><strong>Caídas:</strong> responder con la misma carta que el oponente acaba de jugar.</li>
+              <li><strong>Acumulación de cartas:</strong> al final de la partida, según la cantidad de cartas recogidas.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-eyebrow">Cómo jugar</div>
+            <h2 class="card-title">Preparación de la partida</h2>
+            <ol class="steps">
+              <li class="step-item">
+                <div class="step-number">1</div>
+                <div class="step-body">
+                  <strong>Elegir quién reparte</strong><br />
+                  Barajen las cartas, colóquenlas boca abajo sobre la mesa y cada jugador toma una carta.
+                  <br />
+                  La carta más alta indica quién barajea y reparte primero.
+                  <div class="substeps">
+                    <span>· Máximo recomendado: <strong>4 jugadores</strong>.</span>
+                  </div>
+                </div>
+              </li>
+              <li class="step-item">
+                <div class="step-number">2</div>
+                <div class="step-body">
+                  <strong>Forma de repartir</strong><br />
+                  El jugador que reparte tiene dos opciones:
+                  <div class="substeps">
+                    <span>
+                      <strong>a) Entregar la mesa primero:</strong> 
+                      lanza 4 cartas boca arriba diciendo “1, 2, 3, 4” o “4, 3, 2, 1”.
+                      Si aparece alguna carta con esos números en el orden exacto,
+                      el repartidor suma esos puntos a su cuenta. Luego reparte 3 cartas a cada jugador.
+                    </span>
+                    <span>
+                      <strong>b) Repartir primero a los jugadores:</strong> 
+                      reparte 3 cartas, una por vez, comenzando por el jugador a su derecha
+                      (incluyéndose a sí mismo). Luego entrega la mesa como se describe en el punto anterior.
+                    </span>
+                  </div>
+                </div>
+              </li>
+              <li class="step-item">
+                <div class="step-number">3</div>
+                <div class="step-body">
+                  <strong>Desarrollo de la mano</strong><br />
+                  Comienza el jugador a la derecha del repartidor:
+                  <div class="substeps">
+                    <span>· Puede <strong>lanzar una carta</strong> a la mesa.</span>
+                    <span>· O, si tiene una carta del <strong>mismo valor</strong> que alguna en la mesa, la juega y recoge esa carta (y las que le sigan en valor, según las reglas de la casa).</span>
+                    <span>· Durante su turno puede además <strong>declarar cantos</strong> presentes en su mano.</span>
+                  </div>
+                </div>
+              </li>
+              <li class="step-item">
+                <div class="step-number">4</div>
+                <div class="step-body">
+                  <strong>Final de la partida</strong><br />
+                  Cuando se agotan todas las cartas del mazo:
+                  <div class="substeps">
+                    <span><strong>· 4 jugadores:</strong> cada uno cuenta hasta 10 cartas. Las cartas sobrantes son puntos.</span>
+                    <span><strong>· 3 jugadores:</strong> el repartidor cuenta hasta 14; los otros 2 hasta 13. Las cartas sobrantes son puntos.</span>
+                    <span><strong>· 2 jugadores:</strong> cada uno cuenta hasta 20 cartas. Las cartas sobrantes son puntos.</span>
+                  </div>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+      </div>
+
+      <div class="column">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-eyebrow">Cantos principales</div>
+            <h2 class="card-title">Jugadas y valor en puntos</h2>
+            <div class="tag-row">
+              <span class="tag tag-primary">Cantos más usados</span>
+              <span class="tag">Mayor puntaje: trivilín de 12</span>
+            </div>
+            <div class="plays-list">
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">1. Caída</div>
+                  <div class="play-description">
+                    Cuando un oponente lanza una carta y el siguiente jugador tiene la <strong>misma carta</strong>,
+                    la golpea, la recoge y suma puntos según su valor.
+                    <br />
+                    · Del 1 al 7 → 1 punto<br />
+                    · 10 → 2 puntos<br />
+                    · 11 → 3 puntos<br />
+                    · 12 → 4 puntos
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">1–4</span>
+                    <span>puntos según carta</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">2. Ronda</div>
+                  <div class="play-description">
+                    <strong>2 cartas iguales y 1 diferente.</strong><br />
+                    · Ronda de 1–7 → 1 punto<br />
+                    · Ronda de 10 → 2 puntos<br />
+                    · Ronda de 11 → 3 puntos<br />
+                    · Ronda de 12 → 4 puntos
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">1–4</span>
+                    <span>según valor</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">3. Trivilín o marisco</div>
+                  <div class="play-description">
+                    <strong>3 cartas iguales.</strong><br />
+                    · Si es en primera y última mano → gana toda la partida.<br />
+                    · Si aparece en cualquier otro momento → 5 puntos.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">5</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">4. Patrulla</div>
+                  <div class="play-description">
+                    Secuencia de <strong>3 cartas consecutivas</strong> (sin usar 8 ni 9) hasta el 12.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">6</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">5. Vigía</div>
+                  <div class="play-description">
+                    <strong>2 cartas iguales y una que le sigue o antecede</strong> en valor.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">7</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">6. Registro</div>
+                  <div class="play-description">
+                    Cartas obligatorias: <strong>1, 11 y 12</strong>.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">8</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">7. Registrico</div>
+                  <div class="play-description">
+                    Cartas obligatorias: <strong>1, 10 y 11</strong>.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">10</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">8. Casa Chica</div>
+                  <div class="play-description">
+                    Cartas obligatorias: <strong>1, 11 y 11</strong>.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">11</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="play-item">
+                <div>
+                  <div class="play-main-title">9. Casa Grande</div>
+                  <div class="play-description">
+                    Cartas obligatorias: <strong>1, 12 y 12</strong>.
+                  </div>
+                </div>
+                <div class="play-points">
+                  <span class="points-pill">
+                    <span class="points-value">12</span>
+                    <span>puntos</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-eyebrow">Reglas importantes</div>
+            <h2 class="card-title">Detalles clave y desempates</h2>
+            <ul class="rules-list">
+              <li><strong>Mesa limpia:</strong> si un jugador recoge cartas y deja la mesa vacía → 4 puntos.</li>
+              <li><strong>Caída con mesa:</strong> caída que además deja la mesa vacía → 5 puntos.</li>
+              <li><strong>Mal echada:</strong> si al entregar la mesa no acierta ningún número previsto, el primer jugador suma 1 punto.</li>
+              <li><strong>Respeto:</strong> se deben respetar todas las jugadas, especialmente cuando hay dinero apostado.</li>
+              <li><strong>Trampas:</strong> cualquier jugador que haga trampa es expulsado de la partida.</li>
+              <li><strong>Zapatero:</strong> si un jugador o equipo termina sin alcanzar al menos 1 punto, se considera zapatero y paga doble en partidas con apuesta (no aplica si tuvo trivilín al principio).</li>
+              <li><strong>Canto mata mesa:</strong> un canto del repartidor puede anular puntos de la mesa y retrasar la victoria del oponente, sobre todo cuando alguien está cercano a los 24 puntos.</li>
+              <li><strong>Reparto perdido:</strong> si al echar la mesa aparecen hasta 4 cartas repetidas, el repartidor pierde su derecho a repartir y pasa el mazo al siguiente jugador a la derecha.</li>
+              <li><strong>Apuestas:</strong> los precios de entrada deben fijarse antes de comenzar y el dinero debe estar sobre la mesa; quien gana se lleva todo.</li>
+              <li><strong>Empate por puntos:</strong> si varios jugadores pasan o llegan a 24 puntos, gana quien tenga más. Si dos o más tienen exactamente 24, se barajea y gana quien saque la carta mayor.</li>
+              <li><strong>Cantos iguales:</strong> si dos jugadores tienen los mismos cantos, pierde quien esté barajeando y gana quien esté más cerca de él hacia la derecha.</li>
+              <li><strong>Rondas iguales:</strong> si los jugadores poseen la misma ronda, gana la ronda cuya tercera carta (la diferente) sea mayor; si siguen iguales, aplica la regla anterior.</li>
+              <li><strong>Registro de puntos:</strong> la cuenta debe ser transparente; si se desconfía de alguien, se recomienda llevar los puntos en papel.</li>
+              <li><strong>Cartas marcadas:</strong> está prohibido jugar con cartas rotas, dobladas, marcadas o de distinto reverso.</li>
+              <li><strong>Trivilín de rey (12):</strong> trivilín de 12 mata toda la partida y quien lo tenga gana automáticamente.</li>
+              <li><strong>Victoria inmediata:</strong> gana automáticamente quien llegue a <strong>24 puntos</strong>.</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <p class="footer-note">
+      Respeta siempre las reglas, evita hacer trampa y acuerda las apuestas antes de comenzar.
+      <br />
+      Lleva la cuenta de puntos con transparencia, idealmente en papel o marcador visible para todos.
+    </p>
+  </div>
+</body>
+</html>

@@ -434,11 +434,139 @@ router.get('/stats', adminAuth, async (req, res) => {
         coins_volume: 0
       };
     }
-    
     res.json(stats);
   } catch (error) {
     logger.error('Error fetching system stats:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// FIAT: list captured rates
+router.get('/fiat/rates', adminAuth, async (req, res) => {
+  try {
+    const { source, pair, limit = 50, offset = 0 } = req.query;
+
+    let queryStr = 'SELECT * FROM fiat_rates WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (source) {
+      queryStr += ` AND source = $${++paramCount}`;
+      params.push(source);
+    }
+
+    if (pair) {
+      queryStr += ` AND pair = $${++paramCount}`;
+      params.push(pair);
+    }
+
+    queryStr += ' ORDER BY captured_at DESC';
+    queryStr += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await query(queryStr, params);
+
+    let countQuery = 'SELECT COUNT(*) AS total FROM fiat_rates WHERE 1=1';
+    const countParams = [];
+    paramCount = 0;
+
+    if (source) {
+      countQuery += ` AND source = $${++paramCount}`;
+      countParams.push(source);
+    }
+
+    if (pair) {
+      countQuery += ` AND pair = $${++paramCount}`;
+      countParams.push(pair);
+    }
+
+    const countResult = await query(countQuery, countParams);
+
+    res.json({
+      rates: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logger.error('Error fetching FIAT rates:', error);
+    res.status(500).json({ error: 'Failed to fetch FIAT rates' });
+  }
+});
+
+// FIAT: list operations
+router.get('/fiat/operations', adminAuth, async (req, res) => {
+  try {
+    const { user_id, status, direction, limit = 50, offset = 0 } = req.query;
+
+    let queryStr = `
+      SELECT 
+        fo.*,
+        u.username,
+        wt.type AS wallet_type,
+        wt.currency AS wallet_currency,
+        wt.amount AS wallet_amount,
+        wt.created_at AS wallet_created_at
+      FROM fiat_operations fo
+      LEFT JOIN users u ON u.id = fo.user_id
+      LEFT JOIN wallet_transactions wt ON wt.id = fo.wallet_transaction_id
+      WHERE 1=1
+    `;
+
+    const params = [];
+    let paramCount = 0;
+
+    if (user_id) {
+      queryStr += ` AND fo.user_id = $${++paramCount}`;
+      params.push(user_id);
+    }
+
+    if (status) {
+      queryStr += ` AND fo.status = $${++paramCount}`;
+      params.push(status);
+    }
+
+    if (direction) {
+      queryStr += ` AND fo.direction = $${++paramCount}`;
+      params.push(direction);
+    }
+
+    queryStr += ' ORDER BY fo.created_at DESC';
+    queryStr += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await query(queryStr, params);
+
+    let countQuery = 'SELECT COUNT(*) AS total FROM fiat_operations fo WHERE 1=1';
+    const countParams = [];
+    paramCount = 0;
+
+    if (user_id) {
+      countQuery += ` AND fo.user_id = $${++paramCount}`;
+      countParams.push(user_id);
+    }
+
+    if (status) {
+      countQuery += ` AND fo.status = $${++paramCount}`;
+      countParams.push(status);
+    }
+
+    if (direction) {
+      countQuery += ` AND fo.direction = $${++paramCount}`;
+      countParams.push(direction);
+    }
+
+    const countResult = await query(countQuery, countParams);
+
+    res.json({
+      operations: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logger.error('Error fetching FIAT operations:', error);
+    res.status(500).json({ error: 'Failed to fetch FIAT operations' });
   }
 });
 

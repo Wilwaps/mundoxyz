@@ -343,9 +343,14 @@ router.get('/:userId/transactions', verifyToken, async (req, res) => {
         wt.balance_after,
         wt.description,
         wt.created_at,
-        u2.username as related_username
+        u2.username as related_username,
+        fo.fiat_amount_ves,
+        fo.usdt_equivalent,
+        fo.tokens_amount AS fiat_tokens_amount,
+        fo.status AS fiat_status
       FROM wallet_transactions wt
       LEFT JOIN users u2 ON u2.id = wt.related_user_id
+      LEFT JOIN fiat_operations fo ON fo.wallet_transaction_id = wt.id AND fo.status = 'approved'
       WHERE wt.wallet_id = $1
     `;
 
