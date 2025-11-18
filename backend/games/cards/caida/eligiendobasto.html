@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elegir basto – Trapecio con base más angosta</title>
+  <style>
+    :root {
+      /* Variables base del trapecio */
+      --base-inset: 20%; /* más alto = base más angosta */
+      --ancho: 280px;
+      --alto: 160px;
+      --color: #4a8;
+      --borde: 4px solid #2f6;
+      --sombra: 0 10px 24px rgba(0,0,0,.18);
+      --radio: 12px; /* borde redondeado (opcional) */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #020617;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+
+    .wrap {
+      text-align: center;
+      padding: 24px;
+      max-width: 720px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #cbd5f5;
+    }
+
+    .shape-frame {
+      padding: 24px 18px 18px;
+      border-radius: 18px;
+      background: radial-gradient(circle at top, #0f172a, #020617 60%, #000 100%);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,0.75),
+        inset 0 0 0 1px rgba(148,163,184,0.4);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .trapezoid {
+      width: var(--ancho);
+      height: var(--alto);
+      background: var(--color);
+      border: var(--borde);
+      box-shadow: var(--sombra);
+      border-radius: var(--radio);
+      /* recorta para que la base inferior sea más angosta */
+      clip-path: polygon(
+        0% 0%,
+        100% 0%,
+        calc(100% - var(--base-inset)) 100%,
+        var(--base-inset) 100%
+      );
+    }
+
+    .dimensions {
+      font-size: 13px;
+      color: #e5e7eb;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(148,163,184,0.5);
+      display: inline-flex;
+      gap: 10px;
+    }
+
+    .dimensions span strong {
+      color: #a5f3fc;
+    }
+
+    .controls {
+      margin-top: 18px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #020617;
+      border-radius: 10px;
+      padding: 8px 12px;
+      border: 1px solid rgba(55,65,81,0.9);
+      font-size: 13px;
+      color: #e5e7eb;
+    }
+
+    .controls input[type="range"] {
+      width: 180px;
+      accent-color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Elegir forma del basto</h1>
+
+    <div class="shape-frame">
+      <div class="trapezoid" id="shape"></div>
+      <div class="dimensions" id="dimensions">
+        <span><strong>Ancho:</strong> <span id="dim-width">280</span> px</span>
+        <span><strong>Alto:</strong> <span id="dim-height">160</span> px</span>
+        <span><strong>Base inferior:</strong> <span id="dim-base">168</span> px (<span id="dim-base-percent">60</span>%)</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label>
+        Base inferior (angosta)
+        <input type="range" id="inset" min="0" max="40" value="20" />
+      </label>
+      <label>
+        Ancho
+        <input type="range" id="width" min="160" max="520" value="280" />
+      </label>
+      <label>
+        Alto
+        <input type="range" id="height" min="80" max="300" value="160" />
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const rootStyle = document.documentElement.style;
+    const inset = document.getElementById('inset');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+
+    const dimWidth = document.getElementById('dim-width');
+    const dimHeight = document.getElementById('dim-height');
+    const dimBase = document.getElementById('dim-base');
+    const dimBasePercent = document.getElementById('dim-base-percent');
+
+    function updateFromInputs() {
+      const insetVal = Number(inset.value);       // % que entra cada lado
+      const widthVal = Number(widthInput.value);  // px
+      const heightVal = Number(heightInput.value);
+
+      rootStyle.setProperty('--base-inset', insetVal + '%');
+      rootStyle.setProperty('--ancho', widthVal + 'px');
+      rootStyle.setProperty('--alto', heightVal + 'px');
+
+      // Cálculos de dimensiones
+      const basePercent = 100 - insetVal * 2; // ancho relativo de la base
+      const basePx = Math.max(0, widthVal * basePercent / 100);
+
+      dimWidth.textContent = widthVal.toFixed(0);
+      dimHeight.textContent = heightVal.toFixed(0);
+      dimBase.textContent = basePx.toFixed(0);
+      dimBasePercent.textContent = basePercent.toFixed(0);
+    }
+
+    inset.addEventListener('input', updateFromInputs);
+    widthInput.addEventListener('input', updateFromInputs);
+    heightInput.addEventListener('input', updateFromInputs);
+
+    // Inicializar valores
+    updateFromInputs();
+  </script>
+</body>
+</html>

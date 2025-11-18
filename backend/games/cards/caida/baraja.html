@@ -273,7 +273,7 @@
     }
 
     .es-card[data-palo="bastos"] .es-mini-suit {
-      background: radial-gradient(circle at 30% 25%, #e5e7d0, #a3a380 55%, #4d5d2a 100%);
+      background: radial-gradient(circle at 30% 25%, #e6f4a3, #8ea934 55%, #3f4f1a 100%);
       border-radius: 10px;
     }
 
@@ -469,8 +469,22 @@
       width: 10px;
       height: 7px;
       border-radius: 999px;
-      background: radial-gradient(circle at 30% 30%, #e5e7d0, #a3a380, #4d5d2a);
+      background: radial-gradient(circle at 30% 30%, #e6f4a3, #8ea934, #3f4f1a);
       box-shadow: 0 0 0 1px rgba(61, 75, 41, 0.95);
+    }
+
+    .es-card[data-palo="bastos"] .es-symbol::after {
+      content: "";
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 11px;
+      height: 8px;
+      background: linear-gradient(180deg, #7c2d12, #451a03);
+      border-radius: 4px;
+      clip-path: polygon(18% 0, 82% 0, 70% 100%, 30% 100%);
+      box-shadow: 0 0 0 1px rgba(30, 64, 175, 0.7);
     }
 
     /* Distribuciones numéricas 1–7 (patrones genéricos) */

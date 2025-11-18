@@ -6,6 +6,7 @@ const roleService = require('../services/roleService');
 const logger = require('../utils/logger');
 const fiatRateService = require('../services/fiatRateService');
 const axios = require('axios');
+const https = require('https');
 
 // Welcome events management
 router.get('/welcome/events', adminAuth, async (req, res) => {
@@ -576,7 +577,19 @@ async function scrapeBcvRate(pair) {
   const url = process.env.FIAT_BCV_URL || 'https://www.bcv.org.ve';
 
   try {
-    const response = await axios.get(url, { timeout: 15000 });
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
+
+    const response = await axios.get(url, {
+      timeout: 15000,
+      httpsAgent,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
     const html = response.data || '';
 
     const match = html.match(/USD[^0-9]*([0-9.,]+)/i);
@@ -610,7 +623,7 @@ async function scrapeBcvRate(pair) {
 async function scrapeBinanceAndMxyz(pair) {
   const url =
     process.env.FIAT_BINANCE_P2P_URL ||
-    'https://p2p.binance.com/bapi/c2c/v2/public/ads/search';
+    'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search';
 
   const payload = {
     page: 1,
