@@ -592,9 +592,9 @@ async function scrapeBcvRate(pair) {
     });
     const html = response.data || '';
 
-    // Extraer específicamente el bloque del dólar oficial
+    // Extraer específicamente el valor numérico del bloque del dólar oficial (div id="dolar" y div.centrado)
     const dolarMatch = html.match(
-      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<span>\s*USD\s*<\\/span>[\s\S]*?<strong>\s*([0-9.,]+)\s*<\\/strong>/i
+      /<div[^>]*id=["']dolar["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*centrado[^"']*["'][^>]*>\s*<strong>\s*([0-9.,]+)\s*<\\/strong>/i
     );
 
     if (!dolarMatch) {
