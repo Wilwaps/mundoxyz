@@ -518,7 +518,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           animate={{ y: 0, opacity: 1 }}
           className="bg-glass rounded-2xl p-6 mb-6"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div className="flex items-start gap-4">
               <button
                 onClick={() => navigate('/raffles')}
@@ -579,7 +579,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             </div>
             
             {/* Acciones */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 mt-4 lg:mt-0 lg:justify-end lg:items-center w-full lg:w-auto">
               {/* Ayuda */}
               <motion.button
                 whileHover={{ scale: 1.05 }}

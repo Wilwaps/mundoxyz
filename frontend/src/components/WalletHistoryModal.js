@@ -121,7 +121,9 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
     ];
     
     // Verificar si el tipo contiene palabras clave de débito
-    const typeStr = type.toLowerCase();
+    const typeStr = (type || '').toLowerCase();
+
+    if (typeStr === 'fire_purchase') return false;
     if (debitTypes.includes(typeStr)) return true;
     if (typeStr.includes('cost') || typeStr.includes('bet') || 
         typeStr.includes('burn') || typeStr.includes('spend') ||

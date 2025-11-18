@@ -1228,6 +1228,53 @@ router.delete('/rooms/:code', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/tictactoe/rooms/admin - Listar salas activas para admin/tote
+router.get('/rooms/admin', verifyToken, async (req, res) => {
+  try {
+    const roles = req.user.roles || [];
+    const isAdmin = roles.includes('admin') || roles.includes('tote');
+    
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo admin/tote.' });
+    }
+    
+    const result = await query(
+      `SELECT 
+        r.*,
+        u.username as host_username,
+        u.display_name as host_display_name,
+        u.avatar_url as host_avatar
+      FROM tictactoe_rooms r
+      JOIN users u ON u.id = r.host_id
+      WHERE r.status IN ('waiting', 'ready', 'playing')
+      ORDER BY r.created_at DESC`
+    );
+    
+    const rooms = result.rows.map((room) => {
+      if (typeof room.board === 'string') {
+        try {
+          room.board = JSON.parse(room.board);
+        } catch (e) {
+          room.board = [[null,null,null],[null,null,null],[null,null,null]];
+        }
+      }
+      if (typeof room.moves_history === 'string') {
+        try {
+          room.moves_history = JSON.parse(room.moves_history);
+        } catch (e) {
+          room.moves_history = [];
+        }
+      }
+      return room;
+    });
+    
+    res.json({ rooms });
+  } catch (error) {
+    logger.error('Error fetching admin tictactoe rooms:', error);
+    res.status(500).json({ error: 'Failed to fetch admin rooms' });
+  }
+});
+
 // GET /api/tictactoe/rooms/public - Listar salas públicas
 router.get('/rooms/public', optionalAuth, async (req, res) => {
   try {

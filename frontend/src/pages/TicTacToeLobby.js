@@ -19,6 +19,7 @@ const TicTacToeLobby = () => {
   const [modeFilter, setModeFilter] = useState('all');
   const [joinCode, setJoinCode] = useState('');
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const isAdminOrTote = !!(user && (user.roles?.includes('admin') || user.roles?.includes('tote')));
   
   // Fetch active room (para reconexión)
   const { data: activeRoomData } = useQuery({
@@ -48,6 +49,21 @@ const TicTacToeLobby = () => {
       return response.data.rooms;
     },
     refetchInterval: 5000 // Refetch every 5 seconds
+  });
+  
+  // Admin: fetch all active rooms (waiting, ready, playing)
+  const {
+    data: adminRooms,
+    isLoading: isLoadingAdminRooms,
+    refetch: refetchAdminRooms
+  } = useQuery({
+    queryKey: ['tictactoe-admin-rooms'],
+    queryFn: async () => {
+      const response = await axios.get('/api/tictactoe/rooms/admin');
+      return response.data.rooms;
+    },
+    enabled: isAdminOrTote,
+    refetchInterval: 5000
   });
   
   // Fetch user balance
@@ -112,7 +128,10 @@ const TicTacToeLobby = () => {
     },
     onSuccess: (data) => {
       toast.success(data.message || 'Sala cerrada exitosamente');
-      refetch(); // Refrescar lista de salas
+      refetch();
+      if (isAdminOrTote) {
+        refetchAdminRooms();
+      }
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al cerrar sala');
@@ -390,6 +409,96 @@ const TicTacToeLobby = () => {
           >
             Crear Primera Sala
           </button>
+        </div>
+      )}
+
+      {isAdminOrTote && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-text flex items-center gap-2">
+              <Users size={18} className="text-accent" />
+              <span>Salas activas (admin/tote)</span>
+            </h2>
+          </div>
+
+          {isLoadingAdminRooms ? (
+            <div className="flex justify-center py-6">
+              <div className="spinner"></div>
+            </div>
+          ) : adminRooms && adminRooms.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {adminRooms.map((room) => (
+                <motion.div
+                  key={room.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="card-glass p-4 cursor-pointer relative"
+                  onClick={() => navigate(`/tictactoe/room/${room.code}`)}
+                >
+                  {user && (user.roles?.includes('admin') || user.roles?.includes('tote')) && (
+                    <button
+                      onClick={(e) => handleCloseRoom(room, e)}
+                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-error/80 hover:bg-error text-white transition-colors z-10"
+                      title="Cerrar sala (Admin)"
+                      disabled={closeRoomMutation.isPending}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-bold text-lg text-text">
+                        Sala {room.code}
+                      </h3>
+                      <p className="text-sm text-text/60">
+                        Host: {room.host_username}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs text-text/60">
+                      <div
+                        className={`px-2 py-1 rounded-full font-medium inline-block ${
+                          room.status === 'waiting'
+                            ? 'bg-success/20 text-success'
+                            : room.status === 'ready'
+                              ? 'bg-violet/20 text-violet'
+                              : 'bg-accent/20 text-accent'
+                        }`}
+                      >
+                        {room.status === 'waiting'
+                          ? 'Esperando'
+                          : room.status === 'ready'
+                            ? 'Listo'
+                            : 'Jugando'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      {room.mode === 'coins' ? (
+                        <>
+                          <Coins size={16} className="text-accent" />
+                          <span className="text-accent font-bold">{room.bet_amount}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Flame size={16} className="text-fire-orange" />
+                          <span className="text-fire-orange font-bold">{room.bet_amount}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-xs text-text/50">
+                      {room.visibility === 'public' ? 'Pública' : 'Privada'}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-text/60">No hay salas activas en este momento.</p>
+          )}
         </div>
       )}
       
