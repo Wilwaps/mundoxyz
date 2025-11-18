@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
@@ -899,6 +899,33 @@ const AdminRedemptions = () => {
 
 // Admin FIAT monitoring component
 const AdminFiat = () => {
+  const queryClient = useQueryClient();
+  const [scrapingSource, setScrapingSource] = useState(null);
+
+  const scrapeMutation = useMutation({
+    mutationFn: async (source) => {
+      const response = await axios.post('/api/admin/fiat/scrape', { source });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-fiat-rates']);
+      queryClient.invalidateQueries(['economy-fiat-context']);
+    }
+  });
+
+  const handleScrape = async (source) => {
+    try {
+      setScrapingSource(source);
+      await scrapeMutation.mutateAsync(source);
+      toast.success(`Tasa ${source.toUpperCase()} actualizada`);
+    } catch (error) {
+      const msg = error?.response?.data?.error || 'Error al actualizar tasas FIAT';
+      toast.error(msg);
+    } finally {
+      setScrapingSource(null);
+    }
+  };
+
   const {
     data: ratesData,
     isLoading: loadingRates,
@@ -1028,11 +1055,21 @@ const AdminFiat = () => {
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-glass p-4">
-          <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
-              $</span>
-            BCV (USD/VES)
-          </h3>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <h3 className="text-sm font-semibold text-text/70 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
+                $</span>
+              BCV (USD/VES)
+            </h3>
+            <button
+              type="button"
+              onClick={() => handleScrape('bcv')}
+              disabled={scrapingSource !== null}
+              className="px-3 py-1 rounded-full text-[11px] bg-glass hover:bg-glass-hover text-text/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {scrapingSource === 'bcv' ? 'Consultando…' : 'Consultar'}
+            </button>
+          </div>
           <div className="text-2xl font-bold">
             {bcvRate ? bcvRate.toFixed(2) : '—'} <span className="text-sm text-text/60">Bs</span>
           </div>
@@ -1044,11 +1081,21 @@ const AdminFiat = () => {
         </div>
 
         <div className="card-glass p-4">
-          <h3 className="text-sm font-semibold text-text/70 mb-2 flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
-              $</span>
-            Binance P2P (USD/VES)
-          </h3>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <h3 className="text-sm font-semibold text-text/70 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-glass">
+                $</span>
+              Binance P2P (USD/VES)
+            </h3>
+            <button
+              type="button"
+              onClick={() => handleScrape('binance')}
+              disabled={scrapingSource !== null}
+              className="px-3 py-1 rounded-full text-[11px] bg-glass hover:bg-glass-hover text-text/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {scrapingSource === 'binance' ? 'Consultando…' : 'Consultar'}
+            </button>
+          </div>
           <div className="text-2xl font-bold">
             {binanceRate ? binanceRate.toFixed(2) : '—'} <span className="text-sm text-text/60">Bs</span>
           </div>

@@ -4,6 +4,8 @@ const { query, transaction } = require('../db');
 const { adminAuth, verifyToken, requireTote } = require('../middleware/auth');
 const roleService = require('../services/roleService');
 const logger = require('../utils/logger');
+const fiatRateService = require('../services/fiatRateService');
+const axios = require('axios');
 
 // Welcome events management
 router.get('/welcome/events', adminAuth, async (req, res) => {
@@ -567,6 +569,169 @@ router.get('/fiat/operations', adminAuth, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching FIAT operations:', error);
     res.status(500).json({ error: 'Failed to fetch FIAT operations' });
+  }
+});
+
+async function scrapeBcvRate(pair) {
+  const url = process.env.FIAT_BCV_URL || 'https://www.bcv.org.ve';
+
+  try {
+    const response = await axios.get(url, { timeout: 15000 });
+    const html = response.data || '';
+
+    const match = html.match(/USD[^0-9]*([0-9.,]+)/i);
+    if (!match) {
+      logger.warn('FIAT BCV scraping: no rate match in HTML');
+      return null;
+    }
+
+    const raw = match[1].replace(/\./g, '').replace(/,/g, '.');
+    const rate = parseFloat(raw);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      logger.warn('FIAT BCV scraping: invalid rate after parse', { raw });
+      return null;
+    }
+
+    const capturedAt = new Date();
+    const insertRes = await query(
+      `INSERT INTO fiat_rates (source, pair, rate, spread_vs_bcv, is_degraded, captured_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       RETURNING *`,
+      ['bcv', pair, rate, null, false, capturedAt]
+    );
+
+    return insertRes.rows[0] || null;
+  } catch (error) {
+    logger.error('Error scraping BCV rate:', error);
+    return null;
+  }
+}
+
+async function scrapeBinanceAndMxyz(pair) {
+  const url =
+    process.env.FIAT_BINANCE_P2P_URL ||
+    'https://p2p.binance.com/bapi/c2c/v2/public/ads/search';
+
+  const payload = {
+    page: 1,
+    rows: 10,
+    payTypes: [],
+    asset: 'USDT',
+    tradeType: 'BUY',
+    fiat: 'VES',
+    publisherType: null
+  };
+
+  try {
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      timeout: 15000
+    });
+
+    const data = response.data && response.data.data;
+    if (!Array.isArray(data) || data.length === 0) {
+      logger.warn('FIAT Binance scraping: empty data array');
+      return { binance: null, mundoxyz: null };
+    }
+
+    const adv = data[1] || data[0];
+    const priceStr = adv && adv.adv && adv.adv.price;
+    const rate = parseFloat(priceStr);
+
+    if (!Number.isFinite(rate) || rate <= 0) {
+      logger.warn('FIAT Binance scraping: invalid price', { priceStr });
+      return { binance: null, mundoxyz: null };
+    }
+
+    const capturedAt = new Date();
+
+    // Usar última tasa BCV para calcular spread
+    let spreadVsBcv = null;
+    try {
+      const bcvRes = await query(
+        'SELECT rate FROM fiat_rates WHERE source = $1 AND pair = $2 ORDER BY captured_at DESC LIMIT 1',
+        ['bcv', pair]
+      );
+      if (bcvRes.rows.length > 0) {
+        const bcvRate = parseFloat(bcvRes.rows[0].rate);
+        if (Number.isFinite(bcvRate)) {
+          spreadVsBcv = rate - bcvRate;
+        }
+      }
+    } catch (spreadError) {
+      logger.warn('FIAT Binance scraping: error computing spread vs BCV', spreadError);
+    }
+
+    const binInsert = await query(
+      `INSERT INTO fiat_rates (source, pair, rate, spread_vs_bcv, is_degraded, captured_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       RETURNING *`,
+      ['binance', pair, rate, spreadVsBcv, false, capturedAt]
+    );
+
+    const binanceRow = binInsert.rows[0] || null;
+
+    // Calcular tasa operativa MundoXYZ a partir de Binance y margen config
+    let mxyzRow = null;
+    try {
+      const config = await fiatRateService.getOperationalConfig();
+      const margin = config?.margin_percent != null ? parseFloat(config.margin_percent) : 5.0;
+      const opRate = rate * (1 - margin / 100);
+
+      let spreadMxyz = null;
+      if (spreadVsBcv != null && Number.isFinite(spreadVsBcv)) {
+        spreadMxyz = opRate - (rate - spreadVsBcv);
+      }
+
+      const mxyzInsert = await query(
+        `INSERT INTO fiat_rates (source, pair, rate, spread_vs_bcv, is_degraded, captured_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+         RETURNING *`,
+        ['mundoxyz', pair, opRate, spreadMxyz, false, capturedAt]
+      );
+
+      mxyzRow = mxyzInsert.rows[0] || null;
+    } catch (mxyzError) {
+      logger.error('Error computing MundoXYZ operational rate from Binance:', mxyzError);
+    }
+
+    return { binance: binanceRow, mundoxyz: mxyzRow };
+  } catch (error) {
+    logger.error('Error scraping Binance P2P rate:', error);
+    return { binance: null, mundoxyz: null };
+  }
+}
+
+router.post('/fiat/scrape', adminAuth, async (req, res) => {
+  try {
+    const { source } = req.body || {};
+    const pair = 'USDVES';
+
+    if (!source || !['bcv', 'binance'].includes(source)) {
+      return res.status(400).json({ error: 'Invalid or missing source. Use "bcv" or "binance".' });
+    }
+
+    if (source === 'bcv') {
+      const bcvRow = await scrapeBcvRate(pair);
+      if (!bcvRow) {
+        return res.status(500).json({ error: 'No se pudo obtener tasa BCV' });
+      }
+
+      return res.json({ success: true, source: 'bcv', updated: { bcv: bcvRow } });
+    }
+
+    const { binance, mundoxyz } = await scrapeBinanceAndMxyz(pair);
+    if (!binance) {
+      return res.status(500).json({ error: 'No se pudo obtener tasa Binance P2P' });
+    }
+
+    return res.json({ success: true, source: 'binance', updated: { binance, mundoxyz } });
+  } catch (error) {
+    logger.error('Error in FIAT scrape endpoint:', error);
+    res.status(500).json({ error: 'Error al actualizar tasas FIAT' });
   }
 });
 

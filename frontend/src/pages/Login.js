@@ -100,11 +100,13 @@ const Login = () => {
             <>
               {/* Dev Mode Login */}
               <div className="mb-4">
-                <div className="bg-warning/20 border border-warning/30 rounded-lg p-3 mb-4">
-                  <p className="text-warning text-xs">
-                    Modo desarrollo: No se detectó Telegram WebApp
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => window.open('https://t.me/mundoxyz_bot', '_blank')}
+                  className="w-full mb-4 bg-warning/20 border border-warning/40 rounded-lg py-3 text-warning text-xs font-semibold hover:bg-warning/30 transition"
+                >
+                  ESPERA!! SI TENGO TELEGRAM
+                </button>
                 
                 <form onSubmit={handleDevLogin} className="space-y-4">
                   <div>
