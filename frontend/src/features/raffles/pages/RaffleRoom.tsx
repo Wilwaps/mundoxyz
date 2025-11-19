@@ -590,19 +590,20 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               >
                 <Info className="w-5 h-5 text-accent" />
               </motion.button>
-              {/* Botón elegir ganador manual - Solo host, modo manual, todos vendidos */}
+              {/* Botón elegir ganador manual - visible para host en modo manual, requiere al menos 1 número vendido */}
               {user?.id === raffle.hostId &&
                 raffle.drawMode === 'manual' &&
                 raffle.status === RaffleStatus.ACTIVE &&
-                soldNumbers === totalNumbers &&
                 totalNumbers > 0 && (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleDrawWinner}
-                  disabled={isDrawing}
+                  disabled={isDrawing || soldNumbers <= 0}
                   className="px-4 py-2 bg-gradient-to-r from-accent to-fire-orange rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-bold text-dark"
-                  title="Elegir ganador manualmente"
+                  title={soldNumbers > 0
+                    ? 'Elegir ganador manualmente'
+                    : 'Para sortear necesitas al menos 1 número vendido'}
                 >
                   <Hand className="w-5 h-5" />
                   <span>{isDrawing ? 'Eligiendo...' : 'Elegir Ganador'}</span>

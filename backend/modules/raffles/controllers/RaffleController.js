@@ -665,27 +665,31 @@ class RaffleController {
         });
       }
       
-      // Verificar que todos los números estén vendidos
+      // Verificar que exista al menos un número vendido (ignora reservas)
       const { query } = require('../../../db');
       const checkResult = await query(
         `SELECT 
            COUNT(*) as total,
-           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold
+           SUM(CASE WHEN state = 'sold' THEN 1 ELSE 0 END) as sold,
+           SUM(CASE WHEN state = 'reserved' THEN 1 ELSE 0 END) as reserved
          FROM raffle_numbers
          WHERE raffle_id = $1`,
         [raffle.id]
       );
       
-      const { total, sold } = checkResult.rows[0];
+      const { total, sold, reserved } = checkResult.rows[0];
+      const totalInt = parseInt(total);
+      const soldInt = parseInt(sold);
+      const reservedInt = parseInt(reserved || 0);
       
-      if (parseInt(total) !== parseInt(sold)) {
+      if (!soldInt || soldInt <= 0) {
         return res.status(400).json({
           success: false,
-          message: `No se puede sortear aún. Faltan ${parseInt(total) - parseInt(sold)} números por vender`,
+          message: 'No se puede sortear sin números vendidos',
           stats: {
-            total: parseInt(total),
-            sold: parseInt(sold),
-            remaining: parseInt(total) - parseInt(sold)
+            total: totalInt,
+            sold: soldInt,
+            reserved: reservedInt
           }
         });
       }

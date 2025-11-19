@@ -174,6 +174,15 @@
       cursor: pointer;
     }
 
+    .panel select {
+      font-size: 13px;
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 6px;
+      border: 1px solid rgba(55,65,81,0.9);
+      padding: 4px 8px;
+    }
+
     .shape .resize-handle {
       position: absolute;
       width: 10px;
@@ -212,7 +221,7 @@
       cursor: nesw-resize;
     }
 
-    .shape .vertex-handle {
+    .vertex-handle {
       position: absolute;
       width: 10px;
       height: 10px;
@@ -222,6 +231,23 @@
       box-shadow: 0 0 0 1px rgba(15,23,42,0.9);
       transform: translate(-50%, -50%);
       cursor: pointer;
+      z-index: 40;
+    }
+
+    .shape-text {
+      position: absolute;
+      inset: 6px;
+      padding: 4px 6px;
+      color: #f9fafb;
+      font-size: 13px;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: auto;
+      overflow: hidden;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -231,6 +257,7 @@
 
     <div class="toolbar">
       <button class="btn-primary" id="addElement">+ elemento</button>
+      <button class="btn-primary" id="toggleText">Texto</button>
       <span class="selected-info" id="selectedInfo">Sin elemento seleccionado</span>
     </div>
 
@@ -289,6 +316,14 @@
         Color borde
         <input type="color" id="borderColor" value="#e5e7eb" />
       </label>
+      <label>
+        Alineación texto
+        <select id="textAlign">
+          <option value="left">Izquierda</option>
+          <option value="center" selected>Centro</option>
+          <option value="right">Derecha</option>
+        </select>
+      </label>
     </div>
   </div>
 
@@ -300,6 +335,7 @@
 
     const canvas = document.getElementById('canvas');
     const addButton = document.getElementById('addElement');
+    const toggleTextButton = document.getElementById('toggleText');
     const selectedInfo = document.getElementById('selectedInfo');
 
     const posX = document.getElementById('posX');
@@ -312,6 +348,7 @@
     const zIndex = document.getElementById('zIndex');
     const fillColor = document.getElementById('fillColor');
     const borderColor = document.getElementById('borderColor');
+    const textAlignSelect = document.getElementById('textAlign');
 
     const dimX = document.getElementById('dim-x');
     const dimY = document.getElementById('dim-y');
@@ -324,9 +361,12 @@
     let elements = [];
     let nextId = 1;
     let selectedIndex = -1;
+    let selectedIndices = new Set();
     let dragInfo = null;
     let resizeInfo = null;
     let vertexDragInfo = null;
+    let undoStack = [];
+    const MAX_HISTORY = 80;
 
     function clampState(state) {
       const maxX = Math.max(0, CANVAS_WIDTH - state.w);
@@ -386,27 +426,232 @@
       });
     }
 
-    function selectElement(index) {
-      if (selectedIndex === index) return;
+    function clonePlainState(state) {
+      return {
+        id: state.id,
+        x: state.x,
+        y: state.y,
+        w: state.w,
+        h: state.h,
+        rotate: state.rotate,
+        radius: state.radius,
+        opacity: state.opacity,
+        fill: state.fill,
+        border: state.border,
+        z: state.z,
+        isText: !!state.isText,
+        text: state.text || '',
+        textAlign: state.textAlign || 'center',
+        points: state.points
+          ? state.points.map((p) => ({ x: p.x, y: p.y }))
+          : null,
+      };
+    }
 
-      if (selectedIndex !== -1 && elements[selectedIndex]) {
-        elements[selectedIndex].el.classList.remove('is-selected');
+    function pushHistory() {
+      const snapshot = {
+        elements: elements.map(clonePlainState),
+        selectedId:
+          selectedIndex >= 0 && elements[selectedIndex]
+            ? elements[selectedIndex].id
+            : null,
+        nextId,
+      };
+      undoStack.push(snapshot);
+      if (undoStack.length > MAX_HISTORY) {
+        undoStack.shift();
       }
+    }
 
-      selectedIndex = index;
+    function clearAllElements() {
+      elements.forEach((state) => {
+        if (state.el && state.el.parentNode) {
+          state.el.parentNode.removeChild(state.el);
+        }
+        if (state.resizeEls) {
+          state.resizeEls.forEach((h) => h.remove());
+        }
+        if (state.vertexEls) {
+          state.vertexEls.forEach((h) => h.remove());
+        }
+      });
+      elements = [];
+      selectedIndex = -1;
+      selectedIndices = new Set();
+      updateDims(null);
+      setControlsEnabled(false);
+      selectedInfo.textContent = 'Sin elemento seleccionado';
+    }
 
+    function restoreFromSnapshot(snapshot) {
+      if (!snapshot) return;
+      clearAllElements();
+      nextId = snapshot.nextId || 1;
+
+      snapshot.elements.forEach((data) => {
+        const el = document.createElement('div');
+        el.className = 'shape';
+        const state = {
+          id: data.id,
+          el,
+          x: data.x,
+          y: data.y,
+          w: data.w,
+          h: data.h,
+          rotate: data.rotate,
+          radius: data.radius,
+          opacity: data.opacity,
+          fill: data.fill,
+          border: data.border,
+          z: data.z,
+          points: data.points
+            ? data.points.map((p) => ({ x: p.x, y: p.y }))
+            : null,
+          resizeEls: [],
+          vertexEls: [],
+        };
+        elements.push(state);
+        canvas.appendChild(el);
+
+        ensurePolygonState(state);
+      if (data.isText) {
+        state.isText = true;
+        state.text = data.text || '';
+        state.textAlign = data.textAlign || 'center';
+        ensureTextElement(state);
+      }
+        if (data.points && data.points.length >= 3) {
+          state.points = data.points.map((p) => ({ x: p.x, y: p.y }));
+        }
+
+        const dirs = ['nw', 'ne', 'se', 'sw'];
+        state.resizeEls = [];
+        dirs.forEach((dir) => {
+          const h = document.createElement('div');
+          h.className = 'resize-handle resize-' + dir;
+          h.dataset.dir = dir;
+          h.addEventListener('pointerdown', (ev) => {
+            const idx = elements.indexOf(state);
+            if (idx !== -1) {
+              startResize(ev, idx, dir);
+            }
+          });
+          el.appendChild(h);
+          state.resizeEls.push(h);
+        });
+
+        updateClipPath(state);
+        rebuildVertexHandles(state);
+        applyStateToElement(state);
+
+        el.addEventListener('pointerdown', (ev) => {
+          const target = ev.target;
+          if (
+            target.classList &&
+            (target.classList.contains('resize-handle') ||
+              target.classList.contains('vertex-handle') ||
+              target.classList.contains('shape-text'))
+          ) {
+            return;
+          }
+          const idx = elements.indexOf(state);
+          if (idx !== -1) {
+            const additive = ev.ctrlKey || ev.metaKey;
+            selectElementWithCtrl(idx, additive);
+            startDrag(ev, idx);
+          }
+        });
+
+        el.addEventListener('dblclick', (ev) => {
+          const idx = elements.indexOf(state);
+          if (idx !== -1) {
+            addVertexAtEvent(ev, idx);
+          }
+        });
+      });
+
+      if (snapshot.selectedId != null) {
+        const idx = elements.findIndex((e) => e.id === snapshot.selectedId);
+        if (idx !== -1) {
+          selectElement(idx);
+        } else {
+          selectElement(-1);
+        }
+      } else {
+        selectElement(-1);
+      }
+    }
+
+    function selectElement(index) {
+      // Limpieza previa
       if (index === -1 || !elements[index]) {
+        selectedIndices.forEach((idx) => {
+          if (elements[idx]) {
+            elements[idx].el.classList.remove('is-selected');
+          }
+        });
+        selectedIndices = new Set();
+        selectedIndex = -1;
         selectedInfo.textContent = 'Sin elemento seleccionado';
         setControlsEnabled(false);
         updateDims(null);
         return;
       }
 
+      selectedIndices.forEach((idx) => {
+        if (elements[idx]) {
+          elements[idx].el.classList.remove('is-selected');
+        }
+      });
+      selectedIndices = new Set([index]);
+      selectedIndex = index;
+
       const state = elements[index];
       state.el.classList.add('is-selected');
       selectedInfo.textContent = 'Elemento #' + state.id;
       setControlsEnabled(true);
       syncControlsFromState(state);
+    }
+
+    function selectElementWithCtrl(index, additive) {
+      if (index < 0 || !elements[index]) {
+        selectElement(-1);
+        return;
+      }
+
+      if (!additive) {
+        selectElement(index);
+        return;
+      }
+
+      if (selectedIndices.has(index)) {
+        // Quitar de la selección
+        elements[index].el.classList.remove('is-selected');
+        selectedIndices.delete(index);
+        if (index === selectedIndex) {
+          if (selectedIndices.size > 0) {
+            const first = [...selectedIndices][0];
+            selectedIndex = first;
+            syncControlsFromState(elements[first]);
+          } else {
+            selectElement(-1);
+          }
+        }
+      } else {
+        selectedIndices.add(index);
+        selectedIndex = index;
+        elements[index].el.classList.add('is-selected');
+        syncControlsFromState(elements[index]);
+      }
+
+      if (selectedIndex !== -1 && elements[selectedIndex]) {
+        const primary = elements[selectedIndex];
+        const extra = Math.max(0, selectedIndices.size - 1);
+        selectedInfo.textContent = extra
+          ? `Elemento #${primary.id} (+${extra})`
+          : `Elemento #${primary.id}`;
+        setControlsEnabled(true);
+      }
     }
 
     function ensurePolygonState(state) {
@@ -422,6 +667,28 @@
       rebuildVertexHandles(state);
     }
 
+    function ensureTextElement(state) {
+      if (!state.isText) return;
+      if (!state.textEl) {
+        const t = document.createElement('div');
+        t.className = 'shape-text';
+        t.contentEditable = 'true';
+        t.spellcheck = false;
+        t.textContent = state.text || '';
+        state.el.appendChild(t);
+        state.textEl = t;
+      }
+      const align = state.textAlign || 'center';
+      state.textEl.style.textAlign = align;
+      if (align === 'left') {
+        state.textEl.style.justifyContent = 'flex-start';
+      } else if (align === 'right') {
+        state.textEl.style.justifyContent = 'flex-end';
+      } else {
+        state.textEl.style.justifyContent = 'center';
+      }
+    }
+
     function updateClipPath(state) {
       if (!state.points || state.points.length < 3) {
         state.el.style.clipPath = '';
@@ -431,6 +698,7 @@
         .map((p) => (p.x * 100).toFixed(1) + '% ' + (p.y * 100).toFixed(1) + '%')
         .join(', ');
       state.el.style.clipPath = 'polygon(' + pointsStr + ')';
+      ensureTextElement(state);
     }
 
     function updateVertexHandlePositions(state) {
@@ -438,8 +706,10 @@
       state.points.forEach((p, i) => {
         const h = state.vertexEls[i];
         if (!h) return;
-        h.style.left = (p.x * 100) + '%';
-        h.style.top = (p.y * 100) + '%';
+        const worldX = state.x + p.x * state.w;
+        const worldY = state.y + p.y * state.h;
+        h.style.left = worldX + 'px';
+        h.style.top = worldY + 'px';
       });
     }
 
@@ -468,7 +738,7 @@
             removeVertexAtIndex(ev, idx, i);
           }
         });
-        state.el.appendChild(h);
+        canvas.appendChild(h);
         state.vertexEls.push(h);
       });
       updateVertexHandlePositions(state);
@@ -526,6 +796,7 @@
         return;
       }
 
+      pushHistory();
       state.points.splice(pointIndex, 1);
 
       expandBoundsToFitPoints(state);
@@ -555,6 +826,7 @@
       ev.preventDefault();
       ev.stopPropagation();
 
+      pushHistory();
       const state = elements[index];
       ensurePolygonState(state);
 
@@ -594,17 +866,22 @@
       ev.preventDefault();
       ev.stopPropagation();
 
-      const state = elements[index];
-      selectElement(index);
+      pushHistory();
 
       const rect = canvas.getBoundingClientRect();
       const pointerX = ev.clientX - rect.left;
       const pointerY = ev.clientY - rect.top;
 
+      const indices = selectedIndices.size > 0 ? [...selectedIndices] : [index];
+
       dragInfo = {
-        index,
-        offsetX: pointerX - state.x,
-        offsetY: pointerY - state.y,
+        startPointerX: pointerX,
+        startPointerY: pointerY,
+        items: indices.map((idx) => ({
+          index: idx,
+          startX: elements[idx].x,
+          startY: elements[idx].y,
+        })),
       };
 
       window.addEventListener('pointermove', handlePointerMove);
@@ -617,6 +894,7 @@
       ev.preventDefault();
       ev.stopPropagation();
 
+      pushHistory();
       const state = elements[index];
       selectElement(index);
 
@@ -641,6 +919,7 @@
       ev.preventDefault();
       ev.stopPropagation();
 
+      pushHistory();
       const state = elements[index];
       ensurePolygonState(state);
       selectElement(index);
@@ -666,8 +945,11 @@
         if (state.points && state.points[vertexDragInfo.pointIndex]) {
           state.points[vertexDragInfo.pointIndex].x = nx;
           state.points[vertexDragInfo.pointIndex].y = ny;
+          expandBoundsToFitPoints(state);
+          applyStateToElement(state);
           updateClipPath(state);
           updateVertexHandlePositions(state);
+          syncControlsFromState(state);
         }
         return;
       }
@@ -710,17 +992,25 @@
         return;
       }
 
-      if (!dragInfo || dragInfo.index < 0 || !elements[dragInfo.index]) return;
-      const state = elements[dragInfo.index];
+      if (!dragInfo || !dragInfo.items || dragInfo.items.length === 0) return;
       const rect = canvas.getBoundingClientRect();
       const pointerX = ev.clientX - rect.left;
       const pointerY = ev.clientY - rect.top;
+      const dx = pointerX - dragInfo.startPointerX;
+      const dy = pointerY - dragInfo.startPointerY;
 
-      state.x = pointerX - dragInfo.offsetX;
-      state.y = pointerY - dragInfo.offsetY;
-      applyStateToElement(state);
-      syncControlsFromState(state);
-      updateVertexHandlePositions(state);
+      dragInfo.items.forEach((item) => {
+        const st = elements[item.index];
+        if (!st) return;
+        st.x = item.startX + dx;
+        st.y = item.startY + dy;
+        applyStateToElement(st);
+        updateVertexHandlePositions(st);
+      });
+
+      if (selectedIndex !== -1 && elements[selectedIndex]) {
+        syncControlsFromState(elements[selectedIndex]);
+      }
     }
 
     function handlePointerUp(ev) {
@@ -740,7 +1030,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         resizeInfo = null;
-      } else if (dragInfo && dragInfo.index >= 0 && elements[dragInfo.index]) {
+      } else if (dragInfo && dragInfo.items && dragInfo.items.length > 0) {
         ev.preventDefault();
         ev.stopPropagation();
         dragInfo = null;
@@ -770,6 +1060,10 @@
         fill: '#ef4444',
         border: '#e5e7eb',
         z: elements.length + 1,
+        isText: false,
+        text: '',
+        textAlign: 'center',
+        textEl: null,
       };
 
       elements.push(state);
@@ -799,11 +1093,18 @@
 
       el.addEventListener('pointerdown', (ev) => {
         const target = ev.target;
-        if (target.classList && (target.classList.contains('resize-handle') || target.classList.contains('vertex-handle'))) {
+        if (
+          target.classList &&
+          (target.classList.contains('resize-handle') ||
+            target.classList.contains('vertex-handle') ||
+            target.classList.contains('shape-text'))
+        ) {
           return;
         }
         const idx = elements.indexOf(state);
         if (idx !== -1) {
+          const additive = ev.ctrlKey || ev.metaKey;
+          selectElementWithCtrl(idx, additive);
           startDrag(ev, idx);
         }
       });
@@ -821,6 +1122,7 @@
     function updateFromControls() {
       if (selectedIndex === -1) return;
       const state = elements[selectedIndex];
+      pushHistory();
       state.x = Number(posX.value);
       state.y = Number(posY.value);
       state.w = Number(sizeW.value);
@@ -836,6 +1138,7 @@
     }
 
     addButton.addEventListener('click', () => {
+      pushHistory();
       createElement();
     });
 
@@ -851,6 +1154,86 @@
 
     [fillColor, borderColor].forEach(input => {
       input.addEventListener('input', updateFromControls);
+    });
+
+    textAlignSelect.addEventListener('change', () => {
+      if (selectedIndex === -1 || !elements[selectedIndex]) return;
+      const state = elements[selectedIndex];
+      if (!state.isText) return;
+      pushHistory();
+      state.textAlign = textAlignSelect.value;
+      ensureTextElement(state);
+    });
+
+    function deleteSelectedElement() {
+      if (!elements.length || selectedIndices.size === 0) return;
+      pushHistory();
+
+      const indices = [...selectedIndices].sort((a, b) => b - a);
+      indices.forEach((idx) => {
+        if (!elements[idx]) return;
+        const st = elements[idx];
+        if (st.el) st.el.remove();
+        if (st.resizeEls) st.resizeEls.forEach((h) => h.remove());
+        if (st.vertexEls) st.vertexEls.forEach((h) => h.remove());
+        elements.splice(idx, 1);
+      });
+
+      if (elements.length === 0) {
+        selectedIndex = -1;
+        selectedIndices = new Set();
+        selectedInfo.textContent = 'Sin elemento seleccionado';
+        setControlsEnabled(false);
+        updateDims(null);
+      } else {
+        const newIndex = Math.min(Math.min(...indices), elements.length - 1);
+        selectElement(newIndex);
+      }
+    }
+
+    window.addEventListener('keydown', (ev) => {
+      const key = ev.key;
+
+      if ((key === 'Delete' || key === 'Backspace') && selectedIndex !== -1) {
+        ev.preventDefault();
+        deleteSelectedElement();
+        return;
+      }
+
+      const isUndo = (key === 'z' || key === 'Z') && (ev.ctrlKey || ev.metaKey);
+      if (isUndo) {
+        ev.preventDefault();
+        const snapshot = undoStack.pop();
+        if (snapshot) {
+          restoreFromSnapshot(snapshot);
+        }
+      }
+    });
+
+    toggleTextButton.addEventListener('click', () => {
+      if (selectedIndex === -1 || !elements[selectedIndex]) return;
+      const state = elements[selectedIndex];
+      pushHistory();
+      state.isText = !state.isText;
+      if (state.isText) {
+        state.textAlign = state.textAlign || 'center';
+        if (!state.text || state.text.trim() === '') {
+          state.text = '';
+        } else if (state.textEl) {
+          state.text = state.textEl.textContent || '';
+        }
+        ensureTextElement(state);
+        textAlignSelect.value = state.textAlign;
+        if (state.textEl) {
+          state.textEl.focus();
+        }
+      } else {
+        if (state.textEl) {
+          state.text = state.textEl.textContent || '';
+          state.textEl.remove();
+          state.textEl = null;
+        }
+      }
     });
 
     // Al inicio, sin elemento seleccionado
