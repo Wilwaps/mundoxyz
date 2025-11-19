@@ -345,7 +345,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   
   // Compartir rifa
   const shareRaffle = (platform: 'whatsapp' | 'telegram' | 'copy') => {
-    const shareUrl = `${window.location.origin}/raffles/${code}`;
+    const shareUrl = `${window.location.origin}/raffles/public/${code}`;
     const shareText = `¡Participa en la rifa "${raffle?.name}"! 🎉\n\nPremio: ${raffle?.prizeMeta?.prizeDescription || 'Increíble premio'}\nNúmeros disponibles: ${availableNumbers}\n\nÚnete aquí:`;
     
     switch (platform) {

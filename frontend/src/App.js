@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -40,6 +40,7 @@ const queryClient = new QueryClient({
 // Protected Route Component
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -50,7 +51,9 @@ function ProtectedRoute({ children }) {
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    const nextPath = `${location.pathname}${location.search}`;
+    const target = `/login?next=${encodeURIComponent(nextPath)}`;
+    return <Navigate to={target} replace />;
   }
   
   return children;

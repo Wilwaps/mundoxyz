@@ -497,13 +497,61 @@ router.post('/register', async (req, res) => {
       }
     });
 
+    // Obtener datos completos del usuario para auto-login
+    const userResult = await query(
+      'SELECT u.id, u.username, u.email, u.tg_id, w.id as wallet_id, ' +
+      'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
+      'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
+      'u.security_answer IS NOT NULL as has_security_answer, ' +
+      'u.experience, u.total_games_played, u.total_games_won, ' +
+      'array_agg(r.name) as roles ' +
+      'FROM users u ' +
+      'LEFT JOIN wallets w ON w.user_id = u.id ' +
+      'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
+      'LEFT JOIN roles r ON r.id = ur.role_id ' +
+      'WHERE u.id = $1 ' +
+      'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
+      [result.id]
+    );
+
+    const user = userResult.rows[0];
+
+    // Generar tokens y sesión de forma similar a login
+    const token = generateToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+
+    await query(
+      'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
+      "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
+      [user.id, token, refreshToken, getClientIp(req), req.headers['user-agent']]
+    );
+
+    // Set cookie de sesión
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: config.security.cookieSecure,
+      sameSite: 'none',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
     res.status(201).json({
       success: true,
-      message: 'Usuario registrado exitosamente. Por favor inicia sesión.',
+      message: 'Usuario registrado exitosamente.',
+      token,
+      refreshToken,
       user: {
-        id: result.id,
-        username: result.username,
-        email: result.email
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        tg_id: user.tg_id,
+        wallet_id: user.wallet_id,
+        coins_balance: parseFloat(user.coins_balance || 0),
+        fires_balance: parseFloat(user.fires_balance || 0),
+        experience: user.experience || 0,
+        total_games_played: user.total_games_played || 0,
+        total_games_won: user.total_games_won || 0,
+        has_security_answer: user.has_security_answer || false,
+        roles: (user.roles || []).filter(Boolean)
       }
     });
 

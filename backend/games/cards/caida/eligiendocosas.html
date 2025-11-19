@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elegir cosas – lienzo de elementos</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #020617;
+      color: #e5e7eb;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+
+    .wrap {
+      text-align: center;
+      padding: 24px;
+      max-width: 1100px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #cbd5f5;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .btn-primary {
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(34,197,94,0.9);
+      background: radial-gradient(circle at 30% 0%, #22c55e, #15803d 60%, #052e16 100%);
+      color: #ecfdf5;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow:
+        0 0 0 1px rgba(15,23,42,0.9),
+        0 10px 24px rgba(0,0,0,0.7);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.07);
+    }
+
+    .selected-info {
+      font-size: 13px;
+      color: #e5e7eb;
+      opacity: 0.9;
+    }
+
+    .canvas-frame {
+      margin-top: 8px;
+      padding: 18px 18px 12px;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at top, #020617, #000 70%);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,0.9),
+        inset 0 0 0 1px rgba(30,64,175,0.6);
+    }
+
+    .canvas {
+      position: relative;
+      width: 820px;
+      height: 420px;
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 20% 0%, #1e293b, #020617 60%, #000 100%);
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 0 1px rgba(15,23,42,0.9),
+        0 10px 30px rgba(0,0,0,0.8);
+      cursor: crosshair;
+    }
+
+    .shape {
+      position: absolute;
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ef4444;
+      box-shadow:
+        0 0 0 1px rgba(15,23,42,0.95),
+        0 10px 22px rgba(0,0,0,0.8);
+      cursor: grab;
+      transition: box-shadow 0.12s ease-out, transform 0.12s ease-out;
+    }
+
+    .shape.is-selected {
+      outline: 2px solid #22c55e;
+      outline-offset: 2px;
+      box-shadow:
+        0 0 0 1px rgba(34,197,94,0.8),
+        0 0 18px rgba(34,197,94,0.7);
+    }
+
+    .dimensions {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #e5e7eb;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(148,163,184,0.5);
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .dimensions span strong {
+      color: #a5f3fc;
+    }
+
+    .panel {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .panel label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #020617;
+      border-radius: 10px;
+      padding: 8px 12px;
+      border: 1px solid rgba(55,65,81,0.9);
+      font-size: 13px;
+      color: #e5e7eb;
+    }
+
+    .panel input[type="range"] {
+      width: 170px;
+      accent-color: #22c55e;
+    }
+
+    .panel input[type="color"] {
+      width: 40px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .shape .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #fbbf24;
+      border: 1px solid #111827;
+      border-radius: 2px;
+      box-shadow: 0 0 0 1px rgba(15,23,42,0.9);
+    }
+
+    .shape .resize-nw {
+      top: 0;
+      left: 0;
+      transform: translate(-50%, -50%);
+      cursor: nwse-resize;
+    }
+
+    .shape .resize-ne {
+      top: 0;
+      right: 0;
+      transform: translate(50%, -50%);
+      cursor: nesw-resize;
+    }
+
+    .shape .resize-se {
+      bottom: 0;
+      right: 0;
+      transform: translate(50%, 50%);
+      cursor: nwse-resize;
+    }
+
+    .shape .resize-sw {
+      bottom: 0;
+      left: 0;
+      transform: translate(-50%, 50%);
+      cursor: nesw-resize;
+    }
+
+    .shape .vertex-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #22c55e;
+      border: 1px solid #022c22;
+      box-shadow: 0 0 0 1px rgba(15,23,42,0.9);
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Lienzo de elementos</h1>
+
+    <div class="toolbar">
+      <button class="btn-primary" id="addElement">+ elemento</button>
+      <span class="selected-info" id="selectedInfo">Sin elemento seleccionado</span>
+    </div>
+
+    <div class="canvas-frame">
+      <div class="canvas" id="canvas"></div>
+      <div class="dimensions" id="dims">
+        <span><strong>X:</strong> <span id="dim-x">-</span> px</span>
+        <span><strong>Y:</strong> <span id="dim-y">-</span> px</span>
+        <span><strong>Ancho:</strong> <span id="dim-w">-</span> px</span>
+        <span><strong>Alto:</strong> <span id="dim-h">-</span> px</span>
+        <span><strong>Rotación:</strong> <span id="dim-rot">-</span> °</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <label>
+        Posición X (px)
+        <input type="range" id="posX" min="0" max="800" value="0" />
+      </label>
+      <label>
+        Posición Y (px)
+        <input type="range" id="posY" min="0" max="400" value="0" />
+      </label>
+      <label>
+        Ancho (px)
+        <input type="range" id="sizeW" min="30" max="400" value="120" />
+      </label>
+      <label>
+        Alto (px)
+        <input type="range" id="sizeH" min="30" max="400" value="80" />
+      </label>
+      <label>
+        Rotación (°)
+        <input type="range" id="rotate" min="0" max="360" value="0" />
+      </label>
+      <label>
+        Borde redondeado
+        <input type="range" id="radius" min="0" max="120" value="16" />
+      </label>
+      <label>
+        Opacidad (%)
+        <input type="range" id="opacity" min="10" max="100" value="100" />
+      </label>
+      <label>
+        Z-index
+        <input type="range" id="zIndex" min="0" max="20" value="1" />
+      </label>
+    </div>
+
+    <div class="panel">
+      <label>
+        Color relleno
+        <input type="color" id="fillColor" value="#ef4444" />
+      </label>
+      <label>
+        Color borde
+        <input type="color" id="borderColor" value="#e5e7eb" />
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const CANVAS_WIDTH = 820;
+    const CANVAS_HEIGHT = 420;
+    const MIN_WIDTH = 20;
+    const MIN_HEIGHT = 20;
+
+    const canvas = document.getElementById('canvas');
+    const addButton = document.getElementById('addElement');
+    const selectedInfo = document.getElementById('selectedInfo');
+
+    const posX = document.getElementById('posX');
+    const posY = document.getElementById('posY');
+    const sizeW = document.getElementById('sizeW');
+    const sizeH = document.getElementById('sizeH');
+    const rotate = document.getElementById('rotate');
+    const radius = document.getElementById('radius');
+    const opacity = document.getElementById('opacity');
+    const zIndex = document.getElementById('zIndex');
+    const fillColor = document.getElementById('fillColor');
+    const borderColor = document.getElementById('borderColor');
+
+    const dimX = document.getElementById('dim-x');
+    const dimY = document.getElementById('dim-y');
+    const dimW = document.getElementById('dim-w');
+    const dimH = document.getElementById('dim-h');
+    const dimRot = document.getElementById('dim-rot');
+
+    const panelsInputs = document.querySelectorAll('.panel input');
+
+    let elements = [];
+    let nextId = 1;
+    let selectedIndex = -1;
+    let dragInfo = null;
+    let resizeInfo = null;
+    let vertexDragInfo = null;
+
+    function clampState(state) {
+      const maxX = Math.max(0, CANVAS_WIDTH - state.w);
+      const maxY = Math.max(0, CANVAS_HEIGHT - state.h);
+      state.x = Math.min(Math.max(0, state.x), maxX);
+      state.y = Math.min(Math.max(0, state.y), maxY);
+    }
+
+    function applyStateToElement(state) {
+      clampState(state);
+      const el = state.el;
+      el.style.left = state.x + 'px';
+      el.style.top = state.y + 'px';
+      el.style.width = state.w + 'px';
+      el.style.height = state.h + 'px';
+      el.style.borderRadius = state.radius + 'px';
+      el.style.background = state.fill;
+      el.style.borderColor = state.border;
+      el.style.opacity = state.opacity / 100;
+      el.style.transform = 'rotate(' + state.rotate + 'deg)';
+      el.style.zIndex = String(state.z);
+    }
+
+    function updateDims(state) {
+      if (!state) {
+        dimX.textContent = '-';
+        dimY.textContent = '-';
+        dimW.textContent = '-';
+        dimH.textContent = '-';
+        dimRot.textContent = '-';
+        return;
+      }
+      dimX.textContent = state.x.toFixed(0);
+      dimY.textContent = state.y.toFixed(0);
+      dimW.textContent = state.w.toFixed(0);
+      dimH.textContent = state.h.toFixed(0);
+      dimRot.textContent = state.rotate.toFixed(0);
+    }
+
+    function syncControlsFromState(state) {
+      posX.value = state.x;
+      posY.value = state.y;
+      sizeW.value = state.w;
+      sizeH.value = state.h;
+      rotate.value = state.rotate;
+      radius.value = state.radius;
+      opacity.value = state.opacity;
+      zIndex.value = state.z;
+      fillColor.value = state.fill;
+      borderColor.value = state.border;
+      updateDims(state);
+    }
+
+    function setControlsEnabled(enabled) {
+      panelsInputs.forEach(input => {
+        input.disabled = !enabled;
+      });
+    }
+
+    function selectElement(index) {
+      if (selectedIndex === index) return;
+
+      if (selectedIndex !== -1 && elements[selectedIndex]) {
+        elements[selectedIndex].el.classList.remove('is-selected');
+      }
+
+      selectedIndex = index;
+
+      if (index === -1 || !elements[index]) {
+        selectedInfo.textContent = 'Sin elemento seleccionado';
+        setControlsEnabled(false);
+        updateDims(null);
+        return;
+      }
+
+      const state = elements[index];
+      state.el.classList.add('is-selected');
+      selectedInfo.textContent = 'Elemento #' + state.id;
+      setControlsEnabled(true);
+      syncControlsFromState(state);
+    }
+
+    function ensurePolygonState(state) {
+      if (state.points && state.points.length >= 3) return;
+      state.points = [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ];
+      state.vertexEls = [];
+      updateClipPath(state);
+      rebuildVertexHandles(state);
+    }
+
+    function updateClipPath(state) {
+      if (!state.points || state.points.length < 3) {
+        state.el.style.clipPath = '';
+        return;
+      }
+      const pointsStr = state.points
+        .map((p) => (p.x * 100).toFixed(1) + '% ' + (p.y * 100).toFixed(1) + '%')
+        .join(', ');
+      state.el.style.clipPath = 'polygon(' + pointsStr + ')';
+    }
+
+    function updateVertexHandlePositions(state) {
+      if (!state.points || !state.vertexEls) return;
+      state.points.forEach((p, i) => {
+        const h = state.vertexEls[i];
+        if (!h) return;
+        h.style.left = (p.x * 100) + '%';
+        h.style.top = (p.y * 100) + '%';
+      });
+    }
+
+    function rebuildVertexHandles(state) {
+      if (state.vertexEls) {
+        state.vertexEls.forEach((h) => h.remove());
+      }
+      state.vertexEls = [];
+      if (!state.points || state.points.length < 3) return;
+
+      const stateIndex = elements.indexOf(state);
+      state.points.forEach((p, i) => {
+        const h = document.createElement('div');
+        h.className = 'vertex-handle';
+        h.dataset.index = String(i);
+        h.addEventListener('pointerdown', (ev) => {
+          const idx = elements.indexOf(state);
+          if (idx !== -1) {
+            startVertexDrag(ev, idx, i);
+          }
+        });
+        state.el.appendChild(h);
+        state.vertexEls.push(h);
+      });
+      updateVertexHandlePositions(state);
+    }
+
+    function distancePointToSegment(px, py, a, b) {
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const wx = px - a.x;
+      const wy = py - a.y;
+      const c1 = vx * wx + vy * wy;
+      if (c1 <= 0) return Math.hypot(px - a.x, py - a.y);
+      const c2 = vx * vx + vy * vy;
+      if (c2 <= c1) return Math.hypot(px - b.x, py - b.y);
+      const t = c1 / c2;
+      const projx = a.x + t * vx;
+      const projy = a.y + t * vy;
+      return Math.hypot(px - projx, py - projy);
+    }
+
+    function addVertexAtEvent(ev, index) {
+      if (index < 0 || !elements[index]) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const state = elements[index];
+      ensurePolygonState(state);
+
+      const rect = state.el.getBoundingClientRect();
+      const localX = ev.clientX - rect.left;
+      const localY = ev.clientY - rect.top;
+      const nx = localX / rect.width;
+      const ny = localY / rect.height;
+
+      const pts = state.points;
+      if (pts.length < 3) {
+        pts.push({ x: nx, y: ny });
+      } else {
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          const d = distancePointToSegment(nx, ny, a, b);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i + 1;
+          }
+        }
+        pts.splice(bestIdx, 0, { x: nx, y: ny });
+      }
+
+      updateClipPath(state);
+      rebuildVertexHandles(state);
+    }
+
+    function startDrag(ev, index) {
+      if (index < 0 || !elements[index]) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const state = elements[index];
+      selectElement(index);
+
+      const rect = canvas.getBoundingClientRect();
+      const pointerX = ev.clientX - rect.left;
+      const pointerY = ev.clientY - rect.top;
+
+      dragInfo = {
+        index,
+        offsetX: pointerX - state.x,
+        offsetY: pointerY - state.y,
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+    }
+
+    function startResize(ev, index, dir) {
+      if (index < 0 || !elements[index]) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const state = elements[index];
+      selectElement(index);
+
+      resizeInfo = {
+        index,
+        dir,
+        startW: state.w,
+        startH: state.h,
+        startX: state.x,
+        startY: state.y,
+        startPointerX: ev.clientX,
+        startPointerY: ev.clientY,
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+    }
+
+    function startVertexDrag(ev, index, pointIndex) {
+      if (index < 0 || !elements[index]) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const state = elements[index];
+      ensurePolygonState(state);
+      selectElement(index);
+
+      vertexDragInfo = {
+        index,
+        pointIndex,
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+    }
+
+    function handlePointerMove(ev) {
+      if (vertexDragInfo && vertexDragInfo.index >= 0 && elements[vertexDragInfo.index]) {
+        const state = elements[vertexDragInfo.index];
+        const rect = state.el.getBoundingClientRect();
+        const localX = ev.clientX - rect.left;
+        const localY = ev.clientY - rect.top;
+        const nx = localX / rect.width;
+        const ny = localY / rect.height;
+        if (state.points && state.points[vertexDragInfo.pointIndex]) {
+          state.points[vertexDragInfo.pointIndex].x = nx;
+          state.points[vertexDragInfo.pointIndex].y = ny;
+          updateClipPath(state);
+          updateVertexHandlePositions(state);
+        }
+        return;
+      }
+
+      if (resizeInfo && resizeInfo.index >= 0 && elements[resizeInfo.index]) {
+        const state = elements[resizeInfo.index];
+        const dx = ev.clientX - resizeInfo.startPointerX;
+        const dy = ev.clientY - resizeInfo.startPointerY;
+        let newW = resizeInfo.startW;
+        let newH = resizeInfo.startH;
+        let newX = resizeInfo.startX;
+        let newY = resizeInfo.startY;
+
+        if (resizeInfo.dir.indexOf('e') !== -1) {
+          newW = resizeInfo.startW + dx;
+        }
+        if (resizeInfo.dir.indexOf('s') !== -1) {
+          newH = resizeInfo.startH + dy;
+        }
+        if (resizeInfo.dir.indexOf('w') !== -1) {
+          newW = resizeInfo.startW - dx;
+          newX = resizeInfo.startX + dx;
+        }
+        if (resizeInfo.dir.indexOf('n') !== -1) {
+          newH = resizeInfo.startH - dy;
+          newY = resizeInfo.startY + dy;
+        }
+
+        newW = Math.max(MIN_WIDTH, newW);
+        newH = Math.max(MIN_HEIGHT, newH);
+
+        state.w = newW;
+        state.h = newH;
+        state.x = newX;
+        state.y = newY;
+
+        applyStateToElement(state);
+        syncControlsFromState(state);
+        updateVertexHandlePositions(state);
+        return;
+      }
+
+      if (!dragInfo || dragInfo.index < 0 || !elements[dragInfo.index]) return;
+      const state = elements[dragInfo.index];
+      const rect = canvas.getBoundingClientRect();
+      const pointerX = ev.clientX - rect.left;
+      const pointerY = ev.clientY - rect.top;
+
+      state.x = pointerX - dragInfo.offsetX;
+      state.y = pointerY - dragInfo.offsetY;
+      applyStateToElement(state);
+      syncControlsFromState(state);
+      updateVertexHandlePositions(state);
+    }
+
+    function handlePointerUp(ev) {
+      if (vertexDragInfo) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        vertexDragInfo = null;
+      } else if (resizeInfo) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        resizeInfo = null;
+      } else if (dragInfo && dragInfo.index >= 0 && elements[dragInfo.index]) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        dragInfo = null;
+      } else {
+        dragInfo = null;
+      }
+
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    }
+
+    function createElement() {
+      const el = document.createElement('div');
+      el.className = 'shape';
+
+      const state = {
+        id: nextId++,
+        el,
+        x: 340,
+        y: 150,
+        w: 120,
+        h: 80,
+        rotate: 0,
+        radius: 16,
+        opacity: 100,
+        fill: '#ef4444',
+        border: '#e5e7eb',
+        z: elements.length + 1,
+      };
+
+      elements.push(state);
+      canvas.appendChild(el);
+
+      ensurePolygonState(state);
+
+      const dirs = ['nw', 'ne', 'se', 'sw'];
+      state.resizeEls = [];
+      dirs.forEach((dir) => {
+        const h = document.createElement('div');
+        h.className = 'resize-handle resize-' + dir;
+        h.dataset.dir = dir;
+        h.addEventListener('pointerdown', (ev) => {
+          const idx = elements.indexOf(state);
+          if (idx !== -1) {
+            startResize(ev, idx, dir);
+          }
+        });
+        el.appendChild(h);
+        state.resizeEls.push(h);
+      });
+
+      updateClipPath(state);
+      rebuildVertexHandles(state);
+      applyStateToElement(state);
+
+      el.addEventListener('pointerdown', (ev) => {
+        const target = ev.target;
+        if (target.classList && (target.classList.contains('resize-handle') || target.classList.contains('vertex-handle'))) {
+          return;
+        }
+        const idx = elements.indexOf(state);
+        if (idx !== -1) {
+          startDrag(ev, idx);
+        }
+      });
+
+      el.addEventListener('dblclick', (ev) => {
+        const idx = elements.indexOf(state);
+        if (idx !== -1) {
+          addVertexAtEvent(ev, idx);
+        }
+      });
+
+      selectElement(elements.length - 1);
+    }
+
+    function updateFromControls() {
+      if (selectedIndex === -1) return;
+      const state = elements[selectedIndex];
+      state.x = Number(posX.value);
+      state.y = Number(posY.value);
+      state.w = Number(sizeW.value);
+      state.h = Number(sizeH.value);
+      state.rotate = Number(rotate.value);
+      state.radius = Number(radius.value);
+      state.opacity = Number(opacity.value);
+      state.z = Number(zIndex.value);
+      state.fill = fillColor.value;
+      state.border = borderColor.value;
+      applyStateToElement(state);
+      syncControlsFromState(state);
+    }
+
+    addButton.addEventListener('click', () => {
+      createElement();
+    });
+
+    canvas.addEventListener('click', (ev) => {
+      if (ev.target === canvas) {
+        selectElement(-1);
+      }
+    });
+
+    [posX, posY, sizeW, sizeH, rotate, radius, opacity, zIndex].forEach(input => {
+      input.addEventListener('input', updateFromControls);
+    });
+
+    [fillColor, borderColor].forEach(input => {
+      input.addEventListener('input', updateFromControls);
+    });
+
+    // Al inicio, sin elemento seleccionado
+    setControlsEnabled(false);
+    updateDims(null);
+  </script>
+</body>
+</html>

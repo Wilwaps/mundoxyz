@@ -233,10 +233,22 @@ export const AuthProvider = ({ children }) => {
         security_answer: securityAnswer,
         tg_id: formData.tg_id || null
       });
+      const { token, user: userData } = response.data;
+
+      // Normalizar datos del usuario
+      const normalizedUser = normalizeUserData(userData);
+
+      // Guardar sesión igual que en login
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+
+      setUser(normalizedUser);
 
       toast.success(response.data.message || '¡Registro exitoso!');
       
-      return { success: true, user: response.data.user };
+      return { success: true, user: normalizedUser };
     } catch (error) {
       console.error('Registration error:', error);
       const errorMessage = error.response?.data?.error || 'Error al registrar usuario';

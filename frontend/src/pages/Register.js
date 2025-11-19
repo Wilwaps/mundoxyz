@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Sparkles, UserPlus, Mail, Lock, User, MessageCircle, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react';
@@ -8,6 +8,7 @@ import MathCaptcha from '../components/MathCaptcha';
 
 const Register = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, user, loading } = useAuth();
   const [captchaValid, setCaptchaValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -26,10 +27,14 @@ const Register = () => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nextParam = params.get('next');
+    const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/games';
+
     if (user) {
-      navigate('/games');
+      navigate(safeNext, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.search]);
 
   // Validación en tiempo real
   const validateField = (name, value) => {
@@ -149,8 +154,10 @@ const Register = () => {
 
     const result = await register(formData);
     if (result.success) {
-      toast.success('¡Registro exitoso! Por favor inicia sesión');
-      navigate('/login');
+      const params = new URLSearchParams(location.search);
+      const nextParam = params.get('next');
+      const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/games';
+      navigate(safeNext, { replace: true });
     }
   };
 

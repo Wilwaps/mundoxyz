@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import NumberGrid from '../components/NumberGrid';
 import ParticipantsModal from '../components/ParticipantsModal';
 import type { RaffleNumber, PrizeMeta } from '../types';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface PublicLandingData {
   raffle: {
@@ -62,12 +63,14 @@ interface PublicLandingData {
 const RafflePublicLanding: React.FC = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [data, setData] = useState<PublicLandingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [showAuthRequired, setShowAuthRequired] = useState(false);
   
   useEffect(() => {
     if (!code) return;
@@ -335,7 +338,13 @@ const RafflePublicLanding: React.FC = () => {
           className="text-center"
         >
           <button
-            onClick={() => navigate(`/raffles/${code}`)}
+            onClick={() => {
+              if (!user) {
+                setShowAuthRequired(true);
+                return;
+              }
+              navigate(`/raffles/${code}`);
+            }}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-lg text-white font-semibold text-lg transition-all hover:scale-105 shadow-lg"
             style={{
               background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`
@@ -346,7 +355,7 @@ const RafflePublicLanding: React.FC = () => {
           </button>
           
           <p className="text-sm text-text/60 mt-4">
-            Inicia sesión para comprar tus números
+            Inicia sesión o regístrate para comprar tus números
           </p>
           
           {company?.websiteUrl && (
@@ -362,6 +371,53 @@ const RafflePublicLanding: React.FC = () => {
           )}
         </motion.div>
       </div>
+
+      {/* Modal: requiere autenticación para participar */}
+      {showAuthRequired && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowAuthRequired(false)}
+        >
+          <div
+            className="w-full max-w-md bg-dark rounded-2xl shadow-2xl border border-white/10 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-text mb-2">¿Quieres participar en esta rifa?</h3>
+            <p className="text-sm text-text/70 mb-6">
+              Para comprar números necesitas una cuenta en MUNDOXYZ. Crea tu cuenta en segundos o inicia sesión si ya tienes una.
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                className="w-full btn-accent flex items-center justify-center gap-2"
+                onClick={() => {
+                  const nextPath = code ? `/raffles/${code}` : '/raffles';
+                  navigate(`/register?next=${encodeURIComponent(nextPath)}`);
+                }}
+              >
+                Crear cuenta y participar
+              </button>
+              <button
+                type="button"
+                className="w-full btn-secondary flex items-center justify-center gap-2"
+                onClick={() => {
+                  const nextPath = code ? `/raffles/${code}` : '/raffles';
+                  navigate(`/login?next=${encodeURIComponent(nextPath)}`);
+                }}
+              >
+                Ya tengo cuenta / Iniciar sesión
+              </button>
+              <button
+                type="button"
+                className="w-full px-4 py-2 rounded-lg bg-glass text-text/70 hover:bg-glass/80 text-sm"
+                onClick={() => setShowAuthRequired(false)}
+              >
+                Ahora no
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de imagen de premio */}
       {showPrizeModal && (

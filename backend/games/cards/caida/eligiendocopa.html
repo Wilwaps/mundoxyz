@@ -14,10 +14,18 @@
       --stem-width: 14;     /* % del ancho total */
       --base-height: 20px;  /* altura de la base */
       --base-width: 60;     /* % del ancho total */
+      /* Forma extra */
+      --bowl-radius-bottom: 40px; /* redondez de la base de la boca */
+      --liquid-inset: 6%;         /* margen lateral del líquido */
       /* Rotaciones (en grados) */
       --bowl-rotate: 0deg;
       --stem-rotate: 0deg;
       --base-rotate: 0deg;
+      /* Colores principales por parte */
+      --bowl-color: #ef4444;
+      --liquid-color: #0ea5e9;
+      --stem-color: #020617;
+      --base-color: #020617;
     }
 
     * {
@@ -76,12 +84,12 @@
       position: relative;
       width: 100%;
       height: var(--bowl-height);
-      border-radius: 999px 999px 40px 40px;
+      border-radius: 999px 999px var(--bowl-radius-bottom) var(--bowl-radius-bottom);
       background:
         radial-gradient(circle at 20% 10%, rgba(255,255,255,0.55), transparent 55%),
-        linear-gradient(180deg, #fecaca 0%, #ef4444 55%, #7f1d1d 100%);
+        var(--bowl-color);
       box-shadow:
-        0 0 0 2px rgba(127, 29, 29, 0.95),
+        0 0 0 2px rgba(15, 23, 42, 0.95),
         0 8px 18px rgba(0,0,0,0.7);
       overflow: hidden;
       transform-origin: 50% 80%;
@@ -90,13 +98,13 @@
 
     .cup-liquid {
       position: absolute;
-      inset-inline: 6%;
+      inset-inline: var(--liquid-inset);
       bottom: 0;
       height: calc(var(--bowl-height) * (var(--liquid-fill) / 100));
       border-radius: 999px 999px 32px 32px;
       background:
         radial-gradient(circle at 30% 10%, rgba(240,249,255,0.7), transparent 55%),
-        linear-gradient(180deg, #38bdf8 0%, #0ea5e9 55%, #0369a1 100%);
+        var(--liquid-color);
       box-shadow:
         0 0 0 1px rgba(30, 64, 175, 0.7),
         inset 0 2px 4px rgba(15, 23, 42, 0.6);
@@ -106,7 +114,7 @@
       width: calc(var(--cup-width) * (var(--stem-width) / 100));
       height: var(--stem-height);
       border-radius: 999px;
-      background: linear-gradient(180deg, #111827, #020617);
+      background: var(--stem-color);
       box-shadow:
         0 -1px 0 rgba(248, 250, 252, 0.4),
         0 8px 14px rgba(0,0,0,0.75);
@@ -118,7 +126,7 @@
       width: calc(var(--cup-width) * (var(--base-width) / 100));
       height: var(--base-height);
       border-radius: 999px;
-      background: linear-gradient(180deg, #020617, #020617);
+      background: var(--base-color);
       box-shadow:
         0 -1px 0 rgba(248, 250, 252, 0.16),
         0 6px 14px rgba(0,0,0,0.85);
@@ -166,6 +174,15 @@
     .controls input[type="range"] {
       width: 180px;
       accent-color: #22c55e;
+    }
+
+    .controls input[type="color"] {
+      width: 40px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -231,6 +248,32 @@
         Rotar base (°)
         <input type="range" id="baseRotate" min="-25" max="25" value="0" />
       </label>
+      <label>
+        Redondez base boca
+        <input type="range" id="bowlRadius" min="10" max="80" value="40" />
+      </label>
+      <label>
+        Margen lateral líquido (%)
+        <input type="range" id="liquidInset" min="0" max="20" value="6" />
+      </label>
+    </div>
+    <div class="controls">
+      <label>
+        Color boca
+        <input type="color" id="bowlColor" value="#ef4444" />
+      </label>
+      <label>
+        Color líquido
+        <input type="color" id="liquidColor" value="#0ea5e9" />
+      </label>
+      <label>
+        Color tallo
+        <input type="color" id="stemColor" value="#020617" />
+      </label>
+      <label>
+        Color base
+        <input type="color" id="baseColor" value="#020617" />
+      </label>
     </div>
   </div>
 
@@ -247,6 +290,12 @@
     const bowlRotateInput = document.getElementById('bowlRotate');
     const stemRotateInput = document.getElementById('stemRotate');
     const baseRotateInput = document.getElementById('baseRotate');
+    const bowlRadiusInput = document.getElementById('bowlRadius');
+    const liquidInsetInput = document.getElementById('liquidInset');
+    const bowlColorInput = document.getElementById('bowlColor');
+    const liquidColorInput = document.getElementById('liquidColor');
+    const stemColorInput = document.getElementById('stemColor');
+    const baseColorInput = document.getElementById('baseColor');
 
     const dimBowlWidth = document.getElementById('dim-bowl-width');
     const dimBowlHeight = document.getElementById('dim-bowl-height');
@@ -268,6 +317,13 @@
       const bowlRotateVal = Number(bowlRotateInput.value);
       const stemRotateVal = Number(stemRotateInput.value);
       const baseRotateVal = Number(baseRotateInput.value);
+      const bowlRadiusVal = Number(bowlRadiusInput.value);
+      const liquidInsetVal = Number(liquidInsetInput.value);
+
+      const bowlColorVal = bowlColorInput.value;
+      const liquidColorVal = liquidColorInput.value;
+      const stemColorVal = stemColorInput.value;
+      const baseColorVal = baseColorInput.value;
 
       rootStyle.setProperty('--cup-width', widthVal + 'px');
       rootStyle.setProperty('--bowl-height', bowlHeightVal + 'px');
@@ -279,6 +335,12 @@
       rootStyle.setProperty('--bowl-rotate', bowlRotateVal + 'deg');
       rootStyle.setProperty('--stem-rotate', stemRotateVal + 'deg');
       rootStyle.setProperty('--base-rotate', baseRotateVal + 'deg');
+      rootStyle.setProperty('--bowl-radius-bottom', bowlRadiusVal + 'px');
+      rootStyle.setProperty('--liquid-inset', liquidInsetVal + '%');
+      rootStyle.setProperty('--bowl-color', bowlColorVal);
+      rootStyle.setProperty('--liquid-color', liquidColorVal);
+      rootStyle.setProperty('--stem-color', stemColorVal);
+      rootStyle.setProperty('--base-color', baseColorVal);
 
       const stemWidthPx = Math.max(0, widthVal * stemWidthPercent / 100);
       const baseWidthPx = Math.max(0, widthVal * baseWidthPercent / 100);
@@ -304,6 +366,12 @@
     bowlRotateInput.addEventListener('input', updateCopa);
     stemRotateInput.addEventListener('input', updateCopa);
     baseRotateInput.addEventListener('input', updateCopa);
+    bowlRadiusInput.addEventListener('input', updateCopa);
+    liquidInsetInput.addEventListener('input', updateCopa);
+    bowlColorInput.addEventListener('input', updateCopa);
+    liquidColorInput.addEventListener('input', updateCopa);
+    stemColorInput.addEventListener('input', updateCopa);
+    baseColorInput.addEventListener('input', updateCopa);
 
     updateCopa();
   </script>

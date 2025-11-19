@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Sparkles, Zap, UserPlus, KeyRound } from 'lucide-react';
@@ -7,15 +7,20 @@ import toast from 'react-hot-toast';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginWithTelegram, loginWithCredentials, user, loading } = useAuth();
   const [isDevMode, setIsDevMode] = useState(false);
   const [credentials, setCredentials] = useState({ username: '', password: '' });
 
+  const searchParams = new URLSearchParams(location.search);
+  const nextParam = searchParams.get('next');
+  const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/games';
+
   useEffect(() => {
     if (user) {
-      navigate('/games');
+      navigate(safeNext, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, safeNext]);
 
   useEffect(() => {
     // Check if running in Telegram WebApp
@@ -28,7 +33,7 @@ const Login = () => {
   const handleTelegramLogin = async () => {
     const result = await loginWithTelegram();
     if (result.success) {
-      navigate('/games');
+      navigate(safeNext, { replace: true });
     }
   };
 
@@ -40,7 +45,7 @@ const Login = () => {
     }
     const result = await loginWithCredentials(credentials.username, credentials.password);
     if (result.success) {
-      navigate('/games');
+      navigate(safeNext, { replace: true });
     }
   };
 
@@ -165,7 +170,7 @@ const Login = () => {
               ¿No tienes cuenta todavía?
             </p>
             <Link
-              to="/register"
+              to={nextParam ? `/register?next=${encodeURIComponent(safeNext)}` : '/register'}
               className="w-full btn-accent flex items-center justify-center gap-2"
             >
               <UserPlus size={20} />
