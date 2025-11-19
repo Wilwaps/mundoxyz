@@ -59,12 +59,41 @@ Tiempo: ${new Date().toLocaleString('es-ES')}
       username,
       email,
       fires_amount,
+      commission_amount,
+      total_deducted,
       cedula,
       phone,
       bank_code,
       bank_name,
-      bank_account
+      bank_account,
+      payout_method,
+      wallet_address,
+      network
     } = redemptionData;
+
+    const isUsdt = payout_method === 'usdt_tron';
+
+    const paymentDetails = isUsdt
+      ? `
+<b>📋 Datos de Pago (USDT):</b>
+• <b>Cédula:</b> <code>${cedula}</code>
+• <b>Teléfono:</b> <code>${phone}</code>
+• <b>Método:</b> USDT (TRON)
+${wallet_address ? `• <b>Wallet:</b> <code>${wallet_address}</code>\n` : ''}
+${network ? `• <b>Red:</b> ${network}` : ''}`
+      : `
+<b>📋 Datos de Pago (Banco):</b>
+• <b>Cédula:</b> <code>${cedula}</code>
+• <b>Teléfono:</b> <code>${phone}</code>
+${bank_code ? `• <b>Banco:</b> ${bank_name} (${bank_code})` : ''}
+${bank_account ? `• <b>Cuenta:</b> <code>${bank_account}</code>` : ''}`;
+
+    const feesDetails = commission_amount != null && total_deducted != null
+      ? `
+
+<b>Comisión plataforma:</b> ${commission_amount.toFixed ? commission_amount.toFixed(2) : commission_amount} 🔥
+<b>Total a debitar:</b> ${total_deducted.toFixed ? total_deducted.toFixed(2) : total_deducted} 🔥`
+      : '';
 
     const message = `
 🔥 <b>Nueva Solicitud de Canje</b>
@@ -72,12 +101,8 @@ Tiempo: ${new Date().toLocaleString('es-ES')}
 <b>Usuario:</b> ${username}
 <b>Email:</b> ${email}
 <b>Monto:</b> ${fires_amount} 🔥
-
-<b>📋 Datos de Pago:</b>
-• <b>Cédula:</b> <code>${cedula}</code>
-• <b>Teléfono:</b> <code>${phone}</code>
-${bank_code ? `• <b>Banco:</b> ${bank_name} (${bank_code})` : ''}
-${bank_account ? `• <b>Cuenta:</b> <code>${bank_account}</code>` : ''}
+${feesDetails}
+${paymentDetails}
 
 <b>ID Canje:</b> <code>${redemption_id}</code>
 <b>Fecha:</b> ${new Date().toLocaleString('es-ES', { 

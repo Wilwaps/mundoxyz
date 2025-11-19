@@ -8,13 +8,17 @@ import PasswordRequiredModal from './PasswordRequiredModal';
 
 const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
+  const [paymentMethod, setPaymentMethod] = useState('bs'); // 'bs' | 'usdt_tron'
   const [formData, setFormData] = useState({
     amount: '',
-    bank_reference: ''
+    bank_reference: '',
+    usdt_amount: '',
+    tx_hash: ''
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [copiedBank, setCopiedBank] = useState(false);
+  const [copiedWallet, setCopiedWallet] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [fiatContext, setFiatContext] = useState(null);
 
@@ -78,19 +82,36 @@ Pago`;
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.amount) {
-      newErrors.amount = 'Cantidad requerida';
-    } else {
-      const amount = parseFloat(formData.amount);
-      if (isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Cantidad inválida';
+    if (paymentMethod === 'bs') {
+      if (!formData.amount) {
+        newErrors.amount = 'Cantidad requerida';
+      } else {
+        const amount = parseFloat(formData.amount);
+        if (isNaN(amount) || amount <= 0) {
+          newErrors.amount = 'Cantidad inválida';
+        }
       }
-    }
 
-    if (!formData.bank_reference) {
-      newErrors.bank_reference = 'Referencia bancaria requerida';
-    } else if (formData.bank_reference.length < 4) {
-      newErrors.bank_reference = 'Referencia muy corta';
+      if (!formData.bank_reference) {
+        newErrors.bank_reference = 'Referencia bancaria requerida';
+      } else if (formData.bank_reference.length < 4) {
+        newErrors.bank_reference = 'Referencia muy corta';
+      }
+    } else {
+      if (!formData.usdt_amount) {
+        newErrors.usdt_amount = 'Monto USDT requerido';
+      } else {
+        const usdt = parseFloat(formData.usdt_amount);
+        if (isNaN(usdt) || usdt <= 0) {
+          newErrors.usdt_amount = 'Monto USDT inválido';
+        }
+      }
+
+      if (!formData.tx_hash) {
+        newErrors.tx_hash = 'Hash de transacción requerido';
+      } else if (formData.tx_hash.length < 10) {
+        newErrors.tx_hash = 'Hash demasiado corto';
+      }
     }
 
     setErrors(newErrors);
@@ -108,7 +129,24 @@ Pago`;
     setShowPasswordModal(false);
     setLoading(true);
     try {
-      const response = await axios.post('/api/economy/request-fires', formData);
+      let payload;
+
+      if (paymentMethod === 'bs') {
+        payload = {
+          amount: formData.amount,
+          bank_reference: formData.bank_reference,
+          payment_method: 'bs'
+        };
+      } else {
+        payload = {
+          payment_method: 'usdt_tron',
+          usdt_amount: formData.usdt_amount,
+          tx_hash: formData.tx_hash,
+          network: fiatContext?.config?.usdt_network || 'TRON'
+        };
+      }
+
+      const response = await axios.post('/api/economy/request-fires', payload);
       toast.success('Solicitud enviada. Será revisada por un administrador.');
       
       // Invalidar queries de solicitudes
@@ -124,7 +162,8 @@ Pago`;
   };
 
   const handleClose = () => {
-    setFormData({ amount: '', bank_reference: '' });
+    setPaymentMethod('bs');
+    setFormData({ amount: '', bank_reference: '', usdt_amount: '', tx_hash: '' });
     setErrors({});
     setShowPasswordModal(false);
     onClose();
@@ -136,12 +175,16 @@ Pago`;
     }
   };
 
+  const firesPerUsdt = fiatContext?.config?.fires_per_usdt || 300;
+  const usdtWallet = fiatContext?.config?.usdt_official_wallet || 'TLNsU1jj17zvRHbrJW27Xv9DGK9KiQBD3y';
+  const usdtNetwork = fiatContext?.config?.usdt_network || 'TRON';
+
   let fiatPreview = null;
   if (fiatContext && fiatContext.operationalRate && formData.amount) {
     const parsed = parseFloat(formData.amount);
     if (!isNaN(parsed) && parsed > 0) {
       const tokens = parsed;
-      const usdt = tokens / 300;
+      const usdt = tokens / firesPerUsdt;
       const rate = parseFloat(fiatContext.operationalRate.rate);
       if (Number.isFinite(rate) && rate > 0) {
         const ves = usdt * rate;
@@ -193,95 +236,233 @@ Pago`;
 
             {/* Content */}
             <div className="space-y-4">
-              {/* Instructions */}
-              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
-                <p className="text-xs text-accent">
-                  💡 <strong>Pasos:</strong>
-                  <br />1. Realiza el pago a los datos bancarios
-                  <br />2. Ingresa la cantidad de fuegos y tu referencia
-                  <br />3. Espera la aprobación del administrador
-                </p>
-              </div>
-
-              {/* Bank Data */}
-              <div className="glass-panel p-4 space-y-3">
-                <label className="text-sm font-medium text-text/80">
-                  Datos Bancarios para Pago
-                </label>
-                <div className="bg-background-dark/50 rounded-lg p-3">
-                  <pre className="text-sm text-accent whitespace-pre-wrap font-mono">
-                    {bankData}
-                  </pre>
-                </div>
+              {/* Payment method selector */}
+              <div className="flex bg-glass rounded-lg p-1 text-sm">
                 <button
-                  onClick={handleCopyBankData}
-                  className="w-full py-2 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                  type="button"
+                  onClick={() => setPaymentMethod('bs')}
+                  className={`flex-1 py-2 rounded-md transition-colors ${
+                    paymentMethod === 'bs'
+                      ? 'bg-fire-orange/80 text-black font-semibold'
+                      : 'bg-transparent text-text/60 hover:bg-glass-hover'
+                  }`}
                 >
-                  {copiedBank ? (
-                    <>
-                      <Check size={16} />
-                      ¡Copiado!
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={16} />
-                      Copiar Datos Bancarios
-                    </>
-                  )}
+                  Pago en Bs (Transferencia)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('usdt_tron')}
+                  className={`flex-1 py-2 rounded-md transition-colors ml-1 ${
+                    paymentMethod === 'usdt_tron'
+                      ? 'bg-emerald-500/80 text-black font-semibold'
+                      : 'bg-transparent text-text/60 hover:bg-glass-hover'
+                  }`}
+                >
+                  Pago en USDT (TRON)
                 </button>
               </div>
 
-              {/* Amount Input */}
-              <div>
-                <label className="block text-sm font-medium text-text/80 mb-2">
-                  Cantidad de Fuegos a Solicitar
-                </label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleChange}
-                  className={`input-glass w-full ${errors.amount ? 'border-red-500' : ''}`}
-                  placeholder="Ej: 100"
-                  min="1"
-                  step="0.01"
-                />
-                {errors.amount && (
-                  <p className="text-xs text-red-400 mt-1">{errors.amount}</p>
-                )}
-                {fiatPreview ? (
-                  <p className="text-xs text-text/40 mt-1">
-                    Deposita: {fiatPreview.ves.toFixed(2)} Bs (1🔥 = {(fiatPreview.ves / fiatPreview.tokens).toFixed(2)} Bs)
-                  </p>
-                ) : (
-                  <p className="text-xs text-text/40 mt-1">
-                    El valor en Bs se calcula con la tasa MundoXYZ (Binance P2P - 5%) vigente al registrar tu
-                    solicitud.
-                  </p>
-                )}
-              </div>
+              {paymentMethod === 'bs' ? (
+                <>
+                  {/* Instructions Bs */}
+                  <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+                    <p className="text-xs text-accent">
+                      💡 <strong>Pasos:</strong>
+                      <br />1. Realiza el pago a los datos bancarios
+                      <br />2. Ingresa la cantidad de fuegos y tu referencia
+                      <br />3. Espera la aprobación del administrador
+                    </p>
+                  </div>
 
-              {/* Bank Reference Input */}
-              <div>
-                <label className="block text-sm font-medium text-text/80 mb-2">
-                  Referencia Bancaria (solo números)
-                </label>
-                <input
-                  type="text"
-                  name="bank_reference"
-                  value={formData.bank_reference}
-                  onChange={handleChange}
-                  className={`input-glass w-full ${errors.bank_reference ? 'border-red-500' : ''}`}
-                  placeholder="123456789"
-                  inputMode="numeric"
-                />
-                {errors.bank_reference && (
-                  <p className="text-xs text-red-400 mt-1">{errors.bank_reference}</p>
-                )}
-                <p className="text-xs text-text/40 mt-1">
-                  Ingresa solo los números de tu comprobante de pago
-                </p>
-              </div>
+                  {/* Bank Data */}
+                  <div className="glass-panel p-4 space-y-3">
+                    <label className="text-sm font-medium text-text/80">
+                      Datos Bancarios para Pago
+                    </label>
+                    <div className="bg-background-dark/50 rounded-lg p-3">
+                      <pre className="text-sm text-accent whitespace-pre-wrap font-mono">
+                        {bankData}
+                      </pre>
+                    </div>
+                    <button
+                      onClick={handleCopyBankData}
+                      className="w-full py-2 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                      {copiedBank ? (
+                        <>
+                          <Check size={16} />
+                          ¡Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} />
+                          Copiar Datos Bancarios
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Amount Input (fires) */}
+                  <div>
+                    <label className="block text-sm font-medium text-text/80 mb-2">
+                      Cantidad de Fuegos a Solicitar
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      value={formData.amount}
+                      onChange={handleChange}
+                      className={`input-glass w-full ${errors.amount ? 'border-red-500' : ''}`}
+                      placeholder="Ej: 100"
+                      min="1"
+                      step="0.01"
+                    />
+                    {errors.amount && (
+                      <p className="text-xs text-red-400 mt-1">{errors.amount}</p>
+                    )}
+                    {fiatPreview ? (
+                      <p className="text-xs text-text/40 mt-1">
+                        Deposita: {fiatPreview.ves.toFixed(2)} Bs (1🔥 = {(fiatPreview.ves / fiatPreview.tokens).toFixed(2)} Bs)
+                      </p>
+                    ) : (
+                      <p className="text-xs text-text/40 mt-1">
+                        El valor en Bs se calcula con la tasa MundoXYZ vigente al registrar tu solicitud.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Bank Reference Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-text/80 mb-2">
+                      Referencia Bancaria (solo números)
+                    </label>
+                    <input
+                      type="text"
+                      name="bank_reference"
+                      value={formData.bank_reference}
+                      onChange={handleChange}
+                      className={`input-glass w-full ${errors.bank_reference ? 'border-red-500' : ''}`}
+                      placeholder="123456789"
+                      inputMode="numeric"
+                    />
+                    {errors.bank_reference && (
+                      <p className="text-xs text-red-400 mt-1">{errors.bank_reference}</p>
+                    )}
+                    <p className="text-xs text-text/40 mt-1">
+                      Ingresa solo los números de tu comprobante de pago
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Instructions USDT */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-3">
+                    <p className="text-xs text-emerald-300">
+                      💡 <strong>Pasos:</strong>
+                      <br />1. Envía USDT ({usdtNetwork}) a la billetera oficial
+                      <br />2. Ingresa el monto en USDT y el hash de la transacción
+                      <br />3. Espera la aprobación del administrador y la acreditación de tus fuegos
+                    </p>
+                  </div>
+
+                  {/* USDT Wallet Info */}
+                  <div className="glass-panel p-4 space-y-3">
+                    <label className="text-sm font-medium text-text/80">
+                      Billetera oficial USDT ({usdtNetwork})
+                    </label>
+                    <div className="bg-background-dark/50 rounded-lg p-3">
+                      <pre className="text-sm text-emerald-300 whitespace-pre-wrap font-mono">
+                        {usdtWallet}
+                      </pre>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(usdtWallet);
+                          setCopiedWallet(true);
+                          toast.success('Billetera USDT copiada');
+                          setTimeout(() => setCopiedWallet(false), 2000);
+                        } catch (err) {
+                          toast.error('No se pudo copiar la billetera');
+                        }
+                      }}
+                      className="w-full py-2 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                      {copiedWallet ? (
+                        <>
+                          <Check size={16} />
+                          ¡Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} />
+                          Copiar Billetera USDT
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* USDT Amount Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-text/80 mb-2">
+                      Monto a enviar en USDT
+                    </label>
+                    <input
+                      type="number"
+                      name="usdt_amount"
+                      value={formData.usdt_amount}
+                      onChange={handleChange}
+                      className={`input-glass w-full ${errors.usdt_amount ? 'border-red-500' : ''}`}
+                      placeholder="Ej: 1.00"
+                      min="0.01"
+                      step="0.01"
+                    />
+                    {errors.usdt_amount && (
+                      <p className="text-xs text-red-400 mt-1">{errors.usdt_amount}</p>
+                    )}
+                    {formData.usdt_amount && !errors.usdt_amount && (
+                      <p className="text-xs text-text/40 mt-1">
+                        Recibirás aproximadamente{' '}
+                        {(parseFloat(formData.usdt_amount || 0) * firesPerUsdt).toFixed(2)} 🔥
+                        {fiatContext?.operationalRate && (
+                          <>
+                            {' '}(
+                            ≈{
+                              (
+                                parseFloat(formData.usdt_amount || 0) *
+                                parseFloat(fiatContext.operationalRate.rate || 0)
+                              ).toFixed(2)
+                            }{' '}
+                            Bs)
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Tx Hash Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-text/80 mb-2">
+                      Hash de Transacción USDT
+                    </label>
+                    <input
+                      type="text"
+                      name="tx_hash"
+                      value={formData.tx_hash}
+                      onChange={handleChange}
+                      className={`input-glass w-full ${errors.tx_hash ? 'border-red-500' : ''}`}
+                      placeholder="Ej: 0x..."
+                    />
+                    {errors.tx_hash && (
+                      <p className="text-xs text-red-400 mt-1">{errors.tx_hash}</p>
+                    )}
+                    <p className="text-xs text-text/40 mt-1">
+                      Pega aquí el hash de la transacción en TRON para que el Tote pueda verificar tu pago.
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* Submit Buttons */}
               <div className="flex gap-3 pt-4">

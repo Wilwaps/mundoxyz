@@ -9,7 +9,17 @@ const telegramService = require('../services/telegramService');
 // Request to redeem fires for fiat (mínimo 100, con comisión 5%)
 router.post('/redeem-100-fire', verifyToken, async (req, res) => {
   try {
-    const { cedula, telefono, bank_code, bank_name, bank_account, fires_amount = 100 } = req.body;
+    const {
+      cedula,
+      telefono,
+      bank_code,
+      bank_name,
+      bank_account,
+      fires_amount = 100,
+      payout_method,
+      wallet_address,
+      network
+    } = req.body;
     const userId = req.user.id;
     
     // Validate required fields
@@ -26,6 +36,16 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
     // Calcular comisión 5%
     const commission = requestedAmount * 0.05;
     const totalRequired = requestedAmount + commission;
+
+    const method = payout_method === 'usdt_tron' ? 'usdt_tron' : 'bank_transfer';
+
+    if (!cedula || !telefono) {
+      return res.status(400).json({ error: 'Cedula and telefono are required' });
+    }
+
+    if (method === 'usdt_tron' && !wallet_address) {
+      return res.status(400).json({ error: 'Wallet address is required for USDT payouts' });
+    }
     
     const result = await transaction(async (client) => {
       // Get wallet with lock
@@ -68,10 +88,23 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
       // Create redemption request con comisión registrada
       const redeemResult = await client.query(
         `INSERT INTO market_redeems 
-         (user_id, fires_amount, commission_amount, total_deducted, cedula, phone, bank_code, bank_name, bank_account, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+         (user_id, fires_amount, commission_amount, total_deducted, cedula, phone, bank_code, bank_name, bank_account, payout_method, wallet_address, network, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
          RETURNING id`,
-        [userId, requestedAmount, commission, totalRequired, cedula, telefono, bank_code, bank_name, bank_account]
+        [
+          userId,
+          requestedAmount,
+          commission,
+          totalRequired,
+          cedula,
+          telefono,
+          bank_code,
+          bank_name,
+          bank_account,
+          method,
+          method === 'usdt_tron' ? wallet_address : null,
+          method === 'usdt_tron' ? (network || 'TRON') : null
+        ]
       );
       
       // Record wallet transaction del usuario (canje + comisión)
@@ -172,7 +205,10 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
         phone: telefono,
         bank_code,
         bank_name,
-        bank_account
+        bank_account,
+        payout_method: result.redemption?.payout_method || method,
+        wallet_address: result.redemption?.wallet_address || (method === 'usdt_tron' ? wallet_address : null),
+        network: result.redemption?.network || (method === 'usdt_tron' ? (network || 'TRON') : null)
       });
     } catch (notifyError) {
       logger.error('Error sending Telegram notification:', notifyError);

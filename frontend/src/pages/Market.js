@@ -16,8 +16,11 @@ const Market = () => {
     bank_code: '',
     bank_name: '',
     bank_account: '',
-    fires_amount: 100
+    fires_amount: 100,
+    wallet_address: '',
+    network: 'TRON'
   });
+  const [payoutMethod, setPayoutMethod] = useState('bs'); // 'bs' | 'usdt_tron'
 
   // Fetch user's redemption history
   const { data: redeems } = useQuery({
@@ -42,8 +45,11 @@ const Market = () => {
         bank_code: '',
         bank_name: '',
         bank_account: '',
-        fires_amount: 100
+        fires_amount: 100,
+        wallet_address: '',
+        network: 'TRON'
       });
+      setPayoutMethod('bs');
       refreshUser();
       queryClient.invalidateQueries(['my-redeems']);
       queryClient.invalidateQueries(['user-stats', user.id]);
@@ -79,7 +85,16 @@ const Market = () => {
       toast.error(`Necesitas ${totalRequired.toFixed(2)} fuegos (${amount} + ${commission.toFixed(2)} comisión)`);
       return;
     }
-    redeemMutation.mutate(redeemData);
+
+    if (payoutMethod === 'usdt_tron' && !redeemData.wallet_address) {
+      toast.error('La wallet USDT es requerida para retiros en USDT');
+      return;
+    }
+
+    redeemMutation.mutate({
+      ...redeemData,
+      payout_method: payoutMethod === 'usdt_tron' ? 'usdt_tron' : 'bank_transfer'
+    });
   };
 
   const getStatusIcon = (status) => {
@@ -229,6 +244,35 @@ const Market = () => {
                   <span className="text-fire-orange font-bold">{(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥</span>
                 </div>
               </div>
+              
+              {/* Selector de método de pago */}
+              <div className="flex bg-glass rounded-lg p-1 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setPayoutMethod('bs')}
+                  className={`flex-1 py-2 rounded-md transition-colors ${
+                    payoutMethod === 'bs'
+                      ? 'bg-fire-orange/80 text-black font-semibold'
+                      : 'bg-transparent text-text/60 hover:bg-glass-hover'
+                  }`}
+                >
+                  Recibir en Bs (Transferencia)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayoutMethod('usdt_tron')}
+                  className={`flex-1 py-2 rounded-md transition-colors ml-1 ${
+                    payoutMethod === 'usdt_tron'
+                      ? 'bg-emerald-500/80 text-black font-semibold'
+                      : 'bg-transparent text-text/60 hover:bg-glass-hover'
+                  }`}
+                >
+                  Recibir en USDT (TRON)
+                </button>
+              </div>
+
+              {payoutMethod === 'bs' ? (
+                <>
               <div>
                 <label className="block text-sm text-text/60 mb-1">Cédula *</label>
                 <input
@@ -285,7 +329,58 @@ const Market = () => {
                   className="input-glass w-full"
                 />
               </div>
-              
+                </>
+              ) : (
+                <>
+                <div>
+                  <label className="block text-sm text-text/60 mb-1">Cédula *</label>
+                  <input
+                    type="text"
+                    value={redeemData.cedula}
+                    onChange={(e) => setRedeemData({...redeemData, cedula: e.target.value})}
+                    placeholder="V12345678"
+                    className="input-glass w-full"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-text/60 mb-1">Teléfono *</label>
+                  <input
+                    type="tel"
+                    value={redeemData.telefono}
+                    onChange={(e) => setRedeemData({...redeemData, telefono: e.target.value})}
+                    placeholder="+584121234567"
+                    className="input-glass w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-text/60 mb-1">Wallet USDT (TRON) *</label>
+                  <input
+                    type="text"
+                    value={redeemData.wallet_address}
+                    onChange={(e) => setRedeemData({...redeemData, wallet_address: e.target.value})}
+                    placeholder="TL..."
+                    className="input-glass w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-text/60 mb-1">Red</label>
+                  <input
+                    type="text"
+                    value={redeemData.network}
+                    onChange={(e) => setRedeemData({...redeemData, network: e.target.value})}
+                    placeholder="TRON"
+                    className="input-glass w-full"
+                  />
+                </div>
+                </>
+              )}
+
               <div className="bg-warning/20 border border-warning/30 rounded-lg p-3">
                 <p className="text-warning text-xs">
                   Se debitarán {(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥 de tu cuenta ({redeemData.fires_amount} + 5% comisión). El proceso de pago puede tardar hasta 48 horas.
