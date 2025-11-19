@@ -370,10 +370,10 @@ Pago`;
                     <label className="text-sm font-medium text-text/80">
                       Billetera oficial USDT ({usdtNetwork})
                     </label>
-                    <div className="bg-background-dark/50 rounded-lg p-3">
-                      <pre className="text-sm text-emerald-300 whitespace-pre-wrap font-mono">
+                    <div className="bg-background-dark/50 rounded-lg p-3 overflow-x-auto">
+                      <div className="text-xs sm:text-sm text-emerald-300 font-mono break-all">
                         {usdtWallet}
-                      </pre>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -425,18 +425,6 @@ Pago`;
                       <p className="text-xs text-text/40 mt-1">
                         Recibirás aproximadamente{' '}
                         {(parseFloat(formData.usdt_amount || 0) * firesPerUsdt).toFixed(2)} 🔥
-                        {fiatContext?.operationalRate && (
-                          <>
-                            {' '}(
-                            ≈{
-                              (
-                                parseFloat(formData.usdt_amount || 0) *
-                                parseFloat(fiatContext.operationalRate.rate || 0)
-                              ).toFixed(2)
-                            }{' '}
-                            Bs)
-                          </>
-                        )}
                       </p>
                     )}
                   </div>
