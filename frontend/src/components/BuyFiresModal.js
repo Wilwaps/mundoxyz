@@ -215,7 +215,7 @@ Pago`;
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="w-full max-w-md card-glass p-6"
+            className="w-full max-w-md max-h-[90vh] card-glass p-6 overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
