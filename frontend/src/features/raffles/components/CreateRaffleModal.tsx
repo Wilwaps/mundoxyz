@@ -69,6 +69,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       prizeDescription: '',
       prizeValue: 0,
       prizeImages: [],
+      isPromotion: false,
       bankingInfo: {
         accountHolder: '',
         bankCode: '',
@@ -163,25 +164,28 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         
       case 2:
         if (formData.mode === RaffleMode.PRIZE) {
+          const isPromotion = !!formData.prizeMeta?.isPromotion;
           if (!formData.prizeMeta?.prizeDescription) {
             toast.error('Por favor describe el premio');
             return false;
           }
-          if (!formData.prizeMeta?.bankingInfo?.accountHolder) {
-            toast.error('Por favor ingresa el nombre del titular');
-            return false;
-          }
-          if (!formData.prizeMeta?.bankingInfo?.bankName) {
-            toast.error('Por favor ingresa el banco');
-            return false;
-          }
-          if (!formData.prizeMeta?.bankingInfo?.accountNumber) {
-            toast.error('Por favor ingresa el número de cuenta');
-            return false;
-          }
-          if (!formData.prizeMeta?.bankingInfo?.phone) {
-            toast.error('Por favor ingresa el teléfono de contacto');
-            return false;
+          if (!isPromotion) {
+            if (!formData.prizeMeta?.bankingInfo?.accountHolder) {
+              toast.error('Por favor ingresa el nombre del titular');
+              return false;
+            }
+            if (!formData.prizeMeta?.bankingInfo?.bankName) {
+              toast.error('Por favor ingresa el banco');
+              return false;
+            }
+            if (!formData.prizeMeta?.bankingInfo?.accountNumber) {
+              toast.error('Por favor ingresa el número de cuenta');
+              return false;
+            }
+            if (!formData.prizeMeta?.bankingInfo?.phone) {
+              toast.error('Por favor ingresa el teléfono de contacto');
+              return false;
+            }
           }
         } else {
           const minPrice = formData.mode === RaffleMode.FIRES 
@@ -296,7 +300,10 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       const payload: any = {
         ...formData,
         prizeMeta: sanitizedPrizeMeta,
-        allowFiresPayment: formData.mode === RaffleMode.PRIZE ? allowFiresPayment : undefined,
+        allowFiresPayment:
+          formData.mode === RaffleMode.PRIZE && !(sanitizedPrizeMeta as any)?.isPromotion
+            ? allowFiresPayment
+            : undefined,
         prizeImageBase64: prizeImageBase64 || undefined,
         drawMode: drawMode,
         scheduledDrawAt: drawMode === DrawMode.SCHEDULED ? scheduledDrawAt : undefined,
@@ -674,8 +681,29 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   <p className="text-xs text-text/60 mt-1">JPG, PNG o GIF. Máx. 5MB</p>
                 </div>
                 
+                {/* Promoción (gratis) */}
+                <div className="pt-3 border-t border-white/10">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.prizeMeta?.isPromotion}
+                      onChange={(e) => updateField('prizeMeta', {
+                        ...formData.prizeMeta,
+                        isPromotion: e.target.checked
+                      })}
+                      className="w-5 h-5 rounded bg-glass border-2 border-white/20 checked:bg-accent checked:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-text">Promoción (gratis)</div>
+                      <div className="text-xs text-text/60">
+                        Los participantes no pagan dinero. El anfitrión solo aprueba quién entra en la promoción.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                
                 {/* Toggle Permitir Pago con Fuegos */}
-                {formData.mode === RaffleMode.PRIZE && (
+                {formData.mode === RaffleMode.PRIZE && !formData.prizeMeta?.isPromotion && (
                   <div className="pt-3 border-t border-white/10">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -695,7 +723,8 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 )}
                 
                 {/* Datos bancarios para pago */}
-                <div className="space-y-3 pt-3 border-t border-white/10">
+                {!formData.prizeMeta?.isPromotion && (
+                  <div className="space-y-3 pt-3 border-t border-white/10">
                   <h4 className="text-sm font-semibold text-text flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-accent" />
                     Datos Bancarios para Recibir Pagos
@@ -828,24 +857,25 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     />
                   </div>
                 </div>
-                
-                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-warning mt-0.5" />
-                    <div className="text-xs text-warning">
-                      <p className="font-semibold">Costo de creación:</p>
-                      <p>
-                        {formData.visibility === 'company'
-                          ? companyCreationCost
-                          : prizeCreationCost}{' '}
-                        fuegos
-                        (se deducen al crear)
-                      </p>
-                    </div>
+              )}
+
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-warning mt-0.5" />
+                  <div className="text-xs text-warning">
+                    <p className="font-semibold">Costo de creación:</p>
+                    <p>
+                      {formData.visibility === 'company'
+                        ? companyCreationCost
+                        : prizeCreationCost}{' '}
+                      fuegos
+                      (se deducen al crear)
+                    </p>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
           </div>
         );
         

@@ -119,6 +119,7 @@ const createRaffleSchema = Joi.object({
       }),
       prizeValue: Joi.number().positive().optional(),
       prizeImages: Joi.array().items(Joi.string().uri()).optional(),
+      isPromotion: Joi.boolean().optional().default(false),
       bankingInfo: Joi.object({
         accountHolder: Joi.string().optional(),
         bankName: Joi.string().optional(),
@@ -196,6 +197,8 @@ const updateRaffleSchema = Joi.object({
     prizeValue: Joi.number().positive().optional(),
     prizeImages: Joi.array().items(Joi.string().uri()).optional(),
     category: Joi.string().optional(),
+
+    isPromotion: Joi.boolean().optional(),
 
     bankingInfo: Joi.object({
       accountHolder: Joi.string().optional(),

@@ -142,6 +142,7 @@ export interface PrizeMeta {
   prizeImages?: string[];
   category?: string;
   bankingInfo?: BankingInfo;
+  isPromotion?: boolean;
 }
 
 // Número de rifa

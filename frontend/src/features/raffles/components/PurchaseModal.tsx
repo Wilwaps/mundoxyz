@@ -57,6 +57,8 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     proofImage: null as File | null
   });
   
+  const isPromotion = !!raffle?.prizeMeta?.isPromotion;
+  
   const pricePerNumber = raffle?.mode === 'fires' 
     ? (raffle?.entryPriceFire || 0) 
     : (raffle?.entryPriceCoin || 0);
@@ -128,21 +130,30 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   
   // Procesar compra - Modo Premio
   const processPrizePurchase = async () => {
-    // Validar datos
+    // Validar datos personales
     if (!paymentData.fullName || !paymentData.cedula || !paymentData.phone) {
       toast.error('Por favor completa todos los campos requeridos');
       return;
     }
     
-    if (!paymentData.paymentMethod) {
-      toast.error('Por favor selecciona un método de pago');
-      return;
-    }
-    // Referencia solo requerida para MOBILE y BANK
-    const needsReference = paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK;
-    if (needsReference && !paymentData.referenceNumber) {
-      toast.error('Por favor ingresa el número de referencia');
-      return;
+    let method: PaymentMethod | string | undefined = paymentData.paymentMethod as PaymentMethod | undefined;
+    let needsReference = false;
+    
+    if (!isPromotion) {
+      if (!paymentData.paymentMethod) {
+        toast.error('Por favor selecciona un método de pago');
+        return;
+      }
+      // Referencia solo requerida para MOBILE y BANK
+      needsReference = paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK;
+      if (needsReference && !paymentData.referenceNumber) {
+        toast.error('Por favor ingresa el número de referencia');
+        return;
+      }
+    } else {
+      // En promociones no se requiere método de pago ni referencia; usamos CASH como marcador interno
+      method = PaymentMethod.CASH;
+      needsReference = false;
     }
     
     setIsProcessing(true);
@@ -194,7 +205,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         buyerDocument: normalizedDocument,
         buyerPhone: normalizedPhone,
         ...(paymentData.email?.trim() ? { buyerEmail: paymentData.email.trim() } : {}),
-        paymentMethod: paymentData.paymentMethod as PaymentMethod,
+        paymentMethod: method as PaymentMethod,
         ...(needsReference ? { paymentReference: normalizedReference } : {}),
         ...(paymentProofBase64 ? { paymentProofBase64 } : {})
       };
@@ -302,11 +313,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
           ) : (
             <>
               <h3 className="text-lg font-semibold text-text mb-2">
-                Información de Pago
+                {isPromotion ? 'Confirmar participación (Promoción gratuita)' : 'Información de Pago'}
               </h3>
               
-              {/* Datos bancarios del host */}
-              {raffle?.prizeMeta?.bankingInfo && (
+              {/* Datos bancarios del host (solo si no es promoción) */}
+              {!isPromotion && raffle?.prizeMeta?.bankingInfo && (
                 <div className="bg-glass/50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-semibold text-text">Datos bancarios del organizador</p>
@@ -346,99 +357,117 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 </div>
               )}
 
-              {/* Métodos de pago disponibles */}
-              <div>
-                <label className="block text-sm text-text/80 mb-2">
-                  Método de Pago *
-                </label>
-                <div className="space-y-2">
-                  {[
-                    { id: PaymentMethod.CASH, label: 'Efectivo', type: 'cash' },
-                    { id: PaymentMethod.MOBILE, label: 'Pago Móvil', type: 'transfer' },
-                    { id: PaymentMethod.BANK, label: 'Transferencia Bancaria', type: 'transfer' },
-                    ...(raffle?.allowFiresPayment ? [{ id: PaymentMethod.FIRES, label: 'Fuegos', type: 'fires' } as const] : [])
-                  ].map((m) => (
-                    <label
-                      key={m.id}
-                      className={`flex items-start gap-3 p-3 bg-glass/50 rounded-lg cursor-pointer transition-all ${paymentData.paymentMethod === m.id ? 'ring-2 ring-accent bg-accent/10' : 'hover:bg-glass'}`}
-                    >
-                      <input
-                        type="radio"
-                        value={m.id}
-                        checked={paymentData.paymentMethod === m.id}
-                        onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value})}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-text">{m.label}</p>
-                        {m.type === 'transfer' && raffle?.prizeMeta?.bankingInfo && (
-                          <div className="mt-1 text-sm text-text/80">
-                            <p>Banco: {raffle.prizeMeta.bankingInfo.bankName}</p>
-                            <p>Cuenta: {raffle.prizeMeta.bankingInfo.accountNumber}</p>
-                            <p>Titular: {raffle.prizeMeta.bankingInfo.accountHolder}</p>
-                          </div>
-                        )}
-                        {m.id === PaymentMethod.FIRES && (
-                          <p className="mt-1 text-xs text-text/60">Pagarás con fuegos. Se transferirá directamente al organizador.</p>
-                        )}
-                      </div>
+              {!isPromotion && (
+                <>
+                  {/* Métodos de pago disponibles */}
+                  <div>
+                    <label className="block text-sm text-text/80 mb-2">
+                      Método de Pago *
                     </label>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm text-text/80 mb-1">
-                  Número de Referencia *
-                </label>
-                <input
-                  type="text"
-                  value={paymentData.referenceNumber}
-                  onChange={(e) => setPaymentData({...paymentData, referenceNumber: e.target.value})}
-                  placeholder="Ej: 1234567890"
-                  className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <p className="text-xs text-text/50 mt-1">
-                  Requerido solo para Pago Móvil o Transferencia. No es necesario para Efectivo o Fuegos.
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm text-text/80 mb-1">
-                  Comprobante (opcional)
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setPaymentData({
-                      ...paymentData,
-                      proofImage: e.target.files?.[0] || null
-                    })}
-                    className="hidden"
-                    id="proof-upload"
-                  />
-                  <label
-                    htmlFor="proof-upload"
-                    className="flex items-center justify-center gap-2 p-4 bg-glass/50 rounded-lg cursor-pointer hover:bg-glass transition-colors"
-                  >
-                    <Upload className="w-5 h-5 text-text/60" />
-                    <span className="text-text/60">
-                      {paymentData.proofImage ? paymentData.proofImage.name : 'Subir imagen'}
-                    </span>
-                  </label>
-                </div>
-              </div>
-              
-              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-warning mt-0.5" />
-                  <div className="text-xs text-warning">
-                    <p className="font-semibold mb-1">Importante:</p>
-                    <p>Tu compra será revisada por el organizador. Recibirás una notificación cuando sea aprobada.</p>
+                    <div className="space-y-2">
+                      {[
+                        { id: PaymentMethod.CASH, label: 'Efectivo', type: 'cash' },
+                        { id: PaymentMethod.MOBILE, label: 'Pago Móvil', type: 'transfer' },
+                        { id: PaymentMethod.BANK, label: 'Transferencia Bancaria', type: 'transfer' },
+                        ...(raffle?.allowFiresPayment ? [{ id: PaymentMethod.FIRES, label: 'Fuegos', type: 'fires' } as const] : [])
+                      ].map((m) => (
+                        <label
+                          key={m.id}
+                          className={`flex items-start gap-3 p-3 bg-glass/50 rounded-lg cursor-pointer transition-all ${paymentData.paymentMethod === m.id ? 'ring-2 ring-accent bg-accent/10' : 'hover:bg-glass'}`}
+                        >
+                          <input
+                            type="radio"
+                            value={m.id}
+                            checked={paymentData.paymentMethod === m.id}
+                            onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value})}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-text">{m.label}</p>
+                            {m.type === 'transfer' && raffle?.prizeMeta?.bankingInfo && (
+                              <div className="mt-1 text-sm text-text/80">
+                                <p>Banco: {raffle.prizeMeta.bankingInfo.bankName}</p>
+                                <p>Cuenta: {raffle.prizeMeta.bankingInfo.accountNumber}</p>
+                                <p>Titular: {raffle.prizeMeta.bankingInfo.accountHolder}</p>
+                              </div>
+                            )}
+                            {m.id === PaymentMethod.FIRES && (
+                              <p className="mt-1 text-xs text-text/60">Pagarás con fuegos. Se transferirá directamente al organizador.</p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Número de Referencia *
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentData.referenceNumber}
+                      onChange={(e) => setPaymentData({...paymentData, referenceNumber: e.target.value})}
+                      placeholder="Ej: 1234567890"
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <p className="text-xs text-text/50 mt-1">
+                      Requerido solo para Pago Móvil o Transferencia. No es necesario para Efectivo o Fuegos.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Comprobante (opcional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setPaymentData({
+                          ...paymentData,
+                          proofImage: e.target.files?.[0] || null
+                        })}
+                        className="hidden"
+                        id="proof-upload"
+                      />
+                      <label
+                        htmlFor="proof-upload"
+                        className="flex items-center justify-center gap-2 p-4 bg-glass/50 rounded-lg cursor-pointer hover:bg-glass transition-colors"
+                      >
+                        <Upload className="w-5 h-5 text-text/60" />
+                        <span className="text-text/60">
+                          {paymentData.proofImage ? paymentData.proofImage.name : 'Subir imagen'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isPromotion && (
+                <div className="bg-info/10 border border-info/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-info mt-0.5" />
+                    <div className="text-xs text-info">
+                      <p className="font-semibold mb-1">Promoción gratuita</p>
+                      <p>No necesitas realizar ningún pago. El organizador revisará tu solicitud y aprobará tu participación en la promoción.</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {!isPromotion && (
+                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-warning mt-0.5" />
+                    <div className="text-xs text-warning">
+                      <p className="font-semibold mb-1">Importante:</p>
+                      <p>Tu compra será revisada por el organizador. Recibirás una notificación cuando sea aprobada.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="flex gap-3 mt-6">
                 <button
@@ -452,8 +481,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                   onClick={processPrizePurchase}
                   disabled={
                     isProcessing ||
-                    !paymentData.paymentMethod ||
-                    ((paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK) && !paymentData.referenceNumber)
+                    (!isPromotion && (
+                      !paymentData.paymentMethod ||
+                      ((paymentData.paymentMethod === PaymentMethod.MOBILE || paymentData.paymentMethod === PaymentMethod.BANK) && !paymentData.referenceNumber)
+                    ))
                   }
                   className="flex-1 py-2.5 btn-primary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >

@@ -261,6 +261,34 @@
       overflow: hidden;
       white-space: pre-wrap;
     }
+
+    .ai-figures-tool {
+      margin-top: 10px;
+      align-items: stretch;
+    }
+
+    .ai-figures-input {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(55,65,81,0.9);
+      background: #020617;
+      color: #e5e7eb;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 40px;
+    }
+
+    .ai-figures-button {
+      margin-top: 4px;
+    }
+
+    .ai-figures-status {
+      font-size: 12px;
+      color: #9ca3af;
+      min-height: 16px;
+    }
   </style>
 </head>
 <body>
@@ -337,6 +365,15 @@
           </select>
         </label>
       </div>
+
+      <div class="panel ai-figures-tool">
+        <label>
+          Figura por descripción (IA)
+          <textarea id="aiPrompt" class="ai-figures-input" rows="2" placeholder="Ej: copa de vino, espada medieval..."></textarea>
+        </label>
+        <button id="aiGenerate" class="btn-primary ai-figures-button">Figura con IA</button>
+        <div id="aiStatus" class="ai-figures-status"></div>
+      </div>
     </div>
 
     <div class="canvas-frame">
@@ -369,6 +406,10 @@
     const fillColor = document.getElementById('fillColor');
     const borderColor = document.getElementById('borderColor');
     const textAlignSelect = document.getElementById('textAlign');
+
+    const aiPrompt = document.getElementById('aiPrompt');
+    const aiGenerateButton = document.getElementById('aiGenerate');
+    const aiStatus = document.getElementById('aiStatus');
 
     const dimX = document.getElementById('dim-x');
     const dimY = document.getElementById('dim-y');
@@ -1383,6 +1424,96 @@
       a.click();
       URL.revokeObjectURL(url);
     });
+
+    function createElementFromCss(css) {
+      if (!css) return;
+      pushHistory();
+      createElement();
+      const state = elements[elements.length - 1];
+      if (!state) return;
+
+      const bgMatch = css.match(/background(?:-color)?\s*:\s*([^;]+);/i);
+      if (bgMatch) {
+        state.fill = bgMatch[1].trim();
+      }
+
+      const borderMatch = css.match(/border(?:-color)?\s*:\s*([^;]+);/i);
+      if (borderMatch) {
+        state.border = borderMatch[1].trim();
+      }
+
+      const clipMatch = css.match(/clip-path\s*:\s*polygon\s*\(([^)]+)\)/i);
+      if (clipMatch) {
+        const rawPoints = clipMatch[1].split(',');
+        const pts = [];
+        rawPoints.forEach((part) => {
+          const m = part.trim().match(/^([0-9.]+)%\s+([0-9.]+)%$/);
+          if (m) {
+            pts.push({ x: parseFloat(m[1]) / 100, y: parseFloat(m[2]) / 100 });
+          }
+        });
+        if (pts.length >= 3) {
+          state.points = pts;
+        }
+      }
+
+      applyStateToElement(state);
+      updateClipPath(state);
+      rebuildVertexHandles(state);
+      selectElement(elements.length - 1);
+    }
+
+    function setupAIFigures() {
+      if (!aiPrompt || !aiGenerateButton || !aiStatus) return;
+
+      async function generateFigure() {
+        const texto = (aiPrompt.value || '').trim();
+        if (!texto) {
+          aiStatus.textContent = 'Escribe una descripción primero.';
+          return;
+        }
+
+        aiStatus.textContent = 'Generando figura con IA...';
+        aiGenerateButton.disabled = true;
+
+        try {
+          const resp = await fetch('http://localhost:5050/api/gemini-figura', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ figura: texto })
+          });
+
+          if (!resp.ok) {
+            aiStatus.textContent = 'Error del servidor (' + resp.status + ').';
+            return;
+          }
+
+          const data = await resp.json();
+          if (data && data.css) {
+            createElementFromCss(data.css);
+            aiStatus.textContent = 'Figura creada en el lienzo.';
+          } else if (data && data.error) {
+            aiStatus.textContent = data.error;
+          } else {
+            aiStatus.textContent = 'No se recibió CSS válido.';
+          }
+        } catch (e) {
+          aiStatus.textContent = 'Error al conectar con el generador.';
+        } finally {
+          aiGenerateButton.disabled = false;
+        }
+      }
+
+      aiGenerateButton.addEventListener('click', generateFigure);
+      aiPrompt.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+          ev.preventDefault();
+          generateFigure();
+        }
+      });
+    }
+
+    setupAIFigures();
 
     // Al inicio, sin elemento seleccionado
     setControlsEnabled(false);

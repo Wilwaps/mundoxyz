@@ -924,6 +924,21 @@ class RaffleServiceV2 {
       }
       
       const raffle = raffleResult.rows[0];
+      let prizeMeta = null;
+      let isPromotion = false;
+      if (raffle.prize_meta) {
+        try {
+          prizeMeta = typeof raffle.prize_meta === 'string'
+            ? JSON.parse(raffle.prize_meta)
+            : raffle.prize_meta;
+          isPromotion = !!(prizeMeta && prizeMeta.isPromotion);
+        } catch (e) {
+          logger.warn('[RaffleServiceV2] No se pudo parsear prize_meta en purchaseNumber', {
+            raffleId,
+            error: e.message
+          });
+        }
+      }
       
       // 2. Verificar estado del número (debe estar reservado por este usuario)
       const numberResult = await dbQuery(
@@ -1147,7 +1162,8 @@ class RaffleServiceV2 {
           const requestData = {
             paymentMethod: method || null,
             reference: reference || null,
-            paymentProofBase64: paymentData?.paymentProofBase64 || null
+            paymentProofBase64: paymentData?.paymentProofBase64 || null,
+            isPromotion: isPromotion || false
           };
           await dbQuery(
             `INSERT INTO raffle_requests (raffle_id, buyer_id, user_id, number_idx, status, request_type, request_data, buyer_profile)

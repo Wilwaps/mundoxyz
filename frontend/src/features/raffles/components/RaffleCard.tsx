@@ -60,6 +60,8 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
     ? `${raffle.potCoins.toFixed(0)} 💰`
     : 'Ver Premio';
   
+  const isPromotion = raffle.mode === 'prize' && !!raffle.prizeMeta?.isPromotion;
+  
   // Determinar color de estado
   const statusColor = STATUS_COLORS[raffle.status] || 'bg-gray-500';
   const statusText = STATUS_MESSAGES[raffle.status] || raffle.status;
@@ -112,6 +114,11 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-text truncate">{raffle.name}</h4>
+            {isPromotion && (
+              <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-accent/15 text-[10px] font-semibold text-accent uppercase tracking-wide">
+                Promoción
+              </div>
+            )}
             <div className="flex items-center gap-3 mt-1 text-xs text-text/60">
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3" />
@@ -145,6 +152,11 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
             <Award className="w-3 h-3" />
             DESTACADA
           </div>
+          {isPromotion && (
+            <div className="bg-accent text-dark px-3 py-1 rounded-full text-xs font-bold">
+              PROMOCIÓN
+            </div>
+          )}
           
           {/* Botón cancelar (si tiene permisos) */}
           {canCancel && (
@@ -291,6 +303,11 @@ const RaffleCard: React.FC<RaffleCardProps> = ({
         {/* Título y host */}
         <h3 className="font-bold text-lg text-text mb-1">{raffle.name}</h3>
         <p className="text-sm text-text/60">por @{raffle.hostUsername}</p>
+        {isPromotion && (
+          <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full bg-accent/15 text-[10px] font-semibold text-accent uppercase tracking-wide">
+            Promoción
+          </div>
+        )}
       </div>
       
       {/* Descripción si existe */}
