@@ -499,6 +499,127 @@ class RaffleServiceV2 {
       throw error;
     }
   }
+
+  /**
+   * Actualizar rifa por código
+   */
+  async updateRaffle(code, updates = {}) {
+    const client = await getClient();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Bloquear la rifa actual para evitar condiciones de carrera
+      const raffleResult = await client.query(
+        `SELECT * FROM raffles WHERE code = $1 FOR UPDATE`,
+        [code]
+      );
+
+      if (raffleResult.rows.length === 0) {
+        const error = new Error('Rifa no encontrada');
+        error.code = ErrorCodes.RAFFLE_NOT_FOUND;
+        error.status = 404;
+        throw error;
+      }
+
+      const current = raffleResult.rows[0];
+
+      const setClauses = [];
+      const params = [];
+      let idx = 1;
+
+      if (typeof updates.name !== 'undefined') {
+        setClauses.push(`name = $${idx}`);
+        params.push(updates.name);
+        idx++;
+      }
+
+      if (typeof updates.description !== 'undefined') {
+        setClauses.push(`description = $${idx}`);
+        params.push(updates.description || null);
+        idx++;
+      }
+
+      if (typeof updates.visibility !== 'undefined') {
+        setClauses.push(`visibility = $${idx}`);
+        params.push(updates.visibility);
+        idx++;
+      }
+
+      if (typeof updates.startsAt !== 'undefined') {
+        setClauses.push(`starts_at = $${idx}`);
+        params.push(updates.startsAt || null);
+        idx++;
+      }
+
+      if (typeof updates.endsAt !== 'undefined') {
+        setClauses.push(`ends_at = $${idx}`);
+        params.push(updates.endsAt || null);
+        idx++;
+      }
+
+      if (typeof updates.termsConditions !== 'undefined') {
+        setClauses.push(`terms_conditions = $${idx}`);
+        params.push(updates.termsConditions || null);
+        idx++;
+      }
+
+      // Actualizar prize_meta mezclando el JSON actual con el nuevo
+      if (typeof updates.prizeMeta !== 'undefined') {
+        let currentMeta = null;
+        if (current.prize_meta) {
+          currentMeta = typeof current.prize_meta === 'string'
+            ? JSON.parse(current.prize_meta)
+            : current.prize_meta;
+        }
+
+        const mergedMeta = {
+          ...(currentMeta || {}),
+          ...(updates.prizeMeta || {})
+        };
+
+        setClauses.push(`prize_meta = $${idx}`);
+        params.push(JSON.stringify(mergedMeta));
+        idx++;
+      }
+
+      if (setClauses.length === 0) {
+        // Nada que actualizar
+        await client.query('ROLLBACK');
+        return this.formatRaffleResponse(current);
+      }
+
+      // Siempre actualizar updated_at
+      setClauses.push(`updated_at = NOW()`);
+
+      const updateQuery = `
+        UPDATE raffles
+        SET ${setClauses.join(', ')}
+        WHERE code = $${idx}
+        RETURNING *
+      `;
+
+      params.push(code);
+
+      const updatedResult = await client.query(updateQuery, params);
+      const updated = updatedResult.rows[0];
+
+      await client.query('COMMIT');
+
+      logger.info('[RaffleServiceV2] Rifa actualizada', {
+        code,
+        raffleId: updated.id
+      });
+
+      return this.formatRaffleResponse(updated);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('[RaffleServiceV2] Error actualizando rifa', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
   
   /**
    * Obtener detalle de rifa por código

@@ -190,11 +190,28 @@ const updateRaffleSchema = Joi.object({
     .allow(''),
     
   prizeMeta: Joi.object({
+    // Campos modernos de PrizeMeta
+    prizeType: Joi.string().valid('product', 'service', 'experience').optional(),
+    prizeDescription: Joi.string().optional(),
+    prizeValue: Joi.number().positive().optional(),
+    prizeImages: Joi.array().items(Joi.string().uri()).optional(),
+    category: Joi.string().optional(),
+
+    bankingInfo: Joi.object({
+      accountHolder: Joi.string().optional(),
+      bankCode: Joi.string().optional(),
+      bankName: Joi.string().optional(),
+      accountNumber: Joi.string().optional(),
+      accountType: Joi.string().valid('ahorro', 'corriente').optional(),
+      idNumber: Joi.string().optional(),
+      phone: Joi.string().optional()
+    }).optional(),
+
+    // Campos legacy mantenidos por compatibilidad
     name: Joi.string().optional(),
     description: Joi.string().optional(),
     imageUrl: Joi.string().uri().optional(),
-    estimatedValue: Joi.number().positive().optional(),
-    category: Joi.string().optional()
+    estimatedValue: Joi.number().positive().optional()
   }).optional(),
   
   companyConfig: Joi.object({

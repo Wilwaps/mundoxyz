@@ -30,12 +30,13 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSocket } from '../../../contexts/SocketContext';
-import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle } from '../hooks/useRaffleData';
+import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle, useUpdateRaffle } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
 import ParticipantsModal from '../components/ParticipantsModal';
 import { RaffleStatus, RaffleMode, NumberState, DrawMode } from '../types';
 import { formatDate, formatCurrency } from '../../../utils/format';
+import { VENEZUELAN_BANKS } from '../../../constants/banks';
 
 interface RaffleRoomProps {}
 
@@ -54,6 +55,17 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [timeToDrawMs, setTimeToDrawMs] = useState<number | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showBankingModal, setShowBankingModal] = useState(false);
+  const [isSavingBanking, setIsSavingBanking] = useState(false);
+  const [bankingForm, setBankingForm] = useState({
+    accountHolder: '',
+    bankCode: '',
+    bankName: '',
+    idNumber: '',
+    accountType: 'ahorro' as 'ahorro' | 'corriente',
+    accountNumber: '',
+    phone: ''
+  });
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -102,6 +114,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const reserveNumbers = useReserveNumber();
   const purchaseNumbers = usePurchaseNumber();
   const cancelRaffle = useCancelRaffle();
+   const updateRaffle = useUpdateRaffle();
 
   // Forzar cierre (admin)
   const [isForceFinishing, setIsForceFinishing] = useState(false);
@@ -458,6 +471,57 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     totalPot: raffle?.potFires || raffle?.potCoins || 0,
     myNumbers: raffleData.userNumbers?.length || 0
   };
+
+  // Sincronizar formulario de datos bancarios cuando cargue la rifa
+  useEffect(() => {
+    if (!raffle || raffle.mode !== RaffleMode.PRIZE) return;
+    const info: any = (raffle.prizeMeta as any)?.bankingInfo || {};
+    setBankingForm({
+      accountHolder: info.accountHolder || '',
+      bankCode: info.bankCode || '',
+      bankName: info.bankName || '',
+      idNumber: info.idNumber || '',
+      accountType: (info.accountType as 'ahorro' | 'corriente') || 'ahorro',
+      accountNumber: info.accountNumber || '',
+      phone: info.phone || ''
+    });
+  }, [raffle?.id, raffle?.mode, (raffle as any)?.prizeMeta]);
+
+  const handleSaveBankingInfo = async () => {
+    if (!code || !raffle || raffle.mode !== RaffleMode.PRIZE) return;
+    setIsSavingBanking(true);
+    try {
+      const currentPrizeMeta: any = raffle.prizeMeta || {};
+      const selectedBank = VENEZUELAN_BANKS.find(b => b.code === bankingForm.bankCode);
+      const updatedPrizeMeta = {
+        ...currentPrizeMeta,
+        bankingInfo: {
+          accountHolder: bankingForm.accountHolder.trim(),
+          bankCode: bankingForm.bankCode.trim(),
+          bankName: bankingForm.bankName.trim() || selectedBank?.fullName || '',
+          idNumber: bankingForm.idNumber.trim(),
+          accountType: bankingForm.accountType,
+          accountNumber: bankingForm.accountNumber.trim(),
+          phone: bankingForm.phone.trim()
+        }
+      };
+
+      await updateRaffle.mutateAsync({
+        code,
+        updates: {
+          prizeMeta: updatedPrizeMeta
+        }
+      });
+
+      toast.success('Datos bancarios actualizados');
+      setShowBankingModal(false);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Error actualizando datos bancarios';
+      toast.error(message);
+    } finally {
+      setIsSavingBanking(false);
+    }
+  };
   
   const formatTimeToDraw = (ms: number | null) => {
     if (ms === null) return '';
@@ -699,11 +763,11 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 </button>
               )}
               
-              {user?.id === raffle.hostId && (
+              {raffle.mode === RaffleMode.PRIZE && user?.id === raffle.hostId && (
                 <button
-                  onClick={() => navigate('/raffles/my')}
+                  onClick={() => setShowBankingModal(true)}
                   className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
-                  title="Administrar rifa"
+                  title="Datos de pago del anfitrión"
                 >
                   <Settings className="w-5 h-5 text-text" />
                 </button>
@@ -1175,6 +1239,149 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       <li>Evita cancelar rifas activas salvo que sea estrictamente necesario.</li>
                     </ul>
                   </section>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal de edición de datos bancarios del anfitrión */}
+        <AnimatePresence>
+          {showBankingModal && raffle.mode === RaffleMode.PRIZE && user?.id === raffle.hostId && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowBankingModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="w-full max-w-2xl bg-dark rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
+                      <Settings className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-text">Datos de pago del anfitrión</h3>
+                      <p className="text-[11px] md:text-xs text-text/60">
+                        Ajusta la cuenta donde los participantes enviarán sus pagos.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowBankingModal(false)}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-xs text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="p-4 pt-3 pb-5 space-y-4 text-xs md:text-sm text-text/80 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] md:text-xs text-text/70 mb-1">Nombre del titular</label>
+                      <input
+                        type="text"
+                        value={bankingForm.accountHolder}
+                        onChange={(e) => setBankingForm(prev => ({ ...prev, accountHolder: e.target.value }))}
+                        className="w-full px-3 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="Nombre completo"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] md:text-xs text-text/70 mb-1">Cédula / ID</label>
+                      <input
+                        type="text"
+                        value={bankingForm.idNumber}
+                        onChange={(e) => setBankingForm(prev => ({ ...prev, idNumber: e.target.value }))}
+                        className="w-full px-3 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="V-12345678"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] md:text-xs text-text/70 mb-1">Banco</label>
+                      <select
+                        value={bankingForm.bankCode}
+                        onChange={(e) => {
+                          const code = e.target.value;
+                          const selected = VENEZUELAN_BANKS.find(b => b.code === code);
+                          setBankingForm(prev => ({
+                            ...prev,
+                            bankCode: code,
+                            bankName: selected?.fullName || prev.bankName
+                          }));
+                        }}
+                        className="w-full px-3 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        <option value="">Seleccionar banco...</option>
+                        {VENEZUELAN_BANKS.map(bank => (
+                          <option key={bank.code} value={bank.code}>
+                            {bank.code} - {bank.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] md:text-xs text-text/70 mb-1">Tipo de cuenta</label>
+                      <select
+                        value={bankingForm.accountType}
+                        onChange={(e) => setBankingForm(prev => ({ ...prev, accountType: e.target.value as 'ahorro' | 'corriente' }))}
+                        className="w-full px-3 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        <option value="ahorro">Ahorro</option>
+                        <option value="corriente">Corriente</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] md:text-xs text-text/70 mb-1">Número de cuenta</label>
+                    <input
+                      type="text"
+                      value={bankingForm.accountNumber}
+                      onChange={(e) => setBankingForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                      className="w-full px-3 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                      placeholder="0000-0000-00-0000000000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] md:text-xs text-text/70 mb-1">Teléfono de contacto</label>
+                    <input
+                      type="tel"
+                      value={bankingForm.phone}
+                      onChange={(e) => setBankingForm(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-3 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                      placeholder="0414-1234567"
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowBankingModal(false)}
+                      className="px-4 py-2 rounded-lg bg-glass hover:bg-glass/80 text-xs md:text-sm text-text/80"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveBankingInfo}
+                      disabled={isSavingBanking}
+                      className="px-4 py-2 rounded-lg bg-accent text-dark text-xs md:text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingBanking ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>

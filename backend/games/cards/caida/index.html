@@ -704,6 +704,64 @@
       grid-row: 5;
       grid-column: 3;
     }
+
+    .css-figures-tool {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .css-figures-input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15,23,42,0.95);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      resize: vertical;
+      min-height: 54px;
+    }
+
+    .css-figures-button {
+      align-self: flex-start;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(34,197,94,0.9);
+      background: radial-gradient(circle at 30% 0%, #22c55e, #15803d 60%, #052e16 100%);
+      color: #ecfdf5;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .css-figures-button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .css-figures-status {
+      font-size: 12px;
+      color: var(--text-soft);
+      min-height: 16px;
+    }
+
+    .css-figures-output {
+      margin-top: 4px;
+      max-height: 220px;
+      overflow: auto;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(55,65,81,0.9);
+      background: #020617;
+      font-family: Consolas, ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 12px;
+      white-space: pre;
+    }
   </style>
 </head>
 <body>
@@ -1033,6 +1091,17 @@
             </ul>
           </div>
         </section>
+
+        <section class="card">
+          <div class="card-inner css-figures-tool">
+            <div class="card-eyebrow">Generador CSS con IA</div>
+            <h2 class="card-title">Figuras con polígonos</h2>
+            <textarea id="figuraPrompt" class="css-figures-input" rows="2" placeholder="Escribe la figura, por ejemplo: copa de vino, espada medieval..."></textarea>
+            <button id="btnGenerarFigura" class="css-figures-button">Generar CSS</button>
+            <div id="cssStatus" class="css-figures-status"></div>
+            <pre id="cssResultado" class="css-figures-output"></pre>
+          </div>
+        </section>
       </div>
     </main>
 
@@ -1042,5 +1111,67 @@
       Lleva la cuenta de puntos con transparencia, idealmente en papel o marcador visible para todos.
     </p>
   </div>
+
+  <script>
+    (function () {
+      var input = document.getElementById('figuraPrompt');
+      var button = document.getElementById('btnGenerarFigura');
+      var output = document.getElementById('cssResultado');
+      var statusEl = document.getElementById('cssStatus');
+
+      if (!input || !button || !output || !statusEl) return;
+
+      async function generar() {
+        var texto = (input.value || '').trim();
+        if (!texto) {
+          statusEl.textContent = 'Escribe una descripción primero.';
+          output.textContent = '';
+          return;
+        }
+
+        statusEl.textContent = 'Generando CSS con IA...';
+        output.textContent = '';
+        button.disabled = true;
+
+        try {
+          var resp = await fetch('http://localhost:5050/api/gemini-figura', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ figura: texto })
+          });
+
+          if (!resp.ok) {
+            statusEl.textContent = 'Error del servidor (' + resp.status + ').';
+            return;
+          }
+
+          var data = await resp.json();
+          if (data && data.css) {
+            output.textContent = data.css;
+            statusEl.textContent = 'CSS generado. Copia y pégalo donde lo necesites.';
+          } else if (data && data.error) {
+            statusEl.textContent = data.error;
+          } else {
+            statusEl.textContent = 'No se recibió CSS válido.';
+          }
+        } catch (e) {
+          statusEl.textContent = 'Error al conectar con el generador.';
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      button.addEventListener('click', function () {
+        generar();
+      });
+
+      input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+          ev.preventDefault();
+          generar();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
