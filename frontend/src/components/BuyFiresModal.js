@@ -251,8 +251,7 @@ Pago`;
                 )}
                 {fiatPreview ? (
                   <p className="text-xs text-text/40 mt-1">
-                    Aproximado: {fiatPreview.ves.toFixed(2)} Bs (≈ {fiatPreview.usdt.toFixed(2)} USDT a{' '}
-                    {fiatPreview.rate.toFixed(2)} Bs/USDT MundoXYZ)
+                    Deposita: {fiatPreview.ves.toFixed(2)} Bs (1🔥 = {(fiatPreview.ves / fiatPreview.tokens).toFixed(2)} Bs)
                   </p>
                 ) : (
                   <p className="text-xs text-text/40 mt-1">

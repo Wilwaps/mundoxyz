@@ -5,6 +5,8 @@ const logger = require('../utils/logger');
 
 const DEFAULT_MARGIN_PERCENT = 5.0;
 const DEFAULT_MAX_RATE_AGE_MINUTES = 30;
+const DEFAULT_FIRES_PER_USDT = 300;
+const DEFAULT_USDT_NETWORK = 'TRON';
 
 function getClientQuery(client) {
   if (client && typeof client.query === 'function') {
@@ -30,7 +32,10 @@ async function getOperationalConfig(client) {
         margin_percent: DEFAULT_MARGIN_PERCENT,
         max_rate_age_minutes: DEFAULT_MAX_RATE_AGE_MINUTES,
         is_enabled: false,
-        shadow_mode_enabled: true
+        shadow_mode_enabled: true,
+        fires_per_usdt: DEFAULT_FIRES_PER_USDT,
+        usdt_official_wallet: null,
+        usdt_network: DEFAULT_USDT_NETWORK
       };
     }
     const row = res.rows[0];
@@ -39,6 +44,9 @@ async function getOperationalConfig(client) {
       max_rate_age_minutes: row.max_rate_age_minutes || DEFAULT_MAX_RATE_AGE_MINUTES,
       is_enabled: row.is_enabled,
       shadow_mode_enabled: row.shadow_mode_enabled,
+      fires_per_usdt: parseFloat(row.fires_per_usdt) || DEFAULT_FIRES_PER_USDT,
+      usdt_official_wallet: row.usdt_official_wallet || null,
+      usdt_network: row.usdt_network || DEFAULT_USDT_NETWORK,
       created_at: row.created_at,
       updated_at: row.updated_at
     };
@@ -48,7 +56,10 @@ async function getOperationalConfig(client) {
       margin_percent: DEFAULT_MARGIN_PERCENT,
       max_rate_age_minutes: DEFAULT_MAX_RATE_AGE_MINUTES,
       is_enabled: false,
-      shadow_mode_enabled: true
+      shadow_mode_enabled: true,
+      fires_per_usdt: DEFAULT_FIRES_PER_USDT,
+      usdt_official_wallet: null,
+      usdt_network: DEFAULT_USDT_NETWORK
     };
   }
 }
@@ -107,7 +118,8 @@ async function getOperationalContext(client) {
     let baseSource = baseRate.source;
 
     if (baseRate.source === 'binance') {
-      opRate = rawRate * (1 - margin / 100);
+      // Aplicar markup: la tasa MundoXYZ es mayor que Binance
+      opRate = rawRate * (1 + margin / 100);
     } else {
       // Fallback: si solo hay BCV, usamos BCV como referencia sin margen
       margin = 0;

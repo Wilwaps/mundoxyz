@@ -14,22 +14,33 @@
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
+      display: flex;
       background: #020617;
       color: #e5e7eb;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     }
 
     .wrap {
-      text-align: center;
-      padding: 24px;
-      max-width: 1100px;
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 16px;
+      gap: 16px;
+      max-width: none;
+    }
+
+    .sidebar {
+      width: 320px;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     h1 {
       font-size: 20px;
-      margin-bottom: 12px;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: #cbd5f5;
@@ -38,9 +49,9 @@
     .toolbar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 12px;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .btn-primary {
@@ -70,20 +81,20 @@
     }
 
     .canvas-frame {
-      margin-top: 8px;
-      padding: 18px 18px 12px;
+      flex: 1;
       border-radius: 18px;
+      padding: 18px;
       background:
         radial-gradient(circle at top, #020617, #000 70%);
       box-shadow:
         0 18px 40px rgba(0,0,0,0.9),
         inset 0 0 0 1px rgba(30,64,175,0.6);
+      display: flex;
     }
 
     .canvas {
       position: relative;
-      width: 820px;
-      height: 420px;
+      flex: 1;
       border-radius: 14px;
       background:
         radial-gradient(circle at 20% 0%, #1e293b, #020617 60%, #000 100%);
@@ -92,6 +103,7 @@
         inset 0 0 0 1px rgba(15,23,42,0.9),
         0 10px 30px rgba(0,0,0,0.8);
       cursor: crosshair;
+      min-height: 400px;
     }
 
     .shape {
@@ -253,16 +265,17 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Lienzo de elementos</h1>
+    <div class="sidebar">
+      <h1>Lienzo de elementos</h1>
 
-    <div class="toolbar">
-      <button class="btn-primary" id="addElement">+ elemento</button>
-      <button class="btn-primary" id="toggleText">Texto</button>
-      <span class="selected-info" id="selectedInfo">Sin elemento seleccionado</span>
-    </div>
+      <div class="toolbar">
+        <button class="btn-primary" id="addElement">+ elemento</button>
+        <button class="btn-primary" id="toggleText">Texto</button>
+        <button class="btn-primary" id="exportPng">Exportar PNG</button>
+        <button class="btn-primary" id="exportHtml">Exportar HTML</button>
+        <span class="selected-info" id="selectedInfo">Sin elemento seleccionado</span>
+      </div>
 
-    <div class="canvas-frame">
-      <div class="canvas" id="canvas"></div>
       <div class="dimensions" id="dims">
         <span><strong>X:</strong> <span id="dim-x">-</span> px</span>
         <span><strong>Y:</strong> <span id="dim-y">-</span> px</span>
@@ -270,72 +283,79 @@
         <span><strong>Alto:</strong> <span id="dim-h">-</span> px</span>
         <span><strong>Rotación:</strong> <span id="dim-rot">-</span> °</span>
       </div>
+
+      <div class="panel">
+        <label>
+          Posición X (px)
+          <input type="range" id="posX" min="0" max="800" value="0" />
+        </label>
+        <label>
+          Posición Y (px)
+          <input type="range" id="posY" min="0" max="400" value="0" />
+        </label>
+        <label>
+          Ancho (px)
+          <input type="range" id="sizeW" min="30" max="400" value="120" />
+        </label>
+        <label>
+          Alto (px)
+          <input type="range" id="sizeH" min="30" max="400" value="80" />
+        </label>
+        <label>
+          Rotación (°)
+          <input type="range" id="rotate" min="0" max="360" value="0" />
+        </label>
+        <label>
+          Borde redondeado
+          <input type="range" id="radius" min="0" max="120" value="16" />
+        </label>
+        <label>
+          Opacidad (%)
+          <input type="range" id="opacity" min="10" max="100" value="100" />
+        </label>
+        <label>
+          Z-index
+          <input type="range" id="zIndex" min="0" max="20" value="1" />
+        </label>
+      </div>
+
+      <div class="panel">
+        <label>
+          Color relleno
+          <input type="color" id="fillColor" value="#ef4444" />
+        </label>
+        <label>
+          Color borde
+          <input type="color" id="borderColor" value="#e5e7eb" />
+        </label>
+        <label>
+          Alineación texto
+          <select id="textAlign">
+            <option value="left">Izquierda</option>
+            <option value="center" selected>Centro</option>
+            <option value="right">Derecha</option>
+          </select>
+        </label>
+      </div>
     </div>
 
-    <div class="panel">
-      <label>
-        Posición X (px)
-        <input type="range" id="posX" min="0" max="800" value="0" />
-      </label>
-      <label>
-        Posición Y (px)
-        <input type="range" id="posY" min="0" max="400" value="0" />
-      </label>
-      <label>
-        Ancho (px)
-        <input type="range" id="sizeW" min="30" max="400" value="120" />
-      </label>
-      <label>
-        Alto (px)
-        <input type="range" id="sizeH" min="30" max="400" value="80" />
-      </label>
-      <label>
-        Rotación (°)
-        <input type="range" id="rotate" min="0" max="360" value="0" />
-      </label>
-      <label>
-        Borde redondeado
-        <input type="range" id="radius" min="0" max="120" value="16" />
-      </label>
-      <label>
-        Opacidad (%)
-        <input type="range" id="opacity" min="10" max="100" value="100" />
-      </label>
-      <label>
-        Z-index
-        <input type="range" id="zIndex" min="0" max="20" value="1" />
-      </label>
-    </div>
-
-    <div class="panel">
-      <label>
-        Color relleno
-        <input type="color" id="fillColor" value="#ef4444" />
-      </label>
-      <label>
-        Color borde
-        <input type="color" id="borderColor" value="#e5e7eb" />
-      </label>
-      <label>
-        Alineación texto
-        <select id="textAlign">
-          <option value="left">Izquierda</option>
-          <option value="center" selected>Centro</option>
-          <option value="right">Derecha</option>
-        </select>
-      </label>
+    <div class="canvas-frame">
+      <div class="canvas" id="canvas"></div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
-    const CANVAS_WIDTH = 820;
-    const CANVAS_HEIGHT = 420;
+    let CANVAS_WIDTH = 820;
+    let CANVAS_HEIGHT = 420;
     const MIN_WIDTH = 20;
     const MIN_HEIGHT = 20;
 
     const canvas = document.getElementById('canvas');
     const addButton = document.getElementById('addElement');
     const toggleTextButton = document.getElementById('toggleText');
+    const exportPngButton = document.getElementById('exportPng');
+    const exportHtmlButton = document.getElementById('exportHtml');
     const selectedInfo = document.getElementById('selectedInfo');
 
     const posX = document.getElementById('posX');
@@ -357,6 +377,17 @@
     const dimRot = document.getElementById('dim-rot');
 
     const panelsInputs = document.querySelectorAll('.panel input');
+
+    function updateCanvasMetrics() {
+      const rect = canvas.getBoundingClientRect();
+      CANVAS_WIDTH = rect.width;
+      CANVAS_HEIGHT = rect.height;
+      posX.max = Math.max(0, Math.round(CANVAS_WIDTH - MIN_WIDTH));
+      posY.max = Math.max(0, Math.round(CANVAS_HEIGHT - MIN_HEIGHT));
+    }
+
+    window.addEventListener('resize', updateCanvasMetrics);
+    updateCanvasMetrics();
 
     let elements = [];
     let nextId = 1;
@@ -667,6 +698,21 @@
       rebuildVertexHandles(state);
     }
 
+    function autoSizeTextShape(state) {
+      if (!state.isText || !state.textEl) return;
+      const t = state.textEl;
+      const contentHeight = t.scrollHeight;
+      const neededH = Math.ceil(contentHeight + 12);
+
+      if (!Number.isFinite(neededH)) return;
+
+      state.h = Math.max(MIN_HEIGHT, neededH);
+      applyStateToElement(state);
+      updateClipPath(state);
+      updateVertexHandlePositions(state);
+      syncControlsFromState(state);
+    }
+
     function ensureTextElement(state) {
       if (!state.isText) return;
       if (!state.textEl) {
@@ -677,6 +723,10 @@
         t.textContent = state.text || '';
         state.el.appendChild(t);
         state.textEl = t;
+        t.addEventListener('input', () => {
+          state.text = t.textContent || '';
+          autoSizeTextShape(state);
+        });
       }
       const align = state.textAlign || 'center';
       state.textEl.style.textAlign = align;
@@ -1226,6 +1276,7 @@
         textAlignSelect.value = state.textAlign;
         if (state.textEl) {
           state.textEl.focus();
+          autoSizeTextShape(state);
         }
       } else {
         if (state.textEl) {
@@ -1234,6 +1285,103 @@
           state.textEl = null;
         }
       }
+    });
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function buildTextAlignExport(align) {
+      if (align === 'left') return 'justify-content:flex-start;';
+      if (align === 'right') return 'justify-content:flex-end;';
+      return 'justify-content:center;';
+    }
+
+    exportPngButton.addEventListener('click', async () => {
+      if (!window.html2canvas) {
+        alert('No se pudo cargar la librería de captura (html2canvas).');
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const imgCanvas = await window.html2canvas(canvas, {
+        backgroundColor: '#020617',
+        width: rect.width,
+        height: rect.height,
+        scale,
+      });
+      imgCanvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lienzo.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    });
+
+    exportHtmlButton.addEventListener('click', () => {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+
+      const shapesHtml = elements.map((state) => {
+        const styles = [];
+        styles.push('left:' + state.x + 'px;');
+        styles.push('top:' + state.y + 'px;');
+        styles.push('width:' + state.w + 'px;');
+        styles.push('height:' + state.h + 'px;');
+        styles.push('border-radius:' + state.radius + 'px;');
+        styles.push('background:' + state.fill + ';');
+        styles.push('opacity:' + state.opacity / 100 + ';');
+        styles.push('transform:rotate(' + state.rotate + 'deg);');
+        styles.push('z-index:' + state.z + ';');
+        if (state.el && state.el.style.clipPath) {
+          styles.push('clip-path:' + state.el.style.clipPath + ';');
+        }
+
+        let inner = '';
+        if (state.isText) {
+          const align = state.textAlign || 'center';
+          const content = state.textEl
+            ? state.textEl.textContent || ''
+            : state.text || '';
+          const extra = buildTextAlignExport(align);
+          inner = '<div class="shape-text" style="text-align:' + align + ';' + extra + '">' + escapeHtml(content) + '</div>';
+        }
+
+        return '<div class="shape" style="' + styles.join('') + '">' + inner + '</div>';
+      }).join('');
+
+      const css = [
+        'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#020617;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;}',
+        '.canvas-export{position:relative;width:' + width + 'px;height:' + height + 'px;border-radius:14px;background:radial-gradient(circle at 20% 0%,#1e293b,#020617 60%,#000 100%);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(15,23,42,0.9),0 10px 30px rgba(0,0,0,0.8);}',
+        '.shape{position:absolute;border-radius:16px;box-shadow:0 0 0 1px rgba(15,23,42,0.95),0 10px 22px rgba(0,0,0,0.8);}',
+        '.shape::before{content:"";position:absolute;inset:0;border:2px solid #e5e7eb;border-radius:inherit;pointer-events:none;clip-path:inherit;}',
+        '.shape-text{position:absolute;inset:6px;padding:4px 6px;color:#f9fafb;font-size:13px;line-height:1.3;display:flex;align-items:center;justify-content:center;white-space:pre-wrap;}'
+      ].join('');
+
+      const html =
+        '<!DOCTYPE html>' +
+        '<html lang="es"><head><meta charset="utf-8" /><title>Exportación lienzo</title><style>' +
+        css +
+        '</style></head><body><div class="canvas-export">' +
+        shapesHtml +
+        '</div></body></html>';
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lienzo.html';
+      a.click();
+      URL.revokeObjectURL(url);
     });
 
     // Al inicio, sin elemento seleccionado

@@ -280,9 +280,22 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
     }
     
     try {
+      // Clonar y sanear prizeMeta (especialmente prizeValue opcional)
+      const sanitizedPrizeMeta = formData.prizeMeta
+        ? { ...formData.prizeMeta }
+        : undefined;
+
+      if (sanitizedPrizeMeta) {
+        const rawValue = sanitizedPrizeMeta.prizeValue as number | undefined;
+        if (!rawValue || !isFinite(rawValue) || rawValue <= 0) {
+          delete (sanitizedPrizeMeta as any).prizeValue;
+        }
+      }
+
       // Agregar datos de base64, toggle y modo de sorteo al payload
       const payload: any = {
         ...formData,
+        prizeMeta: sanitizedPrizeMeta,
         allowFiresPayment: formData.mode === RaffleMode.PRIZE ? allowFiresPayment : undefined,
         prizeImageBase64: prizeImageBase64 || undefined,
         drawMode: drawMode,
@@ -603,7 +616,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                 
                 <div>
                   <label className="block text-sm text-text/80 mb-1">
-                    Valor Estimado del Premio
+                    Valor Estimado del Premio en Fuegos🔥
                   </label>
                   <input
                     type="number"
@@ -615,6 +628,15 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     placeholder="0.00"
                     className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
                   />
+                  {formData.prizeMeta?.prizeValue ? (
+                    <p className="text-xs text-text/60 mt-1">
+                      X = {(formData.prizeMeta.prizeValue / 300).toFixed(2)} USDT (referencia interna 1 USDT = 300🔥)
+                    </p>
+                  ) : (
+                    <p className="text-xs text-text/60 mt-1">
+                      Ingresa el valor estimado expresado en fuegos. Mostramos una equivalencia aproximada en USDT.
+                    </p>
+                  )}
                 </div>
                 
                 {/* Imagen del premio */}

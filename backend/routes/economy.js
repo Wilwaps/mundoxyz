@@ -628,40 +628,101 @@ router.post('/transfer-fires', verifyToken, async (req, res) => {
 // Request fires purchase
 router.post('/request-fires', verifyToken, async (req, res) => {
   try {
-    const { amount, bank_reference } = req.body;
+    const { amount, bank_reference, payment_method, usdt_amount, tx_hash, network } = req.body || {};
     const user_id = req.user.id;
 
-    if (!amount || !bank_reference) {
-      return res.status(400).json({ error: 'Monto y referencia bancaria son requeridos' });
-    }
+    // Determinar método de pago (Bs por defecto para compatibilidad)
+    const method = payment_method === 'usdt_tron' ? 'usdt_tron' : 'bs';
 
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return res.status(400).json({ error: 'Monto inválido' });
-    }
+    let parsedAmount = null;
+    let parsedUsdtAmount = null;
 
-    if (!/^\d+$/.test(bank_reference)) {
-      return res.status(400).json({ error: 'La referencia bancaria debe contener solo números' });
+    if (method === 'bs') {
+      // Flujo tradicional en Bs: requiere monto de fuegos y referencia bancaria numérica
+      if (!amount || !bank_reference) {
+        return res.status(400).json({ error: 'Monto y referencia bancaria son requeridos' });
+      }
+
+      parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ error: 'Monto inválido' });
+      }
+
+      if (!/^\d+$/.test(bank_reference)) {
+        return res.status(400).json({ error: 'La referencia bancaria debe contener solo números' });
+      }
+    } else {
+      // Flujo USDT: requiere monto USDT y hash de transacción
+      if (!usdt_amount || !tx_hash) {
+        return res.status(400).json({ error: 'Monto en USDT y hash de transacción son requeridos' });
+      }
+
+      parsedUsdtAmount = parseFloat(usdt_amount);
+      if (isNaN(parsedUsdtAmount) || parsedUsdtAmount <= 0) {
+        return res.status(400).json({ error: 'Monto USDT inválido' });
+      }
     }
 
     const operationalContext = await fiatRateService.getOperationalContext();
+    const firesPerUsdt = operationalContext?.config?.fires_per_usdt || 300;
+    const usdtNetwork = operationalContext?.config?.usdt_network || 'TRON';
 
     const txResult = await transaction(async (client) => {
-      const insertResult = await client.query(
-        `INSERT INTO fire_requests 
-         (user_id, amount, status, reference, created_at, updated_at)
-         VALUES ($1, $2, 'pending', $3, NOW(), NOW())
-         RETURNING id, amount, status, reference, created_at`,
-        [user_id, parsedAmount, bank_reference]
-      );
+      let request;
+      let tokensAmount;
+      let usdtAmountForValuation;
 
-      const request = insertResult.rows[0];
+      if (method === 'usdt_tron') {
+        // Calcular fuegos a partir del monto USDT y la tasa interna
+        tokensAmount = parsedUsdtAmount * firesPerUsdt;
+        usdtAmountForValuation = parsedUsdtAmount;
 
-      if (operationalContext && operationalContext.operationalRate) {
+        const insertResult = await client.query(
+          `INSERT INTO fire_requests 
+           (user_id, amount, status, payment_method, usdt_amount, tx_hash, network, created_at, updated_at)
+           VALUES ($1, $2, 'pending', $3, $4, $5, $6, NOW(), NOW())
+           RETURNING id, amount, status, reference, payment_method, usdt_amount, tx_hash, network, created_at`,
+          [
+            user_id,
+            tokensAmount,
+            'usdt_tron',
+            parsedUsdtAmount,
+            tx_hash,
+            network || usdtNetwork
+          ]
+        );
+
+        request = insertResult.rows[0];
+      } else {
+        // Flujo Bs: tokens = monto ingresado, se marca payment_method = 'bs'
+        tokensAmount = parsedAmount;
+        usdtAmountForValuation = tokensAmount / firesPerUsdt;
+
+        const insertResult = await client.query(
+          `INSERT INTO fire_requests 
+           (user_id, amount, status, reference, payment_method, created_at, updated_at)
+           VALUES ($1, $2, 'pending', $3, $4, NOW(), NOW())
+           RETURNING id, amount, status, reference, payment_method, created_at`,
+          [
+            user_id,
+            parsedAmount,
+            bank_reference,
+            'bs'
+          ]
+        );
+
+        request = insertResult.rows[0];
+      }
+
+      // Registrar valuación FIAT si hay contexto operativo disponible
+      if (
+        operationalContext &&
+        operationalContext.operationalRate &&
+        tokensAmount &&
+        usdtAmountForValuation
+      ) {
         const op = operationalContext.operationalRate;
-        const tokensAmount = parsedAmount;
-        const usdtAmount = tokensAmount / 300;
-        const vesAmount = usdtAmount * op.rate;
+        const vesAmount = usdtAmountForValuation * op.rate;
 
         let rateSource = op.baseSource;
         if (!rateSource && operationalContext.binanceRate) {
@@ -682,7 +743,7 @@ router.post('/request-fires', verifyToken, async (req, res) => {
             'fire_request',
             request.id,
             tokensAmount,
-            usdtAmount,
+            usdtAmountForValuation,
             vesAmount,
             rateSource,
             op.rate
@@ -690,31 +751,44 @@ router.post('/request-fires', verifyToken, async (req, res) => {
         );
       }
 
-      return { request, operationalContext };
+      return { request, operationalContext, method, tokensAmount, usdtAmountForValuation };
     });
 
-    const { request, operationalContext: ctx } = txResult;
+    const { request, operationalContext: ctx, method: resolvedMethod, tokensAmount, usdtAmountForValuation } = txResult;
 
     logger.info('Fire request created', {
       requestId: request.id,
       userId: user_id,
-      amount: parsedAmount
+      amount: tokensAmount,
+      method: resolvedMethod
     });
 
     try {
-      const message = `
-🔥 <b>Nueva Solicitud de Compra de Fuegos</b>
+      const baseInfo =
+        '🔥 <b>Nueva Solicitud de Compra de Fuegos</b>\n\n' +
+        `👤 <b>Usuario:</b> ${req.user.username}\n` +
+        `🔥 <b>Monto:</b> ${request.amount} fuegos\n`;
 
-👤 <b>Usuario:</b> ${req.user.username}
-🔥 <b>Monto:</b> ${request.amount} fuegos
-🧾 <b>Referencia:</b> <code>${request.reference}</code>
-📅 <b>Fecha:</b> ${new Date(request.created_at).toLocaleString('es-ES', {
-        dateStyle: 'short',
-        timeStyle: 'short'
-      })}
-      `.trim();
+      const paymentInfo =
+        resolvedMethod === 'usdt_tron'
+          ?
+            '💱 <b>Pago en:</b> USDT (TRON)\n' +
+            `💵 <b>Monto USDT:</b> ${usdtAmountForValuation ? usdtAmountForValuation.toFixed(2) : 'N/A'}\n` +
+            `🔗 <b>Tx Hash:</b> <code>${request.tx_hash}</code>\n`
+          :
+            '💱 <b>Pago en:</b> Bs (transferencia bancaria)\n' +
+            `🧾 <b>Referencia:</b> <code>${request.reference}</code>\n`;
 
-      await telegramService.sendAdminMessage(message);
+      const footer =
+        '📅 <b>Fecha:</b> ' +
+        new Date(request.created_at).toLocaleString('es-ES', {
+          dateStyle: 'short',
+          timeStyle: 'short'
+        });
+
+      const message = `${baseInfo}${paymentInfo}\n${footer}`;
+
+      await telegramService.sendAdminMessage(message.trim());
     } catch (notifyError) {
       logger.error('Error sending Telegram notification for fire request:', notifyError);
     }
@@ -728,7 +802,8 @@ router.post('/request-fires', verifyToken, async (req, res) => {
             rate_source: ctx.operationalRate.baseSource,
             rate_mxyz: ctx.operationalRate.rate,
             margin_percent: ctx.operationalRate.marginPercent,
-            age_minutes: ctx.operationalRate.ageMinutes
+            age_minutes: ctx.operationalRate.ageMinutes,
+            fires_per_usdt: ctx.config?.fires_per_usdt
           }
         : null
     });
