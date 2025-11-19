@@ -127,6 +127,18 @@ const RafflePublicLanding: React.FC = () => {
   
   const { raffle, company, stats, numbers } = data;
   
+  const handlePublicNumberClick = (idx: number) => {
+    if (!user) {
+      setShowAuthRequired(true);
+      return;
+    }
+    if (code) {
+      navigate(`/raffles/${code}`);
+    } else {
+      navigate('/raffles');
+    }
+  };
+  
   // Colores personalizados de empresa o defaults
   const primaryColor = company?.primaryColor || '#8B5CF6';
   const secondaryColor = company?.secondaryColor || '#06B6D4';
@@ -210,13 +222,39 @@ const RafflePublicLanding: React.FC = () => {
             <div className="text-xs text-text/60">Vendidos</div>
           </div>
           
-          <div className="bg-glass rounded-xl p-4 text-center">
+          <div
+            className="bg-glass rounded-xl p-4 text-center cursor-pointer hover:bg-glass-lighter transition-colors"
+            onClick={() => {
+              if (!user) {
+                setShowAuthRequired(true);
+                return;
+              }
+              if (code) {
+                navigate(`/raffles/${code}`);
+              } else {
+                navigate('/raffles');
+              }
+            }}
+          >
             <TrendingUp className="w-8 h-8 text-fire-orange mx-auto mb-2" />
             <div className="text-2xl font-bold text-fire-orange">{stats.progress}%</div>
             <div className="text-xs text-text/60">Progreso</div>
           </div>
           
-          <div className="bg-glass rounded-xl p-4 text-center">
+          <div
+            className="bg-glass rounded-xl p-4 text-center cursor-pointer hover:bg-glass-lighter transition-colors"
+            onClick={() => {
+              if (!user) {
+                setShowAuthRequired(true);
+                return;
+              }
+              if (code) {
+                navigate(`/raffles/${code}`);
+              } else {
+                navigate('/raffles');
+              }
+            }}
+          >
             <Calendar className="w-8 h-8 text-text/60 mx-auto mb-2" />
             <div className="text-2xl font-bold text-text">{stats.availableNumbers}</div>
             <div className="text-xs text-text/60">Disponibles</div>
@@ -261,7 +299,7 @@ const RafflePublicLanding: React.FC = () => {
             totalNumbers={stats.totalNumbers}
             numbers={numbers || []}
             userNumbers={[]}
-            disabled
+            onNumberClick={handlePublicNumberClick}
           />
         </motion.div>
         

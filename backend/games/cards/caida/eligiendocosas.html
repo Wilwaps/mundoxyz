@@ -96,7 +96,6 @@
 
     .shape {
       position: absolute;
-      border: 2px solid #e5e7eb;
       border-radius: 16px;
       background: #ef4444;
       box-shadow:
@@ -106,9 +105,18 @@
       transition: box-shadow 0.12s ease-out, transform 0.12s ease-out;
     }
 
-    .shape.is-selected {
-      outline: 2px solid #22c55e;
-      outline-offset: 2px;
+    .shape::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 2px solid #e5e7eb;
+      border-radius: inherit;
+      pointer-events: none;
+      clip-path: inherit;
+    }
+
+    .shape.is-selected::before {
+      border-color: #22c55e;
       box-shadow:
         0 0 0 1px rgba(34,197,94,0.8),
         0 0 18px rgba(34,197,94,0.7);
@@ -448,15 +456,83 @@
         h.className = 'vertex-handle';
         h.dataset.index = String(i);
         h.addEventListener('pointerdown', (ev) => {
+          if (ev.detail > 1) return;
           const idx = elements.indexOf(state);
           if (idx !== -1) {
             startVertexDrag(ev, idx, i);
+          }
+        });
+        h.addEventListener('dblclick', (ev) => {
+          const idx = elements.indexOf(state);
+          if (idx !== -1) {
+            removeVertexAtIndex(ev, idx, i);
           }
         });
         state.el.appendChild(h);
         state.vertexEls.push(h);
       });
       updateVertexHandlePositions(state);
+    }
+
+    function expandBoundsToFitPoints(state) {
+      if (!state.points || state.points.length === 0) return;
+
+      const pts = state.points;
+      let minX = pts[0].x, maxX = pts[0].x;
+      let minY = pts[0].y, maxY = pts[0].y;
+
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i];
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+
+      const oldX = state.x;
+      const oldY = state.y;
+      const oldW = state.w;
+      const oldH = state.h;
+
+      const worldMinX = oldX + minX * oldW;
+      const worldMaxX = oldX + maxX * oldW;
+      const worldMinY = oldY + minY * oldH;
+      const worldMaxY = oldY + maxY * oldH;
+
+      const newW = Math.max(MIN_WIDTH, worldMaxX - worldMinX);
+      const newH = Math.max(MIN_HEIGHT, worldMaxY - worldMinY);
+
+      const spanX = maxX - minX || 1;
+      const spanY = maxY - minY || 1;
+
+      state.x = worldMinX;
+      state.y = worldMinY;
+      state.w = newW;
+      state.h = newH;
+
+      pts.forEach((p) => {
+        p.x = (p.x - minX) / spanX;
+        p.y = (p.y - minY) / spanY;
+      });
+    }
+
+    function removeVertexAtIndex(ev, stateIndex, pointIndex) {
+      if (stateIndex < 0 || !elements[stateIndex]) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const state = elements[stateIndex];
+      if (!state.points || state.points.length <= 3) {
+        return;
+      }
+
+      state.points.splice(pointIndex, 1);
+
+      expandBoundsToFitPoints(state);
+      applyStateToElement(state);
+      updateClipPath(state);
+      rebuildVertexHandles(state);
+      syncControlsFromState(state);
     }
 
     function distancePointToSegment(px, py, a, b) {
@@ -506,8 +582,11 @@
         pts.splice(bestIdx, 0, { x: nx, y: ny });
       }
 
+      expandBoundsToFitPoints(state);
+      applyStateToElement(state);
       updateClipPath(state);
       rebuildVertexHandles(state);
+      syncControlsFromState(state);
     }
 
     function startDrag(ev, index) {
@@ -648,6 +727,14 @@
       if (vertexDragInfo) {
         ev.preventDefault();
         ev.stopPropagation();
+        const state = elements[vertexDragInfo.index];
+        if (state) {
+          expandBoundsToFitPoints(state);
+          applyStateToElement(state);
+          updateClipPath(state);
+          updateVertexHandlePositions(state);
+          syncControlsFromState(state);
+        }
         vertexDragInfo = null;
       } else if (resizeInfo) {
         ev.preventDefault();
