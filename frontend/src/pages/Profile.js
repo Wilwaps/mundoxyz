@@ -25,6 +25,8 @@ import ReceiveFiresModal from '../components/ReceiveFiresModal';
 import MyDataModal from '../components/MyDataModal';
 import AdminRoomsManager from '../components/bingo/AdminRoomsManager';
 import * as raffleApi from '../features/raffles/api';
+import { useRaffleList } from '../features/raffles/hooks/useRaffleData';
+import RaffleCard from '../features/raffles/components/RaffleCard';
 
 const Profile = () => {
   const queryClient = useQueryClient();
@@ -43,6 +45,7 @@ const Profile = () => {
   const [raffleSettingsLoading, setRaffleSettingsLoading] = useState(false);
   const [raffleSettingsSaving, setRaffleSettingsSaving] = useState(false);
   const [forceSecuritySetup, setForceSecuritySetup] = useState(false);
+  const [rafflesTab, setRafflesTab] = useState('active'); // 'active' | 'finished'
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -134,6 +137,25 @@ const Profile = () => {
     },
     enabled: !!user?.id
   });
+
+  // Rifas del usuario (como host o participante)
+  const {
+    data: raffleListData,
+    isLoading: rafflesLoading,
+    error: rafflesError
+  } = useRaffleList({});
+
+  const allRaffles = (raffleListData && raffleListData.raffles) ? raffleListData.raffles : [];
+  const myRaffles = Array.isArray(allRaffles)
+    ? allRaffles.filter((r) => {
+        const isHost = r.hostId === user?.id;
+        const hasNumbers = Array.isArray(r.myNumbers) && r.myNumbers.length > 0;
+        return isHost || hasNumbers;
+      })
+    : [];
+
+  const myActiveRaffles = myRaffles.filter((r) => r.status === 'active');
+  const myFinishedRaffles = myRaffles.filter((r) => r.status === 'finished');
 
   const handleLogout = async () => {
     if (window.confirm('¿Seguro que quieres cerrar sesión?')) {
@@ -263,6 +285,99 @@ const Profile = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Rifas del usuario */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="card-glass mb-6"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            <Trophy size={20} className="text-accent" />
+            Rifas
+          </h3>
+          <div className="flex gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setRafflesTab('active')}
+              className={`px-3 py-1 rounded-full font-medium transition-colors ${
+                rafflesTab === 'active'
+                  ? 'bg-accent text-dark'
+                  : 'bg-glass text-text/60 hover:text-text'
+              }`}
+            >
+              Mis rifas
+            </button>
+            <button
+              type="button"
+              onClick={() => setRafflesTab('finished')}
+              className={`px-3 py-1 rounded-full font-medium transition-colors ${
+                rafflesTab === 'finished'
+                  ? 'bg-accent text-dark'
+                  : 'bg-glass text-text/60 hover:text-text'
+              }`}
+            >
+              Finalizadas
+            </button>
+          </div>
+        </div>
+
+        {rafflesLoading ? (
+          <div className="py-6 text-sm text-text/60">Cargando tus rifas...</div>
+        ) : rafflesError ? (
+          <div className="py-6 text-sm text-red-400">Error al cargar tus rifas</div>
+        ) : (
+          <>
+            {rafflesTab === 'active' && (
+              <div className="space-y-3">
+                {myActiveRaffles.length === 0 ? (
+                  <p className="text-sm text-text/60">
+                    No tienes rifas activas como organizador o participante.
+                  </p>
+                ) : (
+                  myActiveRaffles.slice(0, 5).map((raffle) => (
+                    <RaffleCard
+                      key={raffle.id}
+                      raffle={raffle}
+                      variant="compact"
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {rafflesTab === 'finished' && (
+              <div className="space-y-3">
+                {myFinishedRaffles.length === 0 ? (
+                  <p className="text-sm text-text/60">
+                    Aún no tienes rifas finalizadas en las que hayas participado o sido anfitrión.
+                  </p>
+                ) : (
+                  myFinishedRaffles.slice(0, 5).map((raffle) => (
+                    <RaffleCard
+                      key={raffle.id}
+                      raffle={raffle}
+                      variant="compact"
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate('/raffles/my')}
+                className="text-xs px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-text/80"
+              >
+                Ver detalle de mis rifas
+              </button>
+            </div>
+          </>
+        )}
+      </motion.div>
 
       {/* Admin Rooms Manager - Solo para tote/admin */}
       <motion.div 

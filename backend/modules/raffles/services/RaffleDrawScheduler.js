@@ -95,9 +95,13 @@ class RaffleDrawScheduler {
           scheduledAt: raffle.scheduled_draw_at
         });
 
-        // Verificar si todos los números están vendidos
-        if (totalNumbers === soldNumbers && soldNumbers > 0) {
-          logger.info(`[RaffleDrawScheduler] ✅ Todos los números vendidos - Finalizando rifa ${raffle.code}`);
+        // Nueva regla: si hay al menos 1 número vendido, se realiza el sorteo programado
+        if (soldNumbers > 0) {
+          logger.info(`[RaffleDrawScheduler] ✅ Hay ${soldNumbers} números vendidos - Realizando sorteo programado para rifa ${raffle.code}`, {
+            total: totalNumbers,
+            sold: soldNumbers,
+            disponibles: totalNumbers - soldNumbers
+          });
 
           try {
             // Emitir socket antes de finalizar
@@ -105,30 +109,29 @@ class RaffleDrawScheduler {
               global.io.to(`raffle:${raffle.code}`).emit('raffle:drawing_scheduled', {
                 code: raffle.code,
                 drawInSeconds: 0,
-                message: '¡Hora del sorteo programado! Eligiendo ganador...'
+                message: '¡Hora del sorteo programado! Eligiendo ganador entre los números vendidos...'
               });
             }
 
-            // Finalizar rifa
+            // Finalizar rifa (elige ganador solo entre números vendidos)
             await this.raffleService.finishRaffle(raffle.id);
 
-            logger.info(`[RaffleDrawScheduler] ✅ Rifa ${raffle.code} finalizada exitosamente`);
+            logger.info(`[RaffleDrawScheduler] ✅ Rifa ${raffle.code} finalizada exitosamente por sorteo programado`);
           } catch (error) {
             logger.error(`[RaffleDrawScheduler] Error finalizando rifa ${raffle.code}`, error);
           }
         } else {
-          logger.warn(`[RaffleDrawScheduler] ⚠️ Rifa ${raffle.code} llegó a fecha programada pero no todos los números están vendidos`, {
+          logger.warn(`[RaffleDrawScheduler] ⚠️ Rifa ${raffle.code} llegó a fecha programada pero no tiene ningún número vendido`, {
             sold: soldNumbers,
-            total: totalNumbers,
-            faltantes: totalNumbers - soldNumbers
+            total: totalNumbers
           });
 
-          // Emitir socket informando que no se puede sortear
+          // Emitir socket informando que no se puede sortear por falta de participantes
           if (global.io) {
             global.io.to(`raffle:${raffle.code}`).emit('raffle:draw_cancelled', {
               code: raffle.code,
-              reason: 'no_all_sold',
-              message: `No se puede realizar el sorteo programado. Faltan ${totalNumbers - soldNumbers} números por vender.`
+              reason: 'no_participants',
+              message: 'No se puede realizar el sorteo programado porque no hay números vendidos.'
             });
           }
 

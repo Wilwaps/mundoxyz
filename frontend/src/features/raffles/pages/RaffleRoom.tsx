@@ -664,7 +664,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       initial={{ opacity: 0, scale: 0.95, y: -10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      className="absolute right-0 mt-2 w-48 bg-dark rounded-lg shadow-xl border border-white/10 overflow-hidden z-10"
+                      className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 max-w-[calc(100vw-3rem)] bg-dark rounded-lg shadow-xl border border-white/10 overflow-hidden z-20"
                     >
                       <button
                         onClick={() => shareRaffle('whatsapp')}
@@ -701,7 +701,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               
               {user?.id === raffle.hostId && (
                 <button
-                  onClick={() => navigate(`/raffles/${code}/manage`)}
+                  onClick={() => navigate('/raffles/my')}
                   className="p-2 bg-glass/50 rounded-lg hover:bg-glass transition-colors"
                   title="Administrar rifa"
                 >

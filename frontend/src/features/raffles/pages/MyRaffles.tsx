@@ -263,7 +263,7 @@ const MyRaffles: React.FC = () => {
                         whileTap={{ scale: 0.95 }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/raffles/${raffle.code}/manage`);
+                          navigate(`/raffles/${raffle.code}`);
                         }}
                         className="absolute bottom-4 right-4 p-2 bg-dark/80 backdrop-blur-sm rounded-lg hover:bg-dark transition-colors"
                       >
@@ -283,7 +283,7 @@ const MyRaffles: React.FC = () => {
           onClose={() => setShowCreateModal(false)}
           onSuccess={(code) => {
             setShowCreateModal(false);
-            navigate(`/raffles/${code}/manage`);
+            navigate(`/raffles/${code}`);
           }}
         />
       </div>
