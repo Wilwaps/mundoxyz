@@ -38,12 +38,15 @@ import { RaffleStatus, RaffleMode, NumberState, DrawMode } from '../types';
 import { formatDate, formatCurrency } from '../../../utils/format';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 
+const GUEST_SELECTION_KEY = 'raffle_guest_selection';
+const GUEST_RESERVATION_TIMEOUT_MS = 10_000; // 10 segundos para invitados
+
 interface RaffleRoomProps {}
 
 const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loginWithTelegram, loading } = useAuth();
   const { socket } = useSocket();
   
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -66,6 +69,29 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     accountNumber: '',
     phone: ''
   });
+  const [showGuestAuthModal, setShowGuestAuthModal] = useState(false);
+  const guestTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const saveGuestSelection = (raffleCode: string, numbers: number[]) => {
+    try {
+      const payload = {
+        code: raffleCode,
+        numbers,
+        createdAt: Date.now()
+      };
+      localStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify(payload));
+    } catch (e) {
+      console.error('[RaffleRoom] Error guardando selección invitado:', e);
+    }
+  };
+
+  const clearGuestSelection = () => {
+    try {
+      localStorage.removeItem(GUEST_SELECTION_KEY);
+    } catch (e) {
+      console.error('[RaffleRoom] Error limpiando selección invitado:', e);
+    }
+  };
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
@@ -107,14 +133,116 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
+      if (guestTimerRef.current) {
+        clearTimeout(guestTimerRef.current);
+      }
     };
   }, []);
-  
+
+  // Limpiar selección invitado si se entra a otra rifa distinta
+  useEffect(() => {
+    if (!code) return;
+    try {
+      const raw = localStorage.getItem(GUEST_SELECTION_KEY);
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      if (stored.code && stored.code !== code) {
+        clearGuestSelection();
+      }
+    } catch (e) {
+      clearGuestSelection();
+    }
+  }, [code]);
+
   // Mutations
   const reserveNumbers = useReserveNumber();
   const purchaseNumbers = usePurchaseNumber();
   const cancelRaffle = useCancelRaffle();
-   const updateRaffle = useUpdateRaffle();
+  const updateRaffle = useUpdateRaffle();
+
+  const tryResumeGuestSelection = useCallback(async () => {
+    if (!user || !code) return;
+
+    let storedRaw: string | null = null;
+    try {
+      storedRaw = localStorage.getItem(GUEST_SELECTION_KEY);
+    } catch (e) {
+      console.error('[RaffleRoom] Error leyendo selección invitado:', e);
+      return;
+    }
+
+    if (!storedRaw) return;
+
+    let stored: any;
+    try {
+      stored = JSON.parse(storedRaw);
+    } catch (e) {
+      console.error('[RaffleRoom] Error parseando selección invitado:', e);
+      clearGuestSelection();
+      return;
+    }
+
+    if (stored.code !== code) {
+      clearGuestSelection();
+      return;
+    }
+
+    if (!Array.isArray(stored.numbers) || stored.numbers.length === 0) {
+      clearGuestSelection();
+      return;
+    }
+
+    const ageMs = Date.now() - (stored.createdAt || 0);
+    if (ageMs > GUEST_RESERVATION_TIMEOUT_MS) {
+      clearGuestSelection();
+      toast.error('La reserva temporal expiró, selecciona los números de nuevo');
+      return;
+    }
+
+    const numbersToReserve: number[] = stored.numbers;
+    const toastId = toast.loading(`Reservando ${numbersToReserve.length} número${numbersToReserve.length > 1 ? 's' : ''}...`);
+    const reserved: number[] = [];
+    const failed: number[] = [];
+
+    for (const idx of numbersToReserve) {
+      try {
+        await reserveNumbers.mutateAsync({ code: code, idx });
+        reserved.push(idx);
+      } catch (err) {
+        console.error('[RaffleRoom] Error reservando número (reanudación invitado):', err);
+        failed.push(idx);
+      }
+    }
+
+    clearGuestSelection();
+
+    if (reserved.length === 0) {
+      toast.error('No se pudo reservar tu número, por favor selecciona otro', { id: toastId });
+      setSelectedNumbers([]);
+      return;
+    }
+
+    if (failed.length > 0) {
+      toast.error(
+        `Algunos números ya no están disponibles: ${failed.join(', ')}`,
+        { id: toastId, duration: 5000 }
+      );
+    } else {
+      toast.success(
+        `${reserved.length} número${reserved.length > 1 ? 's' : ''} reservado${reserved.length > 1 ? 's' : ''}`,
+        { id: toastId }
+      );
+    }
+
+    setSelectedNumbers(reserved);
+    setShowPurchaseModal(true);
+  }, [user, code, reserveNumbers]);
+
+  // Reanudar selección invitado después de login/redirección
+  useEffect(() => {
+    if (!user || !code) return;
+    tryResumeGuestSelection();
+  }, [user, code, tryResumeGuestSelection]);
 
   // Forzar cierre (admin)
   const [isForceFinishing, setIsForceFinishing] = useState(false);
@@ -255,26 +383,73 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     raffleData.forceRefresh();
   }, [raffle?.code, raffleData]);
   
+  const handleGuestAuthClose = () => {
+    setShowGuestAuthModal(false);
+    setSelectedNumbers([]);
+    clearGuestSelection();
+    if (guestTimerRef.current) {
+      clearTimeout(guestTimerRef.current);
+      guestTimerRef.current = null;
+    }
+  };
+
+  const handleGuestTelegramLogin = async () => {
+    const result = await loginWithTelegram();
+    if (result?.success) {
+      if (guestTimerRef.current) {
+        clearTimeout(guestTimerRef.current);
+        guestTimerRef.current = null;
+      }
+      setShowGuestAuthModal(false);
+      // La reanudación de la reserva se maneja en tryResumeGuestSelection
+    }
+  };
+
+  const navigateToLogin = () => {
+    const nextUrl = window.location.pathname + window.location.search;
+    navigate(`/login?next=${encodeURIComponent(nextUrl)}`);
+  };
+
+  const navigateToRegister = () => {
+    const nextUrl = window.location.pathname + window.location.search;
+    navigate(`/register?next=${encodeURIComponent(nextUrl)}`);
+  };
+
   // Manejar selección de números
   const handleNumberClick = (number: number) => {
-    if (!user) {
-      toast.error('Debes iniciar sesión para seleccionar números');
-      return;
-    }
-    
     const numberData = numbers?.find((n: any) => n.idx === number);
-    
+
     if (numberData?.state === NumberState.SOLD) {
-      if (numberData.ownerId === user.id) {
+      if (user && numberData.ownerId === user.id) {
         toast('Ya compraste este número', { icon: '✅' });
       } else {
         toast.error('Este número ya fue vendido');
       }
       return;
     }
-    
-    if (numberData?.state === NumberState.RESERVED && numberData.ownerId !== user.id) {
+
+    if (numberData?.state === NumberState.RESERVED && (!user || numberData.ownerId !== user.id)) {
       toast.error('Este número está reservado por otro usuario');
+      return;
+    }
+
+    if (!user) {
+      if (!code) return;
+
+      setSelectedNumbers([number]);
+      saveGuestSelection(code, [number]);
+      setShowGuestAuthModal(true);
+
+      if (guestTimerRef.current) {
+        clearTimeout(guestTimerRef.current);
+      }
+      guestTimerRef.current = setTimeout(() => {
+        clearGuestSelection();
+        setSelectedNumbers([]);
+        setShowGuestAuthModal(false);
+      }, GUEST_RESERVATION_TIMEOUT_MS);
+
+      toast('Reserva temporal mientras inicias sesión', { icon: '⏳' });
       return;
     }
     
@@ -1448,8 +1623,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
                 className="max-w-3xl w-full bg-dark rounded-2xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -1478,6 +1653,93 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       <div className="text-text/60">Sin imagen de premio</div>
                     );
                   })()}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal de autenticación para invitados */}
+        <AnimatePresence>
+          {showGuestAuthModal && !user && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={handleGuestAuthClose}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="w-full max-w-md bg-dark rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-text">Inicia sesión para continuar</h3>
+                      <p className="text-[11px] md:text-xs text-text/60">
+                        Reservamos tu número unos segundos mientras te conectas.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleGuestAuthClose}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-xs text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4 text-xs md:text-sm text-text/80">
+                  {/* Botón principal: Iniciar con Telegram */}
+                  <button
+                    type="button"
+                    onClick={handleGuestTelegramLogin}
+                    disabled={loading}
+                    className="w-full btn-primary flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-lg">📲</span>
+                    <span>{loading ? 'Conectando con Telegram...' : 'Iniciar sesión con Telegram'}</span>
+                  </button>
+
+                  {/* Botón "ESPERA!! SI TENGO TELEGRAM" como en Login */}
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://t.me/mundoxyz_bot', '_blank')}
+                    className="w-full bg-warning/20 border border-warning/40 rounded-lg py-2.5 text-warning text-[11px] md:text-xs font-semibold hover:bg-warning/30 transition"
+                  >
+                    ESPERA!! SI TENGO TELEGRAM
+                  </button>
+
+                  <div className="h-px bg-white/10" />
+
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={navigateToLogin}
+                      className="w-full px-4 py-2 rounded-lg bg-glass hover:bg-glass/80 text-xs md:text-sm text-text/90"
+                    >
+                      Iniciar sesión con email/usuario
+                    </button>
+                    <button
+                      type="button"
+                      onClick={navigateToRegister}
+                      className="w-full px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-xs md:text-sm text-accent font-semibold"
+                    >
+                      Crear cuenta nueva
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] md:text-xs text-text/50 text-center mt-2">
+                    Si cierras esta ventana o esperas más de 10 segundos, tu selección se liberará
+                    automáticamente.
+                  </p>
                 </div>
               </motion.div>
             </motion.div>
