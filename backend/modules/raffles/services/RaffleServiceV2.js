@@ -1099,7 +1099,10 @@ class RaffleServiceV2 {
           if (!buyerWallet || !hostWallet) {
             throw { code: ErrorCodes.WALLET_NOT_FOUND, status: 404, message: 'Wallet no encontrado (comprador u host)' };
           }
-          const price = raffle.entry_price_fire || 0;
+          let price = raffle.entry_price_fire || 0;
+          if ((!price || price <= 0) && prizeMeta && typeof prizeMeta.prizeValue === 'number' && isFinite(prizeMeta.prizeValue) && prizeMeta.prizeValue > 0) {
+            price = prizeMeta.prizeValue;
+          }
           if (buyerWallet.fires_balance < price) {
             throw { code: ErrorCodes.INSUFFICIENT_BALANCE, status: 400, message: 'Saldo de fuegos insuficiente' };
           }
@@ -1464,15 +1467,118 @@ class RaffleServiceV2 {
       
       const participants = participantsResult.rows;
       
-      // Seleccionar ganador aleatorio
-      const randomIndex = Math.floor(Math.random() * participants.length);
-      const winner = participants[randomIndex];
-      const winnerNumbers = winner.numbers || [];
-      const winningNumber = winnerNumbers.length > 0
-        ? winnerNumbers[Math.floor(Math.random() * winnerNumbers.length)]
-        : null;
-      
-      const winnerDisplayName = winner.display_name || winner.username;
+      let winner = null;
+      let winningNumber = null;
+      let winnerDisplayName = '';
+      let winnersList = [];
+
+      if (effectiveMode === RaffleMode.PRIZE) {
+        let prizeMeta = null;
+        let winnersCount = 1;
+        if (raffle.prize_meta) {
+          try {
+            prizeMeta = typeof raffle.prize_meta === 'string'
+              ? JSON.parse(raffle.prize_meta)
+              : raffle.prize_meta;
+            if (prizeMeta && typeof prizeMeta.winnersCount === 'number' && isFinite(prizeMeta.winnersCount)) {
+              winnersCount = Math.max(1, Math.floor(prizeMeta.winnersCount));
+            }
+          } catch (e) {
+            logger.warn('[RaffleServiceV2] No se pudo parsear prize_meta en finishRaffle', {
+              raffleId,
+              error: e.message
+            });
+          }
+        }
+
+        const tickets = [];
+        for (const p of participants) {
+          const nums = p.numbers || [];
+          for (const n of nums) {
+            tickets.push({
+              userId: p.owner_id,
+              username: p.username,
+              displayName: p.display_name,
+              number: n
+            });
+          }
+        }
+
+        const uniqueOwners = Array.from(new Set(participants.map(p => p.owner_id)));
+        const maxWinners = Math.min(winnersCount, uniqueOwners.length);
+        const usedOwners = new Set();
+
+        while (tickets.length > 0 && winnersList.length < maxWinners) {
+          const idx = Math.floor(Math.random() * tickets.length);
+          const ticket = tickets[idx];
+          if (usedOwners.has(ticket.userId)) {
+            tickets.splice(idx, 1);
+            continue;
+          }
+          winnersList.push({
+            userId: ticket.userId,
+            username: ticket.username,
+            displayName: ticket.displayName,
+            winningNumber: ticket.number
+          });
+          usedOwners.add(ticket.userId);
+          for (let i = tickets.length - 1; i >= 0; i--) {
+            if (tickets[i].userId === ticket.userId) {
+              tickets.splice(i, 1);
+            }
+          }
+        }
+
+        if (winnersList.length === 0 && participants.length > 0) {
+          const randomIndex = Math.floor(Math.random() * participants.length);
+          const p = participants[randomIndex];
+          const nums = p.numbers || [];
+          const num = nums.length > 0
+            ? nums[Math.floor(Math.random() * nums.length)]
+            : null;
+          winnersList.push({
+            userId: p.owner_id,
+            username: p.username,
+            displayName: p.display_name,
+            winningNumber: num
+          });
+        }
+
+        const main = winnersList[0];
+        winner = participants.find(p => p.owner_id === main.userId) || {
+          owner_id: main.userId,
+          username: main.username,
+          display_name: main.displayName,
+          numbers: [main.winningNumber]
+        };
+        winningNumber = main.winningNumber;
+        winnerDisplayName = main.displayName || main.username;
+
+        if (prizeMeta) {
+          prizeMeta.winnersCount = winnersCount;
+          prizeMeta.winners = winnersList;
+          await client.query(
+            `UPDATE raffles
+             SET prize_meta = $1
+             WHERE id = $2`,
+            [JSON.stringify(prizeMeta), raffleId]
+          );
+        }
+      } else {
+        const randomIndex = Math.floor(Math.random() * participants.length);
+        winner = participants[randomIndex];
+        const winnerNumbers = winner.numbers || [];
+        winningNumber = winnerNumbers.length > 0
+          ? winnerNumbers[Math.floor(Math.random() * winnerNumbers.length)]
+          : null;
+        winnerDisplayName = winner.display_name || winner.username;
+        winnersList = [{
+          userId: winner.owner_id,
+          username: winner.username,
+          displayName: winnerDisplayName,
+          winningNumber
+        }];
+      }
 
       logger.info('[RaffleServiceV2] Ganador seleccionado', {
         raffleId,
@@ -1480,7 +1586,8 @@ class RaffleServiceV2 {
         winnerUsername: winner.username,
         winnerDisplayName,
         totalParticipants: participants.length,
-        winningNumber
+        winningNumber,
+        winnersCount: winnersList.length
       });
       
       // Calcular distribución según modo

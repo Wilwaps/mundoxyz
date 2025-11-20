@@ -315,6 +315,23 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               <h3 className="text-lg font-semibold text-text mb-2">
                 {isPromotion ? 'Confirmar participación (Promoción gratuita)' : 'Información de Pago'}
               </h3>
+              {raffle?.prizeMeta?.prizeValue && (
+                <div className="mb-4 bg-dark rounded-lg p-4 border border-white/10">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-text/60">Números seleccionados:</span>
+                    <span className="text-text font-medium">{selectedNumbers.join(', ')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-text/60">Monto estimado del premio:</span>
+                    <span className="text-text font-semibold">{raffle.prizeMeta.prizeValue} 🔥</span>
+                  </div>
+                  <p className="text-[11px] text-text/60 mt-1">
+                    Referencia interna: 1 USDT ≈ 300🔥. Valor aproximado: {(
+                      (raffle.prizeMeta.prizeValue as number) / 300
+                    ).toFixed(2)} USDT.
+                  </p>
+                </div>
+              )}
               
               {/* Datos bancarios del host (solo si no es promoción) */}
               {!isPromotion && raffle?.prizeMeta?.bankingInfo && (

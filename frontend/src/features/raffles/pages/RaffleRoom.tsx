@@ -472,6 +472,13 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     myNumbers: raffleData.userNumbers?.length || 0
   };
 
+  const prizeWinners =
+    raffle?.mode === RaffleMode.PRIZE && (raffle as any)?.prizeMeta && Array.isArray((raffle as any).prizeMeta.winners)
+      ? (raffle as any).prizeMeta.winners
+      : (winner ? [winner] : []);
+  const hasWinners = prizeWinners.length > 0;
+  const mainWinner: any = hasWinners ? prizeWinners[0] : null;
+
   // Sincronizar formulario de datos bancarios cuando cargue la rifa
   useEffect(() => {
     if (!raffle || raffle.mode !== RaffleMode.PRIZE) return;
@@ -860,25 +867,36 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               </button>
             </div>
           )}
-          {raffle?.status === RaffleStatus.FINISHED && winner && (
+          {raffle?.status === RaffleStatus.FINISHED && hasWinners && (
             <div className="bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-300/10 border border-amber-400/40 rounded-xl p-4 flex flex-col gap-2">
               <div className="flex items-center gap-2 text-amber-200">
                 <Crown className="w-4 h-4" />
-                <span className="text-xs uppercase tracking-wide">Ganador</span>
+                <span className="text-xs uppercase tracking-wide">
+                  {prizeWinners.length > 1 ? 'Ganador principal' : 'Ganador'}
+                </span>
               </div>
               <div>
                 <div className="text-lg font-semibold text-amber-100">
-                  {winner.displayName || winner.username || 'Ganador secreto'}
+                  {mainWinner.displayName || mainWinner.username || 'Ganador secreto'}
                 </div>
-                {winner.winningNumber !== undefined && (
-                  <div className="text-sm text-amber-200/80">Número #{winner.winningNumber}</div>
+                {mainWinner.winningNumber !== undefined && (
+                  <div className="text-sm text-amber-200/80">Número #{mainWinner.winningNumber}</div>
                 )}
               </div>
               <div className="text-sm text-amber-200/80 mt-auto">
                 Premio:&nbsp;
                 <span className="font-semibold">
-                  {winner.currency === 'fires' ? '🔥' : '🪙'}
-                  {raffle?.mode === RaffleMode.FIRES ? raffle?.potFires : raffle?.potCoins}
+                  {raffle.mode === RaffleMode.FIRES && (
+                    <>
+                      🔥{raffle.potFires}
+                    </>
+                  )}
+                  {raffle.mode === RaffleMode.COINS && (
+                    <>
+                      🪙{raffle.potCoins}
+                    </>
+                  )}
+                  {raffle.mode === RaffleMode.PRIZE && '🎁 Premio'}
                 </span>
               </div>
             </div>
@@ -929,7 +947,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
           >
             Información
           </button>
-          {winner && (
+          {hasWinners && (
             <button
               onClick={() => setActiveTab('winners')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
@@ -939,7 +957,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               }`}
             >
               <Crown className="w-4 h-4" />
-              Ganador
+              {prizeWinners.length > 1 ? 'Ganadores' : 'Ganador'}
             </button>
           )}
         </div>
@@ -1096,7 +1114,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             </motion.div>
           )}
           
-          {activeTab === 'winners' && winner && (
+          {activeTab === 'winners' && hasWinners && (
             <motion.div
               key="winners"
               initial={{ opacity: 0, y: 10 }}
@@ -1108,23 +1126,32 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   <Crown className="w-6 h-6" />
                   <div>
                     <div className="text-lg font-semibold">
-                      {winner.displayName || winner.username}
+                      {mainWinner.displayName || mainWinner.username}
                     </div>
                     <div className="text-sm text-amber-200/80">
-                      Ganador de la rifa
+                      {prizeWinners.length > 1 ? 'Ganador principal de la rifa' : 'Ganador de la rifa'}
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-4">
                     <div className="text-xs text-amber-200/70 uppercase tracking-wide">Número ganador</div>
-                    <div className="text-3xl font-bold text-amber-100 mt-1">#{winner.winningNumber ?? '—'}</div>
+                    <div className="text-3xl font-bold text-amber-100 mt-1">#{mainWinner.winningNumber ?? '—'}</div>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-4">
                     <div className="text-xs text-amber-200/70 uppercase tracking-wide">Premio</div>
                     <div className="text-2xl font-semibold text-amber-100 mt-1">
-                      {winner.currency === 'fires' ? '🔥' : '🪙'}
-                      {raffle?.mode === RaffleMode.FIRES ? raffle?.potFires : raffle?.potCoins}
+                      {raffle.mode === RaffleMode.FIRES && (
+                        <>
+                          🔥{raffle.potFires}
+                        </>
+                      )}
+                      {raffle.mode === RaffleMode.COINS && (
+                        <>
+                          🪙{raffle.potCoins}
+                        </>
+                      )}
+                      {raffle.mode === RaffleMode.PRIZE && '🎁 Premio'}
                     </div>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-4">
@@ -1132,6 +1159,27 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                     <div className="text-lg font-semibold text-amber-100 mt-1">Completada</div>
                   </div>
                 </div>
+                {prizeWinners.length > 1 && (
+                  <div className="mt-4 space-y-2">
+                    {prizeWinners.map((w: any, index: number) => {
+                      if (index === 0) return null;
+                      const place = `${index + 1}° lugar`;
+                      return (
+                        <div
+                          key={`${w.userId || w.username || index}-${w.winningNumber}`}
+                          className="flex justify-between items-center text-sm text-amber-100 bg-amber-500/10 border border-amber-400/20 rounded-lg px-3 py-2"
+                        >
+                          <span>{place}</span>
+                          <span>
+                            {w.displayName || w.username || 'Ganador'}
+                            {' '}
+                            #{w.winningNumber !== undefined ? w.winningNumber : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="text-sm text-amber-200/80">
                   Felicita al ganador y mantente atento a las próximas rifas para más oportunidades de ganar.
                 </div>

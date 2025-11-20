@@ -69,6 +69,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
       prizeDescription: '',
       prizeValue: 0,
       prizeImages: [],
+      winnersCount: 1,
       isPromotion: false,
       bankingInfo: {
         accountHolder: '',
@@ -475,11 +476,17 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          toast.success('Logo seleccionado (carga pendiente)');
                           // TODO: Implementar upload a Cloudinary/S3
+                          const result = await processImage(file, 5);
+                          if (result.error) {
+                            toast.error(result.error);
+                          } else {
+                            setLogoBase64(result.base64);
+                            toast.success('Logo cargado exitosamente');
+                          }
                         }
                       }}
                       className="hidden"
@@ -490,7 +497,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                       className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
                     >
                       <Upload className="w-5 h-5" />
-                      <span className="text-sm">Subir logo de empresa</span>
+                      <span className="text-sm">{logoBase64 ? '✅ Logo cargado' : 'Subir logo de empresa'}</span>
                     </label>
                   </div>
                   <p className="text-xs text-text/60 mt-1">PNG o JPG. Máx. 2MB</p>
@@ -644,6 +651,31 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                       Ingresa el valor estimado expresado en fuegos. Mostramos una equivalencia aproximada en USDT.
                     </p>
                   )}
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text/80 mb-1">
+                      Cantidad de ganadores
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={formData.prizeMeta?.winnersCount ?? 1}
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        const safe = Number.isNaN(raw) || raw < 1 ? 1 : raw;
+                        updateField('prizeMeta', {
+                          ...formData.prizeMeta,
+                          winnersCount: safe
+                        });
+                      }}
+                      className="w-full px-4 py-2 bg-glass rounded-lg text-text placeholder:text-text/40 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <p className="text-xs text-text/60 mt-1">
+                      Define cuántas personas ganarán esta rifa (1° lugar, 2° lugar, etc.).
+                    </p>
+                  </div>
                 </div>
                 
                 {/* Imagen del premio */}

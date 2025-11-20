@@ -143,6 +143,13 @@ export interface PrizeMeta {
   category?: string;
   bankingInfo?: BankingInfo;
   isPromotion?: boolean;
+  winnersCount?: number;
+  winners?: {
+    userId: string;
+    username: string;
+    displayName?: string;
+    winningNumber: number;
+  }[];
 }
 
 // Número de rifa

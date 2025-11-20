@@ -120,11 +120,14 @@ const createRaffleSchema = Joi.object({
       prizeValue: Joi.number().positive().optional(),
       prizeImages: Joi.array().items(Joi.string().uri()).optional(),
       isPromotion: Joi.boolean().optional().default(false),
+      winnersCount: Joi.number().integer().min(1).optional(),
       bankingInfo: Joi.object({
         accountHolder: Joi.string().optional(),
+        bankCode: Joi.string().optional(),
         bankName: Joi.string().optional(),
         accountNumber: Joi.string().optional(),
         accountType: Joi.string().valid('ahorro', 'corriente').optional(),
+        idNumber: Joi.string().optional(),
         phone: Joi.string().optional()
       }).optional()
     }).required(),
@@ -139,6 +142,7 @@ const createRaffleSchema = Joi.object({
       primaryColor: Joi.string().pattern(/^#[0-9A-F]{6}$/i).optional(),
       secondaryColor: Joi.string().pattern(/^#[0-9A-F]{6}$/i).optional(),
       logoUrl: Joi.string().uri().optional(),
+      logoBase64: Joi.string().optional(),
       contactEmail: Joi.string().email().optional(),
       contactPhone: Joi.string().optional()
     }).required(),
@@ -199,6 +203,8 @@ const updateRaffleSchema = Joi.object({
     category: Joi.string().optional(),
 
     isPromotion: Joi.boolean().optional(),
+
+    winnersCount: Joi.number().integer().min(1).optional(),
 
     bankingInfo: Joi.object({
       accountHolder: Joi.string().optional(),
