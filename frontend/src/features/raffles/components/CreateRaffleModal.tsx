@@ -295,6 +295,26 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
         if (!rawValue || !isFinite(rawValue) || rawValue <= 0) {
           delete (sanitizedPrizeMeta as any).prizeValue;
         }
+
+        // Si es promoción (gratis), no enviamos datos bancarios
+        if ((sanitizedPrizeMeta as any).isPromotion) {
+          delete (sanitizedPrizeMeta as any).bankingInfo;
+        } else if ((sanitizedPrizeMeta as any).bankingInfo) {
+          // Limpiar campos vacíos de bankingInfo para evitar errores de validación
+          const cleanedBankingInfo: any = { ...(sanitizedPrizeMeta as any).bankingInfo };
+          Object.keys(cleanedBankingInfo).forEach((key) => {
+            const value = cleanedBankingInfo[key];
+            if (value === '' || value === null || typeof value === 'undefined') {
+              delete cleanedBankingInfo[key];
+            }
+          });
+
+          if (Object.keys(cleanedBankingInfo).length === 0) {
+            delete (sanitizedPrizeMeta as any).bankingInfo;
+          } else {
+            (sanitizedPrizeMeta as any).bankingInfo = cleanedBankingInfo;
+          }
+        }
       }
 
       // Agregar datos de base64, toggle y modo de sorteo al payload
