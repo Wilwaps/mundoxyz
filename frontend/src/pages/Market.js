@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const FIRES_PER_USDT = 300; // Peg interno: 300🔥 ≈ 1 USDT
+
 const Market = () => {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
@@ -21,6 +23,11 @@ const Market = () => {
     network: 'TRON'
   });
   const [payoutMethod, setPayoutMethod] = useState('bs'); // 'bs' | 'usdt_tron'
+
+  const amountNumber = parseFloat(redeemData.fires_amount || 0);
+  const commissionAmount = amountNumber * 0.05;
+  const totalRequiredAmount = amountNumber + commissionAmount;
+  const estimatedUsdt = amountNumber > 0 ? amountNumber / FIRES_PER_USDT : 0;
 
   // Fetch user's redemption history
   const { data: redeems } = useQuery({
@@ -60,7 +67,7 @@ const Market = () => {
   });
 
   const handleRedeem = () => {
-    const minRequired = 105; // 100 + 5% comisión
+    const minRequired = 105; // 100 + 5% comisión (umbral base para abrir modal)
     if (user?.fires_balance < minRequired) {
       toast.error(`Necesitas al menos ${minRequired} 🔥 para canjear (100 + 5% comisión)`);
       return;
@@ -75,10 +82,16 @@ const Market = () => {
       return;
     }
     const amount = parseFloat(redeemData.fires_amount);
-    if (amount < 100) {
-      toast.error('La cantidad mínima es 100 fuegos');
+    const minAmount = payoutMethod === 'usdt_tron' ? 300 : 100;
+    if (amount < minAmount) {
+      if (payoutMethod === 'usdt_tron') {
+        toast.error(`La cantidad mínima para retiros en USDT es ${minAmount} fuegos`);
+      } else {
+        toast.error(`La cantidad mínima es ${minAmount} fuegos`);
+      }
       return;
     }
+
     const commission = amount * 0.05;
     const totalRequired = amount + commission;
     if (user?.fires_balance < totalRequired) {
@@ -222,26 +235,30 @@ const Market = () => {
                   type="number"
                   value={redeemData.fires_amount}
                   onChange={(e) => setRedeemData({...redeemData, fires_amount: e.target.value})}
-                  min="100"
+                  min={payoutMethod === 'usdt_tron' ? 300 : 100}
                   step="1"
                   className="input-glass w-full"
                   required
                 />
-                <p className="text-xs text-text/40 mt-1">Mínimo: 100 fuegos</p>
+                <p className="text-xs text-text/40 mt-1">
+                  {payoutMethod === 'usdt_tron'
+                    ? 'Mínimo: 300 fuegos (retiro en USDT)'
+                    : 'Mínimo: 100 fuegos'}
+                </p>
               </div>
               
               <div className="bg-glass/50 rounded-lg p-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-text/60">Cantidad a canjear:</span>
-                  <span className="text-text font-semibold">{parseFloat(redeemData.fires_amount || 0).toFixed(2)} 🔥</span>
+                  <span className="text-text font-semibold">{amountNumber.toFixed(2)} 🔥</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text/60">Comisión plataforma (5%):</span>
-                  <span className="text-warning font-semibold">{(parseFloat(redeemData.fires_amount || 0) * 0.05).toFixed(2)} 🔥</span>
+                  <span className="text-warning font-semibold">{commissionAmount.toFixed(2)} 🔥</span>
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between">
                   <span className="text-text font-bold">Total a deducir:</span>
-                  <span className="text-fire-orange font-bold">{(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥</span>
+                  <span className="text-fire-orange font-bold">{totalRequiredAmount.toFixed(2)} 🔥</span>
                 </div>
               </div>
               
@@ -382,9 +399,19 @@ const Market = () => {
               )}
 
               <div className="bg-warning/20 border border-warning/30 rounded-lg p-3">
-                <p className="text-warning text-xs">
-                  Se debitarán {(parseFloat(redeemData.fires_amount || 0) * 1.05).toFixed(2)} 🔥 de tu cuenta ({redeemData.fires_amount} + 5% comisión). El proceso de pago puede tardar hasta 48 horas.
-                </p>
+                {payoutMethod === 'usdt_tron' ? (
+                  <p className="text-warning text-xs">
+                    Se debitarán {totalRequiredAmount.toFixed(2)} 🔥 de tu cuenta ({amountNumber.toFixed(2)} + 5% comisión).
+                    {' '}Recibirás aproximadamente {estimatedUsdt.toFixed(2)} USDT (1 USDT ≈ {FIRES_PER_USDT} 🔥).
+                    {' '}El proceso de pago puede tardar hasta 48 horas.
+                  </p>
+                ) : (
+                  <p className="text-warning text-xs">
+                    Se debitarán {totalRequiredAmount.toFixed(2)} 🔥 de tu cuenta ({amountNumber.toFixed(2)} + 5% comisión).
+                    {' '}El equivalente en Bs se calculará según la tasa interna MundoXYZ al momento de procesar.
+                    {' '}El proceso de pago puede tardar hasta 48 horas.
+                  </p>
+                )}
               </div>
               </div>
               

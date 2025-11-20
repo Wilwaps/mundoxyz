@@ -89,7 +89,24 @@ export const useCreateRaffle = () => {
       return raffle;
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || UI_TEXTS.ERRORS.GENERIC;
+      const data = error.response?.data;
+      let message = data?.message || UI_TEXTS.ERRORS.GENERIC;
+
+      if (data?.message === 'Validation error' && data.errors) {
+        if (typeof data.errors === 'string') {
+          message = data.errors;
+        } else if (Array.isArray(data.errors)) {
+          message = data.errors.join(' | ');
+        } else {
+          const firstError = Object.values(data.errors)[0] as any;
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            message = firstError[0];
+          } else if (typeof firstError === 'string') {
+            message = firstError;
+          }
+        }
+      }
+
       toast.error(message);
     }
   });

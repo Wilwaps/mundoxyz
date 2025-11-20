@@ -27,17 +27,22 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Cedula and telefono are required' });
     }
     
-    // Validar cantidad mínima
     const requestedAmount = parseFloat(fires_amount);
-    if (requestedAmount < 100) {
-      return res.status(400).json({ error: 'La cantidad mínima para canjear es 100 fuegos' });
+    const method = payout_method === 'usdt_tron' ? 'usdt_tron' : 'bank_transfer';
+
+    // Validar cantidad mínima según método de pago
+    const minAmount = method === 'usdt_tron' ? 300 : 100;
+    if (requestedAmount < minAmount) {
+      const errorMessage =
+        method === 'usdt_tron'
+          ? 'La cantidad mínima para canjear en USDT es 300 fuegos'
+          : 'La cantidad mínima para canjear es 100 fuegos';
+      return res.status(400).json({ error: errorMessage });
     }
     
     // Calcular comisión 5%
     const commission = requestedAmount * 0.05;
     const totalRequired = requestedAmount + commission;
-
-    const method = payout_method === 'usdt_tron' ? 'usdt_tron' : 'bank_transfer';
 
     if (!cedula || !telefono) {
       return res.status(400).json({ error: 'Cedula and telefono are required' });
