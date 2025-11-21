@@ -163,7 +163,7 @@ if (!token) {
         : 'N/D';
 
       const staleWarning = ageMinutes !== null && ageMinutes > 60
-        ? '\n\n⚠️ Esta tasa tiene más de 60 minutos. Puede estar desactualizada.'
+        ? '\n\nPuedes consultar la web del [BCV](https://www.bcv.org.ve/) si prefieres.'
         : '';
 
       const sourceLabel = bcv.source || 'bcv';

@@ -124,7 +124,7 @@ const Layout = () => {
               <button
                 type="button"
                 className="badge-coins cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => window.open('https://web.telegram.org/a/#-1002660157966', '_blank')}
+                onClick={() => window.open('https://t.me/+DXLjmoWzEJc0NDZh', '_blank')}
                 title="Abrir grupo oficial de Telegram"
               >
                 <span className="text-sm">📢</span>
