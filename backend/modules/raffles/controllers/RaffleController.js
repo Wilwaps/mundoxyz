@@ -506,6 +506,7 @@ class RaffleController {
       
       const filters = {
         hostId: userId,
+        visibility: ['public', 'private', 'company'],
         limit: 50
       };
       

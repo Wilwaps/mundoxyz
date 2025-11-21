@@ -60,6 +60,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showBankingModal, setShowBankingModal] = useState(false);
   const [isSavingBanking, setIsSavingBanking] = useState(false);
+  const [showWinnerContactModal, setShowWinnerContactModal] = useState(false);
   const [bankingForm, setBankingForm] = useState({
     accountHolder: '',
     bankCode: '',
@@ -98,6 +99,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   const raffle = raffleData.raffle;
   const numbers = raffleData.numbers;
   const winner = raffleData.winner;
+  const winnerContact = (raffleData as any).winnerContact;
   const isLoading = raffleData.isLoading;
   const error = raffleData.error;
   
@@ -653,6 +655,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       : (winner ? [winner] : []);
   const hasWinners = prizeWinners.length > 0;
   const mainWinner: any = hasWinners ? prizeWinners[0] : null;
+  const isHost = !!(user && raffle && user.id === raffle.hostId);
+  const canViewWinnerContact = !!(isHost && winnerContact && raffle?.status === RaffleStatus.FINISHED);
 
   // Sincronizar formulario de datos bancarios cuando cargue la rifa
   useEffect(() => {
@@ -1043,7 +1047,14 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             </div>
           )}
           {raffle?.status === RaffleStatus.FINISHED && hasWinners && (
-            <div className="bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-300/10 border border-amber-400/40 rounded-xl p-4 flex flex-col gap-2">
+            <div
+              className={`bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-300/10 border border-amber-400/40 rounded-xl p-4 flex flex-col gap-2 ${canViewWinnerContact ? 'cursor-pointer hover:bg-amber-500/25 transition-colors' : ''}`}
+              onClick={() => {
+                if (canViewWinnerContact) {
+                  setShowWinnerContactModal(true);
+                }
+              }}
+            >
               <div className="flex items-center gap-2 text-amber-200">
                 <Crown className="w-4 h-4" />
                 <span className="text-xs uppercase tracking-wide">
@@ -1294,7 +1305,12 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               key="winners"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-glass rounded-2xl p-6 border border-amber-400/40"
+              className={`bg-glass rounded-2xl p-6 border border-amber-400/40 ${canViewWinnerContact ? 'cursor-pointer hover:bg-amber-500/5 transition-colors' : ''}`}
+              onClick={() => {
+                if (canViewWinnerContact) {
+                  setShowWinnerContactModal(true);
+                }
+              }}
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3 text-amber-200">
@@ -1400,14 +1416,14 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </button>
                 </div>
 
-                <div className="p-4 pt-3 pb-5 space-y-4 text-xs md:text-sm text-text/80 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                <div className="p-4 pt-3 pb-5 space-y-3 text-sm md:text-base text-text/90 max-h-[70vh] overflow-y-auto scrollbar-thin leading-snug">
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">1. Crear una rifa desde el Lobby</h4>
+                    <h4 className="font-bold text-text text-sm md:text-base">1. Crear una rifa desde el Lobby</h4>
                     <p>
                       En la página de <span className="font-semibold">Rifas Activas</span> pulsa <span className="font-semibold">"Crear Rifa"</span>. 
                       El asistente te guía paso a paso:
                     </p>
-                    <ul className="list-disc list-inside space-y-1">
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>
                         <span className="font-semibold">Modo:</span> elige si el premio es en 🔥 fires, 🪙 monedas o un premio físico/servicio.
                       </li>
@@ -1427,8 +1443,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">2. Qué muestra esta sala</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-sm md:text-base">2. Qué muestra esta sala</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li><span className="font-semibold">Encabezado:</span> nombre, estado, código de la rifa y tiempo para el sorteo.</li>
                       <li><span className="font-semibold">Estadísticas:</span> números totales, vendidos, reservados, disponibles y pote acumulado.</li>
                       <li><span className="font-semibold">Grilla de números:</span> cada casilla representa un número que puede estar disponible, reservado o vendido.</li>
@@ -1437,8 +1453,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">3. Cómo comprar números</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-sm md:text-base">3. Cómo comprar números</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Haz clic sobre los números disponibles para seleccionarlos (hasta 50 por compra).</li>
                       <li>La barra flotante muestra cuántos números llevas y el <span className="font-semibold">total a pagar</span>.</li>
                       <li>Al pulsar <span className="font-semibold">"Comprar"</span>, el sistema los reserva y luego confirma el pago desde tu wallet.</li>
@@ -1446,8 +1462,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">4. Rol del organizador</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-sm md:text-base">4. Rol del organizador</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Puede cancelar la rifa si es necesario; la plataforma reembolsa a todos los compradores.</li>
                       <li>En modo manual, el host puede pulsar <span className="font-semibold">"Elegir Ganador"</span> cuando todos los números estén vendidos.</li>
                       <li>En rifas empresariales, puede compartir la <span className="font-semibold">landing pública</span> para vender más rápido.</li>
@@ -1455,13 +1471,103 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">5. Buenas prácticas</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-sm md:text-base">5. Buenas prácticas</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Elige un rango de números acorde al tamaño de tu comunidad.</li>
                       <li>Define precios justos y comunica claramente el premio y las condiciones.</li>
                       <li>Evita cancelar rifas activas salvo que sea estrictamente necesario.</li>
                     </ul>
                   </section>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal de contacto del ganador - solo anfitrión */}
+        <AnimatePresence>
+          {showWinnerContactModal && winnerContact && isHost && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowWinnerContactModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="w-full max-w-md bg-dark rounded-2xl shadow-2xl border border-amber-400/40 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-amber-400/30 flex items-center justify-between bg-gradient-to-r from-amber-500/20 to-amber-300/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-500/30 flex items-center justify-center">
+                      <Crown className="w-5 h-5 text-amber-100" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-amber-50">Datos de contacto del ganador</h3>
+                      <p className="text-[11px] md:text-xs text-amber-100/80">
+                        Solo tú, como anfitrión, puedes ver esta información.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowWinnerContactModal(false)}
+                    className="px-3 py-1 rounded-lg bg-glass hover:bg-glass/80 text-[11px] text-text/80"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <div className="bg-amber-500/10 border border-amber-400/40 rounded-xl p-3">
+                    <div className="text-xs text-amber-200/80 uppercase tracking-wide mb-1">Ganador</div>
+                    <div className="text-sm font-semibold text-amber-50">
+                      {winnerContact.displayName || winnerContact.username || 'Ganador'}
+                    </div>
+                    {mainWinner?.winningNumber !== undefined && (
+                      <div className="text-xs text-amber-200/80 mt-1">Número ganador: #{mainWinner.winningNumber}</div>
+                    )}
+                  </div>
+
+                  <div className="bg-glass/60 rounded-xl p-3 space-y-2 text-sm text-text/90">
+                    {winnerContact.username && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-text/60 text-xs">Usuario</span>
+                        <span className="font-mono text-xs">@{winnerContact.username}</span>
+                      </div>
+                    )}
+                    {winnerContact.tgId && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-text/60 text-xs">tg_id</span>
+                        <span className="font-mono text-xs">{winnerContact.tgId}</span>
+                      </div>
+                    )}
+                    {winnerContact.phone && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-text/60 text-xs">Teléfono</span>
+                        <span className="font-mono text-xs">{winnerContact.phone}</span>
+                      </div>
+                    )}
+                    {winnerContact.email && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-text/60 text-xs">Email</span>
+                        <span className="font-mono text-[11px] break-all">{winnerContact.email}</span>
+                      </div>
+                    )}
+
+                    {!winnerContact.tgId && !winnerContact.phone && !winnerContact.email && (
+                      <div className="text-xs text-text/60">
+                        No hay datos de contacto adicionales almacenados para este ganador.
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-text/60 leading-snug">
+                    Usa estos datos solo para coordinar la entrega del premio. No compartas esta información con otros usuarios sin permiso del ganador.
+                  </p>
                 </div>
               </motion.div>
             </motion.div>

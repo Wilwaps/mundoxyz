@@ -187,7 +187,7 @@ export const API_ENDPOINTS = {
   STATS: (code: string) => `/${code}/stats`,
   
   // Usuario
-  USER_RAFFLES: '/my-raffles',
+  USER_RAFFLES: '/user/my-raffles',
   USER_NUMBERS: (code: string) => `/${code}/my-numbers`,
   
   // Admin

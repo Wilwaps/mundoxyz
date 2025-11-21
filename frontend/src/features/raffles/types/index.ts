@@ -201,6 +201,15 @@ export interface RaffleWinner {
   claimedAt?: Date;
 }
 
+export interface RaffleWinnerContact {
+  userId: string;
+  username: string;
+  displayName?: string;
+  tgId?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
 // Estadísticas
 export interface RaffleStats {
   totalParticipants: number;
@@ -241,6 +250,7 @@ export interface RaffleDetailResponse {
   userNumbers?: number[];
   winner?: RaffleWinner;
   stats?: RaffleStats;
+  winnerContact?: RaffleWinnerContact;
 }
 
 export interface PurchaseResponse {

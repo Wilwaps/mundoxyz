@@ -491,6 +491,7 @@ export const useRaffle = (code: string) => {
       : (userNumbersQuery.data || []),
     stats: raffleQuery.data?.stats,
     winner,
+    winnerContact: (raffleQuery.data as any)?.winnerContact,
     
     // Estados de carga
     isLoading: raffleQuery.isLoading || numbersQuery.isLoading,

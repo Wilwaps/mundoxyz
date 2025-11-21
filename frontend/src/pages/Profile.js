@@ -25,7 +25,7 @@ import ReceiveFiresModal from '../components/ReceiveFiresModal';
 import MyDataModal from '../components/MyDataModal';
 import AdminRoomsManager from '../components/bingo/AdminRoomsManager';
 import * as raffleApi from '../features/raffles/api';
-import { useRaffleList } from '../features/raffles/hooks/useRaffleData';
+import { useUserRaffles } from '../features/raffles/hooks/useRaffleData';
 import RaffleCard from '../features/raffles/components/RaffleCard';
 
 const Profile = () => {
@@ -138,24 +138,17 @@ const Profile = () => {
     enabled: !!user?.id
   });
 
-  // Rifas del usuario (como host o participante)
+  // Rifas del usuario (como host)
   const {
-    data: raffleListData,
+    data: userRaffles = [],
     isLoading: rafflesLoading,
     error: rafflesError
-  } = useRaffleList({});
+  } = useUserRaffles();
 
-  const allRaffles = (raffleListData && raffleListData.raffles) ? raffleListData.raffles : [];
-  const myRaffles = Array.isArray(allRaffles)
-    ? allRaffles.filter((r) => {
-        const isHost = r.hostId === user?.id;
-        const hasNumbers = Array.isArray(r.myNumbers) && r.myNumbers.length > 0;
-        return isHost || hasNumbers;
-      })
-    : [];
+  const createdRaffles = Array.isArray(userRaffles) ? userRaffles : [];
 
-  const myActiveRaffles = myRaffles.filter((r) => r.status === 'active');
-  const myFinishedRaffles = myRaffles.filter((r) => r.status === 'finished');
+  const myActiveRaffles = createdRaffles.filter((r) => r.status === 'active');
+  const myFinishedRaffles = createdRaffles.filter((r) => r.status === 'finished');
 
   const handleLogout = async () => {
     if (window.confirm('¿Seguro que quieres cerrar sesión?')) {
@@ -334,7 +327,7 @@ const Profile = () => {
               <div className="space-y-3">
                 {myActiveRaffles.length === 0 ? (
                   <p className="text-sm text-text/60">
-                    No tienes rifas activas como organizador o participante.
+                    No tienes rifas activas como organizador.
                   </p>
                 ) : (
                   myActiveRaffles.slice(0, 5).map((raffle) => (
@@ -352,7 +345,7 @@ const Profile = () => {
               <div className="space-y-3">
                 {myFinishedRaffles.length === 0 ? (
                   <p className="text-sm text-text/60">
-                    Aún no tienes rifas finalizadas en las que hayas participado o sido anfitrión.
+                    Aún no tienes rifas finalizadas como organizador.
                   </p>
                 ) : (
                   myFinishedRaffles.slice(0, 5).map((raffle) => (

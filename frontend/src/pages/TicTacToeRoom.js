@@ -956,13 +956,13 @@ const TicTacToeRoom = () => {
                 </button>
               </div>
 
-              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin text-xs md:text-sm text-text/80 space-y-4">
+              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin text-sm md:text-base text-text/90 space-y-3 leading-snug">
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">1. Crear una sala desde el Lobby</h3>
+                  <h3 className="font-bold text-text text-base md:text-lg">1. Crear una sala desde el Lobby</h3>
                   <p>
                     En el Lobby de La Vieja toca <span className="font-semibold">"Crear Sala"</span>. Allí eliges cómo se va a jugar:
                   </p>
-                  <ul className="list-disc list-inside space-y-1">
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>
                       <span className="font-semibold">Modo:</span> 
                       <span> 💰 Coins o 🔥 Fires. En modo fires la apuesta es fija de 1 fuego (1 Bs).</span>
@@ -977,8 +977,8 @@ const TicTacToeRoom = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">2. Flujo de una sala</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">2. Flujo de una sala</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Creas la sala y se descuenta tu apuesta de la wallet.</li>
                     <li>Tu amigo u otro jugador entra con el código o desde el listado público.</li>
                     <li>Cuando ambos entran, el sistema arma el pozo con las dos apuestas.</li>
@@ -988,8 +988,8 @@ const TicTacToeRoom = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">3. Premios y revanchas</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">3. Premios y revanchas</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>El ganador recibe el pozo completo (sin comisión) en la misma moneda de la apuesta.</li>
                     <li>En empate, cada jugador recupera su apuesta.</li>
                     <li>Después de terminar, puedes pedir <span className="font-semibold">revancha</span> en la misma sala, sin crear una nueva.</li>
@@ -997,8 +997,8 @@ const TicTacToeRoom = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">4. Buenas prácticas</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">4. Buenas prácticas</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Antes de crear una sala grande, revisa bien tu balance de coins/fires.</li>
                     <li>Usa salas privadas cuando quieras jugar solo con amigos o hacer retos específicos.</li>
                     <li>Si una sala se queda sin oponente, puedes cerrarla desde administración para reembolsar.</li>

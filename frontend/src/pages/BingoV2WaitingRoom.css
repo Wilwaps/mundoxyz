@@ -277,29 +277,30 @@
   max-height: 60vh;
   overflow-y: auto;
   padding-right: 4px;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .help-modal-body section {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .help-modal-body h3 {
   margin: 0 0 4px;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .help-modal-body p {
-  margin: 0 0 4px;
+  margin: 0 0 3px;
 }
 
 .help-modal-body ul {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   padding-left: 1rem;
 }
 
 .help-modal-body li {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .modal-content h2 {

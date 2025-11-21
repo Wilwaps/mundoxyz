@@ -704,13 +704,13 @@ const TicTacToeLobby = () => {
                 </button>
               </div>
 
-              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin scroll-touch-y text-xs md:text-sm text-text/80 space-y-4">
+              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin scroll-touch-y text-sm md:text-base text-text/90 space-y-3 leading-snug">
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">1. Desde dónde se crean las salas</h3>
+                  <h3 className="font-bold text-text text-base md:text-lg">1. Desde dónde se crean las salas</h3>
                   <p>
                     Usa el botón <span className="font-semibold">"Crear Sala"</span> de arriba. Desde aquí defines cómo será el duelo:
                   </p>
-                  <ul className="list-disc list-inside space-y-1">
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>
                       <span className="font-semibold">Modo:</span> elige entre 💰 <span className="font-semibold">Coins</span> o 🔥 <span className="font-semibold">Fires</span>.
                     </li>
@@ -724,8 +724,8 @@ const TicTacToeLobby = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">2. Qué pasa al crear la sala</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">2. Qué pasa al crear la sala</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Se descuenta tu apuesta de la wallet y se crea una sala nueva con un código de 6 dígitos.</li>
                     <li>La sala aparece en este lobby si es pública, o puedes compartir el código si es privada.</li>
                     <li>Cuando otro jugador entra, el sistema arma el pozo con las dos apuestas.</li>
@@ -733,16 +733,16 @@ const TicTacToeLobby = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">3. Unirse usando código o lista</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">3. Unirse usando código o lista</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Desde el campo <span className="font-semibold">"Código de sala"</span> puedes entrar directo si te compartieron el código.</li>
                     <li>También puedes unirte tocando cualquier sala pública de la lista de abajo.</li>
                   </ul>
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">4. Estados de la sala</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">4. Estados de la sala</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li><span className="font-semibold">Esperando:</span> estás tú solo, esperando rival.</li>
                     <li><span className="font-semibold">Listo:</span> ambos jugadores dentro; el invitado marca "Estoy listo".</li>
                     <li><span className="font-semibold">Jugando:</span> partida en curso con turnos de 15 segundos.</li>
@@ -750,8 +750,8 @@ const TicTacToeLobby = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-text">5. Buenas prácticas</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-text text-base md:text-lg">5. Buenas prácticas</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Crea salas públicas para encontrar rivales rápido, y privadas para jugar solo con amigos.</li>
                     <li>Antes de apostar alto, revisa tu balance de coins/fires.</li>
                     <li>Si una sala se queda colgada, puedes pedir al admin/tote que la cierre para reembolsar apuestas.</li>

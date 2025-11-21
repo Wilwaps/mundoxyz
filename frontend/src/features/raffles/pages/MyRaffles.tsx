@@ -20,7 +20,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import RaffleCard from '../components/RaffleCard';
 import CreateRaffleModal from '../components/CreateRaffleModal';
-import { useRaffleList } from '../hooks/useRaffleData';
+import { useRaffleList, useUserRaffles } from '../hooks/useRaffleData';
 
 const MyRaffles: React.FC = () => {
   const navigate = useNavigate();
@@ -28,7 +28,14 @@ const MyRaffles: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'created' | 'participating'>('participating');
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  // Query de rifas - simular con useRaffleList por ahora
+  // Rifas creadas por el usuario (host)
+  const {
+    data: createdRaffles = [],
+    isLoading: createdLoading,
+    error: createdError
+  } = useUserRaffles();
+
+  // Query de rifas públicas para detectar participaciones (myNumbers)
   const {
     data: raffleData = { raffles: [] },
     isLoading,
@@ -37,9 +44,12 @@ const MyRaffles: React.FC = () => {
   
   // Separar rifas creadas y participando (por ahora usar el mismo data)
   const data = {
-    created: (raffleData as any)?.raffles?.filter((r: any) => r.hostId === user?.id) || [],
+    created: Array.isArray(createdRaffles) ? createdRaffles : [],
     participating: (raffleData as any)?.raffles?.filter((r: any) => r.myNumbers && r.myNumbers.length > 0) || []
   };
+
+  const loading = isLoading || createdLoading;
+  const combinedError = error || createdError;
   
   // Estadísticas
   const stats = {
@@ -145,7 +155,7 @@ const MyRaffles: React.FC = () => {
         
         {/* Content */}
         <AnimatePresence mode="wait">
-          {isLoading ? (
+          {loading ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -155,7 +165,7 @@ const MyRaffles: React.FC = () => {
               <div className="w-16 h-16 border-4 border-accent/30 border-t-accent rounded-full animate-spin mb-4"></div>
               <p className="text-text/60">Cargando rifas...</p>
             </motion.div>
-          ) : error ? (
+          ) : combinedError ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

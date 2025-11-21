@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { query } = require('../db');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+const fiatRateService = require('../services/fiatRateService');
 const telegramGroupRewardsService = require('../services/telegramGroupRewardsService');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -128,6 +129,63 @@ if (!token) {
       `¡Nos vemos en el juego! 🔥`,
       { parse_mode: 'Markdown' }
     );
+  });
+
+  // Handle /bcv command (BCV reference rate)
+  bot.onText(/\/bcv(?:@[^\s]+)?/, async (msg) => {
+    const chatId = msg.chat.id;
+
+    try {
+      const ctx = await fiatRateService.getOperationalContext();
+      const bcv = ctx?.bcvRate;
+
+      if (!bcv || !bcv.rate) {
+        return bot.sendMessage(
+          chatId,
+          '⚠️ No hay una tasa BCV disponible en este momento. Intenta de nuevo más tarde.'
+        );
+      }
+
+      const rate = parseFloat(bcv.rate);
+      const capturedAt = bcv.captured_at ? new Date(bcv.captured_at) : null;
+      const now = new Date();
+      let ageMinutes = null;
+
+      if (capturedAt && Number.isFinite(capturedAt.getTime())) {
+        ageMinutes = Math.round(Math.abs(now.getTime() - capturedAt.getTime()) / 60000);
+      }
+
+      const dateLabel = capturedAt
+        ? capturedAt.toLocaleString('es-VE', {
+            dateStyle: 'short',
+            timeStyle: 'short'
+          })
+        : 'N/D';
+
+      const staleWarning = ageMinutes !== null && ageMinutes > 60
+        ? '\n\n⚠️ Esta tasa tiene más de 60 minutos. Puede estar desactualizada.'
+        : '';
+
+      const sourceLabel = bcv.source || 'bcv';
+
+      const message =
+        '💵 *Tasa BCV de Referencia*' +
+        `\n\n1 USD ≈ *${rate.toFixed(2)} Bs*` +
+        `\nFuente: *${sourceLabel.toUpperCase()}*` +
+        `\nActualizada: _${dateLabel}_` +
+        (ageMinutes !== null
+          ? `\n(≈ ${ageMinutes} min atrás)`
+          : '') +
+        staleWarning;
+
+      await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Error handling /bcv command:', error);
+      bot.sendMessage(
+        chatId,
+        '❌ Ocurrió un error al obtener la tasa BCV. Intenta de nuevo más tarde.'
+      );
+    }
   });
 
   // Handle /help command

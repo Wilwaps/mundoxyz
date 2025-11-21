@@ -483,13 +483,13 @@ const RafflesLobby: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="p-4 pt-3 pb-5 space-y-4 text-xs md:text-sm text-text/80 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                <div className="p-4 pt-3 pb-5 space-y-3 text-sm md:text-base text-text/90 max-h-[70vh] overflow-y-auto scrollbar-thin leading-snug">
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">1. Abrir el creador de rifas</h4>
+                    <h4 className="font-bold text-text text-base md:text-lg">1. Abrir el creador de rifas</h4>
                     <p>
                       Pulsa el botón <span className="font-semibold">"Crear Rifa"</span>. Se abrirá un asistente con varios pasos:
                     </p>
-                    <ul className="list-disc list-inside space-y-1">
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li><span className="font-semibold">Modo:</span> define si el premio es en 🔥 fires, 🪙 monedas o un premio físico/servicio.</li>
                       <li><span className="font-semibold">Rango de números:</span> cuántos números tendrá la rifa (100, 500, 1000...).</li>
                       <li><span className="font-semibold">Precio por número:</span> cuánto paga cada jugador por número.</li>
@@ -498,8 +498,8 @@ const RafflesLobby: React.FC = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">2. Qué ves en la lista de rifas</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-base md:text-lg">2. Qué ves en la lista de rifas</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Cada tarjeta muestra nombre, estado, pote actual y número de participantes.</li>
                       <li>Las rifas públicas y empresariales se listan por defecto; puedes filtrarlas por estado y modo.</li>
                       <li>Desde aquí entras a la sala de cada rifa para comprar números y ver detalles.</li>
@@ -507,16 +507,16 @@ const RafflesLobby: React.FC = () => {
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">3. Filtros y orden</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-base md:text-lg">3. Filtros y orden</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Usa los filtros de estado, modo y orden para priorizar rifas activas, próximas o con mayor pote.</li>
                       <li>El buscador permite localizar rifas por nombre o código.</li>
                     </ul>
                   </section>
 
                   <section className="space-y-1">
-                    <h4 className="font-semibold text-text">4. Buenas prácticas al crear rifas</h4>
-                    <ul className="list-disc list-inside space-y-1">
+                    <h4 className="font-bold text-text text-base md:text-lg">4. Buenas prácticas al crear rifas</h4>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
                       <li>Elige un rango de números razonable para el tamaño de tu comunidad.</li>
                       <li>Define precios que sean atractivos pero sostenibles para el premio que ofreces.</li>
                       <li>Describe bien el premio en el proceso de creación para generar confianza.</li>

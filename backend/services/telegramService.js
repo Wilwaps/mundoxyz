@@ -4,6 +4,7 @@ class TelegramService {
   constructor() {
     this.bot = null;
     this.adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID || '1417856820';
+    this.rafflesChannelId = process.env.TELEGRAM_RAFFLES_CHANNEL_ID || this.adminChatId;
   }
 
   async sendAdminMessage(message, options = {}) {
@@ -22,6 +23,26 @@ class TelegramService {
       return true;
     } catch (error) {
       logger.error('Error sending Telegram message:', error);
+      return false;
+    }
+  }
+
+  async sendRafflesMessage(message, options = {}) {
+    try {
+      if (!this.bot) {
+        logger.warn('Telegram bot not initialized, skipping raffles message');
+        return false;
+      }
+
+      await this.bot.sendMessage(this.rafflesChannelId, message, {
+        parse_mode: 'HTML',
+        ...options
+      });
+
+      logger.info('Raffles message sent via Telegram');
+      return true;
+    } catch (error) {
+      logger.error('Error sending Telegram raffles message:', error);
       return false;
     }
   }
@@ -160,6 +181,49 @@ ${paymentDetails}
     `;
 
     return this.sendAdminMessage(message);
+  }
+
+  async notifyRaffleFinished(data) {
+    const {
+      code,
+      name,
+      mode,
+      companyName,
+      host,
+      participantsCount,
+      winners,
+      prizeLabel,
+      raffleUrl
+    } = data;
+
+    const modeLabel = mode === 'fires'
+      ? 'Fuegos'
+      : mode === 'coins'
+        ? 'Coins'
+        : 'Premio';
+
+    const hostLabel = (host && (host.displayName || host.username)) || 'Desconocido';
+
+    const winnersLines = Array.isArray(winners) && winners.length > 0
+      ? winners
+          .map((w, idx) => {
+            const display = w.displayName || w.username || `Ganador ${idx + 1}`;
+            const num = w.winningNumber !== undefined && w.winningNumber !== null
+              ? `#${w.winningNumber}`
+              : '';
+            return num ? `• ${display} — <code>${num}</code>` : `• ${display}`;
+          })
+          .join('\n')
+      : '';
+
+    const companyLine = companyName ? `\n<b>Empresa:</b> ${companyName}` : '';
+    const prizeLine = prizeLabel ? `\n<b>Premio:</b> ${prizeLabel}` : '';
+    const winnersBlock = winnersLines ? `\n<b>Ganador(es):</b>\n${winnersLines}` : '';
+    const urlLine = raffleUrl ? `\n\n🔗 <a href="${raffleUrl}">Ver rifa en MundoXYZ</a>` : '';
+
+    const message = `🎉 <b>Rifa finalizada</b>\n\n<b>${name || 'Rifa'} (${code})</b>${companyLine}\n<b>Host:</b> ${hostLabel}\n<b>Modo:</b> ${modeLabel}${prizeLine}\n<b>Participantes:</b> ${participantsCount}${winnersBlock}${urlLine}`;
+
+    return this.sendRafflesMessage(message);
   }
 
   setBot(bot) {

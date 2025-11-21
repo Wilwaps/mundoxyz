@@ -78,12 +78,16 @@ const Layout = () => {
       <header className="bg-card border-b border-glass px-4 py-3 safe-top">
         <div className="flex flex-wrap items-center justify-between gap-y-3">
           <div className="flex items-center gap-3 min-w-0">
-            <img 
-              src="/logo.ico" 
-              alt="XYZ Logo" 
-              className="w-8 h-8 md:w-10 md:h-10 object-contain flex-shrink-0"
-            />
-            <h1 className="text-xl md:text-2xl font-bold text-gradient-accent truncate">XYZ</h1>
+            <div className="flex flex-col items-start">
+              <img 
+                src="/logo.ico" 
+                alt="XYZ Logo" 
+                className="w-8 h-8 md:w-10 md:h-10 object-contain flex-shrink-0"
+              />
+              <h1 className="mt-1 text-lg md:text-xl font-bold text-gradient-accent leading-tight">
+                XYZ
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Balance Display - Clickeable */}
@@ -114,6 +118,23 @@ const Layout = () => {
               >
                 <span className="text-sm">🔥</span>
                 <span className="text-xs font-semibold">{displayFires.toFixed(2)}</span>
+              </div>
+              
+              {/* Telegram Group Shortcut */}
+              <button
+                type="button"
+                className="badge-coins cursor-pointer hover:scale-105 transition-transform"
+                onClick={() => window.open('https://web.telegram.org/a/#-1002660157966', '_blank')}
+                title="Abrir grupo oficial de Telegram"
+              >
+                <span className="text-sm">📢</span>
+              </button>
+              {/* Language Indicator */}
+              <div
+                className="badge-experience cursor-default"
+                title="Idioma: Español (España)"
+              >
+                <span className="text-sm">🇪🇸</span>
               </div>
               
               {/* Message Inbox Button */}

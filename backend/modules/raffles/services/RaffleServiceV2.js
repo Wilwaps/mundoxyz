@@ -6,6 +6,8 @@
 const { query, getClient } = require('../../../db');
 const logger = require('../../../utils/logger');
 const { generateCode } = require('../../../utils/codeGenerator');
+const config = require('../../../config/config');
+const telegramService = require('../../../services/telegramService');
 const {
   RaffleStatus,
   RaffleMode,
@@ -620,7 +622,7 @@ class RaffleServiceV2 {
       client.release();
     }
   }
-  
+
   /**
    * Obtener detalle de rifa por código
    */
@@ -661,12 +663,11 @@ class RaffleServiceV2 {
 
       const raffle = this.formatRaffleResponse(result.rows[0]);
       
-      // Obtener números si el usuario es dueño o admin
+      // Números y números del usuario
       let numbers = [];
       let userNumbers = [];
-      
+
       if (userId) {
-        // Números del usuario
         const userNumsResult = await query(
           `SELECT number_idx 
            FROM raffle_numbers 
@@ -676,8 +677,7 @@ class RaffleServiceV2 {
         );
         userNumbers = userNumsResult.rows.map(r => r.number_idx);
       }
-      
-      // Obtener estado de todos los números
+
       const numbersResult = await query(
         `SELECT 
           number_idx as idx,
@@ -693,7 +693,7 @@ class RaffleServiceV2 {
          ORDER BY rn.number_idx`,
         [raffle.id]
       );
-      
+
       numbers = numbersResult.rows.map(n => ({
         idx: n.idx,
         state: n.state,
@@ -703,8 +703,8 @@ class RaffleServiceV2 {
         reservedUntil: n.reserved_until,
         purchasedAt: n.purchased_at
       }));
-      
-      // Obtener estadísticas
+
+      // Estadísticas agregadas
       const statsResult = await query(
         `SELECT 
           COUNT(DISTINCT owner_id) FILTER (WHERE state = 'sold') as total_participants,
@@ -716,7 +716,7 @@ class RaffleServiceV2 {
          WHERE rn.raffle_id = $1`,
         [raffle.id]
       );
-      
+
       const stats = {
         totalParticipants: parseInt(statsResult.rows[0].total_participants),
         totalNumbersSold: parseInt(statsResult.rows[0].total_numbers_sold),
@@ -727,12 +727,19 @@ class RaffleServiceV2 {
           : 0,
         completionRate: Math.round((statsResult.rows[0].total_numbers_sold / raffle.numbersRange) * 100)
       };
-      
-      // Construir objeto de ganador si existe
-      let winner = undefined;
+
+      // Ganador público
+      let winner;
+      let winnerContact;
+
       if (raffle.winnerId) {
-        const currency = raffle.mode === RaffleMode.FIRES ? 'fires' : (raffle.mode === RaffleMode.COINS ? 'coins' : undefined);
-        const prizeAmount = raffle.mode === RaffleMode.FIRES ? raffle.potFires : (raffle.mode === RaffleMode.COINS ? raffle.potCoins : undefined);
+        const currency = raffle.mode === RaffleMode.FIRES
+          ? 'fires'
+          : (raffle.mode === RaffleMode.COINS ? 'coins' : undefined);
+        const prizeAmount = raffle.mode === RaffleMode.FIRES
+          ? raffle.potFires
+          : (raffle.mode === RaffleMode.COINS ? raffle.potCoins : undefined);
+
         winner = {
           userId: raffle.winnerId,
           username: raffle.winnerUsername,
@@ -741,6 +748,61 @@ class RaffleServiceV2 {
           prizeAmount,
           currency
         };
+
+        // Datos de contacto solo para el anfitrión
+        if (userId && raffle.hostId && raffle.hostId === userId) {
+          try {
+            const contactRes = await query(
+              `SELECT username, display_name, tg_id, email
+               FROM users
+               WHERE id = $1`,
+              [raffle.winnerId]
+            );
+            const contactUser = contactRes.rows[0];
+
+            let phone = null;
+            if (raffle.mode === RaffleMode.PRIZE) {
+              try {
+                const reqRes = await query(
+                  `SELECT buyer_profile
+                   FROM raffle_requests
+                   WHERE raffle_id = $1 AND buyer_id = $2 AND status = 'approved'
+                   ORDER BY created_at DESC
+                   LIMIT 1`,
+                  [raffle.id, raffle.winnerId]
+                );
+                if (reqRes.rows.length > 0 && reqRes.rows[0].buyer_profile) {
+                  const rawProfile = reqRes.rows[0].buyer_profile;
+                  const profile = typeof rawProfile === 'string' ? JSON.parse(rawProfile) : rawProfile;
+                  if (profile && profile.phone) {
+                    phone = profile.phone;
+                  }
+                }
+              } catch (profileError) {
+                logger.warn('[RaffleServiceV2] No se pudo obtener buyer_profile del ganador', {
+                  raffleId: raffle.id,
+                  winnerId: raffle.winnerId,
+                  error: profileError?.message
+                });
+              }
+            }
+
+            winnerContact = {
+              userId: raffle.winnerId,
+              username: contactUser?.username || raffle.winnerUsername,
+              displayName: contactUser?.display_name || raffle.winnerDisplayName,
+              tgId: contactUser?.tg_id ? String(contactUser.tg_id) : null,
+              email: contactUser?.email || null,
+              phone
+            };
+          } catch (contactError) {
+            logger.warn('[RaffleServiceV2] No se pudo obtener datos de contacto del ganador', {
+              raffleId: raffle.id,
+              winnerId: raffle.winnerId,
+              error: contactError?.message
+            });
+          }
+        }
       }
 
       return {
@@ -748,18 +810,15 @@ class RaffleServiceV2 {
         numbers,
         userNumbers,
         stats,
-        ...(winner ? { winner } : {})
+        ...(winner ? { winner } : {}),
+        ...(winnerContact ? { winnerContact } : {})
       };
-      
     } catch (error) {
       logger.error('[RaffleServiceV2] Error obteniendo rifa', error);
       throw error;
     }
   }
-  
-  /**
-   * Reservar número
-   */
+
   async reserveNumber(raffleId, numberIdx, userId, client = null) {
     const dbQuery = client?.query || query;
     
@@ -1434,6 +1493,11 @@ class RaffleServiceV2 {
       }
       
       const raffle = raffleResult.rows[0];
+      const hostUserResult = await client.query(
+        'SELECT username, display_name FROM users WHERE id = $1',
+        [raffle.host_id]
+      );
+      const hostUser = hostUserResult.rows[0] || null;
       
       // Soporte retrocompatible: usar raffle.mode si raffle_mode no existe en BD
       const effectiveMode = raffle.raffle_mode || raffle.mode;
@@ -1467,10 +1531,12 @@ class RaffleServiceV2 {
       
       const participants = participantsResult.rows;
       
+      
       let winner = null;
       let winningNumber = null;
       let winnerDisplayName = '';
       let winnersList = [];
+      let prizeLabel = null;
 
       if (effectiveMode === RaffleMode.PRIZE) {
         let prizeMeta = null;
@@ -1601,6 +1667,7 @@ class RaffleServiceV2 {
         winnerPrize = Math.floor(totalPot * 0.7);
         hostReward = Math.floor(totalPot * 0.2);
         platformCommission = totalPot - winnerPrize - hostReward; // El resto para evitar pérdidas por redondeo
+        prizeLabel = `${totalPot} 🔥`;
         
         logger.info('[RaffleServiceV2] Distribución calculada (modo FIRES)', {
           totalPot,
@@ -1611,9 +1678,25 @@ class RaffleServiceV2 {
       } else if (effectiveMode === RaffleMode.COINS) {
         // Modo COINS: 100% al ganador (sin split)
         winnerPrize = raffle.pot_coins || 0;
+        prizeLabel = `${winnerPrize} 🪙`;
       } else if (effectiveMode === RaffleMode.PRIZE) {
         // Modo PRIZE: No hay premio en moneda virtual
         logger.info('[RaffleServiceV2] Modo PRIZE - Sin premio en moneda virtual');
+        try {
+          if (raffle.prize_meta) {
+            const meta = typeof raffle.prize_meta === 'string'
+              ? JSON.parse(raffle.prize_meta)
+              : raffle.prize_meta;
+            if (meta && meta.prizeDescription) {
+              prizeLabel = meta.prizeDescription;
+            }
+          }
+        } catch (e) {
+          logger.warn('[RaffleServiceV2] No se pudo obtener descripción de premio para notificación Telegram', {
+            raffleId,
+            error: e.message
+          });
+        }
       }
       
       const currency = effectiveMode === RaffleMode.FIRES ? 'fires' : 'coins';
@@ -1865,6 +1948,29 @@ class RaffleServiceV2 {
               : `La rifa ${raffle.code} finalizó. Ganador: @${winner.username}`
           });
         }
+      }
+      try {
+        const baseUrl = (config && config.telegram && config.telegram.webappUrl) || (config && config.server && config.server.frontendUrl) || '';
+        const normalizedBase = baseUrl.replace(/\/$/, '');
+        const raffleUrl = normalizedBase ? `${normalizedBase}/raffles/public/${raffle.code}` : '';
+        const notifyData = {
+          code: raffle.code,
+          name: raffle.name,
+          mode: effectiveMode,
+          companyName: raffle.company_name,
+          host: {
+            id: raffle.host_id,
+            username: hostUser ? hostUser.username : null,
+            displayName: hostUser ? hostUser.display_name : null
+          },
+          participantsCount: participants.length,
+          winners: winnersList,
+          prizeLabel,
+          raffleUrl
+        };
+        await telegramService.notifyRaffleFinished(notifyData);
+      } catch (telegramError) {
+        logger.error('[RaffleServiceV2] Error enviando notificación de rifa a Telegram', telegramError);
       }
       
       return {

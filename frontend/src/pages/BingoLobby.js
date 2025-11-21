@@ -349,13 +349,13 @@ const BingoLobby = () => {
                 </button>
               </div>
 
-              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin scroll-touch-y text-xs md:text-sm text-white/80 space-y-4">
+              <div className="flex-1 px-4 pb-4 pt-3 overflow-y-auto scrollbar-thin scroll-touch-y text-sm md:text-base text-white/90 space-y-3 leading-snug">
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-white">1. Crear una sala nueva</h3>
+                  <h3 className="font-bold text-white text-base md:text-lg">1. Crear una sala nueva</h3>
                   <p>
                     Usa el botón <span className="font-semibold">"Crear Sala"</span> para abrir el formulario de configuración.
                   </p>
-                  <ul className="list-disc list-inside space-y-1">
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li><span className="font-semibold">Moneda:</span> define si se juega con fuegos 🔥 o monedas 💰.</li>
                     <li><span className="font-semibold">Modo:</span> cantidad de números del cartón (por ejemplo 75 o 90).</li>
                     <li><span className="font-semibold">Patrón de victoria:</span> línea, cartón lleno u otros formatos.</li>
@@ -364,8 +364,8 @@ const BingoLobby = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-white">2. Qué ves en la lista de salas</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-white text-base md:text-lg">2. Qué ves en la lista de salas</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Cada tarjeta muestra host, precio por cartón, modo y estado.</li>
                     <li>Las salas activas donde ya tienes cartones se resaltan y puedes volver a ellas rápidamente.</li>
                     <li>Si eres admin/tote, puedes cerrar salas problemáticas para reembolsar a los jugadores.</li>
@@ -373,24 +373,24 @@ const BingoLobby = () => {
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-white">3. Cómo unirse a una sala</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-white text-base md:text-lg">3. Cómo unirse a una sala</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Al pulsar una sala pública se abre un modal para comprar tus cartones.</li>
                     <li>Si ya estás jugando en esa sala, el sistema te lleva directamente a la sala de espera o de juego.</li>
                   </ul>
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-white">4. Filtros y búsqueda</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-white text-base md:text-lg">4. Filtros y búsqueda</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Usa los filtros de moneda y modo para encontrar salas que se ajusten a tu estilo.</li>
                     <li>La barra de búsqueda permite filtrar por código de sala o nombre del host.</li>
                   </ul>
                 </section>
 
                 <section className="space-y-1">
-                  <h3 className="font-semibold text-white">5. Buenas prácticas</h3>
-                  <ul className="list-disc list-inside space-y-1">
+                  <h3 className="font-bold text-white text-base md:text-lg">5. Buenas prácticas</h3>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
                     <li>Revisa siempre el precio del cartón y el número máximo de jugadores antes de crear.</li>
                     <li>Da tiempo suficiente para que entren jugadores antes de iniciar la partida.</li>
                     <li>Si una sala no se llena, puedes cerrarla para que el sistema reembolse automáticamente.</li>
