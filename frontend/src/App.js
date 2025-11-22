@@ -25,6 +25,7 @@ import RaffleRoom from './features/raffles/pages/RaffleRoom';
 import MyRaffles from './features/raffles/pages/MyRaffles';
 import RafflePublicLanding from './features/raffles/pages/RafflePublicLanding';
 import Landing from './pages/Landing';
+import TitoDashboard from './pages/TitoDashboard';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -125,6 +126,7 @@ function App() {
                 <Route index element={<Navigate to="/lobby" replace />} />
                 <Route path="games" element={<Games />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="tito" element={<TitoDashboard />} />
                 <Route path="lobby" element={<Lobby />} />
                 <Route path="market" element={<Market />} />
                 <Route path="roles" element={<Roles />} />

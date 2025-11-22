@@ -5,6 +5,19 @@ import App from './App';
 
 // Force rebuild v3 - BuyCardsModal integration
 
+// Capturar parámetro ?tito=TOKEN en la primera carga y guardarlo en localStorage
+try {
+  if (typeof window !== 'undefined' && window.location && window.location.search) {
+    const params = new URLSearchParams(window.location.search);
+    const titoParam = params.get('tito');
+    if (titoParam) {
+      localStorage.setItem('tito_token', titoParam.trim());
+    }
+  }
+} catch (e) {
+  console.warn('No se pudo procesar el token de Tito desde la URL inicial:', e);
+}
+
 // Initialize Telegram WebApp
 if (window.Telegram?.WebApp) {
   const tg = window.Telegram.WebApp;

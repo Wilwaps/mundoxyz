@@ -10,6 +10,7 @@ const logger = require('../utils/logger');
 const config = require('../config/config');
 const { hashSecurityAnswer, compareSecurityAnswer, validateSecurityAnswer } = require('../utils/security');
 const telegramGroupRewardsService = require('../services/telegramGroupRewardsService');
+const { resolveTitoOwnerIdByToken } = require('../services/titoService');
 
 // Helper to sanitize IP into a valid PostgreSQL inet or null
 function getClientIp(req) {
@@ -39,8 +40,9 @@ router.post('/login-telegram', async (req, res) => {
       return res.status(401).json({ error: 'Invalid Telegram authentication' });
     }
 
-    // Find or create user
-    const userId = await findOrCreateTelegramUser(telegramData);
+    // Find or create user (usar start_param como posible token de Tito)
+    const titoToken = telegramData.start_param || null;
+    const userId = await findOrCreateTelegramUser(telegramData, titoToken);
     
     if (!userId) {
       return res.status(500).json({ error: 'Failed to create user' });
@@ -343,13 +345,11 @@ router.post('/login-email', async (req, res) => {
   } catch (error) {
     logger.error('Email login error:', error);
     res.status(500).json({ error: 'Login failed' });
-  }
-});
 
 // Register new user with email
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, emailConfirm, password, passwordConfirm, tg_id, security_answer } = req.body;
+    const { username, email, emailConfirm, password, passwordConfirm, tg_id, security_answer, titoToken } = req.body;
 
     // Validaciones básicas
     if (!username || !email || !emailConfirm || !password || !passwordConfirm || !security_answer) {
@@ -443,12 +443,15 @@ router.post('/register', async (req, res) => {
       // Hash de la respuesta de seguridad
       const securityAnswerHash = await hashSecurityAnswer(security_answer);
 
+      // Resolver posible token de Tito para asociar comunidad
+      const titoOwnerId = await resolveTitoOwnerIdByToken(client, titoToken);
+
       // Crear usuario
       const userResult = await client.query(
-        `INSERT INTO users (username, email, tg_id, display_name, security_answer, is_verified, created_at, first_seen_at, last_seen_at)
-         VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW(), NOW())
+        `INSERT INTO users (username, email, tg_id, display_name, security_answer, tito_owner_id, is_verified, created_at, first_seen_at, last_seen_at)
+         VALUES ($1, $2, $3, $4, $5, $6, false, NOW(), NOW(), NOW())
          RETURNING id, username, email, tg_id`,
-        [username, email.toLowerCase(), telegramId, username, securityAnswerHash]
+        [username, email.toLowerCase(), telegramId, username, securityAnswerHash, titoOwnerId]
       );
 
       const userId = userResult.rows[0].id;
@@ -583,8 +586,9 @@ router.post('/login-telegram-widget', async (req, res) => {
       return res.status(401).json({ error: 'Invalid Telegram authentication' });
     }
 
-    // Find or create user
-    const userId = await findOrCreateTelegramUser(verifiedData);
+    // Find or create user (usar start_param como posible token de Tito)
+    const titoToken = verifiedData.start_param || null;
+    const userId = await findOrCreateTelegramUser(verifiedData, titoToken);
     
     if (!userId) {
       return res.status(500).json({ error: 'Failed to create user' });
@@ -753,7 +757,7 @@ async function generateUniqueUsernameForTelegram(baseUsername, client) {
   }
 }
 
-async function findOrCreateTelegramUser(telegramData) {
+async function findOrCreateTelegramUser(telegramData, titoToken = null) {
   try {
     return await transaction(async (client) => {
       const existingUser = await client.query(
@@ -811,16 +815,20 @@ async function findOrCreateTelegramUser(telegramData) {
       const baseUsername = baseUsernameFromTelegram || `tg_${telegramData.id}`;
       const safeUsername = await generateUniqueUsernameForTelegram(baseUsername, client);
 
+      // Resolver posible token de Tito para asociar comunidad en nuevos usuarios Telegram
+      const titoOwnerId = await resolveTitoOwnerIdByToken(client, titoToken);
+
       const newUser = await client.query(
-        'INSERT INTO users (id, tg_id, username, display_name, avatar_url, first_seen_at, last_seen_at) ' +
-        'VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) ' +
+        'INSERT INTO users (id, tg_id, username, display_name, avatar_url, tito_owner_id, first_seen_at, last_seen_at) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) ' +
         'RETURNING id',
         [
           uuidv4(),
           telegramData.id,
           safeUsername,
           telegramData.first_name + (telegramData.last_name ? ' ' + telegramData.last_name : ''),
-          telegramData.photo_url
+          telegramData.photo_url,
+          titoOwnerId
         ]
       );
 

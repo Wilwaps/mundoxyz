@@ -5,6 +5,7 @@ const { verifyToken, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const config = require('../config/config');
 const telegramService = require('../services/telegramService');
+const { calculateAndLogCommission } = require('../services/commissionService');
 
 // Request to redeem fires for fiat (mínimo 100, con comisión 5%)
 router.post('/redeem-100-fire', verifyToken, async (req, res) => {
@@ -40,7 +41,7 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
       return res.status(400).json({ error: errorMessage });
     }
     
-    // Calcular comisión 5%
+    // Calcular comisión 5% (cantidad total que se reservará como comisión de plataforma)
     const commission = requestedAmount * 0.05;
     const totalRequired = requestedAmount + commission;
 
@@ -111,6 +112,21 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
           method === 'usdt_tron' ? (network || 'TRON') : null
         ]
       );
+
+      // Registrar distribución de comisión (Tito / Tote) en commissions_log
+      const platformRate = 0.05;
+      const split = await calculateAndLogCommission({
+        client,
+        operationId: redeemResult.rows[0].id,
+        operationType: 'withdraw',
+        actorUserId: userId,
+        amountBase: requestedAmount,
+        platformCommissionRate: platformRate,
+        metadata: {
+          route: 'redeem-100-fire',
+          payout_method: method
+        }
+      });
       
       // Record wallet transaction del usuario (canje + comisión)
       await client.query(
@@ -140,14 +156,59 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
         [requestedAmount, userId, `Canje de mercado: ${requestedAmount} fuegos`, req.ip]
       );
       
-      // Transferir comisión al usuario admin (tg_id 1417856820)
+      // Transferir comisión al usuario admin/Tote (solo la parte que queda para plataforma)
       const adminTgId = '1417856820';
       const adminCheck = await client.query(
         'SELECT id FROM users WHERE tg_id = $1',
         [adminTgId]
       );
       
-      if (adminCheck.rows.length > 0) {
+      // 1) Acreditar comisión a Tito si aplica
+      if (split.titoUserId && split.titoCommissionAmount > 0) {
+        const titoWalletRes = await client.query(
+          'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+          [split.titoUserId]
+        );
+
+        if (titoWalletRes.rows.length > 0) {
+          const titoWallet = titoWalletRes.rows[0];
+          const titoBefore = parseFloat(titoWallet.fires_balance || 0);
+          const titoAmount = split.titoCommissionAmount;
+
+          await client.query(
+            `UPDATE wallets 
+             SET fires_balance = fires_balance + $1
+             WHERE id = $2`,
+            [titoAmount, titoWallet.id]
+          );
+
+          await client.query(
+            `INSERT INTO wallet_transactions 
+             (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+             VALUES (
+               $1,
+               'tito_commission_withdraw', 'fires', $2,
+               $3,
+               $4,
+               $5,
+               $6
+             )`,
+            [
+              titoWallet.id,
+              titoAmount,
+              titoBefore,
+              titoBefore + titoAmount,
+              `Comisión Tito canje mercado (5% de ${requestedAmount})`,
+              redeemResult.rows[0].id
+            ]
+          );
+        }
+      }
+
+      // 2) Acreditar comisión restante al admin/Tote
+      const toteCommissionAmount = split.toteCommissionAmount;
+
+      if (adminCheck.rows.length > 0 && toteCommissionAmount > 0) {
         const adminUserId = adminCheck.rows[0].id;
         
         // Acreditar comisión al admin
@@ -155,7 +216,7 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
           `UPDATE wallets 
            SET fires_balance = fires_balance + $1
            WHERE user_id = $2`,
-          [commission, adminUserId]
+          [toteCommissionAmount, adminUserId]
         );
         
         // Registrar transacción del admin
@@ -169,17 +230,17 @@ router.post('/redeem-100-fire', verifyToken, async (req, res) => {
              (SELECT fires_balance FROM wallets WHERE user_id = $1),
              $3, $4
            )`,
-          [adminUserId, commission,
+          [adminUserId, toteCommissionAmount,
            `Comisión canje mercado (5% de ${requestedAmount})`,
            redeemResult.rows[0].id]
         );
         
         logger.info('Commission transferred to admin', {
           adminUserId,
-          commission: commission.toFixed(2),
+          commission: toteCommissionAmount.toFixed(2),
           redemptionId: redeemResult.rows[0].id
         });
-      } else {
+      } else if (adminCheck.rows.length === 0) {
         logger.warn('Admin user not found for commission transfer', { adminTgId });
       }
       

@@ -33,6 +33,7 @@ const telegramWebhookRoutes = require('./routes/telegram-webhook');
 const rafflesV2Routes = require('./modules/raffles/routes');
 const experienceRoutes = require('./routes/experience');
 const messagesRoutes = require('./routes/messages');
+const commissionsRoutes = require('./routes/commissions');
 
 // Create Express app
 const app = express();
@@ -258,6 +259,7 @@ app.use('/api/bingo/v2', (req, res, next) => {
 }, bingoV2Routes);
 app.use('/api/market', marketRoutes);
 app.use('/api/rooms', roomsRoutes);
+app.use('/api/commissions', commissionsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
 app.use('/api/debug-xp', debugXpRoutes);

@@ -13,7 +13,8 @@ import {
   Shield,
   Clock,
   Settings,
-  Trophy
+  Trophy,
+  Sparkles
 } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
@@ -66,6 +67,11 @@ const Layout = () => {
     { path: '/roles', icon: Shield, label: 'Rol' },
     { path: '/upcoming', icon: Clock, label: 'Próximo' }
   ];
+
+  // Añadir panel Tito para usuarios con rol 'tito'
+  if (user?.roles?.includes('tito')) {
+    navItems.splice(5, 0, { path: '/tito', icon: Sparkles, label: 'Tito' });
+  }
 
   // Añadir panel Admin para admins o para usuarios tote
   if (isAdmin() || isTote) {

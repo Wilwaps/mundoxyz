@@ -4,8 +4,14 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 // Database configuration
+// Prefer DATABASE_PUBLIC_URL (Railway proxy) if present, then DATABASE_URL, then local PG vars
+const connectionString =
+  process.env.DATABASE_PUBLIC_URL ||
+  process.env.DATABASE_URL ||
+  `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`,
+  connectionString,
   ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false
 });
 

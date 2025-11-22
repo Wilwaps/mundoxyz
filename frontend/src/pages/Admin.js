@@ -238,6 +238,7 @@ const AdminUsers = () => {
           <option value="vip">VIP</option>
           <option value="moderator">Moderador</option>
           <option value="admin">Admin</option>
+          <option value="tito">Tito</option>
         </select>
       </div>
 

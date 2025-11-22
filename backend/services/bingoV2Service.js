@@ -5,6 +5,7 @@ const BingoCardGenerator = require('../utils/bingoCardGenerator');
 
 // ID de la plataforma/Tote en Telegram (usado como fallback para comisiones)
 const PLATFORM_TELEGRAM_ID = '1417856820';
+const { calculateAndLogCommission } = require('./commissionService');
 
 class BingoV2Service {
   /**
@@ -1241,11 +1242,27 @@ class BingoV2Service {
         );
       }
 
-      // 10% commission to platform/Tote
+      // 10% commission to platform/Tote (y Tito si aplica)
       if (platformFee > 0) {
         const balanceField = currencyColumn;
         let targetWallet = null;
 
+        // Calcular split Tito/Tote y registrar en commissions_log (10%)
+        const platformRate = 0.10;
+        const split = await calculateAndLogCommission({
+          client,
+          operationId: `bingo_room_${roomId}`,
+          operationType: 'bingo',
+          actorUserId: room.host_id,
+          amountBase: totalPot,
+          platformCommissionRate: platformRate,
+          metadata: {
+            roomId,
+            roomCode: room.code
+          }
+        });
+
+        // Buscar wallet de Tote
         try {
           const toteRes = await dbQuery(
             `SELECT w.id, w.${balanceField} AS balance, u.id as user_id
@@ -1287,10 +1304,52 @@ class BingoV2Service {
           }
         }
 
-        if (targetWallet) {
+        // 1) Acreditar comisión a Tito si aplica
+        if (split.titoUserId && split.titoCommissionAmount > 0) {
+          const titoWalletRes = await dbQuery(
+            `SELECT id, ${balanceField} AS balance FROM wallets WHERE user_id = $1 LIMIT 1 FOR UPDATE`,
+            [split.titoUserId]
+          );
+
+          if (titoWalletRes.rows.length > 0) {
+            const titoWallet = titoWalletRes.rows[0];
+            const beforeTito = parseFloat(titoWallet.balance || 0);
+            const afterTito = beforeTito + split.titoCommissionAmount;
+
+            try {
+              await dbQuery(
+                `UPDATE wallets
+                 SET ${balanceField} = $1
+                 WHERE id = $2`,
+                [afterTito, titoWallet.id]
+              );
+
+              await dbQuery(
+                `INSERT INTO wallet_transactions
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+                 VALUES ($1, 'bingo_tito_fee', $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                  titoWallet.id,
+                  currency,
+                  split.titoCommissionAmount,
+                  beforeTito,
+                  afterTito,
+                  'Comisión Tito Bingo sala #' + room.code + ' (10% del pot)',
+                  'bingo_commission_' + room.code,
+                  room.host_id
+                ]
+              );
+            } catch (e) {
+              logger.error('[BingoV2Service] Error acreditando comisión Tito', e);
+            }
+          }
+        }
+
+        // 2) Acreditar comisión restante a Tote/plataforma
+        if (targetWallet && split.toteCommissionAmount > 0) {
           const safeBefore = parseFloat(targetWallet.balance || 0);
           const before = Number.isFinite(safeBefore) ? safeBefore : 0;
-          const after = before + platformFee;
+          const after = before + split.toteCommissionAmount;
 
           try {
             await dbQuery(
@@ -1307,7 +1366,7 @@ class BingoV2Service {
               [
                 targetWallet.id,
                 currency,
-                platformFee,
+                split.toteCommissionAmount,
                 before,
                 after,
                 'Comisión de Bingo sala #' + room.code + ' (10% del pot)',
@@ -1319,13 +1378,13 @@ class BingoV2Service {
             logger.info('[BingoV2Service] Comisión de plataforma acreditada', {
               roomId,
               walletId: targetWallet.id,
-              platformFee,
+              platformFee: split.toteCommissionAmount,
               currency
             });
           } catch (e) {
             logger.error('[BingoV2Service] Error acreditando comisión de plataforma', e);
           }
-        } else {
+        } else if (!targetWallet) {
           logger.warn('[BingoV2Service] No se encontró wallet destino para comisión de plataforma', {
             roomId,
             currency,

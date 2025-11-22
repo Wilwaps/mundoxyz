@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
   total_games_won INTEGER DEFAULT 0,
   role VARCHAR(50) DEFAULT 'user',
   roles TEXT[] DEFAULT ARRAY['user'],
+  tito_owner_id UUID REFERENCES users(id),
   is_active BOOLEAN DEFAULT true,
   is_verified BOOLEAN DEFAULT false,
   nickname VARCHAR(20) UNIQUE,
@@ -51,10 +52,71 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_tg_id ON users(tg_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname) WHERE nickname IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_tito_owner_id ON users(tito_owner_id) WHERE tito_owner_id IS NOT NULL;
 
 COMMENT ON TABLE users IS 'Usuarios del sistema - información principal';
 COMMENT ON COLUMN users.experience IS 'Puntos de experiencia acumulados';
 COMMENT ON COLUMN users.security_answer IS 'Respuesta de seguridad para recuperación de cuenta';
+
+COMMENT ON COLUMN users.tito_owner_id IS 'Usuario Tito que trajo a este usuario (tracking de comunidad Tito)';
+
+-- ============================================
+-- TITO TOKENS
+-- ============================================
+CREATE TABLE IF NOT EXISTS tito_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  tito_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(128) NOT NULL UNIQUE,
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_tito_tokens_user ON tito_tokens(tito_user_id);
+CREATE INDEX IF NOT EXISTS idx_tito_tokens_status ON tito_tokens(status);
+
+COMMENT ON TABLE tito_tokens IS 'Tokens de invitación para rol Tito (tracking de comunidad)';
+COMMENT ON COLUMN tito_tokens.tito_user_id IS 'Usuario con rol Tito dueño del token';
+COMMENT ON COLUMN tito_tokens.token IS 'Token único utilizado en links ?tito=TOKEN';
+
+-- ============================================
+-- COMMISSIONS LOG (Tito / Líder / Pote / Tote)
+-- ============================================
+CREATE TABLE IF NOT EXISTS commissions_log (
+  id BIGSERIAL PRIMARY KEY,
+  operation_id VARCHAR(64) NOT NULL,
+  operation_type VARCHAR(32) NOT NULL,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount_base DECIMAL(18,4) NOT NULL,
+  platform_commission_rate NUMERIC(6,4) NOT NULL,
+  platform_commission_total DECIMAL(18,4) NOT NULL,
+
+  tito_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+  tito_commission_amount DECIMAL(18,4),
+  tito_base_amount DECIMAL(18,4),
+  tito_referral_amount DECIMAL(18,4),
+
+  leader_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+  leader_commission_amount DECIMAL(18,4),
+
+  community_pot_amount DECIMAL(18,4),
+  tote_commission_amount DECIMAL(18,4) NOT NULL,
+
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_commissions_log_user ON commissions_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_commissions_log_tito ON commissions_log(tito_user_id) WHERE tito_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_commissions_log_leader ON commissions_log(leader_user_id) WHERE leader_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_commissions_log_operation ON commissions_log(operation_type, operation_id);
+CREATE INDEX IF NOT EXISTS idx_commissions_log_created ON commissions_log(created_at DESC);
+
+COMMENT ON TABLE commissions_log IS 'Log de distribuciones de comisión (Tito / Líder / Pote / Tote) por operación económica';
+COMMENT ON COLUMN commissions_log.operation_type IS 'Tipo de operación: withdraw, transfer, raffle_fire, bingo, etc.';
+COMMENT ON COLUMN commissions_log.tito_base_amount IS 'Parte de la comisión de Tito por ser rol Tito (propia actividad)';
+COMMENT ON COLUMN commissions_log.tito_referral_amount IS 'Parte de la comisión de Tito por comunidad (usuarios traídos con token)';
 
 -- ============================================
 -- 2. AUTH_IDENTITIES

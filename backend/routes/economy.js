@@ -5,6 +5,7 @@ const { verifyToken, requireAdmin, adminAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const telegramService = require('../services/telegramService');
 const fiatRateService = require('../services/fiatRateService');
+const { calculateAndLogCommission } = require('../services/commissionService');
 
 // Get user balance
 router.get('/balance', verifyToken, async (req, res) => {
@@ -505,18 +506,33 @@ router.post('/transfer-fires', verifyToken, async (req, res) => {
         throw new Error('No puedes enviarte fuegos a ti mismo');
       }
 
-      // Calcular comisión 5%
-      const commission = parsedAmount * 0.05;
-      const totalToDeduct = parsedAmount + commission;
-
       const fromBalance = parseFloat(fromWallet.rows[0].fires_balance);
+
+      // Calcular comisión 5% y distribución (Tito/Tote) + registrar en commissions_log
+      const platformRate = 0.05;
+      const operationId = `transfer_fires_${from_user_id}_${Date.now()}`;
+
+      const split = await calculateAndLogCommission({
+        client,
+        operationId,
+        operationType: 'transfer',
+        actorUserId: fromWallet.rows[0].user_id,
+        amountBase: parsedAmount,
+        platformCommissionRate: platformRate,
+        metadata: {
+          toUserId: toWallet.rows[0].user_id
+        }
+      });
+
+      const commission = split.platformCommissionTotal;
+      const totalToDeduct = parsedAmount + commission;
 
       // Verificar balance suficiente
       if (fromBalance < totalToDeduct) {
         throw new Error(`Balance insuficiente. Necesitas ${totalToDeduct} fuegos (${parsedAmount} + ${commission.toFixed(2)} comisión)`);
       }
 
-      // Obtener wallet de Tote para la comisión
+      // Obtener wallet de Tote para la parte de comisión que queda en plataforma
       const toteWallet = await client.query(
         `SELECT w.* FROM wallets w 
          JOIN users u ON u.id = w.user_id 
@@ -550,15 +566,73 @@ router.post('/transfer-fires', verifyToken, async (req, res) => {
         [parsedAmount, toWallet.rows[0].id]
       );
 
-      // Agregar comisión a Tote
-      await client.query(
-        `UPDATE wallets 
-         SET fires_balance = fires_balance + $1,
-             total_fires_earned = total_fires_earned + $1,
-             updated_at = NOW()
-         WHERE id = $2`,
-        [commission, toteWallet.rows[0].id]
-      );
+      // Distribuir comisión entre Tito (si aplica) y Tote
+
+      // 1) Tito
+      if (split.titoUserId && split.titoCommissionAmount > 0) {
+        const titoWalletRes = await client.query(
+          'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+          [split.titoUserId]
+        );
+
+        if (titoWalletRes.rows.length > 0) {
+          const titoWallet = titoWalletRes.rows[0];
+          const titoBefore = parseFloat(titoWallet.fires_balance || 0);
+          const titoAmount = split.titoCommissionAmount;
+
+          await client.query(
+            `UPDATE wallets 
+             SET fires_balance = fires_balance + $1,
+                 total_fires_earned = total_fires_earned + $1,
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [titoAmount, titoWallet.id]
+          );
+
+          await client.query(
+            `INSERT INTO wallet_transactions 
+             (wallet_id, type, currency, amount, balance_before, balance_after, description, related_user_id)
+             VALUES ($1, 'tito_commission_transfer', 'fires', $2, $3, $4, $5, $6)`,
+            [
+              titoWallet.id,
+              titoAmount,
+              titoBefore,
+              titoBefore + titoAmount,
+              'Comisión Tito por transferencia (5%)',
+              fromWallet.rows[0].user_id
+            ]
+          );
+        }
+      }
+
+      // 2) Tote (resto de la comisión)
+      const toteCommissionAmount = split.toteCommissionAmount;
+      if (toteCommissionAmount > 0) {
+        const toteBalance = parseFloat(toteWallet.rows[0].fires_balance);
+
+        await client.query(
+          `UPDATE wallets 
+           SET fires_balance = fires_balance + $1,
+               total_fires_earned = total_fires_earned + $1,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [toteCommissionAmount, toteWallet.rows[0].id]
+        );
+
+        await client.query(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description, related_user_id)
+           VALUES ($1, 'commission', 'fires', $2, $3, $4, $5, $6)`,
+          [
+            toteWallet.rows[0].id,
+            toteCommissionAmount,
+            toteBalance,
+            toteBalance + toteCommissionAmount,
+            'Comisión por transferencia (5%)',
+            fromWallet.rows[0].user_id
+          ]
+        );
+      }
 
       // Registrar transacción del emisor
       await client.query(

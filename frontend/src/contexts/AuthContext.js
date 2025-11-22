@@ -224,6 +224,8 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Respuesta de seguridad inválida' };
       }
       
+      const titoToken = typeof window !== 'undefined' ? localStorage.getItem('tito_token') : null;
+
       const response = await axios.post('/api/auth/register', {
         username: formData.username,
         email: formData.email,
@@ -231,7 +233,8 @@ export const AuthProvider = ({ children }) => {
         password: formData.password,
         passwordConfirm: formData.passwordConfirm,
         security_answer: securityAnswer,
-        tg_id: formData.tg_id || null
+        tg_id: formData.tg_id || null,
+        titoToken: titoToken || undefined
       });
       const { token, user: userData } = response.data;
 
@@ -243,6 +246,13 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', token);
       }
       localStorage.setItem('user', JSON.stringify(normalizedUser));
+
+      // Una vez registrado, ya no necesitamos el token local de Tito en este dispositivo
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('tito_token');
+        }
+      } catch (_) {}
 
       setUser(normalizedUser);
 

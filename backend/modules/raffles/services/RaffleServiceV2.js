@@ -8,6 +8,7 @@ const logger = require('../../../utils/logger');
 const { generateCode } = require('../../../utils/codeGenerator');
 const config = require('../../../config/config');
 const telegramService = require('../../../services/telegramService');
+const { calculateAndLogCommission } = require('../../../services/commissionService');
 const {
   RaffleStatus,
   RaffleMode,
@@ -1785,6 +1786,21 @@ class RaffleServiceV2 {
         
         // 3. COMISIÓN A LA PLATAFORMA (solo modo FIRES)
         if (platformCommission > 0 && effectiveMode === RaffleMode.FIRES) {
+          // Calcular split Tito/Tote y registrar en commissions_log (10%)
+          const platformRate = 0.10;
+          const split = await calculateAndLogCommission({
+            client,
+            operationId: `raffle_${raffle.id}`,
+            operationType: 'raffle_fire',
+            actorUserId: raffle.host_id,
+            amountBase: raffle.pot_fires || 0,
+            platformCommissionRate: platformRate,
+            metadata: {
+              raffleId,
+              raffleCode: raffle.code
+            }
+          });
+
           // Intentar acreditar a la wallet del rol 'tote'
           let targetWallet = null;
           try {
@@ -1820,13 +1836,52 @@ class RaffleServiceV2 {
             }
           }
 
-          if (targetWallet) {
+          // 3.1 Acreditar comisión a Tito si aplica
+          if (split.titoUserId && split.titoCommissionAmount > 0) {
+            const titoWalletRes = await client.query(
+              'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+              [split.titoUserId]
+            );
+
+            if (titoWalletRes.rows.length > 0) {
+              const titoWallet = titoWalletRes.rows[0];
+              const titoBefore = parseFloat(titoWallet.fires_balance || 0);
+              const titoAmount = split.titoCommissionAmount;
+
+              await client.query(
+                `UPDATE wallets
+                 SET fires_balance = fires_balance + $1
+                 WHERE id = $2`,
+                [titoAmount, titoWallet.id]
+              );
+
+              await client.query(
+                `INSERT INTO wallet_transactions
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, related_user_id)
+                 VALUES ($1, 'raffle_tito_commission', $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                  titoWallet.id,
+                  'fires',
+                  titoAmount,
+                  titoBefore,
+                  titoBefore + titoAmount,
+                  `Comisión Tito rifa ${raffle.code} (10% del pot)`,
+                  `raffle_commission_${raffle.code}`,
+                  raffle.host_id
+                ]
+              );
+            }
+          }
+
+          // 3.2 Acreditar comisión restante a Tote/plataforma
+          const toteAmount = split.toteCommissionAmount;
+          if (targetWallet && toteAmount > 0) {
             const before = parseFloat(targetWallet.fires_balance || 0);
             await client.query(
               `UPDATE wallets
                SET fires_balance = fires_balance + $1
                WHERE id = $2`,
-              [platformCommission, targetWallet.id]
+              [toteAmount, targetWallet.id]
             );
             await client.query(
               `INSERT INTO wallet_transactions
@@ -1835,19 +1890,20 @@ class RaffleServiceV2 {
               [
                 targetWallet.id,
                 'fires',
-                platformCommission,
+                toteAmount,
                 before,
-                before + platformCommission,
+                before + toteAmount,
                 `Comisión de rifa ${raffle.code} (10% del pot)`,
                 `raffle_commission_${raffle.code}`,
                 raffle.host_id
               ]
             );
-            logger.info('[RaffleServiceV2] Comisión acreditada (tote/plataforma)', {
+            logger.info('[RaffleServiceV2] Comisión acreditada (tito/tote)', {
               walletId: targetWallet.id,
-              commission: platformCommission
+              commission: toteAmount,
+              titoUserId: split.titoUserId
             });
-          } else {
+          } else if (!targetWallet) {
             logger.warn('[RaffleServiceV2] No se encontró wallet destino para comisión de plataforma');
           }
         }
