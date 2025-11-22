@@ -8,12 +8,18 @@ import {
   BarChart3, Target, Sparkles, Gift, MessageCircle
 } from 'lucide-react';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import './Landing.css';
 
 const Landing = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [bingoCardCount, setBingoCardCount] = useState(4);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     fetchPublicStats();
@@ -116,6 +122,48 @@ const Landing = () => {
         {children}
       </motion.div>
     );
+  };
+
+  const handlePlayBingo = () => {
+    if (user) {
+      navigate('/bingo');
+    } else {
+      navigate('/register?next=/bingo');
+    }
+  };
+
+  const handleGenerateBingoPdf = async () => {
+    if (generatingPdf) return;
+    let count = parseInt(bingoCardCount, 10);
+    if (!Number.isFinite(count) || count <= 0) {
+      count = 1;
+    }
+    if (count > 40) {
+      count = 40;
+    }
+    setBingoCardCount(count);
+    setGeneratingPdf(true);
+    try {
+      const cards = generateMultipleBingo75Cards(count);
+      const payload = {
+        createdAt: Date.now(),
+        mode: 75,
+        count,
+        cards
+      };
+      try {
+        localStorage.setItem('bingoPrintCards', JSON.stringify(payload));
+      } catch (_) {}
+      await createBingoPdfFromCards(cards);
+      try {
+        localStorage.removeItem('bingoPrintCards');
+      } catch (_) {}
+    } catch (error) {
+      console.error('Error generating bingo PDF', error);
+      alert('Error al generar el PDF de cartones. Intenta nuevamente.');
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   return (
@@ -423,6 +471,54 @@ const Landing = () => {
         </section>
       </FadeInSection>
 
+      <FadeInSection>
+        <section className="bingo-print-section">
+          <div className="container">
+            <div className="section-header">
+              <Target size={32} className="section-icon" />
+              <h2>Saca tus cartones o juega aquí</h2>
+              <p>Genera cartones de bingo 75 bolas para imprimir o entra directo al lobby de bingo.</p>
+            </div>
+            <div className="bingo-print-content">
+              <div className="bingo-print-generator">
+                <h3>Cartones para imprimir</h3>
+                <p>Elige cuántos cartones quieres (máximo 40). Se crearán en un PDF con 4 cartones por hoja carta, listo para imprimir.</p>
+                <div className="bingo-print-input-row">
+                  <label htmlFor="bingo-card-count">Cantidad de cartones</label>
+                  <input
+                    id="bingo-card-count"
+                    type="number"
+                    min="1"
+                    max="40"
+                    value={bingoCardCount}
+                    onChange={(e) => setBingoCardCount(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="bingo-print-button"
+                  type="button"
+                  disabled={generatingPdf}
+                  onClick={handleGenerateBingoPdf}
+                >
+                  {generatingPdf ? 'Generando PDF...' : 'Sacar cartones para imprimir'}
+                </button>
+              </div>
+              <div className="bingo-play-cta">
+                <h3>Juega bingo en vivo</h3>
+                <p>Si prefieres jugar en línea, entra al lobby de bingo y participa con la comunidad.</p>
+                <button
+                  className="bingo-play-button"
+                  type="button"
+                  onClick={handlePlayBingo}
+                >
+                  Ir al lobby de bingo
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
       {/* ECONOMÍA DUAL */}
       <FadeInSection>
         <section className="dual-economy-section">
@@ -648,7 +744,7 @@ const Landing = () => {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>© 2025 MUNDOXYZ - Todos los derechos reservados</p>
+            <p> 2025 MUNDOXYZ - Todos los derechos reservados</p>
             <p className="footer-tagline">Donde tu diversión tiene valor real</p>
           </div>
         </div>
@@ -656,5 +752,175 @@ const Landing = () => {
     </div>
   );
 };
+
+function generateMultipleBingo75Cards(count) {
+  const cards = [];
+  const usedHashes = new Set();
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    let card;
+    let hash;
+    do {
+      card = generateSingleBingo75Card();
+      hash = getBingoCardHash(card);
+      attempts += 1;
+      if (attempts > 100) {
+        break;
+      }
+    } while (usedHashes.has(hash));
+    usedHashes.add(hash);
+    cards.push({ ...card, index: i + 1 });
+  }
+  return cards;
+}
+
+function generateSingleBingo75Card() {
+  const ranges = {
+    B: { min: 1, max: 15 },
+    I: { min: 16, max: 30 },
+    N: { min: 31, max: 45 },
+    G: { min: 46, max: 60 },
+    O: { min: 61, max: 75 }
+  };
+  const columns = { B: [], I: [], N: [], G: [], O: [] };
+  const grid = [];
+  const allNumbers = [];
+  Object.keys(ranges).forEach((letter) => {
+    const range = ranges[letter];
+    const numbers = getRandomNumbersInRange(range.min, range.max, 5);
+    columns[letter] = numbers.sort((a, b) => a - b);
+  });
+  for (let row = 0; row < 5; row++) {
+    const gridRow = [];
+    ['B', 'I', 'N', 'G', 'O'].forEach((letter) => {
+      if (letter === 'N' && row === 2) {
+        gridRow.push({ value: 'FREE', free: true });
+      } else {
+        const value = columns[letter][row];
+        gridRow.push({ value, free: false });
+        allNumbers.push(value);
+      }
+    });
+    grid.push(gridRow);
+  }
+  columns.N.splice(2, 1);
+  return { grid, allNumbers };
+}
+
+function getRandomNumbersInRange(min, max, count) {
+  const available = [];
+  for (let i = min; i <= max; i++) {
+    available.push(i);
+  }
+  const numbers = [];
+  for (let i = 0; i < count && available.length > 0; i++) {
+    const index = Math.floor(Math.random() * available.length);
+    const value = available.splice(index, 1)[0];
+    numbers.push(value);
+  }
+  return numbers;
+}
+
+function getBingoCardHash(card) {
+  if (!card || !Array.isArray(card.allNumbers)) {
+    return '';
+  }
+  const sorted = [...card.allNumbers].sort((a, b) => a - b);
+  return sorted.join('-');
+}
+
+async function createBingoPdfFromCards(cards) {
+  const container = document.createElement('div');
+  container.className = 'bingo-print-root';
+  container.style.position = 'fixed';
+  container.style.left = '0';
+  container.style.top = '0';
+  container.style.opacity = '0';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '-1';
+  document.body.appendChild(container);
+  let currentPage = null;
+  cards.forEach((card, index) => {
+    if (index % 4 === 0) {
+      currentPage = document.createElement('div');
+      currentPage.className = 'bingo-print-page';
+      container.appendChild(currentPage);
+    }
+    const cardElement = buildPrintableCardElement(card);
+    currentPage.appendChild(cardElement);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const pages = Array.from(container.querySelectorAll('.bingo-print-page'));
+  const pdf = new jsPDF('p', 'pt', 'letter');
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const canvas = await html2canvas(page, {
+      backgroundColor: '#ffffff',
+      scale: 3
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+    const renderWidth = imgWidth * ratio;
+    const renderHeight = imgHeight * ratio;
+    const x = (pdfWidth - renderWidth) / 2;
+    const y = (pdfHeight - renderHeight) / 2;
+    if (i > 0) {
+      pdf.addPage();
+    }
+    pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
+  }
+  document.body.removeChild(container);
+  const fileName = cards.length === 1 ? 'carton-bingo-75.pdf' : `cartones-bingo-75-${cards.length}.pdf`;
+  pdf.save(fileName);
+}
+
+function buildPrintableCardElement(card) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'bingo-print-card';
+  const header = document.createElement('div');
+  header.className = 'bingo-print-card-header';
+  const title = document.createElement('div');
+  title.textContent = 'BINGO 75';
+  const code = document.createElement('div');
+  code.textContent = `N.º ${card.index}`;
+  header.appendChild(title);
+  header.appendChild(code);
+  const grid = document.createElement('div');
+  grid.className = 'bingo-print-grid';
+  const headerRow = document.createElement('div');
+  headerRow.className = 'bingo-print-grid-header';
+  ['B', 'I', 'N', 'G', 'O'].forEach((letter) => {
+    const cell = document.createElement('div');
+    cell.className = 'bingo-print-cell bingo-print-cell-header';
+    cell.textContent = letter;
+    headerRow.appendChild(cell);
+  });
+  grid.appendChild(headerRow);
+  card.grid.forEach((row) => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'bingo-print-grid-row';
+    row.forEach((cellData) => {
+      const cell = document.createElement('div');
+      cell.className = 'bingo-print-cell';
+      if (cellData && cellData.value === 'FREE') {
+        cell.className += ' bingo-print-cell-free';
+        cell.textContent = 'FREE';
+      } else if (cellData && typeof cellData.value === 'number') {
+        cell.textContent = String(cellData.value);
+      } else {
+        cell.textContent = '';
+      }
+      rowEl.appendChild(cell);
+    });
+    grid.appendChild(rowEl);
+  });
+  wrapper.appendChild(header);
+  wrapper.appendChild(grid);
+  return wrapper;
+}
 
 export default Landing;

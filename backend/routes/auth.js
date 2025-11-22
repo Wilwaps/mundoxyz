@@ -233,7 +233,7 @@ router.post('/login-email', async (req, res) => {
         maxAge: 7 * 24 * 60 * 60 * 1000
       });
 
-      const payload = {
+      const adminPayload = {
         success: true,
         token,
         refreshToken,
@@ -254,7 +254,7 @@ router.post('/login-email', async (req, res) => {
       };
 
       logger.info('login-email admin success', { userId });
-      return res.json(payload);
+      return res.json(adminPayload);
     }
 
     // Regular email/username login with stored password
@@ -340,11 +340,152 @@ router.post('/login-email', async (req, res) => {
         roles: (row.roles || []).filter(Boolean)
       }
     };
+
     logger.info('login-email regular success', { userId });
     return res.json(payload);
   } catch (error) {
     logger.error('Email login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+  // Get user data
+  const userResult = await query(
+    'SELECT u.*, w.id as wallet_id, w.coins_balance, w.fires_balance, ' +
+    'u.experience, u.total_games_played, u.total_games_won, ' +
+    'array_agg(r.name) as roles ' +
+    'FROM users u ' +
+    'LEFT JOIN wallets w ON w.user_id = u.id ' +
+    'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
+    'LEFT JOIN roles r ON r.id = ur.role_id ' +
+    'WHERE u.id = $1 ' +
+    'GROUP BY u.id, w.id, w.coins_balance, w.fires_balance, u.experience, u.total_games_played, u.total_games_won',
+    [userId]
+  );
+
+  const user = userResult.rows[0];
+
+  // Set cookie
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: config.security.cookieSecure,
+    sameSite: 'none',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+
+  const payload = {
+    success: true,
+    token,
+    refreshToken,
+    user: {
+      id: user.id,
+      tg_id: user.tg_id,
+      username: user.username,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      wallet_id: user.wallet_id,
+      coins_balance: parseFloat(user.coins_balance || 0),
+      fires_balance: parseFloat(user.fires_balance || 0),
+      experience: user.experience || 0,
+      total_games_played: user.total_games_played || 0,
+      total_games_won: user.total_games_won || 0,
+      roles: user.roles?.filter(Boolean) || []
+    }
+  };
+
+  logger.info('login-email admin success', { userId });
+  return res.json(payload);
+}
+
+// Regular email/username login with stored password
+logger.info('login-email regular path');
+const result = await query(
+  'SELECT u.id, u.username, u.email, ai.password_hash, w.id as wallet_id, ' +
+  'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
+  'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
+  'u.security_answer IS NOT NULL as has_security_answer, ' +
+  'u.experience, u.total_games_played, u.total_games_won, ' +
+  'array_agg(r.name) as roles ' +
+  'FROM users u ' +
+  "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
+  'LEFT JOIN wallets w ON w.user_id = u.id ' +
+  'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
+  'LEFT JOIN roles r ON r.id = ur.role_id ' +
+  'WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1) OR ai.provider_uid = $1 ' +
+  'GROUP BY u.id, ai.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
+  [identifier]
+);
+
+if (result.rows.length === 0) {
+  return res.status(401).json({ error: 'Credenciales inválidas' });
+}
+
+const row = result.rows[0];
+if (!row.password_hash) {
+  return res.status(401).json({ error: 'Usuario sin contraseña configurada' });
+}
+
+const ok = await bcrypt.compare(password, row.password_hash);
+if (!ok) {
+  return res.status(401).json({ error: 'Credenciales inválidas' });
+}
+
+const userId = row.id;
+
+// Acreditar recompensas pendientes por mensajes en grupo de Telegram
+let tgGroupRewards = { credited: 0 };
+try {
+  const rewardResult = await telegramGroupRewardsService.creditPendingRewardsForUser(userId);
+  if (rewardResult && typeof rewardResult.credited === 'number') {
+    tgGroupRewards.credited = rewardResult.credited;
+  }
+} catch (error) {
+  logger.error('Error crediting Telegram group rewards on login-email:', error);
+}
+
+const token = generateToken(userId);
+const refreshToken = generateRefreshToken(userId);
+
+await query(
+  'INSERT INTO user_sessions (user_id, session_token, refresh_token, ip_address, user_agent, expires_at) ' +
+  "VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')",
+  [userId, token, refreshToken, getClientIp(req), req.headers['user-agent']]
+);
+
+res.cookie('token', token, {
+  httpOnly: true,
+  secure: config.security.cookieSecure,
+  sameSite: 'none',
+  maxAge: 7 * 24 * 60 * 60 * 1000
+});
+
+const baseCoinsBalance = parseFloat(row.coins_balance || 0);
+const coinsBalanceWithRewards = baseCoinsBalance + (tgGroupRewards.credited || 0);
+
+const payload = {
+  success: true,
+  token,
+  refreshToken,
+  user: {
+    id: row.id,
+    username: row.username,
+    email: row.email,
+    wallet_id: row.wallet_id,
+    coins_balance: coinsBalanceWithRewards,
+    fires_balance: parseFloat(row.fires_balance || 0),
+    experience: row.experience || 0,
+    total_games_played: row.total_games_played || 0,
+    total_games_won: row.total_games_won || 0,
+    has_security_answer: row.has_security_answer || false,
+    roles: (row.roles || []).filter(Boolean)
+  }
+};
+logger.info('login-email regular success', { userId });
+return res.json(payload);
+} catch (error) {
+  logger.error('Email login error:', error);
+  res.status(500).json({ error: 'Login failed' });
+}
+});
 
 // Register new user with email
 router.post('/register', async (req, res) => {
