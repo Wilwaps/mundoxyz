@@ -116,7 +116,123 @@ Se aplica la siguiente lógica conceptual (números iniciales, ajustables):
 
 ---
 
-## 4. Ideas futuras de roles (borrador)
+## 4. Rol: Vendedor y Sistema de Tiendas
+
+### 4.1. Perfil e intención
+
+- Usuario asociado a una **tienda** (comercio físico o digital) dentro de MundoXYZ.
+- Su objetivo es **vender productos y servicios** usando la economía interna (fuegos, coins, rifas, juegos, canjes).
+
+### 4.2. Tiendas y catálogo de productos
+
+- Cada tienda tiene:
+  - Nombre, logo, datos de contacto, dirección y horario.
+  - Configuración de comisiones/porcentajes con MundoXYZ.
+  - Opciones de entrega (retiro en tienda, delivery, etc. a definir).
+- Productos:
+  - Pueden ser **productos físicos** (pizzas, bebidas, ropa) o **servicios**.
+  - Atributos principales:
+    - Nombre, descripción corta.
+    - Precio base (en fuegos, coins o moneda fiat de referencia).
+    - Categoría (ej. Pizzas, Bebidas, Postres).
+    - Etiqueta opcional **"menú"** para aparecer en el menú principal de la tienda.
+  - Opciones configurables por producto (tipo "ingredientes"):
+    - Ejemplo Pizza Primavera:
+      - Ingredientes por defecto: jamón, maíz, tocineta.
+      - El cliente puede **desmarcar** cualquiera de esos ingredientes antes de confirmar el pedido.
+    - Conceptualmente: lista de opciones con checkboxes (incluido por defecto, precio extra opcional).
+
+### 4.3. Punto de Venta (POS) para vendedores
+
+- Interfaz de **Punto de Venta** dentro de MundoXYZ:
+  - El vendedor busca al cliente (usuario de MundoXYZ) o registra un **cliente invitado**.
+  - Agrega productos al pedido, ajusta cantidades y opciones (ej. quitar maíz de la pizza).
+  - El pedido entra en un **carrito POS** con:
+    - Subtotal, impuestos, descuentos, total.
+    - Método de pago: fuegos, coins, efectivo externo, transferencia, etc. (a definir técnicamente).
+  - Al confirmar el pedido:
+    - Se crea una **orden de venta** ligada a la tienda y al usuario (si está logueado).
+    - Se descuenta inventario y se actualizan métricas de la tienda.
+
+### 4.4. Carrito para clientes online
+
+- Clientes que no están físicamente en la tienda pueden:
+  - Abrir el **menú** de la tienda (con los productos marcados como "menú").
+  - Seleccionar productos, configurar opciones (toppings, extras, ingredientes a quitar).
+  - Agregar al carrito y confirmar el pedido.
+- El flujo de pago puede usar:
+  - Fuegos / coins.
+  - Métodos externos (ej. pago móvil, efectivo) registrados como referencia.
+
+### 4.5. Inventario y facturación
+
+- Inventario por tienda:
+  - Stock por producto y, si aplica, por variante.
+  - Ajustes manuales de stock (entradas de mercancía, pérdidas, promociones, etc.).
+- Facturación:
+  - Cada pedido confirmado genera un **documento de venta** (factura o comprobante interno).
+  - Futuro: exportar reportes en CSV/PDF para contabilidad.
+
+### 4.6. Reportes de la tienda
+
+- Reportes que la tienda puede consultar:
+  - Ventas **diarias, semanales, mensuales o por rango de fechas**.
+  - Productos más vendidos y tickets promedio.
+  - Opcional: margen estimado por producto/categoría.
+- Estos reportes se integran con el sistema de roles para potencialmente:
+  - Recompensar a tiendas/vendedores con mejor desempeño.
+  - Conectar tiendas con líderes de comunidad o patrocinantes.
+
+### 4.7. Propietario de tienda vs. Vendedor
+
+- **Propietario de tienda**:
+  - Crea y configura la tienda.
+  - Administra catálogo, precios, inventario y comisiones.
+  - Otorga y revoca permisos de **vendedor**.
+- **Vendedor**:
+  - Usa el POS para registrar pedidos.
+  - Ve un panel con sus ventas personales (cantidad de pedidos atendidos, volumen, etc.).
+  - No puede modificar configuraciones críticas de la tienda.
+
+---
+
+## 5. Sistema de seguimiento de referidos
+
+### 5.1. Objetivo
+
+- Permitir que cada usuario genere **links de invitación** rastreables.
+- Medir cuántas personas interactúan con esos links y recompensar a quien los comparte.
+
+### 5.2. Tokens de rastreo
+
+- Cada vez que un usuario comparte un link (rifa, sala de juego, landing, tienda, etc.),
+  el sistema genera un **token de rastreo** único.
+- El link compartido incluye ese token (ej. `?ref=TOKENXYZ`).
+- Conceptualmente se registran dos niveles:
+  - **Toques al link**: cuántas veces se abrió el enlace.
+  - **Activaciones**: cuántos usuarios se loguearon/registraron y realizaron alguna acción después de entrar por ese enlace.
+
+### 5.3. Puntos de participación
+
+- Cada toque/activación suma **puntos de participación** al usuario dueño del token.
+- Estos puntos no son monedas; sirven para:
+  - Aumentar la **probabilidad de ganar premios** en sorteos especiales.
+  - Desbloquear logros o niveles dentro del sistema de roles.
+- Idea conceptual de ponderación (ajustable):
+  - 1 punto por cada toque único.
+  - Puntos extra si el referido se registra, juega, compra o crea rifas.
+
+### 5.4. Transparencia y paneles
+
+- Panel para el usuario que comparte:
+  - Lista de links activos y su token.
+  - Toques, activaciones y puntos generados por cada link.
+- A nivel de plataforma:
+  - Métricas agregadas de referidos para campañas de crecimiento.
+
+---
+
+## 6. Ideas futuras de roles (borrador)
 
 > Estas ideas son solo semillas. Las iremos detallando y aprobando contigo antes de pasar a diseño técnico.
 
@@ -135,7 +251,7 @@ Se aplica la siguiente lógica conceptual (números iniciales, ajustables):
 
 ---
 
-## 5. Próximos pasos
+## 7. Próximos pasos
 
 1. **Validar contigo las ideas de Patrocinante y Líder de Comunidad** (porcentajes, condiciones, límites).
 2. Definir qué acciones exactas generan el 3% + 1% (solo retiros y envíos, o también compras de rifas / juegos).

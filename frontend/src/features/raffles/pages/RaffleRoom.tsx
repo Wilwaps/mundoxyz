@@ -72,6 +72,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   });
   const [showGuestAuthModal, setShowGuestAuthModal] = useState(false);
   const guestTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const boardRef = React.useRef<HTMLDivElement | null>(null);
+  const [isExportingBoard, setIsExportingBoard] = useState(false);
 
   const saveGuestSelection = (raffleCode: string, numbers: number[]) => {
     try {
@@ -417,6 +419,36 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     navigate(`/register?next=${encodeURIComponent(nextUrl)}`);
   };
 
+  const handleExportBoardImage = async () => {
+    if (!boardRef.current || !raffle) return;
+    try {
+      setIsExportingBoard(true);
+      const { default: html2canvas } = await import('html2canvas');
+
+      const canvas = await html2canvas(boardRef.current, {
+        backgroundColor: '#020617',
+        scale: window.devicePixelRatio > 1 ? 2 : 1.5
+      });
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const link = document.createElement('a');
+      const safeName = (raffle.name || 'rifa')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/gi, '-');
+      link.href = dataUrl;
+      link.download = `${safeName || 'rifa'}-tablero.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('[RaffleRoom] Error exportando tablero:', error);
+      toast.error('No se pudo generar la imagen del tablero. Intenta de nuevo.');
+    } finally {
+      setIsExportingBoard(false);
+    }
+  };
+
   // Manejar selección de números
   const handleNumberClick = (number: number) => {
     const numberData = numbers?.find((n: any) => n.idx === number);
@@ -648,6 +680,31 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     totalPot: raffle?.potFires || raffle?.potCoins || 0,
     myNumbers: raffleData.userNumbers?.length || 0
   };
+
+  const drawModeLabel = (() => {
+    if (!raffle || !raffle.drawMode) return 'No definido';
+
+    if (raffle.drawMode === DrawMode.AUTOMATIC) {
+      return 'Automático (al vender el último número)';
+    }
+
+    if (raffle.drawMode === DrawMode.MANUAL) {
+      return 'Manual (el anfitrión decide cuándo sortear)';
+    }
+
+    if (raffle.drawMode === DrawMode.SCHEDULED) {
+      if (raffle.scheduledDrawAt) {
+        const d = new Date(raffle.scheduledDrawAt);
+        return `Programado: ${d.toLocaleString('es-VE', {
+          dateStyle: 'short',
+          timeStyle: 'short'
+        })}`;
+      }
+      return 'Programado (fecha por definir)';
+    }
+
+    return String(raffle.drawMode);
+  })();
 
   const prizeWinners =
     raffle?.mode === RaffleMode.PRIZE && (raffle as any)?.prizeMeta && Array.isArray((raffle as any).prizeMeta.winners)
@@ -1159,15 +1216,72 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               className="space-y-6 pb-12"
             >
               {/* Grilla de números */}
-              <div className="bg-glass rounded-xl p-6">
-                <NumberGrid
-                  numbers={numbers || []}
-                  totalNumbers={raffle.numbersRange}
-                  userNumbers={raffleData.userNumbers || []}
-                  selectedNumbers={selectedNumbers}
-                  onNumberClick={handleNumberClick}
-                  disabled={raffle.status !== RaffleStatus.ACTIVE}
-                />
+              <div className="bg-glass rounded-xl p-4 sm:p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-text/80">Tablero de números</h4>
+                    <p className="text-xs text-text/60">
+                      Vista actual con números vendidos, reservados y disponibles.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportBoardImage}
+                    disabled={isExportingBoard}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-accent/40 bg-accent/10 hover:bg-accent/20 transition-colors ${
+                      isExportingBoard ? 'opacity-60 cursor-wait' : ''
+                    }`}
+                  >
+                    <Share2 className="w-3 h-3" />
+                    {isExportingBoard ? 'Generando imagen...' : 'Descargar tablero JPG'}
+                  </button>
+                </div>
+
+                <div ref={boardRef} className="space-y-3">
+                  <div className="flex justify-between items-start gap-3 text-xs text-text/70">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-text text-sm line-clamp-2">{raffle.name}</div>
+                      <div>
+                        <span className="font-semibold">Código:</span> {raffle.code}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Modo:</span>{' '}
+                        {raffle.mode === RaffleMode.FIRES && '🔥 Fuegos'}
+                        {raffle.mode === RaffleMode.COINS && '🪙 Monedas'}
+                        {raffle.mode === RaffleMode.PRIZE && '🎁 Premio'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Modo de victoria:</span>{' '}
+                        {drawModeLabel}
+                      </div>
+                    </div>
+                    {raffle.mode === RaffleMode.PRIZE && raffle.prizeMeta && (raffle.prizeMeta.prizeImages?.[0] || raffle.prizeImageBase64) && (
+                      <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+                        <img
+                          src={(raffle.prizeMeta.prizeImages && raffle.prizeMeta.prizeImages[0]) || raffle.prizeImageBase64 || ''}
+                          alt="Premio"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <NumberGrid
+                    numbers={numbers || []}
+                    totalNumbers={raffle.numbersRange}
+                    userNumbers={raffleData.userNumbers || []}
+                    selectedNumbers={selectedNumbers}
+                    onNumberClick={handleNumberClick}
+                    disabled={raffle.status !== RaffleStatus.ACTIVE}
+                  />
+
+                  <div className="flex justify-between items-center text-[11px] text-text/60">
+                    <span>
+                      Vendidos: {stats.soldNumbers} • Reservados: {stats.reservedNumbers} • Disponibles: {stats.availableNumbers}
+                    </span>
+                    <span>{window.location.origin}/raffles/{raffle.code}</span>
+                  </div>
+                </div>
               </div>
               
               {/* Barra de compra flotante - Alineada a la izquierda */}
@@ -1242,7 +1356,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       <p className="text-text mb-2">{raffle.prizeMeta.prizeDescription}</p>
                       {raffle.prizeMeta.prizeValue > 0 && (
                         <p className="text-sm text-text/60">
-                          Valor estimado: ${raffle.prizeMeta.prizeValue}
+                          Valor estimado: 🔥 {raffle.prizeMeta.prizeValue}
                         </p>
                       )}
                     </div>
@@ -1260,6 +1374,10 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                           {raffle.mode === 'coins' && '🪙 Monedas'}
                           {raffle.mode === 'prize' && '🎁 Premio'}
                         </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text/60">Modo de victoria:</span>
+                        <span className="text-text text-right">{drawModeLabel}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-text/60">Precio por número:</span>

@@ -24,11 +24,6 @@ const Market = () => {
   });
   const [payoutMethod, setPayoutMethod] = useState('bs'); // 'bs' | 'usdt_tron'
 
-  const amountNumber = parseFloat(redeemData.fires_amount || 0);
-  const commissionAmount = amountNumber * 0.05;
-  const totalRequiredAmount = amountNumber + commissionAmount;
-  const estimatedUsdt = amountNumber > 0 ? amountNumber / FIRES_PER_USDT : 0;
-
   // Fetch user's redemption history
   const { data: redeems } = useQuery({
     queryKey: ['my-redeems'],
@@ -37,6 +32,28 @@ const Market = () => {
       return response.data;
     }
   });
+
+  // Fetch FIAT context (BCV, Binance, tasa operativa MundoXYZ)
+  const { data: fiatContext } = useQuery({
+    queryKey: ['fiat-context'],
+    queryFn: async () => {
+      const response = await axios.get('/api/economy/fiat-context');
+      return response.data;
+    }
+  });
+
+  const firesPerUsdt = fiatContext?.config?.fires_per_usdt ?? FIRES_PER_USDT;
+
+  const amountNumber = parseFloat(redeemData.fires_amount || 0);
+  const commissionAmount = amountNumber * 0.05;
+  const totalRequiredAmount = amountNumber + commissionAmount;
+  const estimatedUsdt = amountNumber > 0 ? amountNumber / firesPerUsdt : 0;
+
+  const operationalRate = fiatContext?.operationalRate?.rate ?? null;
+  const estimatedBs =
+    payoutMethod === 'bs' && amountNumber > 0 && operationalRate
+      ? (amountNumber / firesPerUsdt) * operationalRate
+      : null;
 
   // Redeem mutation
   const redeemMutation = useMutation({
@@ -402,13 +419,25 @@ const Market = () => {
                 {payoutMethod === 'usdt_tron' ? (
                   <p className="text-warning text-xs">
                     Se debitarán {totalRequiredAmount.toFixed(2)} 🔥 de tu cuenta ({amountNumber.toFixed(2)} + 5% comisión).
-                    {' '}Recibirás aproximadamente {estimatedUsdt.toFixed(2)} USDT (1 USDT ≈ {FIRES_PER_USDT} 🔥).
+                    {' '}Recibirás aproximadamente {estimatedUsdt.toFixed(2)} USDT (1 USDT ≈ {firesPerUsdt} 🔥).
                     {' '}El proceso de pago puede tardar hasta 48 horas.
                   </p>
                 ) : (
                   <p className="text-warning text-xs">
                     Se debitarán {totalRequiredAmount.toFixed(2)} 🔥 de tu cuenta ({amountNumber.toFixed(2)} + 5% comisión).
-                    {' '}El equivalente en Bs se calculará según la tasa interna MundoXYZ al momento de procesar.
+                    {' '}
+                    {estimatedBs !== null ? (
+                      <>
+                        Recibirás <span className="font-semibold">{estimatedBs.toFixed(2)} Bs</span>
+                        {operationalRate && (
+                          <>
+                            {' '}según la tasa operativa MundoXYZ ({operationalRate.toFixed(2)} Bs por 1 USD).
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      'El equivalente en Bs se calculará según la tasa interna MundoXYZ al momento de procesar.'
+                    )}
                     {' '}El proceso de pago puede tardar hasta 48 horas.
                   </p>
                 )}
