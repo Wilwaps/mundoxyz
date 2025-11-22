@@ -75,19 +75,17 @@ const Layout = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background-dark">
       {/* Header */}
-      <header className="bg-card border-b border-glass px-4 py-2 safe-top">
-        <div className="flex flex-wrap items-center justify-between gap-y-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex flex-col items-start">
-              <img
-                src="/logo.ico"
-                alt="XYZ Logo"
-                className="w-8 h-8 md:w-9 md:h-9 object-contain flex-shrink-0"
-              />
-              <h1 className="mt-0.5 text-base md:text-lg font-bold text-gradient-accent leading-tight">
-                XYZ
-              </h1>
-            </div>
+      <header className="bg-card border-b border-glass px-3 py-1.5 safe-top">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src="/logo.ico"
+              alt="XYZ Logo"
+              className="w-8 h-8 md:w-9 md:h-9 object-contain flex-shrink-0"
+            />
+            <h1 className="text-base md:text-lg font-bold text-gradient-accent leading-none">
+              XYZ
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             {/* Balance Display - Clickeable */}

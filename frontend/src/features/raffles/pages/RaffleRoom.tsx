@@ -427,7 +427,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
 
       const canvas = await html2canvas(boardRef.current, {
         backgroundColor: '#020617',
-        scale: window.devicePixelRatio > 1 ? 2 : 1.5
+        scale: window.devicePixelRatio > 1 ? 2 : 1.5,
+        useCORS: true,
+        logging: false
       });
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -436,11 +438,26 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
         .toString()
         .toLowerCase()
         .replace(/[^a-z0-9]+/gi, '-');
+      const fileName = `${safeName || 'rifa'}-tablero.jpg`;
+
       link.href = dataUrl;
-      link.download = `${safeName || 'rifa'}-tablero.jpg`;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      // Fallback para algunos navegadores móviles que ignoran el atributo download con data URLs
+      const ua = navigator.userAgent || '';
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+      if (isMobile) {
+        try {
+          window.open(dataUrl, '_blank');
+        } catch (e) {
+          // fallback silencioso si el navegador bloquea window.open
+        }
+      }
+
+      toast.success('Tablero generado. Revisa tus descargas o galería.');
     } catch (error) {
       console.error('[RaffleRoom] Error exportando tablero:', error);
       toast.error('No se pudo generar la imagen del tablero. Intenta de nuevo.');
