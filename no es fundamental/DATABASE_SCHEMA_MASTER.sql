@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS commissions_log (
   tito_commission_amount DECIMAL(18,4),
   tito_base_amount DECIMAL(18,4),
   tito_referral_amount DECIMAL(18,4),
+  tito_global_amount DECIMAL(18,4),
 
   leader_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
   leader_commission_amount DECIMAL(18,4),
@@ -117,6 +118,7 @@ COMMENT ON TABLE commissions_log IS 'Log de distribuciones de comisión (Tito / 
 COMMENT ON COLUMN commissions_log.operation_type IS 'Tipo de operación: withdraw, transfer, raffle_fire, bingo, etc.';
 COMMENT ON COLUMN commissions_log.tito_base_amount IS 'Parte de la comisión de Tito por ser rol Tito (propia actividad)';
 COMMENT ON COLUMN commissions_log.tito_referral_amount IS 'Parte de la comisión de Tito por comunidad (usuarios traídos con token)';
+COMMENT ON COLUMN commissions_log.tito_global_amount IS 'Porción de la comisión de plataforma (1.5% de M) reservada como dividendo global para todos los Titos';
 
 -- ============================================
 -- 2. AUTH_IDENTITIES
