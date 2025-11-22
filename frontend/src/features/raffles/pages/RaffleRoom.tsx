@@ -451,7 +451,11 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
       if (isMobile) {
         try {
-          window.open(dataUrl, '_blank');
+          const win = window.open('', '_blank');
+          if (win && win.document) {
+            win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8" /><title>${fileName}</title></head><body style="margin:0;background:#020617;display:flex;align-items:center;justify-content:center;"><img src="${dataUrl}" style="max-width:100%;height:auto;box-shadow:0 0 24px rgba(0,0,0,0.6);" alt="Tablero de rifa" /></body></html>`);
+            win.document.close();
+          }
         } catch (e) {
           // fallback silencioso si el navegador bloquea window.open
         }
