@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { verifyToken, adminAuth } = require('../middleware/auth');
+const { verifyToken, adminAuth, requireTote } = require('../middleware/auth');
 const giftService = require('../services/giftService');
 const logger = require('../utils/logger');
 
@@ -49,6 +49,91 @@ router.post('/claim/:giftId', verifyToken, async (req, res) => {
   } catch (error) {
     logger.error('Error claiming gift:', error);
     res.status(400).json({ error: error.message || 'Failed to claim gift' });
+  }
+});
+
+// Tote: Crear link de regalo desde supply
+router.post('/links', verifyToken, requireTote, async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const gift = await giftService.createGiftLink(senderId, req.body);
+
+    const originHeader = req.get('origin');
+    const baseUrl = originHeader ? originHeader.replace(/\/$/, '') : '';
+    const url = gift.link_token && baseUrl
+      ? `${baseUrl}/gift-link/${gift.link_token}`
+      : null;
+
+    res.json({
+      success: true,
+      gift,
+      url
+    });
+  } catch (error) {
+    logger.error('Error creating gift link:', error);
+    res.status(400).json({ error: error.message || 'Failed to create gift link' });
+  }
+});
+
+// Usuario: Reclamar link de regalo por token
+router.post('/links/claim', verifyToken, async (req, res) => {
+  try {
+    const { token } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    const result = await giftService.claimGiftLink(token, req.user.id, req.ip);
+
+    logger.info('Gift link claimed', {
+      userId: req.user.id,
+      firesReceived: result.fires_received,
+      coinsReceived: result.coins_received
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Error claiming gift link:', error);
+    res.status(400).json({ error: error.message || 'Failed to claim gift link' });
+  }
+});
+
+// Tote: Listar links de regalo creados
+router.get('/links/my', verifyToken, requireTote, async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = parseInt(req.query.offset, 10) || 0;
+
+    const result = await query(
+      `SELECT 
+        dg.id,
+        dg.message,
+        dg.fires_amount,
+        dg.max_claims,
+        dg.claimed_count,
+        dg.status,
+        dg.origin,
+        dg.link_token,
+        dg.created_at,
+        dg.expires_at
+       FROM direct_gifts dg
+       WHERE dg.sender_id = $1
+         AND dg.target_type = 'link'
+       ORDER BY dg.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [senderId, limit, offset]
+    );
+
+    res.json({
+      links: result.rows,
+      limit,
+      offset
+    });
+  } catch (error) {
+    logger.error('Error fetching gift links:', error);
+    res.status(500).json({ error: 'Failed to fetch gift links' });
   }
 });
 

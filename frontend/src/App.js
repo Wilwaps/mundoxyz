@@ -25,7 +25,15 @@ import RaffleRoom from './features/raffles/pages/RaffleRoom';
 import MyRaffles from './features/raffles/pages/MyRaffles';
 import RafflePublicLanding from './features/raffles/pages/RafflePublicLanding';
 import Landing from './pages/Landing';
+import GiftLinkClaimPage from './pages/GiftLinkClaimPage';
 import TitoDashboard from './pages/TitoDashboard';
+import PoolLobby from './pages/PoolLobby';
+import PoolRoom from './pages/PoolRoom';
+import CaidaLobby from './pages/CaidaLobby';
+import CaidaRoom from './pages/CaidaRoom';
+import StoreFront from './pages/store/StoreFront';
+import POS from './pages/store/POS';
+import KitchenDisplay from './pages/store/KitchenDisplay';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -42,7 +50,7 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -50,13 +58,13 @@ function ProtectedRoute({ children }) {
       </div>
     );
   }
-  
+
   if (!user) {
     const nextPath = `${location.pathname}${location.search}`;
     const target = `/login?next=${encodeURIComponent(nextPath)}`;
     return <Navigate to={target} replace />;
   }
-  
+
   return children;
 }
 
@@ -80,71 +88,80 @@ function App() {
         <SocketProvider>
           <Router>
             <div className="App min-h-screen bg-background-dark text-text font-display">
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                duration: 2000,
-                style: {
-                  background: '#121A2B',
-                  color: '#E6EDF3',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '0.75rem',
-                  backdropFilter: 'blur(10px)',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#10B981',
-                    secondary: '#E6EDF3',
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  duration: 2000,
+                  style: {
+                    background: '#121A2B',
+                    color: '#E6EDF3',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '0.75rem',
+                    backdropFilter: 'blur(10px)',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#EF4444',
-                    secondary: '#E6EDF3',
+                  success: {
+                    iconTheme: {
+                      primary: '#10B981',
+                      secondary: '#E6EDF3',
+                    },
                   },
-                },
-              }}
-            />
-            
-            <Routes>
-              {/* Landing Page Principal (sin login) */}
-              <Route path="/landing" element={<Landing />} />
-              
-              {/* Landing Pública de Rifas (sin login) */}
-              <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
-              
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              
-              
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<Navigate to="/lobby" replace />} />
-                <Route path="games" element={<Games />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="tito" element={<TitoDashboard />} />
-                <Route path="lobby" element={<Lobby />} />
-                <Route path="market" element={<Market />} />
-                <Route path="roles" element={<Roles />} />
-                <Route path="upcoming" element={<Upcoming />} />
-                <Route path="bingo" element={<BingoLobby />} />
-                <Route path="bingo/v2/room/:code" element={<BingoV2WaitingRoom />} />
-                <Route path="bingo/v2/play/:code" element={<BingoV2GameRoom />} />
-                <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
-                <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
-                <Route path="raffles" element={<RafflesLobby />} />
-                <Route path="raffles/my" element={<MyRaffles />} />
-                <Route path="raffles/:code" element={<RaffleRoom />} />
-                <Route path="admin/*" element={<Admin />} />
-              </Route>
-            </Routes>
-          </div>
-        </Router>
-      </SocketProvider>
+                  error: {
+                    iconTheme: {
+                      primary: '#EF4444',
+                      secondary: '#E6EDF3',
+                    },
+                  },
+                }}
+              />
+
+              <Routes>
+                {/* Landing Page Principal (sin login) */}
+                <Route path="/landing" element={<Landing />} />
+
+                {/* Landing Pública de Rifas (sin login) */}
+                <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
+
+                <Route path="/gift-link/:token" element={<GiftLinkClaimPage />} />
+
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+
+
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="/lobby" replace />} />
+                  <Route path="games" element={<Games />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="tito" element={<TitoDashboard />} />
+                  <Route path="lobby" element={<Lobby />} />
+                  <Route path="market" element={<Market />} />
+                  <Route path="roles" element={<Roles />} />
+                  <Route path="upcoming" element={<Upcoming />} />
+                  <Route path="bingo" element={<BingoLobby />} />
+                  <Route path="bingo/v2/room/:code" element={<BingoV2WaitingRoom />} />
+                  <Route path="bingo/v2/play/:code" element={<BingoV2GameRoom />} />
+                  <Route path="tictactoe/lobby" element={<TicTacToeLobby />} />
+                  <Route path="tictactoe/room/:code" element={<TicTacToeRoom />} />
+                  <Route path="pool/lobby" element={<PoolLobby />} />
+                  <Route path="pool/room/:code" element={<PoolRoom />} />
+                  <Route path="caida/lobby" element={<CaidaLobby />} />
+                  <Route path="caida/room/:code" element={<CaidaRoom />} />
+                  <Route path="store/:slug" element={<StoreFront />} />
+                  <Route path="store/:slug/pos" element={<POS />} />
+                  <Route path="store/:slug/kitchen" element={<KitchenDisplay />} />
+                  <Route path="raffles" element={<RafflesLobby />} />
+                  <Route path="raffles/my" element={<MyRaffles />} />
+                  <Route path="raffles/:code" element={<RaffleRoom />} />
+                  <Route path="admin/*" element={<Admin />} />
+                </Route>
+              </Routes>
+            </div>
+          </Router>
+        </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

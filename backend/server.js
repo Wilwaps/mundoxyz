@@ -34,6 +34,11 @@ const rafflesV2Routes = require('./modules/raffles/routes');
 const experienceRoutes = require('./routes/experience');
 const messagesRoutes = require('./routes/messages');
 const commissionsRoutes = require('./routes/commissions');
+const poolRoutes = require('./routes/pool');
+const caidaRoutes = require('./routes/caida');
+const storeCoreRoutes = require('./routes/store/core');
+const storeOrderRoutes = require('./routes/store/orders');
+const storeInventoryRoutes = require('./routes/store/inventory');
 
 // Create Express app
 const app = express();
@@ -42,10 +47,10 @@ const server = createServer(app);
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
       // Allow same origins as Express CORS
       if (!origin) return callback(null, true);
-      
+
       const allowedOrigins = [
         config.server.frontendUrl,
         'http://localhost:3000',
@@ -83,7 +88,7 @@ global.io = io;
 // Socket.IO connection handler
 io.on('connection', (socket) => {
   logger.info('New socket connection:', socket.id);
-  
+
   // Get userId from socket handshake
   const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
   // Join personal user room to receive direct notifications
@@ -95,27 +100,35 @@ io.on('connection', (socket) => {
       logger.warn('Failed to join personal room', { userId, error: e?.message });
     }
   }
-  
+
   // Initialize TicTacToe socket handlers
   const { initTicTacToeSocket } = require('./socket/tictactoe');
   initTicTacToeSocket(io, socket);
-  
+
+  // Initialize Pool socket handlers
+  const { initPoolSocket } = require('./socket/pool');
+  initPoolSocket(io, socket);
+
+  // Initialize Caída socket handlers
+  const { initCaidaSocket } = require('./socket/caida');
+  initCaidaSocket(io, socket);
+
   // Initialize Unified Chat socket handlers
   const globalChatHandler = require('./socket/globalChat');
   const anonymousChatHandler = require('./socket/anonymousChat');
   const roomChatHandler = require('./socket/roomChat');
   const ronChatHandler = require('./socket/ronChat');
-  
+
   globalChatHandler(io, socket);
   anonymousChatHandler(io, socket);
   roomChatHandler(io, socket);
   ronChatHandler(io, socket);
-  
+
   // Initialize Raffle socket handlers
   if (userId) {
     raffleSocketHandler.handleConnection(socket, userId);
   }
-  
+
   socket.on('disconnect', () => {
     logger.info('Socket disconnected:', socket.id);
   });
@@ -155,7 +168,7 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
 
@@ -253,6 +266,20 @@ app.use('/api/tictactoe', (req, res, next) => {
   req.io = io;
   next();
 }, tictactoeRoutes);
+app.use('/api/pool', (req, res, next) => {
+  req.io = io;
+  next();
+}, poolRoutes);
+app.use('/api/caida', (req, res, next) => {
+  req.io = io;
+  next();
+}, caidaRoutes);
+
+// Store Routes
+app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeCoreRoutes);
+app.use('/api/store/order', (req, res, next) => { req.io = io; next(); }, storeOrderRoutes);
+app.use('/api/store/inventory', (req, res, next) => { req.io = io; next(); }, storeInventoryRoutes);
+
 app.use('/api/bingo/v2', (req, res, next) => {
   req.io = io;
   next();
@@ -298,10 +325,10 @@ if (process.env.NODE_ENV === 'production' || fs.existsSync(buildPath)) {
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', err);
-  
+
   // Don't leak error details in production
   const isDev = process.env.NODE_ENV === 'development';
-  
+
   res.status(err.status || 500).json({
     error: isDev ? err.message : 'Internal server error',
     stack: isDev ? err.stack : undefined
@@ -334,7 +361,7 @@ async function startServer() {
         const bingoV2FailureDetection = require('./jobs/bingoV2FailureDetection');
         bingoV2FailureDetection.start();
         logger.info('✅ Bingo V2 Failure Detection Job started');
-        
+
         // Start Gift Expiration Job
         const giftService = require('./services/giftService');
         setInterval(async () => {
@@ -382,17 +409,17 @@ async function startServer() {
         logger.error('Failed to initialize Telegram bot:', error);
       }
     })();
-    
+
     // ✅ NUEVO: Scheduler para limpiar reservas expiradas
     (async () => {
       try {
         const raffleService = require('./modules/raffles/services/RaffleServiceV2');
-        
+
         // Ejecutar cada 30 segundos
         setInterval(async () => {
           try {
             const expired = await raffleService.cleanExpiredReservations();
-            
+
             if (expired && Object.keys(expired).length > 0) {
               // Emitir eventos WebSocket por cada rifa afectada
               for (const [raffleId, numbers] of Object.entries(expired)) {
@@ -402,14 +429,14 @@ async function startServer() {
                   'SELECT code FROM raffles WHERE id = $1',
                   [raffleId]
                 );
-                
+
                 if (result.rows.length > 0) {
                   const raffleCode = result.rows[0].code;
                   io.to(`raffle:${raffleCode}`).emit('numbers:released', {
                     numbers,
                     reason: 'expired'
                   });
-                  
+
                   logger.info('[Scheduler] Reservas liberadas', {
                     raffleCode,
                     count: numbers.length
@@ -421,28 +448,28 @@ async function startServer() {
             logger.error('[Scheduler] Error limpiando reservas:', err);
           }
         }, 30000); // 30 segundos
-        
+
         logger.info('✅ Scheduler de reservas iniciado (cada 30s)');
       } catch (error) {
         logger.error('Failed to initialize reservation scheduler:', error);
       }
     })();
-    
+
     // ✅ NUEVO: Scheduler para sorteos programados
     (async () => {
       try {
         const raffleService = require('./modules/raffles/services/RaffleServiceV2');
         const RaffleDrawScheduler = require('./modules/raffles/services/RaffleDrawScheduler');
-        
+
         const drawScheduler = new RaffleDrawScheduler(raffleService);
         drawScheduler.start();
-        
+
         logger.info('✅ Scheduler de sorteos programados iniciado (cada 60s)');
       } catch (error) {
         logger.error('Failed to initialize draw scheduler:', error);
       }
     })();
-    
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

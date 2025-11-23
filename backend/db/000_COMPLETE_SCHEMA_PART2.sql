@@ -182,11 +182,17 @@ CREATE TABLE IF NOT EXISTS direct_gifts (
   status VARCHAR(50) DEFAULT 'pending',
   expires_at TIMESTAMP,
   claimed_at TIMESTAMP,
+  origin VARCHAR(20) DEFAULT 'supply',
+  link_token VARCHAR(64),
+  max_claims INTEGER,
+  claimed_count INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   CHECK (coins_amount >= 0 AND fires_amount >= 0),
   CHECK (coins_amount > 0 OR fires_amount > 0)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_direct_gifts_link_token ON direct_gifts(link_token);
 
 -- 20. DIRECT_GIFT_CLAIMS
 CREATE TABLE IF NOT EXISTS direct_gift_claims (

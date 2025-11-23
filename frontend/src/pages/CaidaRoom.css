@@ -1,0 +1,26 @@
+.caida-room {
+    background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);
+    color: #e2e8f0;
+}
+
+.bg-scene {
+    background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);
+}
+
+.text-gradient-gold {
+    background: linear-gradient(to right, #fcd34d, #d97706);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.glass-panel {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.game-table {
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.5),
+        inset 0 0 100px rgba(0, 0, 0, 0.5);
+}

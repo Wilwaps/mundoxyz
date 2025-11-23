@@ -46,6 +46,17 @@ const Profile = () => {
   const [raffleSettingsSaving, setRaffleSettingsSaving] = useState(false);
   const [forceSecuritySetup, setForceSecuritySetup] = useState(false);
   const [rafflesTab, setRafflesTab] = useState('active'); // 'active' | 'finished'
+  const [giftLinks, setGiftLinks] = useState([]);
+  const [giftLinksLoading, setGiftLinksLoading] = useState(false);
+  const [giftLinkForm, setGiftLinkForm] = useState({
+    firesPerUser: '',
+    maxClaims: '',
+    expiresHours: 72,
+    message: '',
+    origin: 'supply'
+  });
+  const [creatingGiftLink, setCreatingGiftLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState(null);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -76,6 +87,22 @@ const Profile = () => {
     }
   }, [location.search]);
 
+  const fetchGiftLinks = async () => {
+    if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
+    try {
+      setGiftLinksLoading(true);
+      const response = await axios.get('/api/gifts/links/my', {
+        params: { limit: 50, offset: 0 }
+      });
+      setGiftLinks(Array.isArray(response.data?.links) ? response.data.links : []);
+    } catch (error) {
+      console.error('Error loading gift links:', error);
+      toast.error('Error al cargar links de regalo');
+    } finally {
+      setGiftLinksLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
     const loadSettings = async () => {
@@ -94,6 +121,11 @@ const Profile = () => {
       }
     };
     loadSettings();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
+    fetchGiftLinks();
   }, [user?.id]);
 
   // Sync walletAddress when user changes
@@ -163,6 +195,66 @@ const Profile = () => {
     queryClient.invalidateQueries(['user-wallet', user?.id]);
     queryClient.invalidateQueries(['user-games', user?.id]);
     toast.success('Balance actualizado');
+  };
+
+  const handleCreateGiftLink = async () => {
+    if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
+
+    const fires = Number(giftLinkForm.firesPerUser);
+    const maxClaims = Number(giftLinkForm.maxClaims);
+    const expiresHours = Number(giftLinkForm.expiresHours) || 72;
+
+    if (!Number.isFinite(fires) || fires <= 0 || !Number.isFinite(maxClaims) || maxClaims <= 0) {
+      toast.error('Ingresa valores válidos para fuegos por persona y cantidad de personas');
+      return;
+    }
+
+    if (!giftLinkForm.message.trim()) {
+      toast.error('El mensaje no puede estar vacío');
+      return;
+    }
+
+    try {
+      setCreatingGiftLink(true);
+      setGeneratedLink(null);
+
+      const payload = {
+        fires_per_user: fires,
+        max_claims: maxClaims,
+        message: giftLinkForm.message,
+        expires_hours: expiresHours,
+        origin: 'supply'
+      };
+
+      const response = await axios.post('/api/gifts/links', payload);
+      const gift = response.data?.gift;
+
+      if (!gift) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+
+      const backendUrl = response.data?.url;
+      const url = backendUrl || `${window.location.origin}/gift-link/${gift.link_token}`;
+
+      setGeneratedLink({ url, gift });
+      toast.success('Link de regalo creado');
+
+      setGiftLinkForm((prev) => ({
+        ...prev,
+        firesPerUser: '',
+        maxClaims: '',
+        expiresHours,
+        message: prev.message
+      }));
+
+      await fetchGiftLinks();
+    } catch (error) {
+      console.error('Error creating gift link:', error);
+      const message = error?.response?.data?.error || 'Error al crear link de regalo';
+      toast.error(message);
+    } finally {
+      setCreatingGiftLink(false);
+    }
   };
 
   return (
@@ -268,6 +360,213 @@ const Profile = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Generador de links de regalo - Solo Tote */}
+      {Array.isArray(user?.roles) && user.roles.includes('tote') && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.16 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Flame size={20} className="text-fire-orange" />
+            Generador de links de regalo
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <div className="text-xs text-text/60 mb-1">Fuegos por persona (🔥)</div>
+              <input
+                type="number"
+                min={1}
+                value={giftLinkForm.firesPerUser}
+                onChange={(e) =>
+                  setGiftLinkForm((prev) => ({
+                    ...prev,
+                    firesPerUser: e.target.value
+                  }))
+                }
+                className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <div className="text-xs text-text/60 mb-1">Cantidad de personas (slots)</div>
+              <input
+                type="number"
+                min={1}
+                value={giftLinkForm.maxClaims}
+                onChange={(e) =>
+                  setGiftLinkForm((prev) => ({
+                    ...prev,
+                    maxClaims: e.target.value
+                  }))
+                }
+                className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <div className="text-xs text-text/60 mb-1">Expira en (horas)</div>
+              <input
+                type="number"
+                min={1}
+                value={giftLinkForm.expiresHours}
+                onChange={(e) =>
+                  setGiftLinkForm((prev) => ({
+                    ...prev,
+                    expiresHours: e.target.value
+                  }))
+                }
+                className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="text-xs text-text/60 mb-1">Mensaje para el buzón (se muestra después de reclamar)</div>
+            <textarea
+              rows={3}
+              value={giftLinkForm.message}
+              onChange={(e) =>
+                setGiftLinkForm((prev) => ({
+                  ...prev,
+                  message: e.target.value
+                }))
+              }
+              className="w-full px-4 py-2 bg-glass rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </div>
+
+          <div className="mb-4 text-xs text-text/60">
+            Origen de los fuegos:
+            <div className="mt-1 flex gap-3 items-center">
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="radio"
+                  checked={giftLinkForm.origin === 'supply'}
+                  onChange={() =>
+                    setGiftLinkForm((prev) => ({
+                      ...prev,
+                      origin: 'supply'
+                    }))
+                  }
+                />
+                <span>Desde supply (max supply)</span>
+              </label>
+              <label className="flex items-center gap-2 text-xs opacity-50 cursor-not-allowed">
+                <input type="radio" disabled />
+                <span>Desde mi wallet (próximamente)</span>
+              </label>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCreateGiftLink}
+            disabled={creatingGiftLink}
+            className="w-full py-3 px-4 bg-glass hover:bg-glass-hover rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+          >
+            {creatingGiftLink ? 'Creando link...' : 'Crear link de regalo'}
+          </button>
+
+          {generatedLink && (
+            <div className="mb-4 p-3 glass-panel text-xs">
+              <div className="font-semibold mb-1">Link generado</div>
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedLink.url}
+                  className="flex-1 px-3 py-2 bg-background-dark rounded-lg text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(generatedLink.url);
+                      toast.success('Link copiado');
+                    } catch (e) {
+                      console.error('Error copying link:', e);
+                      toast.error('No se pudo copiar el link');
+                    }
+                  }}
+                  className="px-3 py-2 text-xs rounded-full bg-accent text-dark font-semibold"
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-text/80">Links creados</h4>
+              {giftLinksLoading && (
+                <span className="text-[11px] text-text/60">Cargando...</span>
+              )}
+            </div>
+
+            {giftLinks.length === 0 ? (
+              <p className="text-xs text-text/60">Aún no has creado links de regalo.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
+                {giftLinks.map((link) => {
+                  const totalSlots = link.max_claims != null ? Number(link.max_claims) : null;
+                  const claimed = link.claimed_count != null ? Number(link.claimed_count) : 0;
+                  const remaining = totalSlots != null ? Math.max(totalSlots - claimed, 0) : null;
+                  const status = link.status;
+                  const url = link.link_token
+                    ? `${window.location.origin}/gift-link/${link.link_token}`
+                    : '';
+
+                  return (
+                    <div key={link.id} className="glass-panel p-2 flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold truncate">
+                          {link.message?.slice(0, 40) || 'Sin mensaje'}
+                        </div>
+                        {url && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                toast.success('Link copiado');
+                              } catch (e) {
+                                console.error('Error copying link:', e);
+                                toast.error('No se pudo copiar el link');
+                              }
+                            }}
+                            className="px-2 py-1 text-[10px] rounded-full bg-glass hover:bg-glass-hover"
+                          >
+                            Copiar
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[11px] text-text/70">
+                        <span>🔥 {Number(link.fires_amount || 0)} por persona</span>
+                        {totalSlots != null && (
+                          <span>
+                            Slots: {claimed}/{totalSlots}
+                            {remaining !== null && ` (libres: ${remaining})`}
+                          </span>
+                        )}
+                        <span>
+                          Estado: {status}
+                        </span>
+                        {link.expires_at && (
+                          <span>
+                            Expira: {new Date(link.expires_at).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Section */}
       {stats && (

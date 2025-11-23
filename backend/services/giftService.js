@@ -7,6 +7,16 @@ const telegramService = require('./telegramService');
  */
 class GiftService {
   
+  generateRandomToken(length = 32) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < length; i++) {
+      const index = Math.floor(Math.random() * chars.length);
+      token += chars.charAt(index);
+    }
+    return token;
+  }
+
   /**
    * Enviar regalo directo a usuario(s)
    */
@@ -79,6 +89,113 @@ class GiftService {
           coins_amount,
           fires_amount
         })]
+      );
+
+      return gift;
+    });
+  }
+
+  async createGiftLink(senderId, giftData = {}) {
+    const {
+      fires_per_user,
+      max_claims,
+      message,
+      expires_hours = 72,
+      origin = 'supply'
+    } = giftData;
+
+    const firesPerUserRaw = parseFloat(fires_per_user);
+    const maxClaimsRaw = parseInt(max_claims, 10);
+    const expiresHoursRaw = parseInt(expires_hours, 10);
+
+    const firesPerUser = Number.isFinite(firesPerUserRaw) && firesPerUserRaw > 0 ? firesPerUserRaw : NaN;
+    const maxClaims = Number.isFinite(maxClaimsRaw) && maxClaimsRaw > 0 ? maxClaimsRaw : NaN;
+    const expiresHours = Number.isFinite(expiresHoursRaw) && expiresHoursRaw > 0 ? expiresHoursRaw : 72;
+
+    if (!Number.isFinite(firesPerUser) || !Number.isFinite(maxClaims)) {
+      throw new Error('Invalid fires_per_user or max_claims');
+    }
+
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      throw new Error('Message is required');
+    }
+
+    if (origin !== 'supply') {
+      throw new Error('Unsupported gift origin');
+    }
+
+    const totalPotential = firesPerUser * maxClaims;
+
+    if (!Number.isFinite(totalPotential) || totalPotential <= 0) {
+      throw new Error('Invalid total potential fires for gift link');
+    }
+
+    return await transaction(async (client) => {
+      const supplyResult = await client.query(
+        'SELECT total_max, total_emitted, total_reserved FROM fire_supply WHERE id = 1 FOR UPDATE'
+      );
+
+      if (supplyResult.rows.length === 0) {
+        throw new Error('Fire supply not configured');
+      }
+
+      const supply = supplyResult.rows[0];
+      const totalMaxRaw = parseFloat(supply.total_max);
+      const totalEmittedRaw = parseFloat(supply.total_emitted);
+      const totalReservedRaw = parseFloat(supply.total_reserved);
+
+      const totalMax = Number.isFinite(totalMaxRaw) ? totalMaxRaw : 0;
+      const totalEmitted = Number.isFinite(totalEmittedRaw) ? totalEmittedRaw : 0;
+      const totalReserved = Number.isFinite(totalReservedRaw) ? totalReservedRaw : 0;
+
+      let available = totalMax - totalEmitted - totalReserved;
+      if (!Number.isFinite(available)) {
+        available = 0;
+      }
+
+      if (available < totalPotential) {
+        throw new Error('Not enough fire supply available for this link');
+      }
+
+      await client.query(
+        'UPDATE fire_supply SET total_reserved = total_reserved + $1 WHERE id = 1',
+        [totalPotential]
+      );
+
+      const linkToken = this.generateRandomToken(48);
+
+      const giftResult = await client.query(
+        `INSERT INTO direct_gifts 
+         (sender_id, target_type, target_user_id, target_segment, message,
+          coins_amount, fires_amount, status, expires_at, origin, link_token, max_claims, claimed_count)
+         VALUES ($1, 'link', NULL, $2, $3, 0, $4, 'pending', NOW() + INTERVAL '${expiresHours} hours', $5, $6, $7, 0)
+         RETURNING *`,
+        [
+          senderId,
+          JSON.stringify({}),
+          message,
+          firesPerUser,
+          origin,
+          linkToken,
+          maxClaims
+        ]
+      );
+
+      const gift = giftResult.rows[0];
+
+      await client.query(
+        `INSERT INTO gift_analytics (gift_id, action, metadata)
+         VALUES ($1, 'sent', $2)`,
+        [
+          gift.id,
+          JSON.stringify({
+            target_type: 'link',
+            origin,
+            fires_amount: firesPerUser,
+            max_claims: maxClaims,
+            total_potential: totalPotential
+          })
+        ]
       );
 
       return gift;
@@ -199,10 +316,15 @@ class GiftService {
     }
 
     const wallet = walletResult.rows[0];
-    const oldCoinsBalance = parseFloat(wallet.coins_balance);
-    const oldFiresBalance = parseFloat(wallet.fires_balance);
-    const coinsAmount = parseFloat(gift.coins_amount);
-    const firesAmount = parseFloat(gift.fires_amount);
+    const oldCoinsRaw = parseFloat(wallet.coins_balance);
+    const oldFiresRaw = parseFloat(wallet.fires_balance);
+    const coinsAmountRaw = parseFloat(gift.coins_amount);
+    const firesAmountRaw = parseFloat(gift.fires_amount);
+
+    const oldCoinsBalance = Number.isFinite(oldCoinsRaw) ? oldCoinsRaw : 0;
+    const oldFiresBalance = Number.isFinite(oldFiresRaw) ? oldFiresRaw : 0;
+    const coinsAmount = Number.isFinite(coinsAmountRaw) ? coinsAmountRaw : 0;
+    const firesAmount = Number.isFinite(firesAmountRaw) ? firesAmountRaw : 0;
 
     // Actualizar wallet
     await client.query(
@@ -218,10 +340,11 @@ class GiftService {
 
     // Actualizar fire supply si hay fires
     if (firesAmount > 0) {
-      await client.query(
-        'UPDATE fire_supply SET total_emitted = total_emitted + $1, total_circulating = total_circulating + $1 WHERE id = 1',
-        [firesAmount]
-      );
+      const supplyQuery = gift.target_type === 'link'
+        ? 'UPDATE fire_supply SET total_emitted = total_emitted + $1, total_circulating = total_circulating + $1, total_reserved = GREATEST(total_reserved - $1, 0) WHERE id = 1'
+        : 'UPDATE fire_supply SET total_emitted = total_emitted + $1, total_circulating = total_circulating + $1 WHERE id = 1';
+
+      await client.query(supplyQuery, [firesAmount]);
 
       // Registrar supply transaction
       await client.query(
@@ -286,6 +409,116 @@ class GiftService {
       new_coins_balance: oldCoinsBalance + coinsAmount,
       new_fires_balance: oldFiresBalance + firesAmount
     };
+  }
+
+  /**
+   * Reclamar un gift link (solo origin = 'supply')
+   */
+  async claimGiftLink(token, userId, ipAddress = null) {
+    if (!token || typeof token !== 'string') {
+      throw new Error('Token is required');
+    }
+
+    return await transaction(async (client) => {
+      // Bloquear fila del regalo por token
+      const giftResult = await client.query(
+        'SELECT * FROM direct_gifts WHERE link_token = $1 FOR UPDATE',
+        [token]
+      );
+
+      if (giftResult.rows.length === 0) {
+        throw new Error('Gift link not found');
+      }
+
+      const gift = giftResult.rows[0];
+
+      if (gift.target_type !== 'link') {
+        throw new Error('Invalid gift link');
+      }
+
+      if (gift.origin !== 'supply') {
+        throw new Error('Unsupported gift origin');
+      }
+
+      // Verificar expiración
+      if (gift.expires_at && new Date(gift.expires_at) < new Date()) {
+        await client.query(
+          'UPDATE direct_gifts SET status = $1, updated_at = NOW() WHERE id = $2',
+          ['expired', gift.id]
+        );
+        throw new Error('Gift link has expired');
+      }
+
+      // Verificar límite de claims
+      const maxClaims = gift.max_claims != null ? parseInt(gift.max_claims, 10) : null;
+      const claimedCount = gift.claimed_count != null ? parseInt(gift.claimed_count, 10) : 0;
+
+      if (maxClaims !== null && claimedCount >= maxClaims) {
+        throw new Error('Gift link has no remaining claims');
+      }
+
+      // Verificar si este usuario ya reclamó este gift
+      const existingClaim = await client.query(
+        'SELECT 1 FROM direct_gift_claims WHERE gift_id = $1 AND user_id = $2',
+        [gift.id, userId]
+      );
+
+      if (existingClaim.rows.length > 0) {
+        throw new Error('You already claimed this gift');
+      }
+
+      // Acreditar usando la lógica estándar
+      const creditResult = await this.creditGiftToUser(client, gift.id, userId, ipAddress);
+
+      // Actualizar contador de claims y estado
+      const newClaimedCount = claimedCount + 1;
+      let newStatus = gift.status;
+      const reachedMax = maxClaims !== null && newClaimedCount >= maxClaims;
+
+      if (reachedMax) {
+        newStatus = 'claimed';
+      }
+
+      await client.query(
+        'UPDATE direct_gifts SET claimed_count = $1, status = $2, claimed_at = CASE WHEN $3 THEN NOW() ELSE claimed_at END, updated_at = NOW() WHERE id = $4',
+        [newClaimedCount, newStatus, reachedMax, gift.id]
+      );
+
+      // Crear mensaje en buzón después del reclamo
+      const coinsAmountRaw = parseFloat(gift.coins_amount);
+      const firesAmountRaw = parseFloat(gift.fires_amount);
+      const coinsAmount = Number.isFinite(coinsAmountRaw) ? coinsAmountRaw : 0;
+      const firesAmount = Number.isFinite(firesAmountRaw) ? firesAmountRaw : 0;
+
+      await client.query(
+        `INSERT INTO bingo_v2_messages 
+         (user_id, category, title, content, metadata, is_read)
+         VALUES ($1, 'system', $2, $3, $4, false)`,
+        [
+          userId,
+          '🎁 Has recibido un regalo',
+          gift.message,
+          JSON.stringify({
+            type: 'gift_link_claimed',
+            gift_id: gift.id,
+            coins_amount: coinsAmount,
+            fires_amount: firesAmount
+          })
+        ]
+      );
+
+      return {
+        ...creditResult,
+        gift: {
+          id: gift.id,
+          message: gift.message,
+          fires_per_user: firesAmount,
+          max_claims: maxClaims,
+          claimed_count: newClaimedCount,
+          status: newStatus
+        }
+      };
+    });
   }
 
   /**
