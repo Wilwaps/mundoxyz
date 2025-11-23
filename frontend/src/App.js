@@ -27,6 +27,7 @@ import RafflePublicLanding from './features/raffles/pages/RafflePublicLanding';
 import Landing from './pages/Landing';
 import GiftLinkClaimPage from './pages/GiftLinkClaimPage';
 import TitoDashboard from './pages/TitoDashboard';
+import TitoLanding from './pages/TitoLanding';
 import PoolLobby from './pages/PoolLobby';
 import PoolRoom from './pages/PoolRoom';
 import CaidaLobby from './pages/CaidaLobby';
@@ -136,6 +137,7 @@ function App() {
                   <Route index element={<Navigate to="/lobby" replace />} />
                   <Route path="games" element={<Games />} />
                   <Route path="profile" element={<Profile />} />
+                  <Route path="tito/info" element={<TitoLanding />} />
                   <Route path="tito" element={<TitoDashboard />} />
                   <Route path="lobby" element={<Lobby />} />
                   <Route path="market" element={<Market />} />

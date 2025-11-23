@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -180,7 +181,7 @@ const Roles = () => {
         )}
 
         {activeTab === 'tito' && (
-          <div className="space-y-3 text-sm text-text/80">
+          <div className="space-y-4 text-sm text-text/80">
             <p>
               El rol <span className="font-semibold">Tito</span> reconoce a personas cercanas al proyecto que
               ayudan a hacer crecer la comunidad.
@@ -199,6 +200,14 @@ const Roles = () => {
                 Puedes ver tu link y tus comisiones en el panel Tito del menú principal.
               </li>
             </ul>
+            <div className="pt-2">
+              <Link
+                to="/tito/info"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/15 hover:bg-orange-500/25 text-xs font-semibold text-orange-300 transition-colors"
+              >
+                <span>Ver guía completa de Tito</span>
+              </Link>
+            </div>
           </div>
         )}
 

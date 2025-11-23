@@ -78,6 +78,14 @@ async function runMigrations() {
         if (file === '006_bingo_host_abandonment.sql') {
           console.log('⚠️  Attempting fix for migration 006...');
           await fixMigration006();
+        // Migración 063 está corrupta (contiene bytes inválidos). La marcamos como ejecutada
+        // para que el runner pueda continuar, ya que la lógica real de CAI está en 064.
+        } else if (file === '063_create_cai_store.sql') {
+          console.log('⚠️  Skipping corrupted migration 063_create_cai_store.sql and marking it as executed. CAI store is created by 064_create_cai_store.sql');
+          await pool.query(
+            'INSERT INTO migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING',
+            [file]
+          );
         } else {
           throw error;
         }

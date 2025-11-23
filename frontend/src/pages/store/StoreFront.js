@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin } from 'lucide-react';
@@ -57,6 +57,56 @@ const StoreFront = () => {
     };
 
     const cartTotalUSDT = cart.reduce((sum, item) => sum + (parseFloat(item.product.price_usdt) * item.quantity), 0);
+
+    const createOrderMutation = useMutation({
+        mutationFn: async (orderData) => {
+            const response = await axios.post('/api/store/order/create', orderData);
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('Pedido creado exitosamente');
+            setCart([]);
+            setShowCart(false);
+        },
+        onError: (error) => {
+            const message = error?.response?.data?.error || 'Error al crear pedido';
+            toast.error(message);
+        }
+    });
+
+    const handleCheckout = async () => {
+        if (!user) {
+            toast.error('Debes iniciar sesión para confirmar tu pedido');
+            navigate('/login');
+            return;
+        }
+
+        if (cart.length === 0) {
+            toast.error('El carrito está vacío');
+            return;
+        }
+
+        const orderData = {
+            store_id: storeData.store.id,
+            items: cart.map((item) => ({
+                product_id: item.product.id,
+                quantity: item.quantity,
+                modifiers: item.modifiers || []
+            })),
+            type: 'pickup',
+            payment_method: {
+                source: 'storefront',
+                currency: 'USDT',
+                total_usdt: cartTotalUSDT
+            },
+            currency_snapshot: {
+                base: 'USDT',
+                rates: { USDT: 1 }
+            }
+        };
+
+        await createOrderMutation.mutateAsync(orderData);
+    };
 
     if (isLoading) return <div className="flex justify-center p-20"><div className="spinner"></div></div>;
     if (!storeData) return <div className="text-center p-20">Tienda no encontrada</div>;
@@ -238,19 +288,20 @@ const StoreFront = () => {
                                     </div>
                                     <div className="flex justify-between text-white/60">
                                         <span>Delivery</span>
-                                        <span>$5.00</span>
+                                        <span>$0.00</span>
                                     </div>
                                     <div className="flex justify-between text-xl font-bold text-accent pt-2 border-t border-white/10">
                                         <span>Total</span>
-                                        <span>${(cartTotalUSDT + 5).toFixed(2)}</span>
+                                        <span>${cartTotalUSDT.toFixed(2)}</span>
                                     </div>
                                 </div>
 
                                 <button
-                                    className="w-full btn-primary py-4 text-lg flex justify-between items-center px-6"
-                                    onClick={() => toast.success('Checkout no implementado aún')}
+                                    className="w-full btn-primary py-4 text-lg flex justify-between items-center px-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={handleCheckout}
+                                    disabled={cart.length === 0 || createOrderMutation.isLoading}
                                 >
-                                    <span>Pagar</span>
+                                    <span>{createOrderMutation.isLoading ? 'Procesando...' : 'Pagar'}</span>
                                     <ChevronRight />
                                 </button>
                             </div>
