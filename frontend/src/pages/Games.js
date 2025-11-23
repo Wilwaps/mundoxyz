@@ -57,6 +57,27 @@ const Games = () => {
         </g>
       </svg>
     ),
+    pool: (
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <defs>
+          <radialGradient id="grad-pool" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#444" />
+            <stop offset="100%" stopColor="#000" />
+          </radialGradient>
+        </defs>
+        <circle cx="50" cy="50" r="40" fill="url(#grad-pool)" stroke="#333" strokeWidth="2" />
+        <circle cx="50" cy="50" r="18" fill="white" />
+        <text x="50" y="58" textAnchor="middle" fill="black" fontSize="24" fontWeight="bold" fontFamily="Arial">8</text>
+      </svg>
+    ),
+    caida: (
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <rect x="25" y="15" width="50" height="70" rx="5" fill="white" stroke="#eab308" strokeWidth="2" />
+        <path d="M40 40 L60 40 L50 60 Z" fill="#eab308" />
+        <text x="32" y="30" fill="#eab308" fontSize="14" fontWeight="bold">A</text>
+        <text x="68" y="78" fill="#eab308" fontSize="14" fontWeight="bold" transform="rotate(180 68 78)">A</text>
+      </svg>
+    ),
   };
 
   const handleGameClick = (gameId) => {
@@ -64,13 +85,17 @@ const Games = () => {
       navigate('/bingo');
     } else if (gameId === 'tictactoe') {
       navigate('/tictactoe/lobby');
+    } else if (gameId === 'pool') {
+      navigate('/pool/lobby');
+    } else if (gameId === 'caida') {
+      navigate('/caida/lobby');
     }
   };
 
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold text-center mb-8 text-gradient-accent">Juegos</h1>
-      
+
       {/* Main Games Grid */}
       <div className="space-y-6 mb-8">
         {isLoading ? (
@@ -90,10 +115,10 @@ const Games = () => {
               <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
                 {gameIcons[game.id]}
               </div>
-              
+
               <h2 className="text-2xl font-bold text-violet mb-2">{game.name}</h2>
               <p className="text-text/60 mb-4">{game.description}</p>
-              
+
               <div className="flex items-center gap-4 mb-4 text-sm">
                 <div className="flex items-center gap-1 text-text/60">
                   <Users size={16} />
@@ -106,7 +131,7 @@ const Games = () => {
                   </div>
                 )}
               </div>
-              
+
               <button className="w-full max-w-xs btn-primary">
                 Jugar Ahora
               </button>

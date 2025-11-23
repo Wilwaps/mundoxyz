@@ -4,11 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { 
-  Settings, 
-  Users, 
-  TrendingUp, 
-  Gift, 
+import {
+  Settings,
+  Users,
+  TrendingUp,
+  Gift,
   DollarSign,
   Activity,
   Shield,
@@ -23,7 +23,9 @@ import {
 import toast from 'react-hot-toast';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
+import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
+import StoreRoleAssignmentModal from '../components/admin/StoreRoleAssignmentModal';
 
 // Stats Component
 const AdminStats = () => {
@@ -184,6 +186,8 @@ const AdminStats = () => {
 const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [storeModalOpen, setStoreModalOpen] = useState(false);
+  const [selectedUserForStore, setSelectedUserForStore] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: users } = useQuery({
@@ -262,13 +266,23 @@ const AdminUsers = () => {
                   <div className="text-sm text-fire-orange">🔥 {user.fires_balance || 0}</div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <RoleManagementDropdown 
-                    user={user} 
+                  <RoleManagementDropdown
+                    user={user}
                     onRolesUpdated={() => {
                       // Refrescar la lista de usuarios
                       queryClient.invalidateQueries(['admin-users']);
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUserForStore(user);
+                      setStoreModalOpen(true);
+                    }}
+                    className="px-3 py-1 rounded-full text-xs bg-violet/20 text-violet hover:bg-violet/30 transition-colors"
+                  >
+                    🏪 Asignar Tienda
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleResetCredentials(user.id, user.username)}
@@ -289,6 +303,18 @@ const AdminUsers = () => {
           </div>
         ))}
       </div>
+
+      <StoreRoleAssignmentModal
+        isOpen={storeModalOpen}
+        onClose={() => {
+          setStoreModalOpen(false);
+          setSelectedUserForStore(null);
+        }}
+        user={selectedUserForStore}
+        onAssignmentComplete={() => {
+          queryClient.invalidateQueries(['admin-users']);
+        }}
+      />
     </div>
   );
 };
@@ -303,22 +329,20 @@ const AdminWelcome = () => {
       <div className="flex gap-2 border-b border-text/10 mb-6 px-4">
         <button
           onClick={() => setActiveTab('events')}
-          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
-            activeTab === 'events'
+          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'events'
               ? 'text-accent border-b-2 border-accent'
               : 'text-text/60 hover:text-text'
-          }`}
+            }`}
         >
           <Gift size={18} />
           Eventos
         </button>
         <button
           onClick={() => setActiveTab('direct')}
-          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
-            activeTab === 'direct'
+          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'direct'
               ? 'text-accent border-b-2 border-accent'
               : 'text-text/60 hover:text-text'
-          }`}
+            }`}
         >
           <Send size={18} />
           Envío Directo
@@ -370,14 +394,14 @@ const AdminFireRequests = () => {
         });
         toast.success('Solicitud rechazada');
       }
-      
+
       // Invalidar todas las queries relevantes para actualizar en tiempo real
       queryClient.invalidateQueries(['fire-requests']);
       queryClient.invalidateQueries(['user-stats']);
       queryClient.invalidateQueries(['user-wallet']);
       queryClient.invalidateQueries(['wallet-transactions']);
       queryClient.invalidateQueries(['admin-stats']);
-      
+
       setShowReviewModal(false);
       setReviewNotes('');
       refetch();
@@ -409,11 +433,10 @@ const AdminFireRequests = () => {
           <button
             key={status}
             onClick={() => setSelectedStatus(status)}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-              selectedStatus === status
+            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${selectedStatus === status
                 ? 'bg-violet/20 text-violet'
                 : 'bg-glass hover:bg-glass-hover'
-            }`}
+              }`}
           >
             {status === 'pending' && '⏳ Pendientes'}
             {status === 'approved' && '✅ Aprobadas'}
@@ -565,11 +588,10 @@ const AdminFireRequests = () => {
               </button>
               <button
                 onClick={handleConfirmReview}
-                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${
-                  reviewAction === 'approve'
+                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${reviewAction === 'approve'
                     ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
                     : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
-                }`}
+                  }`}
               >
                 Confirmar {reviewAction === 'approve' ? 'Aprobación' : 'Rechazo'}
               </button>
@@ -672,11 +694,10 @@ const AdminRedemptions = () => {
           <button
             key={status}
             onClick={() => setSelectedStatus(status)}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-              selectedStatus === status
+            className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${selectedStatus === status
                 ? 'bg-violet/20 text-violet'
                 : 'bg-glass hover:bg-glass-hover'
-            }`}
+              }`}
           >
             {status === 'pending' && '⏳ Pendientes'}
             {status === 'completed' && '✅ Completados'}
@@ -776,9 +797,9 @@ const AdminRedemptions = () => {
                   <p className="text-xs text-success/80 mb-1">ID de Transacción:</p>
                   <p className="text-sm font-mono">{redemption.transaction_id}</p>
                   {redemption.proof_url && (
-                    <a 
-                      href={redemption.proof_url} 
-                      target="_blank" 
+                    <a
+                      href={redemption.proof_url}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-accent hover:underline mt-1 inline-block"
                     >
@@ -887,11 +908,10 @@ const AdminRedemptions = () => {
               </button>
               <button
                 onClick={handleConfirmAction}
-                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${
-                  actionType === 'accept'
+                className={`flex-1 py-3 px-4 rounded-lg transition-colors ${actionType === 'accept'
                     ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
                     : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
-                }`}
+                  }`}
               >
                 Confirmar {actionType === 'accept' ? 'Aceptación' : 'Rechazo'}
               </button>
@@ -1233,13 +1253,12 @@ const AdminFiat = () => {
                     <td className="py-1.5 pr-2 capitalize">{op.direction}</td>
                     <td className="py-1.5 pr-2">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide ${
-                          op.status === 'approved'
+                        className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide ${op.status === 'approved'
                             ? 'bg-success/20 text-success'
                             : op.status === 'pending'
-                            ? 'bg-warning/20 text-warning'
-                            : 'bg-error/20 text-error'
-                        }`}
+                              ? 'bg-warning/20 text-warning'
+                              : 'bg-error/20 text-error'
+                          }`}
                       >
                         {op.status}
                       </span>
@@ -1288,9 +1307,8 @@ const Admin = () => {
           <NavLink
             to="/admin"
             end
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >
@@ -1299,9 +1317,8 @@ const Admin = () => {
           </NavLink>
           <NavLink
             to="/admin/users"
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >
@@ -1310,9 +1327,8 @@ const Admin = () => {
           </NavLink>
           <NavLink
             to="/admin/welcome"
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >
@@ -1321,9 +1337,8 @@ const Admin = () => {
           </NavLink>
           <NavLink
             to="/admin/fire-requests"
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >
@@ -1332,9 +1347,8 @@ const Admin = () => {
           </NavLink>
           <NavLink
             to="/admin/redemptions"
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >
@@ -1343,9 +1357,8 @@ const Admin = () => {
           </NavLink>
           <NavLink
             to="/admin/fiat"
-            className={({ isActive }) => 
-              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
               }`
             }
           >

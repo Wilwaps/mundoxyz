@@ -34,6 +34,7 @@ import CaidaRoom from './pages/CaidaRoom';
 import StoreFront from './pages/store/StoreFront';
 import POS from './pages/store/POS';
 import KitchenDisplay from './pages/store/KitchenDisplay';
+import StoreAdmin from './pages/store/StoreAdmin';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -153,6 +154,7 @@ function App() {
                   <Route path="store/:slug" element={<StoreFront />} />
                   <Route path="store/:slug/pos" element={<POS />} />
                   <Route path="store/:slug/kitchen" element={<KitchenDisplay />} />
+                  <Route path="store/:slug/admin" element={<StoreAdmin />} />
                   <Route path="raffles" element={<RafflesLobby />} />
                   <Route path="raffles/my" element={<MyRaffles />} />
                   <Route path="raffles/:code" element={<RaffleRoom />} />

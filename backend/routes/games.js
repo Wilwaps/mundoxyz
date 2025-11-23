@@ -28,6 +28,28 @@ router.get('/list', optionalAuth, async (req, res) => {
         min_players: 2,
         max_players: 20,
         status: 'available'
+      },
+      {
+        id: 'pool',
+        name: 'Pool 8-Ball',
+        description: 'Clásico juego de billar bola 8 con físicas realistas',
+        icon: '🎱',
+        modes: ['coins', 'fires'],
+        min_players: 2,
+        max_players: 2,
+        status: 'available',
+        features: ['physics', 'multiplayer', 'betting']
+      },
+      {
+        id: 'caida',
+        name: 'Caída',
+        description: 'Juego de cartas tradicional venezolano',
+        icon: '🎴',
+        modes: ['coins', 'fires'],
+        min_players: 2,
+        max_players: 4,
+        status: 'available',
+        features: ['cards', 'multiplayer', 'betting']
       }
     ];
 
@@ -41,7 +63,7 @@ router.get('/list', optionalAuth, async (req, res) => {
       logger.warn('Tictactoe table not found:', err.message);
       games[0].active_rooms = 0;
     }
-    
+
     try {
       const bingoCount = await query(
         "SELECT COUNT(*) as count FROM bingo_v2_rooms WHERE status IN ('waiting', 'in_progress')"
@@ -51,7 +73,27 @@ router.get('/list', optionalAuth, async (req, res) => {
       logger.error('Error fetching bingo rooms:', err);
       games[1].active_rooms = 0;
     }
-    
+
+    try {
+      const poolCount = await query(
+        "SELECT COUNT(*) as count FROM pool_rooms WHERE status IN ('waiting', 'playing')"
+      );
+      games[2].active_rooms = parseInt(poolCount.rows[0].count);
+    } catch (err) {
+      logger.warn('Pool table not found:', err.message);
+      games[2].active_rooms = 0;
+    }
+
+    try {
+      const caidaCount = await query(
+        "SELECT COUNT(*) as count FROM caida_rooms WHERE status IN ('waiting', 'playing')"
+      );
+      games[3].active_rooms = parseInt(caidaCount.rows[0].count);
+    } catch (err) {
+      logger.warn('Caida table not found:', err.message);
+      games[3].active_rooms = 0;
+    }
+
     res.json(games);
 
   } catch (error) {

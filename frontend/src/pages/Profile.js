@@ -4,17 +4,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { 
-  User, 
-  Trophy, 
-  Coins, 
-  Flame, 
+import {
+  User,
+  Trophy,
+  Coins,
+  Flame,
   Calendar,
   Award,
   TrendingUp,
   LogOut,
   Lock,
-  Key
+  Key,
+  Store
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
@@ -170,6 +171,16 @@ const Profile = () => {
     enabled: !!user?.id
   });
 
+  // Fetch user stores (staff access)
+  const { data: myStores } = useQuery({
+    queryKey: ['user-stores', user?.id],
+    queryFn: async () => {
+      const response = await axios.get(`/api/admin/store-staff/user/${user.id}`);
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
   // Rifas del usuario (como host)
   const {
     data: userRaffles = [],
@@ -260,7 +271,7 @@ const Profile = () => {
   return (
     <div className="p-4">
       {/* Profile Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="card-glass mb-6"
@@ -284,7 +295,7 @@ const Profile = () => {
 
         {/* Balance Cards */}
         <div className="grid grid-cols-2 gap-4">
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05 }}
             className="glass-panel p-4 text-center cursor-pointer"
             onClick={() => {
@@ -296,8 +307,8 @@ const Profile = () => {
             <div className="text-2xl font-bold text-accent">{user?.coins_balance || 0}</div>
             <div className="text-xs text-text/60">Monedas</div>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             whileHover={{ scale: 1.05 }}
             className="glass-panel p-4 text-center cursor-pointer"
             onClick={() => {
@@ -332,11 +343,10 @@ const Profile = () => {
                 return (
                   <span
                     key={role}
-                    className={`badge-coins ${
-                      isClickable
-                        ? 'cursor-pointer hover:scale-105 transition-transform'
-                        : ''
-                    }`}
+                    className={`badge-coins ${isClickable
+                      ? 'cursor-pointer hover:scale-105 transition-transform'
+                      : ''
+                      }`}
                     onClick={() => {
                       if (isAdminRole) {
                         navigate('/admin');
@@ -348,8 +358,8 @@ const Profile = () => {
                       isAdminRole
                         ? 'Ir al Panel Admin'
                         : isTitoRole
-                        ? 'Ir al Panel Tito'
-                        : ''
+                          ? 'Ir al Panel Tito'
+                          : ''
                     }
                   >
                     {icon} {role}
@@ -363,7 +373,7 @@ const Profile = () => {
 
       {/* Generador de links de regalo - Solo Tote */}
       {Array.isArray(user?.roles) && user.roles.includes('tote') && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.16 }}
@@ -570,7 +580,7 @@ const Profile = () => {
 
       {/* Stats Section */}
       {stats && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -602,7 +612,7 @@ const Profile = () => {
       )}
 
       {/* Rifas del usuario */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
@@ -617,22 +627,20 @@ const Profile = () => {
             <button
               type="button"
               onClick={() => setRafflesTab('active')}
-              className={`px-3 py-1 rounded-full font-medium transition-colors ${
-                rafflesTab === 'active'
-                  ? 'bg-accent text-dark'
-                  : 'bg-glass text-text/60 hover:text-text'
-              }`}
+              className={`px-3 py-1 rounded-full font-medium transition-colors ${rafflesTab === 'active'
+                ? 'bg-accent text-dark'
+                : 'bg-glass text-text/60 hover:text-text'
+                }`}
             >
               Mis rifas
             </button>
             <button
               type="button"
               onClick={() => setRafflesTab('finished')}
-              className={`px-3 py-1 rounded-full font-medium transition-colors ${
-                rafflesTab === 'finished'
-                  ? 'bg-accent text-dark'
-                  : 'bg-glass text-text/60 hover:text-text'
-              }`}
+              className={`px-3 py-1 rounded-full font-medium transition-colors ${rafflesTab === 'finished'
+                ? 'bg-accent text-dark'
+                : 'bg-glass text-text/60 hover:text-text'
+                }`}
             >
               Finalizadas
             </button>
@@ -694,8 +702,55 @@ const Profile = () => {
         )}
       </motion.div>
 
+      {/* My Stores Section */}
+      {myStores?.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Store className="text-accent" size={20} />
+            Mis Tiendas
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {myStores.map((store) => (
+              <div
+                key={store.store_id}
+                onClick={() => navigate(`/store/${store.store_slug}/admin`)}
+                className="glass-panel p-4 cursor-pointer hover:bg-glass-hover transition-colors flex items-center gap-4"
+              >
+                <div className="w-12 h-12 rounded-lg bg-glass flex items-center justify-center overflow-hidden">
+                  {store.logo_url ? (
+                    <img src={store.logo_url} alt={store.store_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Store className="text-text/40" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-lg">{store.store_name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full uppercase tracking-wide font-bold ${store.role === 'owner' ? 'bg-accent/20 text-accent' :
+                        store.role === 'admin' ? 'bg-violet/20 text-violet' :
+                          'bg-glass text-text/60'
+                      }`}>
+                      {store.role === 'owner' ? 'Dueño' :
+                        store.role === 'admin' ? 'Admin' :
+                          store.role === 'manager' ? 'Gerente' :
+                            store.role === 'seller' ? 'Vendedor' :
+                              store.role === 'marketing' ? 'Marketing' : store.role}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* Admin Rooms Manager - Solo para tote/admin */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
@@ -704,7 +759,7 @@ const Profile = () => {
       </motion.div>
 
       {Array.isArray(user?.roles) && user.roles.includes('tote') && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18 }}
@@ -777,7 +832,7 @@ const Profile = () => {
 
       {/* Achievements */}
       {stats?.achievements?.length > 0 && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -804,7 +859,7 @@ const Profile = () => {
 
       {/* Active Games */}
       {games && games.bingo?.length > 0 && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -832,14 +887,14 @@ const Profile = () => {
       )}
 
       {/* Account Info */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
         className="card-glass mb-6"
       >
         <h3 className="text-lg font-bold mb-4">Información de Cuenta</h3>
-        
+
         <div className="space-y-3 mb-4">
           <div className="flex items-center gap-2 text-text/60">
             <Calendar size={16} />
@@ -847,7 +902,7 @@ const Profile = () => {
               Miembro desde: {new Date(user?.created_at).toLocaleDateString()}
             </span>
           </div>
-          
+
           {user?.is_verified && (
             <div className="flex items-center gap-2 text-success">
               <Award size={16} />
@@ -888,9 +943,9 @@ const Profile = () => {
       </motion.button>
 
       {/* Modals */}
-      <PasswordChangeModal 
-        isOpen={showPasswordModal} 
-        onClose={() => setShowPasswordModal(false)} 
+      <PasswordChangeModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
         onFirstPasswordSet={() => {
           // Solo forzar flujo si es usuario con Telegram vinculado y sin respuesta de seguridad
           if (user?.tg_id && !user?.security_answer) {
@@ -902,8 +957,8 @@ const Profile = () => {
           }
         }}
       />
-      
-      <WalletHistoryModal 
+
+      <WalletHistoryModal
         isOpen={showFiresHistory}
         onClose={() => setShowFiresHistory(false)}
         onOpenSend={() => setShowSendFires(true)}
@@ -911,9 +966,9 @@ const Profile = () => {
         onOpenReceive={() => setShowReceiveFires(true)}
         initialTab={walletHistoryInitialTab}
       />
-      
-      <SendFiresModal 
-        isOpen={showSendFires} 
+
+      <SendFiresModal
+        isOpen={showSendFires}
         onClose={() => setShowSendFires(false)}
         currentBalance={user?.fires_balance || 0}
         onSuccess={() => {
@@ -921,18 +976,18 @@ const Profile = () => {
           setShowFiresHistory(true);
         }}
       />
-      
-      <BuyFiresModal 
-        isOpen={showBuyFires} 
+
+      <BuyFiresModal
+        isOpen={showBuyFires}
         onClose={() => setShowBuyFires(false)}
         onSuccess={() => {
           toast.success('Solicitud enviada exitosamente');
           setShowFiresHistory(true);
         }}
       />
-      
-      <ReceiveFiresModal 
-        isOpen={showReceiveFires} 
+
+      <ReceiveFiresModal
+        isOpen={showReceiveFires}
         onClose={() => setShowReceiveFires(false)}
         walletAddress={user?.wallet_address || walletAddress}
       />

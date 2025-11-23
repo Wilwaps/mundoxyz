@@ -39,6 +39,7 @@ const caidaRoutes = require('./routes/caida');
 const storeCoreRoutes = require('./routes/store/core');
 const storeOrderRoutes = require('./routes/store/orders');
 const storeInventoryRoutes = require('./routes/store/inventory');
+const storeStaffRoutes = require('./routes/admin/store-staff');
 
 // Create Express app
 const app = express();
@@ -279,6 +280,7 @@ app.use('/api/caida', (req, res, next) => {
 app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeCoreRoutes);
 app.use('/api/store/order', (req, res, next) => { req.io = io; next(); }, storeOrderRoutes);
 app.use('/api/store/inventory', (req, res, next) => { req.io = io; next(); }, storeInventoryRoutes);
+app.use('/api/admin/store-staff', storeStaffRoutes);
 
 app.use('/api/bingo/v2', (req, res, next) => {
   req.io = io;

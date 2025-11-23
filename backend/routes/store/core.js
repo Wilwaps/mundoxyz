@@ -73,6 +73,17 @@ router.post('/create', verifyToken, async (req, res) => {
     }
 });
 
+// GET /api/store/list (Admin only)
+router.get('/list', verifyToken, async (req, res) => {
+    try {
+        // TODO: Add admin check if needed, or allow all for now
+        const result = await query('SELECT id, name, slug, logo_url FROM stores ORDER BY name');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/store/:storeId/category
 router.post('/:storeId/category', verifyToken, async (req, res) => {
     try {
