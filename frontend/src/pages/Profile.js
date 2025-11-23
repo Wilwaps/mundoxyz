@@ -848,6 +848,15 @@ const Profile = () => {
                   >
                     Ver tienda
                   </button>
+                  {row.role === 'owner' && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/store/${row.store_slug}/dashboard`)}
+                      className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30"
+                    >
+                      Panel de tienda
+                    </button>
+                  )}
                   {(row.role === 'owner' || row.role === 'admin' || row.role === 'manager' || row.role === 'seller') && (
                     <button
                       type="button"
