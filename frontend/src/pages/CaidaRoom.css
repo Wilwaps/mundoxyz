@@ -9,6 +9,7 @@
 
 .text-gradient-gold {
     background: linear-gradient(to right, #fcd34d, #d97706);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -23,4 +24,20 @@
     box-shadow:
         0 20px 50px rgba(0, 0, 0, 0.5),
         inset 0 0 100px rgba(0, 0, 0, 0.5);
+}
+
+.player-hand {
+    /* Asegura que la mano se mantenga visible por encima del footer en móviles */
+    max-height: 200px;
+}
+
+@media (max-width: 768px) {
+    .game-table {
+        border-width: 8px;
+        border-radius: 24px;
+    }
+
+    .caida-room {
+        padding-bottom: 96px; /* espacio extra para barra inferior fija de la app */
+    }
 }

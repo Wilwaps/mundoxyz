@@ -273,7 +273,9 @@ const StoreStaffModal = ({ user, onClose }) => {
             {loadingStores ? (
               <div className="text-xs text-text/60 py-2">Cargando tiendas...</div>
             ) : stores.length === 0 ? (
-              <div className="text-xs text-text/60 py-2">No hay tiendas configuradas.</div>
+              <div className="text-xs text-text/60 py-2">
+                No hay tiendas configuradas. Crea una desde Admin &gt; Tiendas.
+              </div>
             ) : (
               <select
                 value={selectedStoreId}
@@ -1474,6 +1476,220 @@ const AdminFiat = () => {
   );
 };
 
+const CreateStoreModal = ({ onClose, onCreated }) => {
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [currencyConfig, setCurrencyConfig] = useState('coins');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const queryClient = useQueryClient();
+
+  const slugify = (value) => {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const createStoreMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await axios.post('/api/store/create', payload);
+      return response.data;
+    },
+    onSuccess: (store) => {
+      toast.success('Tienda creada correctamente');
+      queryClient.invalidateQueries(['stores-list']);
+      if (onCreated) {
+        onCreated(store);
+      }
+      onClose();
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || error.message || 'Error al crear tienda';
+      toast.error(message);
+    }
+  });
+
+  const handleNameChange = (e) => {
+    const value = e.target.value;
+    setName(value);
+    if (!slugTouched) {
+      setSlug(slugify(value));
+    }
+  };
+
+  const handleSlugChange = (e) => {
+    setSlugTouched(true);
+    setSlug(slugify(e.target.value));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    const trimmedSlug = slugify(slug);
+
+    if (!trimmedName || !trimmedSlug) {
+      toast.error('Nombre y slug son obligatorios');
+      return;
+    }
+
+    await createStoreMutation.mutateAsync({
+      name: trimmedName,
+      slug: trimmedSlug,
+      description: description.trim(),
+      currency_config: currencyConfig
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg card-glass p-6"
+      >
+        <h3 className="text-xl font-bold mb-2">Crear tienda</h3>
+        <p className="text-xs text-text/60 mb-4">
+          Define una tienda para poder asignar roles de personal.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <div className="text-xs text-text/60 mb-1">Nombre</div>
+            <input
+              type="text"
+              value={name}
+              onChange={handleNameChange}
+              className="input-glass w-full"
+              placeholder="Ej: Tienda Central"
+            />
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Slug</div>
+            <input
+              type="text"
+              value={slug}
+              onChange={handleSlugChange}
+              className="input-glass w-full"
+              placeholder="tienda-central"
+            />
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Descripción</div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="input-glass w-full h-20 resize-none"
+              placeholder="Descripción breve de la tienda"
+            />
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Configuración de moneda</div>
+            <select
+              value={currencyConfig}
+              onChange={(e) => setCurrencyConfig(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="coins">Solo Coins</option>
+              <option value="fires">Solo Fires</option>
+              <option value="both">Coins y Fires</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-glass hover:bg-glass-hover text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={createStoreMutation.isLoading}
+              className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createStoreMutation.isLoading ? 'Creando…' : 'Crear tienda'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+const AdminStores = () => {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const { data: storesData, isLoading, error } = useQuery({
+    queryKey: ['stores-list'],
+    queryFn: async () => {
+      const response = await axios.get('/api/store/list');
+      return response.data;
+    }
+  });
+
+  const stores = Array.isArray(storesData) ? storesData : [];
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Award size={20} className="text-accent" />
+          Gestión de Tiendas
+        </h2>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-sm font-semibold"
+        >
+          Crear tienda
+        </button>
+      </div>
+
+      {error && (
+        <div className="card-glass mb-4 text-sm text-error">
+          Error al cargar tiendas.
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        </div>
+      ) : stores.length === 0 ? (
+        <div className="card-glass py-10 text-center text-sm text-text/60">
+          No hay tiendas configuradas.
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {stores.map((store) => (
+            <div key={store.id} className="card-glass p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-glass flex items-center justify-center text-sm font-bold">
+                {store.name?.charAt(0)?.toUpperCase() || 'T'}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold">{store.name}</div>
+                <div className="text-xs text-text/60">@{store.slug}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showCreateModal && (
+        <CreateStoreModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {}}
+        />
+      )}
+    </div>
+  );
+};
+
 // Main Admin Component
 const Admin = () => {
   const { isAdmin } = useAuth();
@@ -1509,6 +1725,17 @@ const Admin = () => {
           >
             <Users size={18} />
             Usuarios
+          </NavLink>
+          <NavLink
+            to="/admin/stores"
+            className={({ isActive }) => 
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+              }`
+            }
+          >
+            <Award size={18} />
+            Tiendas
           </NavLink>
           <NavLink
             to="/admin/welcome"
@@ -1561,6 +1788,7 @@ const Admin = () => {
       <Routes>
         <Route index element={<AdminStats />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="stores" element={<AdminStores />} />
         <Route path="welcome" element={<AdminWelcome />} />
         <Route path="fire-requests" element={<AdminFireRequests />} />
         <Route path="redemptions" element={<AdminRedemptions />} />

@@ -53,6 +53,11 @@ const CaidaRoom = () => {
         });
 
         socket.on('caida:game-update', (data) => {
+            console.log('[Caida] game-update', {
+                scores: data.gameState?.scores,
+                gameState: data.gameState,
+                lastMove: data.lastMove
+            });
             setGameState(data.gameState);
             if (data.lastMove?.result?.message) {
                 setLastMoveMessage(data.lastMove.result.message);
@@ -70,11 +75,18 @@ const CaidaRoom = () => {
 
     // Sync local state with room data
     useEffect(() => {
-        if (roomData) {
-            setPlayers(roomData.players || []);
-            if (roomData.game_state && Object.keys(roomData.game_state).length > 0) {
-                setGameState(roomData.game_state);
-            }
+        if (!roomData) return;
+
+        setPlayers(roomData.players || []);
+
+        if (roomData.game_state && Object.keys(roomData.game_state).length > 0) {
+            console.log('[Caida] roomData game_state.scores', roomData.game_state.scores);
+            setGameState(prev => {
+                if (prev && roomData.status === 'playing') {
+                    return prev;
+                }
+                return roomData.game_state;
+            });
         }
     }, [roomData]);
 
@@ -103,8 +115,16 @@ const CaidaRoom = () => {
     const myHand = gameState?.hands?.[user?.id] || [];
     const tableCards = gameState?.table_cards || [];
 
+    const deckCount = gameState?.deck?.length || 0;
+    const handsCount = gameState?.hands
+        ? Object.values(gameState.hands).reduce((sum, hand) => sum + (hand ? hand.length : 0), 0)
+        : 0;
+    const remainingCards = deckCount + handsCount;
+
+    const currentTurnPlayer = players.find(p => p.id === roomData.player_ids[roomData.current_turn_index]);
+
     return (
-        <div className="caida-room min-h-screen bg-scene p-4 flex flex-col items-center">
+        <div className="caida-room min-h-screen bg-scene p-4 pb-24 flex flex-col items-center">
             {/* Header */}
             <div className="w-full max-w-6xl flex justify-between items-center mb-8 glass-panel p-4 rounded-xl">
                 <div>
@@ -132,6 +152,17 @@ const CaidaRoom = () => {
                 </div>
             </div>
 
+            {roomData.status === 'playing' && (
+                <div className="w-full max-w-6xl mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div className={`inline-flex items-center px-4 py-2 rounded-full font-semibold text-sm md:text-base shadow-lg transition-colors ${isMyTurn ? 'bg-accent text-dark animate-pulse' : 'bg-dark/60 text-text/60'}`}>
+                        {isMyTurn ? '¡Tu Turno!' : `Turno de ${currentTurnPlayer?.username || ''}`}
+                    </div>
+                    <div className="text-sm text-text/70">
+                        Cartas restantes: {gameState ? remainingCards : '--'}
+                    </div>
+                </div>
+            )}
+
             {/* Game Area */}
             <div className="flex-1 w-full max-w-6xl flex flex-col justify-center relative">
 
@@ -152,7 +183,7 @@ const CaidaRoom = () => {
                 </AnimatePresence>
 
                 {/* Table */}
-                <div className="game-table relative aspect-[16/9] bg-emerald-900/40 rounded-[30px] border-[12px] border-wood-4 shadow-2xl overflow-hidden mb-8">
+                <div className="game-table relative w-full max-w-3xl mx-auto aspect-[9/16] md:aspect-[16/9] bg-emerald-900/40 rounded-[30px] border-[12px] border-wood-4 shadow-2xl overflow-hidden mb-8">
                     {/* Felt Texture */}
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/felt.png')] opacity-50 mix-blend-overlay"></div>
 
@@ -204,14 +235,13 @@ const CaidaRoom = () => {
 
                 {/* Player Hand */}
                 {roomData.status === 'playing' && (
-                    <div className="h-48 flex justify-center items-end pb-4">
-                        <div className="flex gap-[-40px]">
+                    <div className="player-hand w-full flex justify-center items-end pb-4 mt-2">
+                        <div className="flex items-end gap-2 md:gap-3 px-2 overflow-x-auto max-w-full">
                             {myHand.map((card, idx) => (
                                 <motion.div
-                                    key={`${card.suit}-${card.rank}`}
-                                    whileHover={{ y: -30, zIndex: 10 }}
-                                    className="relative -ml-8 first:ml-0 transition-all duration-200"
-                                    style={{ zIndex: idx }}
+                                    key={`${card.suit}-${card.rank}-${idx}`}
+                                    whileHover={{ y: -20, scale: 1.02 }}
+                                    className="flex-shrink-0 transition-transform duration-200"
                                 >
                                     <Card
                                         suit={card.suit}
@@ -221,16 +251,6 @@ const CaidaRoom = () => {
                                     />
                                 </motion.div>
                             ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Turn Indicator */}
-                {roomData.status === 'playing' && (
-                    <div className="absolute bottom-8 right-8">
-                        <div className={`px-6 py-3 rounded-full font-bold text-lg shadow-lg transition-colors ${isMyTurn ? 'bg-accent text-dark animate-pulse' : 'bg-dark/50 text-text/40'
-                            }`}>
-                            {isMyTurn ? '¡Tu Turno!' : `Turno de ${players.find(p => p.id === roomData.player_ids[roomData.current_turn_index])?.username}`}
                         </div>
                     </div>
                 )}

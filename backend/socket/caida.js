@@ -31,13 +31,28 @@ function initCaidaSocket(io, socket) {
             // 3. Process Move
             const gameState = room.game_state;
 
+            logger.info('[Caida] Processing move', {
+                roomCode,
+                userId,
+                card,
+                scoresBefore: gameState.scores
+            });
+
             // Remove card from hand
             const handIndex = gameState.hands[userId].findIndex(c => c.rank === card.rank && c.suit === card.suit);
             if (handIndex === -1) return; // Card not in hand
             gameState.hands[userId].splice(handIndex, 1);
 
             // Execute Logic
-            const moveResult = processMove(gameState, { userId, card });
+            const moveResult = processMove(gameState, { playerId: userId, card });
+
+            logger.info('[Caida] Move result', {
+                roomCode,
+                userId,
+                points: moveResult?.points,
+                message: moveResult?.message,
+                scoresAfter: gameState.scores
+            });
 
             // 4. Update Turn
             let nextTurnIndex = (room.current_turn_index + 1) % room.player_ids.length;
