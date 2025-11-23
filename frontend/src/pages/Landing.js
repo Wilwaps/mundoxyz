@@ -142,8 +142,8 @@ const Landing = () => {
     if (!Number.isFinite(count) || count <= 0) {
       count = 1;
     }
-    if (count > 40) {
-      count = 40;
+    if (count > 120) {
+      count = 120;
     }
     if (bingoCardCountRef.current) {
       bingoCardCountRef.current.value = String(count);
@@ -488,14 +488,14 @@ const Landing = () => {
             <div className="bingo-print-content">
               <div className="bingo-print-generator">
                 <h3>Cartones para imprimir</h3>
-                <p>Elige cuántos cartones quieres (máximo 40). Se crearán en un PDF con 6 cartones por hoja carta, listo para imprimir.</p>
+                <p>Elige cuántos cartones quieres (máximo 120). Se crearán en un PDF con 6 cartones por hoja carta, listo para imprimir.</p>
                 <div className="bingo-print-input-row">
                   <label htmlFor="bingo-card-count">Cantidad de cartones</label>
                   <input
                     id="bingo-card-count"
                     type="number"
                     min="1"
-                    max="40"
+                    max="120"
                     defaultValue={4}
                     ref={bingoCardCountRef}
                   />
