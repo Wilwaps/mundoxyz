@@ -23,7 +23,6 @@ import {
 import toast from 'react-hot-toast';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
-import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
 import StoreRoleAssignmentModal from '../components/admin/StoreRoleAssignmentModal';
 
@@ -330,8 +329,8 @@ const AdminWelcome = () => {
         <button
           onClick={() => setActiveTab('events')}
           className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'events'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-text/60 hover:text-text'
+            ? 'text-accent border-b-2 border-accent'
+            : 'text-text/60 hover:text-text'
             }`}
         >
           <Gift size={18} />
@@ -340,8 +339,8 @@ const AdminWelcome = () => {
         <button
           onClick={() => setActiveTab('direct')}
           className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'direct'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-text/60 hover:text-text'
+            ? 'text-accent border-b-2 border-accent'
+            : 'text-text/60 hover:text-text'
             }`}
         >
           <Send size={18} />
@@ -434,8 +433,8 @@ const AdminFireRequests = () => {
             key={status}
             onClick={() => setSelectedStatus(status)}
             className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${selectedStatus === status
-                ? 'bg-violet/20 text-violet'
-                : 'bg-glass hover:bg-glass-hover'
+              ? 'bg-violet/20 text-violet'
+              : 'bg-glass hover:bg-glass-hover'
               }`}
           >
             {status === 'pending' && '⏳ Pendientes'}
@@ -589,8 +588,8 @@ const AdminFireRequests = () => {
               <button
                 onClick={handleConfirmReview}
                 className={`flex-1 py-3 px-4 rounded-lg transition-colors ${reviewAction === 'approve'
-                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                    : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                  ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                  : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                   }`}
               >
                 Confirmar {reviewAction === 'approve' ? 'Aprobación' : 'Rechazo'}
@@ -695,8 +694,8 @@ const AdminRedemptions = () => {
             key={status}
             onClick={() => setSelectedStatus(status)}
             className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${selectedStatus === status
-                ? 'bg-violet/20 text-violet'
-                : 'bg-glass hover:bg-glass-hover'
+              ? 'bg-violet/20 text-violet'
+              : 'bg-glass hover:bg-glass-hover'
               }`}
           >
             {status === 'pending' && '⏳ Pendientes'}
@@ -909,8 +908,8 @@ const AdminRedemptions = () => {
               <button
                 onClick={handleConfirmAction}
                 className={`flex-1 py-3 px-4 rounded-lg transition-colors ${actionType === 'accept'
-                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                    : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                  ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                  : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                   }`}
               >
                 Confirmar {actionType === 'accept' ? 'Aceptación' : 'Rechazo'}
@@ -1254,10 +1253,10 @@ const AdminFiat = () => {
                     <td className="py-1.5 pr-2">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide ${op.status === 'approved'
-                            ? 'bg-success/20 text-success'
-                            : op.status === 'pending'
-                              ? 'bg-warning/20 text-warning'
-                              : 'bg-error/20 text-error'
+                          ? 'bg-success/20 text-success'
+                          : op.status === 'pending'
+                            ? 'bg-warning/20 text-warning'
+                            : 'bg-error/20 text-error'
                           }`}
                       >
                         {op.status}
