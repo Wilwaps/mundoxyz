@@ -90,6 +90,12 @@ async function runMigrations() {
     console.error('❌ Migration failed:', error);
     process.exit(1);
   } finally {
+    // Force exit after 1 second if pool.end() hangs
+    setTimeout(() => {
+      console.log('⚠️ Force exiting migration script...');
+      process.exit(0);
+    }, 1000);
+
     await pool.end();
     process.exit(0);
   }
