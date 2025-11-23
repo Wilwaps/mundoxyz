@@ -869,9 +869,24 @@ router.get('/users', adminAuth, async (req, res) => {
     }
     
     const countResult = await query(countQuery, countParams);
-    
+
+    // Normalizar balances para evitar NaN/strings raros en la API
+    const safeUsers = result.rows.map((row) => {
+      const coinsRaw = parseFloat(row.coins_balance);
+      const firesRaw = parseFloat(row.fires_balance);
+
+      const coinsSafe = Number.isFinite(coinsRaw) ? coinsRaw : 0;
+      const firesSafe = Number.isFinite(firesRaw) ? firesRaw : 0;
+
+      return {
+        ...row,
+        coins_balance: coinsSafe,
+        fires_balance: firesSafe
+      };
+    });
+
     res.json({
-      users: result.rows,
+      users: safeUsers,
       total: parseInt(countResult.rows[0].count),
       limit: parseInt(limit),
       offset: parseInt(offset)

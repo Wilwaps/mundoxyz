@@ -1125,7 +1125,7 @@ html {
 }
 
 .bingo-print-root {
-  width: 1000px;
+  width: 850px;
   padding: 16px;
   box-sizing: border-box;
   background: #ffffff;
@@ -1141,23 +1141,25 @@ html {
   margin-bottom: 16px;
   padding: 12px;
   box-sizing: border-box;
+  height: 1050px;
 }
 
 .bingo-print-card {
   border: 2px solid #000000;
-  padding: 8px;
+  padding: 10px 8px;
   display: flex;
   flex-direction: column;
   background: #f97316;
   color: #000000;
+  height: 100%;
 }
 
 .bingo-print-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
-  margin-bottom: 4px;
+  font-size: 12px;
+  margin-bottom: 6px;
   font-weight: 700;
   color: #000000;
 }
@@ -1167,6 +1169,7 @@ html {
   flex-direction: column;
   background: #ffffff;
   border: 2px solid #000000;
+  flex: 1;
 }
 
 .bingo-print-grid-header,
@@ -1177,13 +1180,16 @@ html {
 
 .bingo-print-cell {
   border: 1px solid #000000;
-  font-size: 11px;
+  font-size: 16px;
   text-align: center;
-  padding: 4px 2px;
+  padding: 8px 2px;
   min-width: 0;
   box-sizing: border-box;
   color: #000000;
   background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bingo-print-cell-header {

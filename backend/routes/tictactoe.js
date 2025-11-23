@@ -63,9 +63,11 @@ router.post('/create', verifyToken, async (req, res) => {
         throw new Error('Wallet no encontrado');
       }
       
-      const balance = mode === 'fires' 
+      const rawBalance = mode === 'fires' 
         ? parseFloat(walletResult.rows[0].fires_balance)
         : parseFloat(walletResult.rows[0].coins_balance);
+
+      const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
       
       if (balance < betAmount) {
         throw new Error(`Balance insuficiente. Tienes ${balance} ${mode}, necesitas ${betAmount}`);
@@ -205,9 +207,11 @@ router.post('/join/:code', verifyToken, async (req, res) => {
         throw new Error('Wallet no encontrado');
       }
       
-      const balance = room.mode === 'fires'
+      const rawBalance = room.mode === 'fires'
         ? parseFloat(walletResult.rows[0].fires_balance)
         : parseFloat(walletResult.rows[0].coins_balance);
+
+      const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
       
       const betAmount = parseFloat(room.bet_amount);
       
@@ -808,9 +812,11 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
             [playerId]
           );
           
-          const balance = currency === 'fires'
+          const rawBalance = currency === 'fires'
             ? parseFloat(walletResult.rows[0].fires_balance)
             : parseFloat(walletResult.rows[0].coins_balance);
+
+          const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
           
           if (balance < betAmount) {
             throw new Error(`Jugador ${playerId} no tiene balance suficiente para revancha`);

@@ -219,6 +219,11 @@ const AdminUsers = () => {
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-6">Gestión de Usuarios</h2>
 
+      <div className="card-glass mb-4 flex items-center justify-between text-sm">
+        <span className="text-text/60">Usuarios totales</span>
+        <span className="font-bold text-accent">{users?.total ?? 0}</span>
+      </div>
+
       {/* Search */}
       <div className="card-glass mb-6">
         <input

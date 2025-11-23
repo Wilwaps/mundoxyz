@@ -45,14 +45,21 @@ router.get('/balance', verifyToken, async (req, res) => {
     }
     
     const wallet = result.rows[0];
-    
+
+    const coinsRaw = parseFloat(wallet.coins_balance);
+    const firesRaw = parseFloat(wallet.fires_balance);
+    const totalCoinsEarnedRaw = parseFloat(wallet.total_coins_earned);
+    const totalCoinsSpentRaw = parseFloat(wallet.total_coins_spent);
+    const totalFiresEarnedRaw = parseFloat(wallet.total_fires_earned);
+    const totalFiresSpentRaw = parseFloat(wallet.total_fires_spent);
+
     const balanceData = {
-      coins_balance: parseFloat(wallet.coins_balance || 0),
-      fires_balance: parseFloat(wallet.fires_balance || 0),
-      total_coins_earned: parseFloat(wallet.total_coins_earned || 0),
-      total_coins_spent: parseFloat(wallet.total_coins_spent || 0),
-      total_fires_earned: parseFloat(wallet.total_fires_earned || 0),
-      total_fires_spent: parseFloat(wallet.total_fires_spent || 0)
+      coins_balance: Number.isFinite(coinsRaw) ? coinsRaw : 0,
+      fires_balance: Number.isFinite(firesRaw) ? firesRaw : 0,
+      total_coins_earned: Number.isFinite(totalCoinsEarnedRaw) ? totalCoinsEarnedRaw : 0,
+      total_coins_spent: Number.isFinite(totalCoinsSpentRaw) ? totalCoinsSpentRaw : 0,
+      total_fires_earned: Number.isFinite(totalFiresEarnedRaw) ? totalFiresEarnedRaw : 0,
+      total_fires_spent: Number.isFinite(totalFiresSpentRaw) ? totalFiresSpentRaw : 0
     };
     
     logger.info('Fetched user balance', { 

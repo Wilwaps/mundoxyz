@@ -36,6 +36,13 @@ router.get('/stats', async (req, res) => {
       FROM users
     `);
 
+    // Contar usuarios "online" recientes según last_seen_at
+    const onlineUsers = await query(`
+      SELECT COUNT(*) as online_users
+      FROM users
+      WHERE last_seen_at > NOW() - INTERVAL '5 minutes'
+    `);
+
     // Juegos jugados (últimos 30 días)
     const gamesPlayed = await query(`
       SELECT 
@@ -74,8 +81,10 @@ router.get('/stats', async (req, res) => {
 
     const totalUsersRaw = parseInt(totalUsers.rows[0]?.total_users);
     const activeUsersRaw = parseInt(activeUsers.rows[0]?.active_users_7d);
+    const onlineUsersRaw = parseInt(onlineUsers.rows[0]?.online_users);
     const totalUsersCount = Number.isFinite(totalUsersRaw) ? totalUsersRaw : 0;
     const activeUsersCount = Number.isFinite(activeUsersRaw) ? activeUsersRaw : 0;
+    const onlineUsersCount = Number.isFinite(onlineUsersRaw) ? onlineUsersRaw : 0;
 
     const gamesRow = gamesPlayed.rows[0] || {};
     const bingoGamesRaw = parseInt(gamesRow.bingo_games);
@@ -106,7 +115,8 @@ router.get('/stats', async (req, res) => {
       },
       users: {
         total: totalUsersCount,
-        active7Days: activeUsersCount
+        active7Days: activeUsersCount,
+        onlineNow: onlineUsersCount
       },
       games: {
         playedLast30Days: {

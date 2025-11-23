@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { useNavigate } from 'react-router-dom';
@@ -18,8 +18,8 @@ const Landing = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const [bingoCardCount, setBingoCardCount] = useState(4);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const bingoCardCountRef = useRef(null);
 
   useEffect(() => {
     fetchPublicStats();
@@ -134,14 +134,20 @@ const Landing = () => {
 
   const handleGenerateBingoPdf = async () => {
     if (generatingPdf) return;
-    let count = parseInt(bingoCardCount, 10);
+    let rawValue = '4';
+    if (bingoCardCountRef.current) {
+      rawValue = bingoCardCountRef.current.value;
+    }
+    let count = parseInt(rawValue, 10);
     if (!Number.isFinite(count) || count <= 0) {
       count = 1;
     }
     if (count > 40) {
       count = 40;
     }
-    setBingoCardCount(count);
+    if (bingoCardCountRef.current) {
+      bingoCardCountRef.current.value = String(count);
+    }
     setGeneratingPdf(true);
     try {
       const cards = generateMultipleBingo75Cards(count);
@@ -490,8 +496,8 @@ const Landing = () => {
                     type="number"
                     min="1"
                     max="40"
-                    value={bingoCardCount}
-                    onChange={(e) => setBingoCardCount(e.target.value)}
+                    defaultValue={4}
+                    ref={bingoCardCountRef}
                   />
                 </div>
                 <button
@@ -867,7 +873,7 @@ async function createBingoPdfFromCards(cards) {
     const renderWidth = imgWidth * ratio;
     const renderHeight = imgHeight * ratio;
     const x = (pdfWidth - renderWidth) / 2;
-    const y = (pdfHeight - renderHeight) / 2;
+    const y = 20;
     if (i > 0) {
       pdf.addPage();
     }

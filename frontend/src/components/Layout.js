@@ -55,6 +55,19 @@ const Layout = () => {
   const displayFires = parseFloat(balanceData?.fires_balance ?? user?.fires_balance ?? 0);
   const displayExperience = user?.experience || 0;
 
+  // Stats públicas para mostrar usuarios online
+  const { data: publicStats } = useQuery({
+    queryKey: ['public-stats-header'],
+    queryFn: async () => {
+      const response = await axios.get('/api/public/stats');
+      return response.data?.data;
+    },
+    refetchInterval: 30000,
+    staleTime: 10000
+  });
+
+  const onlineUsers = publicStats?.users?.onlineNow ?? 0;
+
   // Verificar si el usuario es tote (admin mayor)
   const isTote = user?.roles?.includes('tote');
 
@@ -117,6 +130,13 @@ const Layout = () => {
               >
                 <span className="text-sm">🔥</span>
                 <span className="text-xs font-semibold">{displayFires.toFixed(2)}</span>
+              </div>
+              <div
+                className="badge-experience cursor-default"
+                title="Usuarios conectados ahora mismo"
+              >
+                <span className="text-xs font-medium">🟢</span>
+                <span className="text-xs font-semibold">{onlineUsers}</span>
               </div>
               
               {/* Telegram Group Shortcut */}
