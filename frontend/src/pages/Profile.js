@@ -170,6 +170,22 @@ const Profile = () => {
     enabled: !!user?.id
   });
 
+  // Fetch store staff
+  const {
+    data: storeStaff,
+    isLoading: storeStaffLoading,
+    error: storeStaffError
+  } = useQuery({
+    queryKey: ['store-staff-user', user?.id],
+    queryFn: async () => {
+      const response = await axios.get(`/api/admin/store-staff/user/${user.id}`);
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
+  const myStores = Array.isArray(storeStaff) ? storeStaff : [];
+
   // Rifas del usuario (como host)
   const {
     data: userRaffles = [],
@@ -181,6 +197,15 @@ const Profile = () => {
 
   const myActiveRaffles = createdRaffles.filter((r) => r.status === 'active');
   const myFinishedRaffles = createdRaffles.filter((r) => r.status === 'finished');
+
+  const getStoreRoleLabel = (role) => {
+    if (role === 'owner') return 'Dueño';
+    if (role === 'admin') return 'Admin';
+    if (role === 'manager') return 'Gerente';
+    if (role === 'seller') return 'Vendedor';
+    if (role === 'marketing') return 'Marketing';
+    return role;
+  };
 
   const handleLogout = async () => {
     if (window.confirm('¿Seguro que quieres cerrar sesión?')) {
@@ -772,6 +797,70 @@ const Profile = () => {
           >
             {raffleSettingsSaving ? 'Guardando...' : 'Guardar Configuración'}
           </button>
+        </motion.div>
+      )}
+
+      {/* Mis Tiendas */}
+      {myStores.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4">Mis tiendas</h3>
+          {storeStaffLoading && (
+            <div className="text-xs text-text/60 mb-2">Cargando tiendas...</div>
+          )}
+          {storeStaffError && (
+            <div className="text-xs text-red-400 mb-2">Error al cargar tus tiendas</div>
+          )}
+          <div className="space-y-3">
+            {myStores.map((row) => (
+              <div
+                key={row.id}
+                className="glass-panel p-3 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  {row.logo_url ? (
+                    <img
+                      src={row.logo_url}
+                      alt={row.store_name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-glass flex items-center justify-center text-sm font-semibold">
+                      {(row.store_name || 'T')[0]}
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-semibold text-text">{row.store_name}</div>
+                    <div className="text-xs text-text/60">
+                      @{row.store_slug} • {getStoreRoleLabel(row.role)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/store/${row.store_slug}`)}
+                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover"
+                  >
+                    Ver tienda
+                  </button>
+                  {(row.role === 'owner' || row.role === 'admin' || row.role === 'manager' || row.role === 'seller') && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/store/${row.store_slug}/pos`)}
+                      className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30"
+                    >
+                      Ir al POS
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
 

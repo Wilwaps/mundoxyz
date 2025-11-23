@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { Gamepad2, Users, Trophy, Clock, Zap } from 'lucide-react';
+import { Users, Zap } from 'lucide-react';
 
 const Games = () => {
   const navigate = useNavigate();
@@ -57,6 +57,36 @@ const Games = () => {
         </g>
       </svg>
     ),
+    pool: (
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="pool-felt" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#22c55e" />
+            <stop offset="100%" stopColor="#14532d" />
+          </linearGradient>
+        </defs>
+        <rect x="8" y="8" width="84" height="84" rx="12" fill="#0f172a" />
+        <rect x="14" y="14" width="72" height="72" rx="10" fill="url(#pool-felt)" />
+        <circle cx="40" cy="40" r="10" fill="#f9fafb" />
+        <text x="40" y="44" textAnchor="middle" fill="#0f172a" fontSize="10" fontWeight="bold">8</text>
+        <circle cx="65" cy="35" r="4" fill="#e11d48" />
+        <circle cx="30" cy="65" r="4" fill="#22d3ee" />
+      </svg>
+    ),
+    caida: (
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <defs>
+          <filter id="card-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
+          </filter>
+        </defs>
+        <g style={{ filter: 'url(#card-shadow)' }}>
+          <rect x="20" y="18" width="40" height="64" rx="6" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="2" />
+          <rect x="40" y="22" width="40" height="64" rx="6" fill="#111827" stroke="#facc15" strokeWidth="2" />
+          <text x="60" y="58" textAnchor="middle" fill="#facc15" fontSize="22" fontWeight="bold">A</text>
+        </g>
+      </svg>
+    ),
   };
 
   const handleGameClick = (gameId) => {
@@ -64,6 +94,10 @@ const Games = () => {
       navigate('/bingo');
     } else if (gameId === 'tictactoe') {
       navigate('/tictactoe/lobby');
+    } else if (gameId === 'pool') {
+      navigate('/pool/lobby');
+    } else if (gameId === 'caida') {
+      navigate('/caida/lobby');
     }
   };
 

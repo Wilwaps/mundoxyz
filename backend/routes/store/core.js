@@ -7,6 +7,28 @@ const { v4: uuidv4 } = require('uuid');
 
 // --- PUBLIC ENDPOINTS ---
 
+router.get('/list', verifyToken, async (req, res) => {
+    try {
+        const roles = req.user?.roles || [];
+        const isAdmin = roles.includes('tote') || roles.includes('admin');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const result = await query(
+            `SELECT id, slug, name, logo_url
+       FROM stores
+       ORDER BY name ASC`
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching stores list:', error);
+        res.status(500).json({ error: 'Failed to fetch stores list' });
+    }
+});
+
 // GET /api/store/public/:slug
 // Get store details for customer view
 router.get('/public/:slug', async (req, res) => {

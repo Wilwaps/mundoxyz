@@ -180,11 +180,198 @@ const AdminStats = () => {
   );
 };
 
+const StoreStaffModal = ({ user, onClose }) => {
+  const queryClient = useQueryClient();
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [selectedRole, setSelectedRole] = useState('seller');
+
+  const { data: storesData, isLoading: loadingStores } = useQuery({
+    queryKey: ['stores-list'],
+    queryFn: async () => {
+      const response = await axios.get('/api/store/list');
+      return response.data;
+    }
+  });
+
+  const {
+    data: staffData,
+    isLoading: loadingStaff,
+    refetch: refetchStaff
+  } = useQuery({
+    queryKey: ['store-staff-user', user.id],
+    queryFn: async () => {
+      const response = await axios.get(`/api/admin/store-staff/user/${user.id}`);
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
+  const stores = Array.isArray(storesData) ? storesData : [];
+  const staff = Array.isArray(staffData) ? staffData : [];
+
+  const getRoleLabel = (role) => {
+    if (role === 'owner') return 'Dueño';
+    if (role === 'admin') return 'Admin';
+    if (role === 'manager') return 'Gerente';
+    if (role === 'seller') return 'Vendedor';
+    if (role === 'marketing') return 'Marketing';
+    return role;
+  };
+
+  const handleAssign = async () => {
+    if (!selectedStoreId || !selectedRole) {
+      toast.error('Selecciona tienda y rol');
+      return;
+    }
+
+    try {
+      await axios.post('/api/admin/store-staff/assign', {
+        user_id: user.id,
+        store_id: selectedStoreId,
+        role: selectedRole
+      });
+      toast.success('Rol de tienda asignado');
+      await refetchStaff();
+      queryClient.invalidateQueries(['store-staff-user', user.id]);
+    } catch (error) {
+      const message = error?.response?.data?.error || 'Error al asignar rol de tienda';
+      toast.error(message);
+    }
+  };
+
+  const handleRemove = async (staffId) => {
+    try {
+      await axios.delete(`/api/admin/store-staff/${staffId}`);
+      toast.success('Asignación eliminada');
+      await refetchStaff();
+      queryClient.invalidateQueries(['store-staff-user', user.id]);
+    } catch (error) {
+      const message = error?.response?.data?.error || 'Error al eliminar asignación de tienda';
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg card-glass p-6"
+      >
+        <h3 className="text-xl font-bold mb-2">Roles de tienda</h3>
+        <p className="text-xs text-text/60 mb-4">
+          Gestiona las tiendas de {user.display_name || user.username}.
+        </p>
+
+        <div className="mb-4 space-y-3">
+          <div>
+            <div className="text-xs text-text/60 mb-1">Tienda</div>
+            {loadingStores ? (
+              <div className="text-xs text-text/60 py-2">Cargando tiendas...</div>
+            ) : stores.length === 0 ? (
+              <div className="text-xs text-text/60 py-2">No hay tiendas configuradas.</div>
+            ) : (
+              <select
+                value={selectedStoreId}
+                onChange={(e) => setSelectedStoreId(e.target.value)}
+                className="input-glass w-full"
+              >
+                <option value="">Selecciona una tienda</option>
+                {stores.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {store.name} ({store.slug})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <div className="text-xs text-text/60 mb-1">Rol en la tienda</div>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="owner">Dueño</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Gerente</option>
+              <option value="seller">Vendedor</option>
+              <option value="marketing">Marketing</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAssign}
+            className="w-full py-2 px-4 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-sm font-semibold transition-colors"
+          >
+            Guardar asignación
+          </button>
+        </div>
+
+        <div className="border-t border-glass pt-4 mt-2">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-semibold text-text/80">Asignaciones actuales</h4>
+            {loadingStaff && (
+              <span className="text-[11px] text-text/60">Cargando...</span>
+            )}
+          </div>
+
+          {staff.length === 0 ? (
+            <p className="text-xs text-text/60">Este usuario no tiene tiendas asignadas.</p>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
+              {staff.map((row) => (
+                <div
+                  key={row.id}
+                  className="glass-panel p-2 flex items-center justify-between gap-2"
+                >
+                  <div>
+                    <div className="font-semibold text-sm">{row.store_name}</div>
+                    <div className="text-[11px] text-text/60">
+                      @{row.store_slug} • {getRoleLabel(row.role)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(row.id)}
+                    className="px-3 py-1 rounded-full bg-error/20 text-error hover:bg-error/30 text-[11px]"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-glass hover:bg-glass-hover text-sm"
+          >
+            Cerrar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // Users Management Component
 const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [storeModalUser, setStoreModalUser] = useState(null);
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
+  const canManageStoreStaff = isAdmin();
 
   const { data: users } = useQuery({
     queryKey: ['admin-users', search, selectedRole],
@@ -276,6 +463,15 @@ const AdminUsers = () => {
                   >
                     Reiniciar clave
                   </button>
+                  {canManageStoreStaff && (
+                    <button
+                      type="button"
+                      onClick={() => setStoreModalUser(user)}
+                      className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                    >
+                      Tiendas
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -289,6 +485,12 @@ const AdminUsers = () => {
           </div>
         ))}
       </div>
+      {storeModalUser && (
+        <StoreStaffModal
+          user={storeModalUser}
+          onClose={() => setStoreModalUser(null)}
+        />
+      )}
     </div>
   );
 };
