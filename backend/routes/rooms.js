@@ -68,6 +68,12 @@ router.get('/find/:code', async (req, res) => {
       case 'bingo':
         redirectUrl = `/bingo/v2/room/${code}`;
         break;
+      case 'pool':
+        redirectUrl = `/pool/room/${code}`;
+        break;
+      case 'caida':
+        redirectUrl = `/caida/room/${code}`;
+        break;
       default:
         throw new Error(`Tipo de juego no soportado: ${roomDetails.game_type}`);
     }

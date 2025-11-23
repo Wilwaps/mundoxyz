@@ -21,7 +21,7 @@ class RoomCodeService {
       logger.info('🔐 Reservando código de sala', { gameType, roomId });
       
       // Validar game_type
-      const validTypes = ['tictactoe', 'bingo'];
+      const validTypes = ['tictactoe', 'bingo', 'pool', 'caida', 'raffle'];
       if (!validTypes.includes(gameType)) {
         throw new Error(`Tipo de juego inválido: ${gameType}. Tipos válidos: ${validTypes.join(', ')}`);
       }
@@ -153,7 +153,7 @@ class RoomCodeService {
       let roomDetails = null;
       
       switch (game_type) {
-        case 'tictactoe':
+        case 'tictactoe': {
           const tttResult = await query(
             `SELECT 
               r.*,
@@ -167,8 +167,9 @@ class RoomCodeService {
           );
           roomDetails = tttResult.rows[0];
           break;
-          
-        case 'bingo':
+        }
+        
+        case 'bingo': {
           const bingoResult = await query(
             `SELECT 
               r.*,
@@ -183,7 +184,38 @@ class RoomCodeService {
           );
           roomDetails = bingoResult.rows[0];
           break;
-          
+        }
+
+        case 'pool': {
+          const poolResult = await query(
+            `SELECT r.*, 
+              h.username as host_username, 
+              o.username as opponent_username 
+             FROM pool_rooms r
+             LEFT JOIN users h ON r.host_id = h.id
+             LEFT JOIN users o ON r.player_opponent_id = o.id
+             WHERE r.code = $1`,
+            [code]
+          );
+          roomDetails = poolResult.rows[0];
+          break;
+        }
+
+        case 'caida': {
+          const caidaResult = await query(
+            `SELECT r.*, 
+              (SELECT json_agg(json_build_object('id', u.id, 'username', u.username))
+               FROM users u WHERE u.id::text = ANY(
+                 SELECT jsonb_array_elements_text(r.player_ids)
+               )) as players
+             FROM caida_rooms r
+             WHERE r.code = $1`,
+            [code]
+          );
+          roomDetails = caidaResult.rows[0];
+          break;
+        }
+        
         default:
           throw new Error(`Tipo de juego no soportado: ${game_type}`);
       }

@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS room_codes (
     id SERIAL PRIMARY KEY,
     code VARCHAR(6) NOT NULL UNIQUE,
-    game_type VARCHAR(20) NOT NULL CHECK (game_type IN ('tictactoe', 'bingo', 'raffle')),
+    game_type VARCHAR(20) NOT NULL CHECK (game_type IN ('tictactoe', 'bingo', 'raffle', 'pool', 'caida')),
     room_id VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'finished', 'cancelled')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -116,6 +116,6 @@ CREATE TRIGGER trigger_update_room_codes_timestamp
 -- Comentarios para documentación
 COMMENT ON TABLE room_codes IS 'Registro central de códigos únicos para todas las salas de juego';
 COMMENT ON COLUMN room_codes.code IS 'Código único de 6 dígitos numéricos';
-COMMENT ON COLUMN room_codes.game_type IS 'Tipo de juego: tictactoe, bingo, raffle';
+COMMENT ON COLUMN room_codes.game_type IS 'Tipo de juego: tictactoe, bingo, raffle, pool, caida';
 COMMENT ON COLUMN room_codes.room_id IS 'ID de la sala en su tabla específica';
 COMMENT ON COLUMN room_codes.status IS 'Estado: active, finished, cancelled';
