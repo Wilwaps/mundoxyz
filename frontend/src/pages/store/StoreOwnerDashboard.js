@@ -83,6 +83,25 @@ const StoreOwnerDashboard = () => {
 
   const orders = Array.isArray(activeOrders) ? activeOrders : [];
 
+  const currencyConfigLabel = (() => {
+    const cfg = store?.currency_config;
+
+    if (!cfg) return 'coins';
+
+    if (typeof cfg === 'string') return cfg;
+
+    try {
+      const base = cfg.base || 'coins';
+      const accepted = Array.isArray(cfg.accepted) ? cfg.accepted.join(', ') : null;
+      if (accepted) {
+        return `${base} (${accepted})`;
+      }
+      return String(base);
+    } catch (e) {
+      return 'coins';
+    }
+  })();
+
   const normalizedSearch = productSearch.trim().toLowerCase();
   const filteredProducts = products
     .filter((product) => {
@@ -180,7 +199,7 @@ const StoreOwnerDashboard = () => {
           </div>
           <div className="card-glass p-4">
             <p className="text-xs text-text/60 mb-1">Configuración de moneda</p>
-            <p className="text-sm font-semibold text-text/90">{store.currency_config || 'coins'}</p>
+            <p className="text-sm font-semibold text-text/90">{currencyConfigLabel}</p>
           </div>
         </div>
       )}
