@@ -1,20 +1,36 @@
 const logger = require('../utils/logger');
 const { query, transaction } = require('../db');
 const { validateTurn, checkWinCondition } = require('../utils/pool');
+const { refundBet } = require('../utils/tictactoe');
 
-// In-memory state tracking for active rooms (optional, for faster validation)
-// const activePoolRooms = new Map();
+const roomConnections = new Map();
+const socketRooms = new Map();
+const ABANDONMENT_TIMEOUT = 15000;
 
 function initPoolSocket(io, socket) {
 
-    // Join Room
     socket.on('pool:join-room', (data) => {
         const { roomCode, userId } = data;
+        if (!roomCode || !userId) return;
+
         socket.join(`pool:${roomCode}`);
         logger.info(`Socket ${socket.id} joined pool:${roomCode}`);
+
+        registerPoolConnection(roomCode, userId, socket.id);
     });
 
-    // Sync Shot (Player is taking a shot)
+    socket.on('pool:leave-room', (data) => {
+        const { roomCode } = data || {};
+        if (!roomCode) return;
+
+        const state = socketRooms.get(socket.id);
+        const userId = state?.userId;
+        if (!userId) return;
+
+        socket.leave(`pool:${roomCode}`);
+        unregisterPoolConnection(io, roomCode, userId, socket.id);
+    });
+
     socket.on('pool:shot-event', (data) => {
         const { roomCode, force, angle, spin } = data;
         // Broadcast to opponent so they see the cue animation/shot
@@ -23,8 +39,6 @@ function initPoolSocket(io, socket) {
         });
     });
 
-    // Sync Physics State (Ball positions update)
-    // This is sent frequently by the active client to keep opponent in sync
     socket.on('pool:update-state', (data) => {
         const { roomCode, balls, cueBall } = data;
         socket.to(`pool:${roomCode}`).emit('pool:sync-state', {
@@ -32,7 +46,6 @@ function initPoolSocket(io, socket) {
         });
     });
 
-    // Turn End (Shot finished, balls stopped)
     socket.on('pool:turn-end', async (data) => {
         const { roomCode, gameState, turnResult } = data;
         // gameState: { balls, activeSuit, ... }
@@ -116,6 +129,172 @@ function initPoolSocket(io, socket) {
         } catch (error) {
             logger.error('Error processing pool turn:', error);
         }
+    });
+
+    socket.on('disconnect', () => {
+        const state = socketRooms.get(socket.id);
+        if (!state) return;
+
+        const { userId, rooms } = state;
+        for (const roomCode of rooms) {
+            unregisterPoolConnection(io, roomCode, userId, socket.id);
+        }
+
+        socketRooms.delete(socket.id);
+    });
+}
+
+function getOrCreateRoomConnections(roomCode) {
+    if (!roomConnections.has(roomCode)) {
+        roomConnections.set(roomCode, {
+            users: new Map(),
+            timeout: null
+        });
+    }
+    return roomConnections.get(roomCode);
+}
+
+function registerPoolConnection(roomCode, userId, socketId) {
+    const state = socketRooms.get(socketId) || { userId, rooms: new Set() };
+    state.userId = userId;
+    state.rooms.add(roomCode);
+    socketRooms.set(socketId, state);
+
+    const roomState = getOrCreateRoomConnections(roomCode);
+    const users = roomState.users;
+    const current = users.get(userId) || { count: 0 };
+    current.count += 1;
+    users.set(userId, current);
+
+    if (roomState.timeout) {
+        clearTimeout(roomState.timeout);
+        roomState.timeout = null;
+    }
+}
+
+function unregisterPoolConnection(io, roomCode, userId, socketId) {
+    const roomState = roomConnections.get(roomCode);
+    if (!roomState) return;
+
+    const users = roomState.users;
+    const current = users.get(userId);
+    if (!current) return;
+
+    current.count = Math.max(0, current.count - 1);
+    if (current.count === 0) {
+        users.delete(userId);
+    } else {
+        users.set(userId, current);
+    }
+
+    const socketState = socketRooms.get(socketId);
+    if (socketState) {
+        socketState.rooms.delete(roomCode);
+        if (socketState.rooms.size === 0) {
+            socketRooms.delete(socketId);
+        } else {
+            socketRooms.set(socketId, socketState);
+        }
+    }
+
+    if (users.size === 0 && !roomState.timeout) {
+        roomState.timeout = setTimeout(() => {
+            handlePoolAbandonedRoom(io, roomCode).catch((error) => {
+                logger.error('Error handling abandoned pool room:', error);
+            });
+        }, ABANDONMENT_TIMEOUT);
+    }
+}
+
+async function handlePoolAbandonedRoom(io, roomCode) {
+    const roomState = roomConnections.get(roomCode);
+    if (!roomState) return;
+
+    if (roomState.users.size > 0) {
+        if (roomState.timeout) {
+            clearTimeout(roomState.timeout);
+            roomState.timeout = null;
+        }
+        return;
+    }
+
+    const result = await transaction(async (client) => {
+        const roomResult = await client.query(
+            'SELECT * FROM pool_rooms WHERE code = $1 FOR UPDATE',
+            [roomCode]
+        );
+
+        if (roomResult.rows.length === 0) {
+            return { closed: false };
+        }
+
+        const room = roomResult.rows[0];
+
+        if (!['waiting', 'ready', 'playing'].includes(room.status)) {
+            return { closed: false };
+        }
+
+        const isLobby = room.status === 'waiting' || room.status === 'ready';
+
+        if (isLobby) {
+            const betAmount = parseFloat(room.bet_amount);
+            const mode = room.mode;
+
+            if (room.host_id) {
+                await refundBet(
+                    client,
+                    room.host_id,
+                    mode,
+                    betAmount,
+                    room.code,
+                    'Pool room auto-cancelled without participants'
+                );
+            }
+
+            if (room.player_opponent_id) {
+                await refundBet(
+                    client,
+                    room.player_opponent_id,
+                    mode,
+                    betAmount,
+                    room.code,
+                    'Pool room auto-cancelled without participants'
+                );
+            }
+        }
+
+        await client.query(
+            `UPDATE pool_rooms 
+         SET status = 'cancelled', 
+             finished_at = NOW()
+         WHERE id = $1`,
+            [room.id]
+        );
+
+        return { closed: true, isLobby };
+    });
+
+    if (!result.closed) {
+        if (roomState.timeout) {
+            clearTimeout(roomState.timeout);
+            roomState.timeout = null;
+        }
+        return;
+    }
+
+    if (roomState.timeout) {
+        clearTimeout(roomState.timeout);
+    }
+    roomConnections.delete(roomCode);
+
+    io.to(`pool:${roomCode}`).emit('pool:room-abandoned', {
+        roomCode,
+        refunded: result.isLobby
+    });
+
+    logger.info('Pool room closed due to no participants', {
+        roomCode,
+        refunded: result.isLobby
     });
 }
 

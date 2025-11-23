@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const RoomCodeService = require('../services/roomCodeService');
 const { createDeck } = require('../utils/caida');
+const { refundBet } = require('../utils/tictactoe');
 
 // POST /api/caida/create
 router.post('/create', verifyToken, async (req, res) => {
@@ -234,6 +235,188 @@ router.get('/room/:code', verifyToken, async (req, res) => {
         res.json({ room: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+// GET /api/caida/rooms/public - List public lobby rooms
+router.get('/rooms/public', verifyToken, async (req, res) => {
+    try {
+        const { mode, limit = 50, offset = 0 } = req.query;
+
+        let queryStr = `
+      SELECT 
+        r.*, 
+        h.username as host_username
+      FROM caida_rooms r
+      JOIN users h ON h.id = r.host_id
+      WHERE r.status = 'waiting'
+        AND r.visibility = 'public'
+    `;
+
+        const params = [];
+        let paramCount = 0;
+
+        if (mode) {
+            queryStr += ` AND r.mode = $${++paramCount}`;
+            params.push(mode);
+        }
+
+        queryStr += ` ORDER BY r.created_at DESC LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+        params.push(parseInt(limit), parseInt(offset));
+
+        const result = await query(queryStr, params);
+
+        const rooms = result.rows.map((room) => {
+            if (typeof room.player_ids === 'string') {
+                try {
+                    room.player_ids = JSON.parse(room.player_ids);
+                } catch (e) {
+                    room.player_ids = [];
+                }
+            }
+            return room;
+        });
+
+        res.json({ rooms, total: rooms.length });
+    } catch (error) {
+        logger.error('Error fetching public caida rooms:', error);
+        res.status(500).json({ error: 'Failed to fetch public rooms' });
+    }
+});
+
+// GET /api/caida/rooms/admin - List active rooms for admin/tote
+router.get('/rooms/admin', verifyToken, async (req, res) => {
+    try {
+        const roles = req.user.roles || [];
+        const isAdmin = roles.includes('admin') || roles.includes('tote');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo admin/tote.' });
+        }
+
+        const result = await query(
+            `SELECT 
+        r.*,
+        h.username as host_username,
+        h.display_name as host_display_name
+       FROM caida_rooms r
+       JOIN users h ON h.id = r.host_id
+       WHERE r.status IN ('waiting', 'playing')
+       ORDER BY r.created_at DESC`
+        );
+
+        const rooms = result.rows.map((room) => {
+            if (typeof room.player_ids === 'string') {
+                try {
+                    room.player_ids = JSON.parse(room.player_ids);
+                } catch (e) {
+                    room.player_ids = [];
+                }
+            }
+            return room;
+        });
+
+        res.json({ rooms });
+    } catch (error) {
+        logger.error('Error fetching admin caida rooms:', error);
+        res.status(500).json({ error: 'Failed to fetch admin rooms' });
+    }
+});
+
+// DELETE /api/caida/rooms/:code - Close room and refund players (admin/tote)
+router.delete('/rooms/:code', verifyToken, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const userId = req.user.id;
+        const roles = req.user.roles || [];
+        const isAdmin = roles.includes('admin') || roles.includes('tote');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo admin/tote.' });
+        }
+
+        const result = await transaction(async (client) => {
+            const roomResult = await client.query(
+                'SELECT * FROM caida_rooms WHERE code = $1 FOR UPDATE',
+                [code]
+            );
+
+            if (roomResult.rows.length === 0) {
+                throw new Error('Sala no encontrada');
+            }
+
+            const room = roomResult.rows[0];
+
+            if (!['waiting', 'playing'].includes(room.status)) {
+                throw new Error('Esta sala no puede ser cerrada');
+            }
+
+            const betAmount = parseFloat(room.bet_amount);
+            const mode = room.mode;
+
+            let playerIds = [];
+            if (Array.isArray(room.player_ids)) {
+                playerIds = room.player_ids;
+            } else if (typeof room.player_ids === 'string') {
+                try {
+                    playerIds = JSON.parse(room.player_ids);
+                } catch (e) {
+                    playerIds = [];
+                }
+            }
+
+            for (const playerId of playerIds) {
+                await refundBet(
+                    client,
+                    playerId,
+                    mode,
+                    betAmount,
+                    room.code,
+                    'Caida room closed by admin/tote'
+                );
+            }
+
+            await client.query(
+                `UPDATE caida_rooms 
+         SET status = 'cancelled',
+             finished_at = NOW()
+         WHERE id = $1`,
+                [room.id]
+            );
+
+            const refundedCount = playerIds.length;
+
+            logger.info('Admin/Tote closed caida room', {
+                roomCode: code,
+                userId,
+                refundedPlayers: refundedCount,
+                betAmount: room.bet_amount,
+                mode: room.mode
+            });
+
+            return {
+                refundedCount,
+                betAmount: room.bet_amount,
+                mode: room.mode,
+                roomCode: code
+            };
+        });
+
+        if (req.io) {
+            req.io.to(`caida:${code}`).emit('caida:room-abandoned', {
+                roomCode: code,
+                refunded: true,
+                closedByAdmin: true
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Sala cerrada. ${result.refundedCount} jugador(es) reembolsados.`,
+            ...result
+        });
+    } catch (error) {
+        logger.error('Error closing caida room:', error);
+        res.status(400).json({ error: error.message || 'Error cerrando sala' });
     }
 });
 

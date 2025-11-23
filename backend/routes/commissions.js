@@ -123,6 +123,42 @@ router.get('/tito/me/operations', verifyToken, async (req, res) => {
   }
 });
 
+router.get('/tito/me/referrals', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const isTito = await ensureUserIsTito(userId);
+    if (!isTito) {
+      return res.status(403).json({ error: 'No tienes rol Tito' });
+    }
+
+    const { limit = 50, offset = 0 } = req.query;
+    const safeLimit = Math.min(parseInt(limit, 10) || 50, 200);
+    const safeOffset = parseInt(offset, 10) || 0;
+
+    const result = await query(
+      `SELECT 
+         id,
+         username,
+         created_at
+       FROM users
+       WHERE tito_owner_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, safeLimit, safeOffset]
+    );
+
+    res.json({
+      referrals: result.rows,
+      limit: safeLimit,
+      offset: safeOffset
+    });
+  } catch (error) {
+    logger.error('[Commissions] Error fetching Tito referrals', error);
+    res.status(500).json({ error: 'Error al obtener usuarios referidos' });
+  }
+});
+
 router.post('/tito/me/link', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
