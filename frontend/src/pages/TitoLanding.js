@@ -1,14 +1,40 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Sparkles, TrendingUp, Wallet, Users, Info, ArrowRight } from 'lucide-react';
+import { Gamepad2, Sparkles, TrendingUp, Wallet, Users, Info, ArrowRight } from 'lucide-react';
+import './Landing.css';
 
 const TitoLanding = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const displayName = user?.display_name || user?.username || 'Tito';
 
   return (
-    <div className="p-4 max-w-4xl mx-auto space-y-6">
+    <div className="landing-page">
+      {/* HEADER público reutilizando el de Landing */}
+      <header className="landing-header">
+        <div className="container">
+          <div className="header-content">
+            <div className="logo">
+              <Gamepad2 size={32} />
+              <span>MUNDOXYZ</span>
+            </div>
+            <nav className="header-nav">
+              <button onClick={() => navigate('/login')} className="btn-login">
+                Iniciar Sesión
+              </button>
+              <button onClick={() => navigate('/register')} className="btn-register">
+                Registrarse Gratis
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main className="mt-8 mb-12">
+        <div className="container">
+          <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       {/* Hero */}
       <div className="card-glass p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div className="flex items-start gap-4 flex-1">
@@ -138,6 +164,9 @@ const TitoLanding = () => {
           </div>
         </div>
       </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

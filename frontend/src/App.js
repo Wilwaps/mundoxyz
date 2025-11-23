@@ -119,6 +119,9 @@ function App() {
                 {/* Landing Page Principal (sin login) */}
                 <Route path="/landing" element={<Landing />} />
 
+                {/* Landing informativa para Tito (sin login) */}
+                <Route path="/tito/info" element={<TitoLanding />} />
+
                 {/* Landing Pública de Rifas (sin login) */}
                 <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
 
@@ -137,7 +140,6 @@ function App() {
                   <Route index element={<Navigate to="/lobby" replace />} />
                   <Route path="games" element={<Games />} />
                   <Route path="profile" element={<Profile />} />
-                  <Route path="tito/info" element={<TitoLanding />} />
                   <Route path="tito" element={<TitoDashboard />} />
                   <Route path="lobby" element={<Lobby />} />
                   <Route path="market" element={<Market />} />
