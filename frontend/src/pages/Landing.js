@@ -482,7 +482,7 @@ const Landing = () => {
             <div className="bingo-print-content">
               <div className="bingo-print-generator">
                 <h3>Cartones para imprimir</h3>
-                <p>Elige cuántos cartones quieres (máximo 40). Se crearán en un PDF con 4 cartones por hoja carta, listo para imprimir.</p>
+                <p>Elige cuántos cartones quieres (máximo 40). Se crearán en un PDF con 6 cartones por hoja carta, listo para imprimir.</p>
                 <div className="bingo-print-input-row">
                   <label htmlFor="bingo-card-count">Cantidad de cartones</label>
                   <input
@@ -841,7 +841,7 @@ async function createBingoPdfFromCards(cards) {
   document.body.appendChild(container);
   let currentPage = null;
   cards.forEach((card, index) => {
-    if (index % 4 === 0) {
+    if (index % 6 === 0) {
       currentPage = document.createElement('div');
       currentPage.className = 'bingo-print-page';
       container.appendChild(currentPage);

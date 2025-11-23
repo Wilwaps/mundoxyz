@@ -223,24 +223,47 @@ const Profile = () => {
         {user?.roles?.length > 0 && (
           <div className="mt-4 pt-4 border-t border-glass">
             <div className="flex flex-wrap gap-2">
-              {(Array.isArray(user.roles) ? user.roles : []).map((role) => (
-                <span 
-                  key={role} 
-                  className={`badge-coins ${
-                    (role === 'tote' || role === 'admin') 
-                      ? 'cursor-pointer hover:scale-105 transition-transform' 
-                      : ''
-                  }`}
-                  onClick={() => {
-                    if (role === 'tote' || role === 'admin') {
-                      navigate('/admin');
+              {(Array.isArray(user.roles) ? user.roles : []).map((role) => {
+                const isAdminRole = role === 'tote' || role === 'admin';
+                const isTitoRole = role === 'tito';
+                const isClickable = isAdminRole || isTitoRole;
+
+                let icon = '👤';
+                if (role === 'tote') {
+                  icon = '👑';
+                } else if (role === 'admin') {
+                  icon = '⚙️';
+                } else if (role === 'tito') {
+                  icon = '🧑‍🚀';
+                }
+
+                return (
+                  <span
+                    key={role}
+                    className={`badge-coins ${
+                      isClickable
+                        ? 'cursor-pointer hover:scale-105 transition-transform'
+                        : ''
+                    }`}
+                    onClick={() => {
+                      if (isAdminRole) {
+                        navigate('/admin');
+                      } else if (isTitoRole) {
+                        navigate('/tito');
+                      }
+                    }}
+                    title={
+                      isAdminRole
+                        ? 'Ir al Panel Admin'
+                        : isTitoRole
+                        ? 'Ir al Panel Tito'
+                        : ''
                     }
-                  }}
-                  title={(role === 'tote' || role === 'admin') ? 'Ir al Panel Admin' : ''}
-                >
-                  {role === 'tote' ? '👑' : role === 'admin' ? '⚙️' : '👤'} {role}
-                </span>
-              ))}
+                  >
+                    {icon} {role}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}
