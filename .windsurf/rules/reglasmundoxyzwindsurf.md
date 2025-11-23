@@ -40,8 +40,4 @@ git commit -m "feat: FASE 1 reconexión TicTacToe"
 Si prefieres seguir la cadena de comandos sugerida (con el mensaje en un archivo), sería:
 
 powershell
-git add -A
-if ($LASTEXITCODE -eq 0) { Set-Content -Path .git\COMMIT_MSG.txt -Value 'feat: FASE 1 reconexión TicTacToe' }
-if ($LASTEXITCODE -eq 0) { git commit -F .git\COMMIT_MSG.txt }
-if ($LASTEXITCODE -eq 0) { git push -u origin HEAD }
-Recuerda: en PowerShell, si ejecutas un script o binario local, usa el prefijo .\, pero para comandos en el PATH (como git) no hace falta.
+git add -A; git commit -m "mensaje"; git push -u origin HEAD

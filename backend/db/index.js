@@ -2,9 +2,12 @@ const { Pool } = require('pg');
 const config = require('../config/config');
 const logger = require('../utils/logger');
 
+// Prefer DATABASE_PUBLIC_URL when available (useful for local dev against Railway proxy)
+const connectionString = process.env.DATABASE_PUBLIC_URL || config.database.url;
+
 // Configure connection
-const poolConfig = config.database.url ? {
-  connectionString: config.database.url,
+const poolConfig = connectionString ? {
+  connectionString,
   ssl: config.database.sslMode === 'require' ? {
     rejectUnauthorized: false
   } : false,
