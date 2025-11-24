@@ -13,12 +13,13 @@ const POS = () => {
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
     // Payment State
-    const [payments, setPayments] = useState({
+    const initialPayments = {
         cash_usdt: 0,
         zelle: 0,
         bs: 0,
         fires: 0
-    });
+    };
+    const [payments, setPayments] = useState(initialPayments);
 
     // Cliente POS (simple CRM local)
     const [customerName, setCustomerName] = useState('');
@@ -27,6 +28,7 @@ const POS = () => {
     const [recentCustomers, setRecentCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false);
+    const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -73,7 +75,7 @@ const POS = () => {
             toast.success('Orden creada exitosamente');
             setCart([]);
             setPaymentModalOpen(false);
-            setPayments({ cash_usdt: 0, zelle: 0, bs: 0, fires: 0 });
+            setPayments(initialPayments);
 
             // Guardar cliente en recientes (solo si tiene algún dato)
             setRecentCustomers((prev) => {
@@ -166,11 +168,17 @@ const POS = () => {
         (bsAmount / rates.bs) +
         (firesAmount / rates.fires);
 
+    // Lo que falta por pagar (en USDT) – nunca negativo
     const remainingUSDT = Math.max(0, totalUSDT - totalPaidUSDT);
+    // Lo que sobra (cambio) si el cliente paga de más (en USDT)
+    const changeUSDT = Math.max(0, totalPaidUSDT - totalUSDT);
+
     const isPaid = totalPaidUSDT >= totalUSDT - 0.01; // Tolerance
 
     const totalBs = totalUSDT * rates.bs;
     const totalFires = totalUSDT * rates.fires;
+    const remainingBs = remainingUSDT * rates.bs;
+    const changeBs = changeUSDT * rates.bs;
 
     useEffect(() => {
         try {
@@ -214,6 +222,16 @@ const POS = () => {
         };
 
         createOrderMutation.mutate(orderData);
+    };
+
+    const handleNewBilling = () => {
+        // Reinicia la venta actual sin tocar clientes recientes ni historial
+        setCart([]);
+        setPayments(initialPayments);
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerSearch('');
+        setSelectedCustomer(null);
     };
 
     const storeId = storeData?.store?.id;
@@ -489,6 +507,24 @@ const POS = () => {
                     >
                         Pagar
                     </button>
+
+                    <div className="mt-3 flex gap-2 text-xs">
+                        <button
+                            type="button"
+                            onClick={handleNewBilling}
+                            className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50"
+                            disabled={cart.length === 0 && !customerName && !customerPhone && !selectedCustomer}
+                        >
+                            Nueva facturación
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsQuoteModalOpen(true)}
+                            className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10"
+                        >
+                            Cotización
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -574,11 +610,29 @@ const POS = () => {
                                         <span className="font-bold">${totalPaidUSDT.toFixed(2)}</span>
                                     </div>
                                     <div className="h-px bg-white/10 my-4"></div>
-                                    <div className="flex justify-between text-xl font-bold">
-                                        <span>Restante</span>
-                                        <span className={remainingUSDT > 0 ? 'text-red-400' : 'text-green-400'}>
-                                            ${remainingUSDT.toFixed(2)}
-                                        </span>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-sm font-semibold">
+                                            <span>{changeUSDT > 0 ? 'Cambio' : 'Restante'}</span>
+                                            <span className={remainingUSDT > 0 ? 'text-red-400' : 'text-green-400'}>
+                                                {changeUSDT > 0
+                                                    ? changeBs.toLocaleString('es-VE', {
+                                                        style: 'currency',
+                                                        currency: 'VES'
+                                                    })
+                                                    : remainingBs.toLocaleString('es-VE', {
+                                                        style: 'currency',
+                                                        currency: 'VES'
+                                                    })}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-white/70">
+                                            <span>{changeUSDT > 0 ? 'Cambio en USDT' : 'Restante en USDT'}</span>
+                                            <span className={remainingUSDT > 0 ? 'text-red-300' : 'text-green-300'}>
+                                                {changeUSDT > 0
+                                                    ? `$${changeUSDT.toFixed(2)}`
+                                                    : `$${remainingUSDT.toFixed(2)}`}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -616,6 +670,109 @@ const POS = () => {
                     }}
                 />
             )}
+
+            {isQuoteModalOpen && (
+                <QuoteModal
+                    products={products}
+                    rates={rates}
+                    onClose={() => setIsQuoteModalOpen(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+const QuoteModal = ({ products, rates, onClose }) => {
+    const [search, setSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+
+    const filtered = products.filter((p) => {
+        const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || p.category_id === categoryFilter;
+        return matchesSearch && matchesCategory;
+    });
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="w-full max-w-3xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold">Cotización rápida</h2>
+                        <p className="text-[11px] text-white/60">Explora precios sin afectar la orden actual.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-white/60 hover:text-white text-xs px-3 py-1 rounded-lg hover:bg-white/10"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+
+                <div className="mb-3 flex flex-col md:flex-row gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-2.5 text-white/40" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Buscar producto para cotizar..."
+                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto mt-1">
+                    {filtered.length === 0 && (
+                        <div className="text-center text-white/50 text-xs py-8">
+                            Sin productos que coincidan con la búsqueda.
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                        {filtered.map((product) => {
+                            const priceUsdt = Number(product.price_usdt || 0);
+                            const priceBs = priceUsdt * rates.bs;
+                            const priceFires = priceUsdt * rates.fires;
+
+                            return (
+                                <div
+                                    key={product.id}
+                                    className="bg-white/5 rounded-lg p-3 flex flex-col justify-between text-xs"
+                                >
+                                    <div>
+                                        <div className="font-semibold text-sm mb-1 line-clamp-2">{product.name}</div>
+                                        {product.description && (
+                                            <div className="text-[10px] text-white/50 line-clamp-2">
+                                                {product.description}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-2 space-y-0.5">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white/60">USDT</span>
+                                            <span className="font-bold text-accent">${priceUsdt.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white/60">Bolívares</span>
+                                            <span className="font-semibold">
+                                                {priceBs.toLocaleString('es-VE', {
+                                                    style: 'currency',
+                                                    currency: 'VES'
+                                                })}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white/60">Fires</span>
+                                            <span className="font-semibold">{priceFires.toFixed(0)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

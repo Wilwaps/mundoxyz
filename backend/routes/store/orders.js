@@ -61,25 +61,39 @@ router.post('/create', verifyToken, async (req, res) => {
 
         // 3. Create Order Transaction
         const result = await transaction(async (client) => {
+            // Generate per-store invoice number atomically
+            const counterResult = await client.query(
+                `INSERT INTO store_counters (store_id, last_invoice_number)
+         VALUES ($1, 1)
+         ON CONFLICT (store_id)
+         DO UPDATE SET last_invoice_number = store_counters.last_invoice_number + 1,
+                       updated_at = NOW()
+         RETURNING last_invoice_number`,
+                [store_id]
+            );
+
+            const invoiceNumber = counterResult.rows[0].last_invoice_number;
+
             // Create Order
             const orderCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
             const orderResult = await client.query(
                 `INSERT INTO orders 
-         (store_id, user_id, customer_id, code, type, status, 
+         (store_id, user_id, customer_id, code, invoice_number, type, status, 
           payment_status, payment_method, currency_snapshot,
           subtotal_usdt, tax_usdt, delivery_fee_usdt, total_usdt,
           table_number, delivery_info)
-         VALUES ($1, $2, $3, $4, $5, 'pending', 
-                 'unpaid', $6, $7, 
-                 $8, $9, $10, $11,
-                 $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending', 
+                 'unpaid', $7, $8, 
+                 $9, $10, $11, $12,
+                 $13, $14)
          RETURNING *`,
                 [
                     store_id,
                     userId,
                     customer_id || null,
                     orderCode,
+                    invoiceNumber,
                     type,
                     JSON.stringify(payment_method || {}),
                     JSON.stringify(currency_snapshot || {}),
@@ -122,6 +136,164 @@ router.post('/create', verifyToken, async (req, res) => {
         res.json({ success: true, order: result });
     } catch (error) {
         logger.error('Error creating order:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/order/:storeId/orders/history
+// Lista de órdenes recientes de una tienda (para historial / facturación)
+router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+        const result = await query(
+            `SELECT 
+                o.id,
+                o.store_id,
+                o.code,
+                o.invoice_number,
+                o.status,
+                o.payment_status,
+                o.type,
+                o.table_number,
+                o.total_usdt,
+                o.created_at,
+                u.display_name AS customer_name,
+                u.ci_full AS customer_ci,
+                u.phone AS customer_phone,
+                su.id AS seller_id,
+                su.username AS seller_username,
+                su.display_name AS seller_display_name
+           FROM orders o
+           LEFT JOIN users u ON u.id = o.customer_id
+           LEFT JOIN users su ON su.id = o.user_id
+           WHERE o.store_id = $1
+           ORDER BY o.created_at DESC
+           LIMIT $2 OFFSET $3`,
+            [storeId, limit, offset]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching store order history:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/order/:storeId/invoice/:invoiceNumber
+// Obtiene el detalle completo de una factura (orden + ítems)
+router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => {
+    try {
+        const { storeId, invoiceNumber } = req.params;
+
+        const result = await query(
+            `SELECT 
+                o.id,
+                o.store_id,
+                o.user_id,
+                o.customer_id,
+                o.code,
+                o.invoice_number,
+                o.type,
+                o.status,
+                o.payment_status,
+                o.payment_method,
+                o.currency_snapshot,
+                o.subtotal_usdt,
+                o.tax_usdt,
+                o.delivery_fee_usdt,
+                o.discount_usdt,
+                o.total_usdt,
+                o.table_number,
+                o.notes,
+                o.delivery_info,
+                o.created_at,
+                o.updated_at,
+                u.display_name AS customer_name,
+                u.ci_full AS customer_ci,
+                u.phone AS customer_phone,
+                u.email AS customer_email,
+                su.id AS seller_id,
+                su.username AS seller_username,
+                su.display_name AS seller_display_name,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'product_id', p.id,
+                            'product_name', p.name,
+                            'quantity', oi.quantity,
+                            'price_usdt', oi.price_at_time_usdt,
+                            'modifiers', oi.modifiers
+                        )
+                    ) FILTER (WHERE oi.id IS NOT NULL),
+                    '[]'::json
+                ) AS items
+           FROM orders o
+           LEFT JOIN users u ON u.id = o.customer_id
+           LEFT JOIN users su ON su.id = o.user_id
+           LEFT JOIN order_items oi ON oi.order_id = o.id
+           LEFT JOIN products p ON p.id = oi.product_id
+           WHERE o.store_id = $1
+             AND o.invoice_number = $2
+           GROUP BY 
+                o.id,
+                u.display_name,
+                u.ci_full,
+                u.phone,
+                u.email,
+                su.id,
+                su.username,
+                su.display_name`,
+            [storeId, invoiceNumber]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Factura no encontrada' });
+        }
+
+        const row = result.rows[0];
+
+        const order = {
+            id: row.id,
+            store_id: row.store_id,
+            user_id: row.user_id,
+            customer_id: row.customer_id,
+            code: row.code,
+            invoice_number: row.invoice_number,
+            type: row.type,
+            status: row.status,
+            payment_status: row.payment_status,
+            payment_method: row.payment_method || {},
+            currency_snapshot: row.currency_snapshot || {},
+            subtotal_usdt: Number(row.subtotal_usdt || 0),
+            tax_usdt: Number(row.tax_usdt || 0),
+            delivery_fee_usdt: Number(row.delivery_fee_usdt || 0),
+            discount_usdt: Number(row.discount_usdt || 0),
+            total_usdt: Number(row.total_usdt || 0),
+            table_number: row.table_number,
+            notes: row.notes,
+            delivery_info: row.delivery_info || null,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            customer: {
+                name: row.customer_name || null,
+                ci: row.customer_ci || null,
+                phone: row.customer_phone || null,
+                email: row.customer_email || null
+            },
+            items: Array.isArray(row.items) ? row.items : [],
+            seller: {
+                id: row.seller_id || null,
+                username: row.seller_username || null,
+                name: row.seller_display_name || row.seller_username || null
+            }
+        };
+
+        res.json({ order });
+    } catch (error) {
+        logger.error('Error fetching invoice detail:', error);
         res.status(400).json({ error: error.message });
     }
 });

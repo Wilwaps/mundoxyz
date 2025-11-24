@@ -74,6 +74,7 @@ const StoreOwnerDashboard = () => {
   const [editingMode, setEditingMode] = useState('edit');
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const {
     data: storeData,
@@ -257,6 +258,23 @@ const StoreOwnerDashboard = () => {
   }
 
   const orders = Array.isArray(activeOrders) ? activeOrders : [];
+
+  const {
+    data: ordersHistoryData,
+    isLoading: loadingOrdersHistory
+  } = useQuery({
+    queryKey: ['store-orders-history', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/order/${store.id}/orders/history`, {
+        params: { limit: 100, offset: 0 }
+      });
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const ordersHistory = Array.isArray(ordersHistoryData) ? ordersHistoryData : [];
 
   const currencyConfigLabel = (() => {
     const cfg = store?.currency_config;
@@ -714,45 +732,130 @@ const StoreOwnerDashboard = () => {
       )}
 
       {activeTab === 'reports' && (
-        <div className="card-glass p-4 overflow-x-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">Pedidos activos</h2>
-            <span className="text-[11px] text-text/60">Vista rápida de lo que está en curso en tu tienda.</span>
-          </div>
-          {loadingOrders ? (
-            <p className="text-xs text-text/60">Cargando pedidos...</p>
-          ) : orders.length === 0 ? (
-            <p className="text-xs text-text/60">No hay pedidos activos en este momento.</p>
-          ) : (
-            <table className="min-w-full text-xs align-middle">
-              <thead>
-                <tr className="text-text/60 border-b border-glass">
-                  <th className="py-1 pr-3 text-left">Código</th>
-                  <th className="py-1 pr-3 text-left">Estado</th>
-                  <th className="py-1 pr-3 text-left">Tipo</th>
-                  <th className="py-1 pr-3 text-left">Mesa / Ref</th>
-                  <th className="py-1 pr-3 text-right">Total USDT</th>
-                  <th className="py-1 pr-3 text-left">Creado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b border-glass/40">
-                    <td className="py-1 pr-3 text-text/80">{order.code}</td>
-                    <td className="py-1 pr-3 text-text/70">{order.status}</td>
-                    <td className="py-1 pr-3 text-text/70">{order.type}</td>
-                    <td className="py-1 pr-3 text-text/70">{order.table_number || '-'}</td>
-                    <td className="py-1 pr-3 text-right text-text/80">
-                      {Number(order.total_usdt || 0).toFixed(2)}
-                    </td>
-                    <td className="py-1 pr-3 text-text/60">
-                      {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
-                    </td>
+        <div className="space-y-4">
+          <div className="card-glass p-4 overflow-x-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">Pedidos activos</h2>
+              <span className="text-[11px] text-text/60">Vista rápida de lo que está en curso en tu tienda.</span>
+            </div>
+            {loadingOrders ? (
+              <p className="text-xs text-text/60">Cargando pedidos...</p>
+            ) : orders.length === 0 ? (
+              <p className="text-xs text-text/60">No hay pedidos activos en este momento.</p>
+            ) : (
+              <table className="min-w-full text-xs align-middle">
+                <thead>
+                  <tr className="text-text/60 border-b border-glass">
+                    <th className="py-1 pr-3 text-left">Código</th>
+                    <th className="py-1 pr-3 text-left">Estado</th>
+                    <th className="py-1 pr-3 text-left">Tipo</th>
+                    <th className="py-1 pr-3 text-left">Mesa / Ref</th>
+                    <th className="py-1 pr-3 text-right">Total USDT</th>
+                    <th className="py-1 pr-3 text-left">Creado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.id} className="border-b border-glass/40">
+                      <td className="py-1 pr-3 text-text/80">{order.code}</td>
+                      <td className="py-1 pr-3 text-text/70">{order.status}</td>
+                      <td className="py-1 pr-3 text-text/70">{order.type}</td>
+                      <td className="py-1 pr-3 text-text/70">{order.table_number || '-'}</td>
+                      <td className="py-1 pr-3 text-right text-text/80">
+                        {Number(order.total_usdt || 0).toFixed(2)}
+                      </td>
+                      <td className="py-1 pr-3 text-text/60">
+                        {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="card-glass p-4 overflow-x-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">Historial de ventas (recientes)</h2>
+              <span className="text-[11px] text-text/60">
+                Últimas {ordersHistory.length} facturas registradas en esta tienda.
+              </span>
+            </div>
+            {loadingOrdersHistory ? (
+              <p className="text-xs text-text/60">Cargando historial...</p>
+            ) : ordersHistory.length === 0 ? (
+              <p className="text-xs text-text/60">Aún no hay ventas registradas.</p>
+            ) : (
+              <table className="min-w-full text-xs align-middle">
+                <thead>
+                  <tr className="text-text/60 border-b border-glass">
+                    <th className="py-1 pr-3 text-left">Factura #</th>
+                    <th className="py-1 pr-3 text-left">Cliente</th>
+                    <th className="py-1 pr-3 text-left">CI</th>
+                    <th className="py-1 pr-3 text-left">Vendedor</th>
+                    <th className="py-1 pr-3 text-right">Total USDT</th>
+                    <th className="py-1 pr-3 text-right">Total Bs</th>
+                    <th className="py-1 pr-3 text-left">Fecha / hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordersHistory.map((order) => {
+                    const totalUsdt = Number(order.total_usdt || 0);
+                    const totalBsFromRate = vesPerUsdt
+                      ? totalUsdt * vesPerUsdt
+                      : null;
+                    const sellerLabel =
+                      order.seller_display_name || order.seller_username || '-';
+
+                    const canOpenInvoice = order.invoice_number != null;
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className={`border-b border-glass/40 ${
+                          canOpenInvoice ? 'cursor-pointer hover:bg-glass' : ''
+                        }`}
+                        onClick={() => {
+                          if (!canOpenInvoice) return;
+                          setSelectedInvoice({
+                            storeId: store.id,
+                            invoiceNumber: order.invoice_number
+                          });
+                        }}
+                      >
+                        <td className="py-1 pr-3 text-text/80">
+                          {order.invoice_number || '-'}
+                        </td>
+                        <td className="py-1 pr-3 text-text/80">
+                          {order.customer_name || '-'}
+                        </td>
+                        <td className="py-1 pr-3 text-text/70">
+                          {order.customer_ci || '-'}
+                        </td>
+                        <td className="py-1 pr-3 text-text/70">{sellerLabel}</td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {totalUsdt.toFixed(2)}
+                        </td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {totalBsFromRate != null
+                            ? totalBsFromRate.toLocaleString('es-VE', {
+                                style: 'currency',
+                                currency: 'VES'
+                              })
+                            : '-'}
+                        </td>
+                        <td className="py-1 pr-3 text-text/60">
+                          {order.created_at
+                            ? new Date(order.created_at).toLocaleString()
+                            : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 

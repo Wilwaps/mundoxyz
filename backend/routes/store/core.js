@@ -284,9 +284,13 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
             return res.json([]);
         }
 
-        const isNumeric = /^[0-9]+$/.test(qRaw);
+        // Búsqueda flexible:
+        // - qRaw se usa para nombre/usuario/email/teléfono (LIKE %qRaw%)
+        // - digitsOnly se usa para CI numérico (ci_number) y también para buscar dentro de ci_full (V-XXXXXXXX)
+        const digitsOnly = qRaw.replace(/[^0-9]/g, '');
         const likeAny = `%${qRaw}%`;
-        const ciLike = isNumeric ? `${qRaw}%` : `${qRaw}%`;
+        const ciFullLike = digitsOnly ? `%${digitsOnly}%` : likeAny;
+        const ciNumberLike = digitsOnly ? `${digitsOnly}%` : null;
 
         const result = await query(
             `SELECT u.id,
@@ -300,7 +304,7 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
        WHERE sc.store_id = $1
          AND (
               (u.ci_full ILIKE $2)
-           OR (u.ci_number LIKE $3)
+           OR ($3 IS NOT NULL AND u.ci_number LIKE $3)
            OR (u.display_name ILIKE $4)
            OR (u.username ILIKE $4)
            OR (u.email ILIKE $4)
@@ -308,7 +312,7 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
          )
        ORDER BY u.display_name NULLS LAST, u.username
        LIMIT 20`,
-            [storeId, `${ciLike}`, isNumeric ? `${qRaw}%` : qRaw, likeAny]
+            [storeId, ciFullLike, ciNumberLike, likeAny]
         );
 
         const mapped = result.rows.map((row) => ({
