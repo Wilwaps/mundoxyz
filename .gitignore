@@ -89,6 +89,7 @@ Tokengithub*.txt
 # Documentación local (no subir a GitHub)
 Documentacion rifa/
 .windsurf/rules/reglasmundoxyzwindsurf.md
+no es fundamental/
 no es fundamental/DATABASE_SCHEMA_MASTER.sql
 roles.md
 tito/

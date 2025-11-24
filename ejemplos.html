@@ -3,386 +3,495 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Ejemplos UI MundoXYZ</title>
+  <title>Sistema de Diseño MundoXYZ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description"
+    content="Catálogo de componentes UI para MundoXYZ. Diseñado para experiencias inmersivas y responsivas." />
   <style>
+    :root {
+      /* Colors */
+      --bg-dark: #02010a;
+      --bg-gradient: radial-gradient(circle at top, #101827 0, #050816 40%, #02010a 100%);
+      --bg-card: rgba(15, 23, 42, 0.7);
+      --bg-card-hover: rgba(30, 41, 59, 0.8);
+      --border-color: rgba(148, 163, 184, 0.15);
+      --border-highlight: rgba(148, 163, 184, 0.3);
+
+      /* Brand Colors */
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #8b5cf6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+
+      /* Text */
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      /* Spacing & Radius */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+
+      /* Effects */
+      --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      --glass-blur: blur(12px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-      background: radial-gradient(circle at top, #101827 0, #050816 40%, #02010a 100%);
-      color: #e5e7eb;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
     }
 
-    .page {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px 16px 48px;
+    /* --- Header --- */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(2, 1, 10, 0.8);
+      backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .title {
-      font-size: 28px;
+    .brand {
+      font-size: 20px;
       font-weight: 800;
-      background: linear-gradient(90deg, #38bdf8, #a855f7, #f97316);
+      background: linear-gradient(135deg, #38bdf8, #a855f7);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      margin-bottom: 4px;
+      letter-spacing: -0.02em;
     }
 
-    .subtitle {
-      font-size: 13px;
-      color: #9ca3af;
-      margin-bottom: 24px;
+    .menu-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      transition: background 0.2s;
+    }
+
+    .menu-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* --- Layout --- */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      width: 100%;
+      flex: 1;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 60px;
+      padding: 0 20px;
+    }
+
+    .page-title {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      margin: 0 0 16px;
+      background: linear-gradient(to right, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .page-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* --- Grid System --- */
+    .section-label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin: 60px 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      height: 1px;
+      flex: 1;
+      background: linear-gradient(to right, var(--border-color), transparent);
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
     }
 
+    /* --- Card Component --- */
     .card {
-      background: rgba(15, 23, 42, 0.85);
-      border-radius: 16px;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.7);
-      padding: 14px 16px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-highlight);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
     }
 
     .card-header {
       display: flex;
       justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .component-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-main);
+    }
+
+    .component-tag {
+      font-size: 0.75rem;
+      font-family: monospace;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
       align-items: center;
-      margin-bottom: 8px;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
     }
 
-    .card-title {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #e5e7eb;
+    .copy-btn:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
     }
 
-    .chip {
-      font-size: 10px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.08);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      color: #7dd3fc;
+    .preview-area {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--border-color);
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      position: relative;
     }
 
-    .preview {
-      margin-top: 6px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: radial-gradient(circle at top left, rgba(36, 99, 235, 0.4), rgba(15, 23, 42, 0.9));
+    /* --- UI Components --- */
+
+    /* Badges */
+    .badge {
       display: inline-flex;
-      gap: 6px;
       align-items: center;
-      font-size: 13px;
-    }
-
-    .preview.badge span.label {
-      padding: 2px 10px;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.1);
-      border: 1px solid rgba(56, 189, 248, 0.5);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .preview.toast {
-      background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.35), rgba(15, 23, 42, 0.95));
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      border-left-width: 3px;
-      border-radius: 12px;
-      justify-content: space-between;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .preview.toast .title {
-      font-size: 13px;
-      color: #bbf7d0;
-      margin: 0;
-    }
-
-    .preview.toast .message {
-      font-size: 11px;
-      color: #a7f3d0;
-      margin-top: 2px;
-    }
-
-    .section-title {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #9ca3af;
-      margin: 20px 0 6px;
-    }
-
-    .hint {
-      margin-top: 24px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px dashed rgba(148, 163, 184, 0.4);
+      gap: 8px;
+      padding: 6px 12px;
       background: rgba(15, 23, 42, 0.6);
-      font-size: 11px;
-      color: #9ca3af;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
     }
 
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 11px;
-      padding: 2px 4px;
-      border-radius: 6px;
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    /* Buttons */
+    .btn-pill {
+      padding: 8px 20px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-pill:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Stat Card */
+    .stat-display {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: #f97316;
+      text-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+    }
+
+    /* Toasts */
+    .toast {
+      width: 100%;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .toast-success {
+      background: linear-gradient(to right, rgba(16, 185, 129, 0.1), rgba(15, 23, 42, 0.8));
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-left: 3px solid var(--success);
+    }
+
+    .toast-error {
+      background: linear-gradient(to right, rgba(239, 68, 68, 0.1), rgba(15, 23, 42, 0.8));
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-left: 3px solid var(--danger);
+    }
+
+    /* Glass Card */
+    .glass-card-content {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      background: rgba(34, 197, 94, 0.1);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      letter-spacing: 0.05em;
+    }
+
+    /* Filters */
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-chip {
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
       background: rgba(15, 23, 42, 0.8);
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      color: #e5e7eb;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .filter-chip.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--primary);
+      color: #bfdbfe;
+    }
+
+    /* Scroll Area */
+    .custom-scroll {
+      width: 100%;
+      height: 180px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .scroll-item {
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      font-size: 13px;
     }
 
     /* Checklist */
     .checklist-item {
+      width: 100%;
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
+      gap: 12px;
+      padding: 8px 0;
       cursor: pointer;
+      transition: opacity 0.2s;
     }
 
-    .custom-checkbox {
+    .checklist-item:hover {
+      opacity: 0.8;
+    }
+
+    .check-box {
       width: 20px;
       height: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      border: 2px solid var(--border-highlight);
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s;
+      transition: 0.2s;
     }
 
-    .custom-checkbox.checked {
-      background: #3b82f6;
-      border-color: #3b82f6;
+    .checklist-item.checked .check-box {
+      background: var(--primary);
+      border-color: var(--primary);
     }
 
-    .custom-checkbox svg {
-      width: 14px;
-      height: 14px;
-      color: white;
-      opacity: 0;
-      transform: scale(0.8);
-      transition: all 0.2s;
-    }
-
-    .custom-checkbox.checked svg {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    /* Modal */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: all 0.3s;
-      z-index: 1000;
-    }
-
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .modal {
-      background: rgba(30, 41, 59, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 24px;
-      width: 90%;
-      max-width: 400px;
-      transform: translateY(20px);
-      transition: all 0.3s;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-    }
-
-    .modal-overlay.active .modal {
-      transform: translateY(0);
-    }
-
-    /* Scroll Area */
-    .scroll-area {
-      height: 200px;
-      overflow-y: auto;
-      padding-right: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .scroll-area::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .scroll-area::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 3px;
-    }
-
-    .scroll-area::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 3px;
-    }
-
-    .scroll-area::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    /* Buttons */
-    .btn-primary {
-      background: #3b82f6;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .btn-primary:hover {
-      background: #2563eb;
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: #94a3b8;
-      border: 1px solid #475569;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-secondary:hover {
-      border-color: #94a3b8;
-      color: #e2e8f0;
+    .checklist-item.checked span {
+      text-decoration: line-through;
+      color: var(--text-dim);
     }
 
     /* Inputs */
-    .input-group {
-      position: relative;
-      margin-bottom: 12px;
+    .input-wrapper {
+      width: 100%;
     }
 
-    .custom-input {
+    .styled-input {
       width: 100%;
       background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 8px;
-      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px;
       color: white;
       font-size: 14px;
-      transition: all 0.2s;
       outline: none;
+      transition: 0.2s;
     }
 
-    .custom-input:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    .styled-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
 
-    .input-label {
-      display: block;
-      font-size: 12px;
-      color: #94a3b8;
-      margin-bottom: 4px;
-      font-weight: 500;
-    }
-
-    /* Toggle Switch */
-    .toggle-switch {
-      position: relative;
-      width: 44px;
-      height: 24px;
+    /* Toggle */
+    .toggle {
+      width: 48px;
+      height: 28px;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 99px;
+      position: relative;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: 0.3s;
     }
 
-    .toggle-switch.active {
-      background: #3b82f6;
+    .toggle.active {
+      background: var(--success);
     }
 
-    .toggle-thumb {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
+    .toggle-knob {
+      width: 22px;
+      height: 22px;
       background: white;
       border-radius: 50%;
-      transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
-    .toggle-switch.active .toggle-thumb {
+    .toggle.active .toggle-knob {
       transform: translateX(20px);
     }
 
-    /* Progress Bar */
-    .progress-container {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 99px;
-      overflow: hidden;
-      margin: 8px 0;
-    }
-
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-      border-radius: 99px;
-      width: 0%;
-      transition: width 1s ease-out;
-    }
-
     /* Avatars */
-    .avatar-group {
+    .avatar-stack {
       display: flex;
-      align-items: center;
     }
 
     .avatar {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       border: 2px solid #0f172a;
       background: #334155;
+      color: white;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 12px;
       font-weight: 600;
-      color: white;
-      margin-left: -8px;
+      margin-left: -10px;
       position: relative;
     }
 
@@ -390,84 +499,163 @@
       margin-left: 0;
     }
 
-    .avatar img {
-      width: 100%;
-      height: 100%;
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      background: var(--success);
+      border: 2px solid #0f172a;
       border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .status-dot {
       position: absolute;
       bottom: 0;
       right: 0;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      border: 1.5px solid #0f172a;
-    }
-
-    .status-online {
-      background: #22c55e;
     }
 
     .status-offline {
-      background: #94a3b8;
+      background: var(--text-muted);
     }
 
-    /* Alerts */
-    .alert {
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 10px;
-      line-height: 1.4;
+    /* Progress */
+    .progress-wrapper {
+      width: 100%;
     }
 
-    .alert-success {
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.2);
-      color: #86efac;
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 8px;
     }
 
-    .alert-error {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      width: 75%;
+      border-radius: 99px;
     }
 
     /* Tabs */
-    .tabs {
+    .tab-group {
       display: flex;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.3);
       padding: 4px;
-      border-radius: 8px;
+      border-radius: var(--radius-md);
       gap: 4px;
+      width: 100%;
     }
 
-    .tab-item {
+    .tab {
       flex: 1;
       text-align: center;
-      padding: 6px;
-      font-size: 12px;
-      color: #94a3b8;
-      border-radius: 6px;
+      padding: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: 0.2s;
     }
 
-    .tab-item.active {
+    .tab.active {
       background: rgba(255, 255, 255, 0.1);
       color: white;
-      font-weight: 500;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
     }
 
-    .tab-item:hover:not(.active) {
-      color: #cbd5e1;
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--border-color);
+      padding: 60px 20px;
+      margin-top: 80px;
+      background: rgba(2, 1, 10, 0.5);
+      text-align: center;
+    }
+
+    .footer-nav {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 24px;
+    }
+
+    .footer-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover {
+      color: var(--primary);
+    }
+
+    .copyright {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    /* Modal Overlay */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.3s;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-window {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      transform: translateY(20px);
+      transition: 0.3s;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-backdrop.active .modal-window {
+      transform: translateY(0);
+    }
+
+    /* Toast Notification */
+    .copy-toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--success);
+      color: white;
+      padding: 10px 24px;
+      border-radius: 99px;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: var(--shadow-lg);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .copy-toast.show {
+      transform: translateX(-50%) translateY(0);
     }
 
     /* Tooltip */
@@ -481,311 +669,496 @@
       position: absolute;
       bottom: 100%;
       left: 50%;
-      transform: translateX(-50%) translateY(-4px);
-      padding: 4px 8px;
+      transform: translateX(-50%) translateY(-8px);
+      padding: 6px 10px;
       background: #1e293b;
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: white;
       font-size: 11px;
-      border-radius: 4px;
+      border-radius: 6px;
       white-space: nowrap;
       opacity: 0;
       pointer-events: none;
-      transition: all 0.2s;
-      z-index: 10;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      transition: 0.2s;
+      box-shadow: var(--shadow-lg);
     }
 
     [data-tooltip]:hover:before {
       opacity: 1;
-      transform: translateX(-50%) translateY(-8px);
+      transform: translateX(-50%) translateY(-12px);
     }
   </style>
 </head>
 
 <body>
-  <div class="page">
-    <h1 class="title">Catálogo de Ejemplos UI</h1>
-    <p class="subtitle">Guía rápida para pedir componentes a la IA de MundoXYZ (esta página es solo de referencia
-      local).</p>
 
-    <div class="section-title">Componentes Básicos</div>
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">MundoXYZ</div>
+    <button class="menu-btn" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </header>
+
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title">Sistema de Diseño</h1>
+      <p class="page-subtitle">Componentes UI optimizados, accesibles y listos para producción.</p>
+    </div>
+
+    <!-- 1. Basic Components -->
+    <div class="section-label">Componentes Básicos</div>
     <div class="grid">
+
+      <!-- Badge -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">badge</div>
-          <span class="chip">Etiqueta / Estado</span>
+          <div class="card-meta">
+            <span class="component-name">Badge</span>
+            <span class="component-tag">Status</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)" aria-label="Copiar código">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         </div>
-        <div class="preview badge">
-          <span class="label">EN VIVO</span>
-          <span style="font-size:12px;color:#bae6fd;">Bingo XYZ</span>
+        <div class="preview-area">
+          <div class="badge">
+            <span style="font-size:12px;color:#bae6fd;font-weight:600;letter-spacing:0.05em;">BINGO XYZ</span>
+            <div class="badge-dot"></div>
+            <span style="font-size:10px;color:var(--success);font-weight:700;">EN VIVO</span>
+          </div>
         </div>
       </div>
 
+      <!-- Pill Button -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">pill-button</div>
-          <span class="chip">Botón redondeado</span>
+          <div class="card-meta">
+            <span class="component-name">Pill Button</span>
+            <span class="component-tag">Action</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         </div>
-        <div class="preview">
-          <span
-            style="padding:4px 14px;border-radius:999px;background:rgba(248,250,252,0.06);border:1px solid rgba(148,163,184,0.5);">Jugar
-            ahora</span>
+        <div class="preview-area">
+          <button class="btn-pill">Jugar ahora</button>
         </div>
       </div>
 
+      <!-- Stat Card -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">stat-card</div>
-          <span class="chip">Tarjeta de métrica</span>
+          <div class="card-meta">
+            <span class="component-name">Stat Card</span>
+            <span class="component-tag">Metric</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         </div>
-        <div class="preview" style="flex-direction:column;align-items:flex-start;min-width:180px;">
-          <span style="font-size:11px;color:#9ca3af;">Fuegos generados hoy</span>
-          <span style="font-size:20px;font-weight:700;color:#f97316;">12 450 🔥</span>
+        <div class="preview-area">
+          <div class="stat-display">
+            <span style="font-size:12px;color:var(--text-muted);">Fuegos generados hoy</span>
+            <span class="stat-value">12 450 🔥</span>
+          </div>
         </div>
       </div>
+
     </div>
 
-    <div class="section-title">Feedback &amp; Mensajes</div>
+    <!-- 2. Feedback & Messages -->
+    <div class="section-label">Feedback & Mensajes</div>
     <div class="grid">
+
+      <!-- Toast Success -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">toast-success</div>
-          <span class="chip">Notificación</span>
-        </div>
-        <div class="preview toast">
-          <div>
-            <p class="title">Compra completada</p>
-            <p class="message">Tus fuegos ya están en la billetera.</p>
+          <div class="card-meta">
+            <span class="component-name">Toast Success</span>
+            <span class="component-tag">Notification</span>
           </div>
-          <span style="font-size:14px;">✅</span>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="toast toast-success">
+            <div>
+              <div style="font-weight:600;color:#6ee7b7;font-size:14px;margin-bottom:4px;">Compra completada</div>
+              <div style="color:#a7f3d0;font-size:12px;">Tus fuegos ya están en la billetera.</div>
+            </div>
+            <span>✅</span>
+          </div>
         </div>
       </div>
 
+      <!-- Toast Error -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">toast-error</div>
-          <span class="chip">Notificación</span>
-        </div>
-        <div class="preview toast"
-          style="border-color:rgba(248,113,113,0.6);background:radial-gradient(circle at top left,rgba(248,113,113,0.45),rgba(15,23,42,0.98));">
-          <div>
-            <p class="title" style="color:#fecaca;">Algo salió mal</p>
-            <p class="message" style="color:#fecaca;">No se pudo crear la sala, intenta de nuevo.</p>
+          <div class="card-meta">
+            <span class="component-name">Toast Error</span>
+            <span class="component-tag">Alert</span>
           </div>
-          <span style="font-size:14px;">⚠️</span>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="toast toast-error">
+            <div>
+              <div style="font-weight:600;color:#fca5a5;font-size:14px;margin-bottom:4px;">Algo salió mal</div>
+              <div style="color:#fecaca;font-size:12px;">No se pudo crear la sala, intenta de nuevo.</div>
+            </div>
+            <span>⚠️</span>
+          </div>
         </div>
       </div>
+
     </div>
 
-    <div class="section-title">Layouts &amp; Contenedores</div>
+    <!-- 3. Layouts & Containers -->
+    <div class="section-label">Layouts & Contenedores</div>
     <div class="grid">
+
+      <!-- Glass Card -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">glass-card</div>
-          <span class="chip">Tarjeta principal</span>
-        </div>
-        <div class="preview" style="width:100%;justify-content:space-between;">
-          <div>
-            <div style="font-size:13px;font-weight:600;">Sala de Pool</div>
-            <div style="font-size:11px;color:#9ca3af;">Apuesta: 10 🔥 · 2/2 jugadores</div>
+          <div class="card-meta">
+            <span class="component-name">Glass Card</span>
+            <span class="component-tag">Container</span>
           </div>
-          <span
-            style="font-size:11px;padding:3px 10px;border-radius:999px;background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.6);color:#bbf7d0;">EN
-            JUEGO</span>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="glass-card-content">
+            <div>
+              <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Sala de Pool</div>
+              <div style="font-size:11px;color:var(--text-muted);">Apuesta: 10 🔥 · 2/2 jugadores</div>
+            </div>
+            <span class="status-badge">EN JUEGO</span>
+          </div>
         </div>
       </div>
 
+      <!-- Chip Filter -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">chip-filter</div>
-          <span class="chip">Filtro / Tag</span>
+          <div class="card-meta">
+            <span class="component-name">Chip Filter</span>
+            <span class="component-tag">Navigation</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         </div>
-        <div class="preview" style="gap:8px;flex-wrap:wrap;">
-          <span
-            style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.8);font-size:11px;">Todos</span>
-          <span
-            style="padding:3px 10px;border-radius:999px;background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.7);font-size:11px;color:#bfdbfe;">En
-            lobby</span>
-          <span
-            style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(75,85,99,0.9);font-size:11px;">En
-            juego</span>
+        <div class="preview-area">
+          <div class="filter-group">
+            <div class="filter-chip">Todos</div>
+            <div class="filter-chip active">En lobby</div>
+            <div class="filter-chip">En juego</div>
+          </div>
         </div>
       </div>
+
+      <!-- Scroll Area -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Scroll Area</span>
+            <span class="component-tag">Utility</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="custom-scroll">
+            <div class="scroll-item">Item 1 - Contenido scrolleable</div>
+            <div class="scroll-item">Item 2 - Estilo personalizado</div>
+            <div class="scroll-item">Item 3 - Webkit scrollbar</div>
+            <div class="scroll-item">Item 4 - Transparencias</div>
+            <div class="scroll-item">Item 5 - Más contenido</div>
+            <div class="scroll-item">Item 6 - Final de la lista</div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <div class="hint">
-      Para pedir algo a la IA puedes usar el nombre del ejemplo, por ejemplo:
-      <br />
-      <br />
-      · <code>"Hazme un componente React tipo badge como el ejemplo badge"</code><br />
-      · <code>"Quiero un toast-success como en el ejemplo de toasts"</code><br />
-      · <code>"Diseña una glass-card para mostrar el estado de una sala"</code>
-    </div>
-  </div>
-  <div style="margin-top: 40px;" class="section-title">Componentes Interactivos</div>
-  <div class="grid">
-    <!-- Checklist -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Checklist</div>
-        <span class="chip">Interactivo</span>
+    <!-- 4. Interactive Components -->
+    <div class="section-label">Componentes Interactivos</div>
+    <div class="grid">
+
+      <!-- Checklist -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Checklist</span>
+            <span class="component-tag">Task</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area" style="flex-direction: column; align-items: flex-start;">
+          <div class="checklist-item checked" onclick="this.classList.toggle('checked')">
+            <div class="check-box">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="4">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <span>Tarea completada</span>
+          </div>
+          <div class="checklist-item" onclick="this.classList.toggle('checked')">
+            <div class="check-box">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="4">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <span>Tarea pendiente</span>
+          </div>
+        </div>
       </div>
-      <div class="checklist-item" onclick="toggleCheckbox(this)">
-        <div class="custom-checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="3">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg></div>
-        <span style="font-size:14px;color:#cbd5e1;">Tarea completada</span>
+
+      <!-- Modal Trigger -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Modal</span>
+            <span class="component-tag">Overlay</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <button class="btn-pill" style="background:var(--primary);"
+            onclick="document.getElementById('demoModal').classList.add('active')">Abrir Modal</button>
+        </div>
       </div>
-      <div class="checklist-item" onclick="toggleCheckbox(this)">
-        <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg></div>
-        <span style="font-size:14px;color:#cbd5e1;">Tarea pendiente</span>
+
+      <!-- Tabs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Tabs</span>
+            <span class="component-tag">Navigation</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="tab-group">
+            <div class="tab active" onclick="selectTab(this)">Cuenta</div>
+            <div class="tab" onclick="selectTab(this)">Seguridad</div>
+            <div class="tab" onclick="selectTab(this)">Ajustes</div>
+          </div>
+        </div>
       </div>
-      <div class="checklist-item" onclick="toggleCheckbox(this)">
-        <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg></div>
-        <span style="font-size:14px;color:#cbd5e1;">Otra tarea</span>
+
+      <!-- Toggle -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Toggle</span>
+            <span class="component-tag">Switch</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="toggle" onclick="this.classList.toggle('active')">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
       </div>
+
+      <!-- Inputs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Input</span>
+            <span class="component-tag">Form</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="input-wrapper">
+            <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px;">Usuario</label>
+            <input type="text" class="styled-input" placeholder="nombre@ejemplo.com">
+          </div>
+        </div>
+      </div>
+
+      <!-- Avatars -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Avatars</span>
+            <span class="component-tag">Social</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="avatar-stack">
+            <div class="avatar" data-tooltip="Juan Pérez">JP<div class="status-indicator"></div>
+            </div>
+            <div class="avatar" data-tooltip="Ana García">AG<div class="status-indicator status-offline"></div>
+            </div>
+            <div class="avatar" data-tooltip="Carlos Ruiz">CR<div class="status-indicator"></div>
+            </div>
+            <div class="avatar" style="font-size:10px;background:#1e293b;">+3</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-meta">
+            <span class="component-name">Progress Bar</span>
+            <span class="component-tag">Feedback</span>
+          </div>
+          <button class="copy-btn" onclick="copyCode(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="preview-area">
+          <div class="progress-wrapper">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+              <span>Cargando recursos...</span>
+              <span>75%</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Modal Trigger -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Modal</div>
-        <span class="chip">Overlay</span>
-      </div>
-      <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
-        Ejemplo de modal con backdrop blur y animaciÃ³n de entrada.
-      </p>
-      <button class="btn-primary" onclick="openModal()">Abrir Modal</button>
-    </div>
+  </main>
 
-    <!-- Scroll Area -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Scroll Area</div>
-        <span class="chip">Custom Scroll</span>
-      </div>
-      <div class="scroll-area">
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 1 - Contenido scrolleable</div>
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 2 - Estilo personalizado</div>
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 3 - Webkit scrollbar</div>
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 4 - Transparencias</div>
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 5 - MÃ¡s contenido</div>
-        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
-          Item 6 - Final de la lista</div>
-      </div>
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-nav">
+      <a href="#" class="footer-link">Documentación</a>
+      <a href="#" class="footer-link">Soporte</a>
+      <a href="#" class="footer-link">Términos</a>
     </div>
-  </div>
+    <div class="copyright">© 2025 MundoXYZ. Todos los derechos reservados.</div>
+  </footer>
 
-  <!-- Modal Element -->
-  <div class="modal-overlay" id="demoModal" onclick="if(event.target === this) closeModal()">
-    <div class="modal">
-      <h3 style="margin:0 0 10px 0;font-size:18px;font-weight:600;color:white;">TÃ­tulo del Modal</h3>
-      <p style="color:#94a3b8;font-size:14px;line-height:1.5;margin-bottom:24px;">
+  <!-- Global Modal -->
+  <div class="modal-backdrop" id="demoModal" onclick="if(event.target === this) this.classList.remove('active')">
+    <div class="modal-window">
+      <h3 style="margin:0 0 12px;color:white;font-size:18px;">Título del Modal</h3>
+      <p style="color:var(--text-muted);font-size:14px;line-height:1.6;margin-bottom:24px;">
         Este es un ejemplo de modal con efecto glassmorphism. Haz clic fuera o en los botones para cerrar.
       </p>
-      <div style="display:flex;justify-content:flex-end;gap:10px;">
-        <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button class="btn-primary" onclick="closeModal()">Aceptar</button>
+      <div style="display:flex;justify-content:flex-end;gap:12px;">
+        <button class="btn-pill" style="background:transparent;border:1px solid var(--border-color);"
+          onclick="document.getElementById('demoModal').classList.remove('active')">Cancelar</button>
+        <button class="btn-pill" style="background:var(--primary);"
+          onclick="document.getElementById('demoModal').classList.remove('active')">Aceptar</button>
       </div>
     </div>
   </div>
 
-  <div style="margin-top: 40px;" class="section-title">UI Kit Profesional</div>
-  <div class="grid">
-    <!-- Forms & Inputs -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Formularios</div>
-        <span class="chip">Inputs</span>
-      </div>
-      <div class="input-group">
-        <label class="input-label">Usuario</label>
-        <input type="text" class="custom-input" placeholder="nombre@ejemplo.com">
-      </div>
-      <div class="input-group" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
-        <span style="font-size:13px;color:#cbd5e1;">Notificaciones</span>
-        <div class="toggle-switch" onclick="this.classList.toggle('active')">
-          <div class="toggle-thumb"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Feedback & Status -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Estado</div>
-        <span class="chip">Feedback</span>
-      </div>
-      <div style="margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:4px;">
-          <span>Cargando recursos...</span>
-          <span>75%</span>
-        </div>
-        <div class="progress-container">
-          <div class="progress-bar" style="width: 75%"></div>
-        </div>
-      </div>
-      <div class="alert alert-success">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <span>Operación completada con éxito</span>
-      </div>
-    </div>
-
-    <!-- Users & Navigation -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Usuarios & Nav</div>
-        <span class="chip">Social</span>
-      </div>
-      <div style="margin-bottom:20px;">
-        <label class="input-label" style="margin-bottom:8px;">Participantes</label>
-        <div class="avatar-group">
-          <div class="avatar" data-tooltip="Juan Pérez">JP<div class="status-dot status-online"></div>
-          </div>
-          <div class="avatar" data-tooltip="Ana García">AG<div class="status-dot status-offline"></div>
-          </div>
-          <div class="avatar" data-tooltip="Carlos Ruiz">CR<div class="status-dot status-online"></div>
-          </div>
-          <div class="avatar" style="background:#1e293b;color:#94a3b8;font-size:10px;">+3</div>
-        </div>
-      </div>
-      <div class="tabs">
-        <div class="tab-item active" onclick="selectTab(this)">Cuenta</div>
-        <div class="tab-item" onclick="selectTab(this)">Seguridad</div>
-        <div class="tab-item" onclick="selectTab(this)">Ajustes</div>
-      </div>
-    </div>
+  <!-- Toast Notification -->
+  <div class="copy-toast" id="copyToast">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span>¡Código copiado!</span>
   </div>
 
   <script>
-    function selectTab(el) {
-      const tabs = el.parentElement.querySelectorAll('.tab-item');
-      tabs.forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
+    // Copy Functionality
+    function copyCode(btn) {
+      const card = btn.closest('.card');
+      const preview = card.querySelector('.preview-area');
+      // Clone to avoid modifying the display
+      const clone = preview.cloneNode(true);
+      // Clean up the clone if needed (remove utility classes from wrapper if you want raw code)
+      // For this example, we copy the innerHTML of the preview area
+      const code = preview.innerHTML.trim();
+
+      navigator.clipboard.writeText(code).then(() => {
+        showToast();
+      }).catch(err => console.error('Error:', err));
     }
 
-    function toggleCheckbox(el) {
-      const checkbox = el.querySelector('.custom-checkbox');
-      checkbox.classList.toggle('checked');
+    function showToast() {
+      const toast = document.getElementById('copyToast');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
     }
-    function openModal() {
-      document.getElementById('demoModal').classList.add('active');
-    }
-    function closeModal() {
-      document.getElementById('demoModal').classList.remove('active');
+
+    // Tab Logic
+    function selectTab(el) {
+      const tabs = el.parentElement.querySelectorAll('.tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
     }
   </script>
 </body>

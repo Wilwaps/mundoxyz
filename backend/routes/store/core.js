@@ -286,7 +286,8 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
         const digitsOnly = qRaw.replace(/[^0-9]/g, '');
         const likeAny = `%${qRaw}%`;
         const ciFullLike = digitsOnly ? `%${digitsOnly}%` : likeAny;
-        const ciNumberLike = digitsOnly ? `${digitsOnly}%` : null;
+        // Siempre enviamos un string para $3; cuando no haya CI numérico, será ""
+        const ciNumberLike = digitsOnly ? `${digitsOnly}%` : '';
 
         const result = await query(
             `SELECT 
@@ -311,7 +312,7 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
             AND sc.store_id = $1
            WHERE 
                 (u.ci_full ILIKE $2)
-             OR ($3 IS NOT NULL AND u.ci_number LIKE $3)
+             OR ($3 <> '' AND u.ci_number::text LIKE $3)
              OR (u.display_name ILIKE $4)
              OR (u.username ILIKE $4)
              OR (u.email ILIKE $4)
