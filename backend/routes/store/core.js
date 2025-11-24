@@ -114,6 +114,259 @@ router.post('/create', verifyToken, async (req, res) => {
     }
 });
 
+// GET /api/store/:storeId/inventory/purchases - List purchase invoices for a store
+router.get('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT pi.*, s.name AS supplier_name
+       FROM purchase_invoices pi
+       LEFT JOIN suppliers s ON pi.supplier_id = s.id
+       WHERE pi.store_id = $1
+       ORDER BY pi.invoice_date DESC NULLS LAST, pi.created_at DESC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching purchase invoices:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// POST /api/store/:storeId/inventory/purchases - Create a purchase invoice with items
+router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const {
+            supplier_id,
+            invoice_number,
+            invoice_date,
+            supplier_address_snapshot,
+            contact_info,
+            notes,
+            items
+        } = req.body || {};
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'La factura debe tener al menos un ítem' });
+        }
+
+        const userId = req.user.id;
+
+        const result = await transaction(async (client) => {
+            let snapshotAddress = supplier_address_snapshot || null;
+
+            if (supplier_id && !snapshotAddress) {
+                const supplierResult = await client.query(
+                    `SELECT address FROM suppliers WHERE id = $1 AND store_id = $2`,
+                    [supplier_id, storeId]
+                );
+                if (supplierResult.rows.length > 0) {
+                    snapshotAddress = supplierResult.rows[0].address || null;
+                }
+            }
+
+            let totalCostUsdt = 0;
+
+            const normalizedItems = [];
+
+            for (const rawItem of items) {
+                if (!rawItem) continue;
+
+                const productId = rawItem.product_id || null;
+                const ingredientId = rawItem.ingredient_id || null;
+
+                if ((productId && ingredientId) || (!productId && !ingredientId)) {
+                    throw new Error('Cada ítem debe referenciar únicamente un producto o un ingrediente');
+                }
+
+                const quantity = Number(rawItem.quantity);
+                const unitCost = Number(rawItem.unit_cost_usdt);
+
+                if (!Number.isFinite(quantity) || quantity <= 0) {
+                    throw new Error('Cantidad inválida en uno de los ítems');
+                }
+                if (!Number.isFinite(unitCost) || unitCost < 0) {
+                    throw new Error('Costo unitario inválido en uno de los ítems');
+                }
+
+                const lineTotal = quantity * unitCost;
+                totalCostUsdt += lineTotal;
+
+                normalizedItems.push({
+                    product_id: productId,
+                    ingredient_id: ingredientId,
+                    description: rawItem.description || null,
+                    quantity,
+                    unit_cost_usdt: unitCost,
+                    total_cost_usdt: lineTotal
+                });
+            }
+
+            const contactInfoJson = contact_info && typeof contact_info === 'object'
+                ? contact_info
+                : null;
+
+            const invoiceResult = await client.query(
+                `INSERT INTO purchase_invoices
+         (store_id, supplier_id, invoice_number, invoice_date,
+          supplier_address_snapshot, contact_info, notes, total_cost_usdt, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+                [
+                    storeId,
+                    supplier_id || null,
+                    invoice_number || null,
+                    invoice_date || null,
+                    snapshotAddress,
+                    contactInfoJson ? JSON.stringify(contactInfoJson) : null,
+                    notes || null,
+                    totalCostUsdt,
+                    userId
+                ]
+            );
+
+            const invoice = invoiceResult.rows[0];
+
+            for (const item of normalizedItems) {
+                await client.query(
+                    `INSERT INTO purchase_invoice_items
+             (invoice_id, product_id, ingredient_id, description, quantity, unit_cost_usdt, total_cost_usdt)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [
+                        invoice.id,
+                        item.product_id,
+                        item.ingredient_id,
+                        item.description,
+                        item.quantity,
+                        item.unit_cost_usdt,
+                        item.total_cost_usdt
+                    ]
+                );
+
+                if (item.product_id) {
+                    await client.query(
+                        `UPDATE products
+                 SET stock = stock + $1, updated_at = NOW()
+                 WHERE id = $2 AND store_id = $3`,
+                        [item.quantity, item.product_id, storeId]
+                    );
+                } else if (item.ingredient_id) {
+                    await client.query(
+                        `UPDATE ingredients
+                 SET current_stock = current_stock + $1, updated_at = NOW()
+                 WHERE id = $2 AND store_id = $3`,
+                        [item.quantity, item.ingredient_id, storeId]
+                    );
+
+                    await client.query(
+                        `INSERT INTO inventory_logs
+                 (store_id, ingredient_id, change_amount, reason, reference_id, logged_by)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                        [storeId, item.ingredient_id, item.quantity, 'purchase', invoice.id, userId]
+                    );
+                }
+            }
+
+            return {
+                invoice,
+                total_cost_usdt: totalCostUsdt
+            };
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logger.error('Error creating purchase invoice:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/:storeId/suppliers - List suppliers for a store
+router.get('/:storeId/suppliers', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT * FROM suppliers WHERE store_id = $1 ORDER BY name ASC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching suppliers:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// POST /api/store/:storeId/suppliers - Create a new supplier
+router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const {
+            name,
+            contact_name,
+            phone,
+            email,
+            address,
+            extra_contact
+        } = req.body || {};
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'El nombre del proveedor es obligatorio' });
+        }
+
+        let extraContactObj = {};
+        if (extra_contact && typeof extra_contact === 'object') {
+            extraContactObj = extra_contact;
+        }
+
+        const result = await query(
+            `INSERT INTO suppliers
+       (store_id, name, contact_name, phone, email, address, extra_contact)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+            [
+                storeId,
+                name.trim(),
+                contact_name || null,
+                phone || null,
+                email || null,
+                address || null,
+                JSON.stringify(extraContactObj)
+            ]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error creating supplier:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // POST /api/store/:storeId/category
 router.post('/:storeId/category', verifyToken, async (req, res) => {
     try {
@@ -140,20 +393,49 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
         const {
-            category_id, name, description, image_url,
-            price_usdt, price_fires,
-            is_menu_item, has_modifiers
+            category_id,
+            sku,
+            name,
+            description,
+            image_url,
+            price_usdt,
+            price_fires,
+            is_menu_item,
+            has_modifiers,
+            accepts_fires
         } = req.body;
+
+        const normalizedAcceptsFires = accepts_fires === true;
+        let normalizedStock = 0;
+
+        if (req.body && req.body.stock !== undefined) {
+            const parsedStock = parseInt(req.body.stock, 10);
+            if (Number.isFinite(parsedStock) && parsedStock >= 0) {
+                normalizedStock = parsedStock;
+            }
+        }
+
+        const normalizedSku = sku && String(sku).trim() !== '' ? String(sku).trim() : null;
 
         const result = await query(
             `INSERT INTO products 
-       (store_id, category_id, name, description, image_url, 
-        price_usdt, price_fires, is_menu_item, has_modifiers)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       (store_id, category_id, sku, name, description, image_url, 
+        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
             [
-                storeId, category_id, name, description, image_url,
-                price_usdt, price_fires, is_menu_item, has_modifiers
+                storeId,
+                category_id,
+                normalizedSku,
+                name,
+                description,
+                image_url,
+                price_usdt,
+                price_fires,
+                normalizedStock,
+                is_menu_item,
+                has_modifiers,
+                normalizedAcceptsFires
             ]
         );
 
@@ -206,13 +488,16 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
 
         const {
             category_id,
+            sku,
             name,
             description,
             image_url,
             price_usdt,
             price_fires,
             is_menu_item,
-            has_modifiers
+            has_modifiers,
+            accepts_fires,
+            stock
         } = req.body || {};
 
         const fields = [];
@@ -222,6 +507,11 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
         if (category_id !== undefined) {
             fields.push(`category_id = $${idx++}`);
             values.push(category_id);
+        }
+        if (sku !== undefined) {
+            const normalizedSku = sku && String(sku).trim() !== '' ? String(sku).trim() : null;
+            fields.push(`sku = $${idx++}`);
+            values.push(normalizedSku);
         }
         if (name !== undefined) {
             fields.push(`name = $${idx++}`);
@@ -250,6 +540,18 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
         if (has_modifiers !== undefined) {
             fields.push(`has_modifiers = $${idx++}`);
             values.push(has_modifiers);
+        }
+        if (accepts_fires !== undefined) {
+            fields.push(`accepts_fires = $${idx++}`);
+            values.push(accepts_fires === true);
+        }
+        if (stock !== undefined) {
+            let normalizedStock = parseInt(stock, 10);
+            if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
+                normalizedStock = 0;
+            }
+            fields.push(`stock = $${idx++}`);
+            values.push(normalizedStock);
         }
 
         if (fields.length === 0) {
@@ -299,20 +601,23 @@ router.post('/product/:productId/duplicate', verifyToken, async (req, res) => {
         const result = await transaction(async (client) => {
             const insertProduct = await client.query(
                 `INSERT INTO products 
-           (store_id, category_id, name, description, image_url, 
-            price_usdt, price_fires, is_menu_item, has_modifiers)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           (store_id, category_id, sku, name, description, image_url, 
+            price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            RETURNING *`,
                 [
                     original.store_id,
                     original.category_id,
+                    null,
                     newName,
                     original.description,
                     original.image_url,
                     original.price_usdt,
                     original.price_fires,
+                    0,
                     original.is_menu_item,
-                    original.has_modifiers
+                    original.has_modifiers,
+                    original.accepts_fires === true
                 ]
             );
 

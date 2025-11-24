@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, Trash2, CreditCard, Banknote, Flame, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, Trash2, CreditCard, Banknote, Flame, CheckCircle, RefreshCw, User, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const POS = () => {
@@ -20,11 +20,11 @@ const POS = () => {
         fires: 0
     });
 
-    // Exchange Rates (Mock for now, should fetch from API)
-    const rates = {
-        bs: 38.5, // 1 USDT = 38.5 BS
-        fires: 10 // 1 USDT = 10 Fires
-    };
+    // Cliente POS (simple CRM local)
+    const [customerName, setCustomerName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [recentCustomers, setRecentCustomers] = useState([]);
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -35,6 +35,26 @@ const POS = () => {
         }
     });
 
+    // Fetch FIAT context for dynamic rates (USDT -> Bs, USDT -> Fires)
+    const { data: fiatContext } = useQuery({
+        queryKey: ['fiat-context'],
+        queryFn: async () => {
+            const response = await axios.get('/api/economy/fiat-context');
+            return response.data;
+        }
+    });
+
+    const vesPerUsdt = fiatContext?.operationalRate?.rate;
+    const firesPerUsdt = fiatContext?.config?.fires_per_usdt;
+
+    const bsRate = typeof vesPerUsdt === 'number' && isFinite(vesPerUsdt) && vesPerUsdt > 0 ? vesPerUsdt : 38.5;
+    const firesRate = typeof firesPerUsdt === 'number' && isFinite(firesPerUsdt) && firesPerUsdt > 0 ? firesPerUsdt : 10;
+
+    const rates = {
+        bs: bsRate, // 1 USDT = bsRate Bs
+        fires: firesRate // 1 USDT = firesRate Fires
+    };
+
     const createOrderMutation = useMutation({
         mutationFn: async (orderData) => {
             return axios.post('/api/store/order/create', orderData);
@@ -44,6 +64,39 @@ const POS = () => {
             setCart([]);
             setPaymentModalOpen(false);
             setPayments({ cash_usdt: 0, zelle: 0, bs: 0, fires: 0 });
+
+            // Guardar cliente en recientes (solo si tiene algún dato)
+            setRecentCustomers((prev) => {
+                const name = customerName.trim();
+                const phone = customerPhone.trim();
+
+                if (!name && !phone) return prev;
+
+                const existingIndex = prev.findIndex(
+                    (c) => c.name === name && c.phone === phone
+                );
+
+                let next = prev;
+                if (existingIndex !== -1) {
+                    const existing = prev[existingIndex];
+                    next = [existing, ...prev.filter((_, idx) => idx !== existingIndex)];
+                } else {
+                    const entry = { name, phone };
+                    next = [entry, ...prev].slice(0, 20);
+                }
+
+                try {
+                    localStorage.setItem('pos_recent_customers', JSON.stringify(next));
+                } catch {
+                    // ignore
+                }
+
+                return next;
+            });
+
+            setCustomerName('');
+            setCustomerPhone('');
+            setCustomerSearch('');
         },
         onError: (err) => toast.error('Error al crear orden')
     });
@@ -68,8 +121,34 @@ const POS = () => {
     const remainingUSDT = Math.max(0, totalUSDT - totalPaidUSDT);
     const isPaid = totalPaidUSDT >= totalUSDT - 0.01; // Tolerance
 
+    const totalBs = totalUSDT * rates.bs;
+    const totalFires = totalUSDT * rates.fires;
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem('pos_recent_customers');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    setRecentCustomers(parsed);
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
     const handleCheckout = () => {
         if (!isPaid) return toast.error('Falta completar el pago');
+
+        const customerInfo = (customerName || customerPhone)
+            ? {
+                customer: {
+                    name: customerName || null,
+                    phone: customerPhone || null
+                }
+            }
+            : null;
 
         const orderData = {
             store_id: storeData.store.id,
@@ -81,7 +160,8 @@ const POS = () => {
             type: 'dine_in', // Default
             payment_method: payments,
             currency_snapshot: rates,
-            table_number: 'POS-1'
+            table_number: 'POS-1',
+            delivery_info: customerInfo
         };
 
         createOrderMutation.mutate(orderData);
@@ -147,10 +227,94 @@ const POS = () => {
                 </div>
             </div>
 
-            {/* Right: Cart & Payment */}
+            {/* Right: Cart, Customer & Payment */}
             <div className="w-96 flex flex-col bg-dark-lighter">
                 <div className="p-4 border-b border-white/10 font-bold text-lg">
                     Orden Actual
+                </div>
+
+                {/* Cliente */}
+                <div className="p-4 border-b border-white/10 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold flex items-center gap-2">
+                            <User size={16} /> Cliente
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCustomerName('');
+                                setCustomerPhone('');
+                                setCustomerSearch('');
+                            }}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10"
+                        >
+                            <UserPlus size={14} /> Nuevo cliente
+                        </button>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Buscar en clientes recientes..."
+                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                value={customerSearch}
+                                onChange={(e) => setCustomerSearch(e.target.value)}
+                            />
+                            {customerSearch && (
+                                <div className="absolute left-0 right-0 mt-1 bg-dark border border-white/10 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 text-xs">
+                                    {recentCustomers
+                                        .filter((c) => {
+                                            const q = customerSearch.toLowerCase();
+                                            return (
+                                                (c.name || '').toLowerCase().includes(q) ||
+                                                (c.phone || '').toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .slice(0, 5)
+                                        .map((c, idx) => (
+                                            <button
+                                                key={`${c.name}-${c.phone}-${idx}`}
+                                                type="button"
+                                                onClick={() => {
+                                                    setCustomerName(c.name || '');
+                                                    setCustomerPhone(c.phone || '');
+                                                    setCustomerSearch('');
+                                                }}
+                                                className="w-full flex flex-col items-start px-3 py-2 hover:bg-white/5 text-left"
+                                            >
+                                                <span className="font-medium">{c.name || 'Sin nombre'}</span>
+                                                {c.phone && (
+                                                    <span className="text-white/60">{c.phone}</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    {recentCustomers.length === 0 && (
+                                        <div className="px-3 py-2 text-white/50">
+                                            Aún no hay clientes recientes
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                placeholder="Nombre del cliente"
+                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                value={customerName}
+                                onChange={(e) => setCustomerName(e.target.value)}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Teléfono / referencia"
+                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                value={customerPhone}
+                                onChange={(e) => setCustomerPhone(e.target.value)}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -173,14 +337,17 @@ const POS = () => {
                 </div>
 
                 <div className="p-4 bg-white/5 border-t border-white/10">
-                    <div className="flex justify-between text-xl font-bold mb-4">
-                        <span>Total</span>
-                        <span className="text-accent">${totalUSDT.toFixed(2)}</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mb-4 text-xs text-white/60">
-                        <div>BS: {(totalUSDT * rates.bs).toFixed(2)}</div>
-                        <div>Fires: {(totalUSDT * rates.fires).toFixed(0)}</div>
+                    <div className="mb-4">
+                        <div className="text-xs text-white/60">Total a cobrar</div>
+                        <div className="text-2xl font-bold text-accent">
+                            {totalBs.toLocaleString('es-VE', {
+                                style: 'currency',
+                                currency: 'VES'
+                            })}
+                        </div>
+                        <div className="text-xs text-white/60 mt-1">
+                            ≈ {totalUSDT.toFixed(2)} USDT • {totalFires.toFixed(0)} Fires
+                        </div>
                     </div>
 
                     <button
@@ -188,7 +355,7 @@ const POS = () => {
                         disabled={cart.length === 0}
                         className="w-full btn-primary py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Cobrar
+                        Pagar
                     </button>
                 </div>
             </div>
@@ -259,9 +426,16 @@ const POS = () => {
 
                             <div className="bg-white/5 p-6 rounded-xl flex flex-col justify-between">
                                 <div>
-                                    <div className="flex justify-between mb-2">
+                                    <div className="flex justify-between mb-1">
                                         <span>Total a Pagar</span>
                                         <span className="font-bold">${totalUSDT.toFixed(2)}</span>
+                                    </div>
+                                    <div className="text-xs text-white/60 text-right mb-2">
+                                        {totalBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}{' '}
+                                        • {totalFires.toFixed(0)} Fires
                                     </div>
                                     <div className="flex justify-between mb-2 text-success">
                                         <span>Pagado</span>

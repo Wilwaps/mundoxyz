@@ -4,6 +4,23 @@ const { query, transaction } = require('../../db');
 const { verifyToken } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 
+// GET /api/store/inventory/:storeId/ingredients
+router.get('/:storeId/ingredients', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const result = await query(
+            `SELECT * FROM ingredients WHERE store_id = $1 ORDER BY name ASC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching ingredients:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // POST /api/store/:storeId/ingredient
 router.post('/:storeId/ingredient', verifyToken, async (req, res) => {
     try {
