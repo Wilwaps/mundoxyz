@@ -3,6 +3,7 @@ const router = express.Router();
 const { query, transaction } = require('../db');
 const { verifyToken, optionalAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const giftService = require('../services/giftService');
 
 // Get current active welcome event
 router.get('/current', optionalAuth, async (req, res) => {
@@ -83,6 +84,14 @@ router.post('/accept', verifyToken, async (req, res) => {
       }
 
       const event = eventResult.rows[0];
+
+      // Verificar si el usuario pertenece al segmento objetivo del evento
+      const segment = event.target_segment || { type: 'all' };
+      const matchesSegment = await giftService.userMatchesWelcomeSegment(client, userId, segment);
+
+      if (!matchesSegment) {
+        throw new Error('No cumples las condiciones para este bono de bienvenida');
+      }
 
       // Check if already claimed
       const claimCheck = await client.query(

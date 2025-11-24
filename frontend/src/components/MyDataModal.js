@@ -48,18 +48,48 @@ const MyDataModal = ({ isOpen, onClose, forceSecuritySetup = false, onSecuritySe
     }
   };
 
-  // Initialize form data with user data - SOLO cuando el modal se abre
+  // Inicializar siempre los datos desde el backend cuando se abre el modal
+  // Esto evita usar un user desactualizado en memoria (especialmente security_answer y email)
   useEffect(() => {
-    if (isOpen && user) {
-      setFormData({
-        display_name: user.display_name || '',
-        nickname: user.nickname || '',
-        email: user.email || '',
-        bio: user.bio || ''
-      });
-      setHasChanges(false);
-    }
-  }, [isOpen]); // ✅ Solo cuando isOpen cambia, NO cuando user cambia
+    if (!isOpen || !user) return;
+
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      try {
+        const updated = await refreshUser();
+        const source = updated || user;
+
+        if (cancelled) return;
+
+        setFormData({
+          display_name: source.display_name || '',
+          nickname: source.nickname || '',
+          email: source.email || '',
+          bio: source.bio || ''
+        });
+        setHasChanges(false);
+      } catch (error) {
+        console.error('Error loading profile in MyDataModal:', error);
+        if (cancelled) return;
+
+        // Fallback: usar los datos actuales en memoria si el refresh falla
+        setFormData({
+          display_name: user.display_name || '',
+          nickname: user.nickname || '',
+          email: user.email || '',
+          bio: user.bio || ''
+        });
+        setHasChanges(false);
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, user?.id]);
 
   // Cuando se fuerza configuración de seguridad, abrir pestaña Seguridad en modo edición
   useEffect(() => {

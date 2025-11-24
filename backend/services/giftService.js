@@ -251,6 +251,47 @@ class GiftService {
   }
 
   /**
+   * Verificar si un usuario pertenece a un segmento de welcome_events
+   * Actualmente se usa para eventos de first_login y segmentos especiales como 'tito_referral'.
+   */
+  async userMatchesWelcomeSegment(client, userId, segment = {}) {
+    let seg = segment || {};
+
+    // Si el driver devolviera JSON como string, intentar parsearlo
+    if (typeof seg === 'string') {
+      try {
+        seg = JSON.parse(seg);
+      } catch (_) {
+        seg = {};
+      }
+    }
+
+    const type = seg.type || 'all';
+
+    // Segmento por defecto: aplica a todos
+    if (type === 'all') {
+      return true;
+    }
+
+    // Segmento especial: usuarios que llegaron con token de Tito (tienen tito_owner_id)
+    if (type === 'tito_referral') {
+      const res = await client.query(
+        'SELECT tito_owner_id FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (!res.rows.length) {
+        return false;
+      }
+
+      return !!res.rows[0].tito_owner_id;
+    }
+
+    // Para otros tipos de segmento, por ahora no bloqueamos el evento.
+    return true;
+  }
+
+  /**
    * Crear mensaje en bandeja para aceptar regalo
    */
   async createGiftMessage(client, giftId, userId, message, coinsAmount, firesAmount) {
@@ -688,6 +729,19 @@ class GiftService {
 
           if (alreadyClaimed.rows.length > 0) {
             logger.info('User already claimed this event', { eventId: event.id, userId });
+            continue;
+          }
+
+          // Verificar si el usuario pertenece al segmento objetivo del evento
+          const segment = event.target_segment || { type: 'all' };
+          const matchesSegment = await this.userMatchesWelcomeSegment(client, userId, segment);
+
+          if (!matchesSegment) {
+            logger.info('User does not match welcome event segment', {
+              eventId: event.id,
+              userId,
+              segmentType: segment && segment.type ? segment.type : 'all'
+            });
             continue;
           }
 

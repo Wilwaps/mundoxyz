@@ -190,7 +190,8 @@ const WelcomeEventsManager = () => {
       first_time: 'Primera vez',
       inactive: `Inactivos (${segment.days || 7} días)`,
       low_balance: 'Saldo bajo',
-      existing_users: 'Solo usuarios existentes'
+      existing_users: 'Solo usuarios existentes',
+      tito_referral: 'Refe Tito'
     };
     return types[segment.type] || segment.type;
   };
@@ -573,10 +574,16 @@ const WelcomeEventsManager = () => {
                       <option value="inactive">Inactivos</option>
                       <option value="low_balance">Saldo Bajo</option>
                       <option value="existing_users">Solo Usuarios Existentes</option>
+                      <option value="tito_referral">Refe Tito</option>
                     </select>
                     {eventData.target_segment?.type === 'existing_users' && (
                       <p className="text-xs text-accent mt-1">
                         ℹ️ Este evento solo llegará a usuarios registrados ANTES de ahora
+                      </p>
+                    )}
+                    {eventData.target_segment?.type === 'tito_referral' && (
+                      <p className="text-xs text-accent mt-1">
+                        ℹ️ Solo usuarios que se registren entrando con un link de Tito.
                       </p>
                     )}
                   </div>
@@ -752,6 +759,7 @@ const WelcomeEventsManager = () => {
                       <option value="inactive">Inactivos</option>
                       <option value="low_balance">Saldo Bajo</option>
                       <option value="existing_users">Solo Usuarios Existentes</option>
+                      <option value="tito_referral">Refe Tito</option>
                     </select>
                   </div>
                 </div>
