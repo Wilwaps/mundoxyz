@@ -139,6 +139,15 @@ router.post('/login-email', async (req, res) => {
       return res.status(400).json({ error: 'Email/usuario y contraseña son requeridos' });
     }
 
+    // Permitir login por cédula (V/E/J) con o sin guion, ej: v20123123 o V-20123123
+    let ciFull = null;
+    const ciMatch = identifier.match(/^([VEJvej])[-\s]?(\d{5,})$/);
+    if (ciMatch) {
+      const prefix = ciMatch[1].toUpperCase();
+      const number = ciMatch[2];
+      ciFull = `${prefix}-${number}`;
+    }
+
     // Fast path: admin via env headers equivalent
     if (
       config.admin.username &&
@@ -257,23 +266,34 @@ router.post('/login-email', async (req, res) => {
       return res.json(adminPayload);
     }
 
-    // Regular email/username login with stored password
+    // Regular email/username/CI login with stored password
     logger.info('login-email regular path');
     const result = await query(
-      'SELECT u.id, u.username, u.email, ai.password_hash, w.id as wallet_id, ' +
+      'SELECT u.id, u.username, u.email, ' +
+      'COALESCE(ai_email.password_hash, ai_ci.password_hash) AS password_hash, ' +
+      'u.must_change_password, w.id as wallet_id, ' +
       'COALESCE(w.coins_balance, 0)::numeric as coins_balance, ' +
       'COALESCE(w.fires_balance, 0)::numeric as fires_balance, ' +
       'u.security_answer IS NOT NULL as has_security_answer, ' +
       'u.experience, u.total_games_played, u.total_games_won, ' +
+      'MIN(s.slug) AS home_store_slug, ' +
+      'MIN(s.name) AS home_store_name, ' +
       'array_agg(r.name) as roles ' +
       'FROM users u ' +
-      "LEFT JOIN auth_identities ai ON ai.user_id = u.id AND ai.provider = 'email' " +
+      "LEFT JOIN auth_identities ai_email ON ai_email.user_id = u.id AND ai_email.provider = 'email' " +
+      "LEFT JOIN auth_identities ai_ci ON ai_ci.user_id = u.id AND ai_ci.provider = 'ci' " +
       'LEFT JOIN wallets w ON w.user_id = u.id ' +
+      'LEFT JOIN store_customers sc ON sc.user_id = u.id ' +
+      'LEFT JOIN stores s ON s.id = sc.store_id ' +
       'LEFT JOIN user_roles ur ON ur.user_id = u.id ' +
       'LEFT JOIN roles r ON r.id = ur.role_id ' +
-      'WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1) OR ai.provider_uid = $1 ' +
-      'GROUP BY u.id, ai.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
-      [identifier]
+      'WHERE LOWER(u.email) = LOWER($1) ' +
+      '   OR LOWER(u.username) = LOWER($1) ' +
+      '   OR ai_email.provider_uid = $1 ' +
+      '   OR ai_ci.provider_uid = $1 ' +
+      '   OR ($2 IS NOT NULL AND u.ci_full = $2) ' +
+      'GROUP BY u.id, u.must_change_password, ai_email.password_hash, ai_ci.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
+      [identifier, ciFull]
     );
 
     if (result.rows.length === 0) {
@@ -337,7 +357,10 @@ router.post('/login-email', async (req, res) => {
         total_games_played: row.total_games_played || 0,
         total_games_won: row.total_games_won || 0,
         has_security_answer: row.has_security_answer || false,
-        roles: (row.roles || []).filter(Boolean)
+        roles: (row.roles || []).filter(Boolean),
+        home_store_slug: row.home_store_slug || null,
+        home_store_name: row.home_store_name || null,
+        must_change_password: row.must_change_password === true
       }
     };
 
@@ -972,6 +995,12 @@ router.put('/change-password', async (req, res) => {
       );
     }
 
+    // Marcar que el usuario ya cambió/estableció su contraseña
+    await query(
+      'UPDATE users SET last_password_change = NOW(), must_change_password = FALSE WHERE id = $1',
+      [userId]
+    );
+
     logger.info(existingHash ? 'Password changed successfully' : 'Password set successfully', { userId });
 
     res.json({
@@ -1062,6 +1091,12 @@ router.post('/reset-password-request', async (req, res) => {
         [user.id, providerUid, defaultPasswordHash]
       );
     }
+
+    // Obligar cambio de contraseña en el próximo login
+    await query(
+      'UPDATE users SET must_change_password = TRUE, last_password_change = NULL WHERE id = $1',
+      [user.id]
+    );
     
     logger.info('Password reset successful via security answer', {
       userId: user.id,

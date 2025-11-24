@@ -102,7 +102,13 @@ export const AuthProvider = ({ children }) => {
       // Normalizar security_answer: backend puede enviar has_security_answer o security_answer
       security_answer: userData?.security_answer !== undefined 
         ? userData.security_answer 
-        : (userData?.has_security_answer || false)
+        : (userData?.has_security_answer || false),
+      must_change_password: !!userData?.must_change_password,
+      home_store_slug: userData?.home_store_slug || null,
+      home_store_name: userData?.home_store_name || null,
+      home_store: userData?.home_store_slug 
+        ? { slug: userData.home_store_slug, name: userData.home_store_name || null }
+        : null
     };
   };
 
@@ -203,7 +209,7 @@ export const AuthProvider = ({ children }) => {
       setUser(normalizedUser);
       toast.success('¡Bienvenido a MUNDOXYZ!');
       
-      return { success: true };
+      return { success: true, user: normalizedUser };
     } catch (error) {
       console.error('Login error:', error);
       toast.error(error.response?.data?.error || 'Error al iniciar sesión');

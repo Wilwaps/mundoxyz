@@ -70,6 +70,12 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function HomeRedirect() {
+  const { user } = useAuth();
+  const target = user?.home_store_slug ? `/store/${user.home_store_slug}` : '/lobby';
+  return <Navigate to={target} replace />;
+}
+
 function App() {
   useEffect(() => {
     // Set viewport height for mobile
@@ -138,7 +144,7 @@ function App() {
                     <Layout />
                   </ProtectedRoute>
                 }>
-                  <Route index element={<Navigate to="/lobby" replace />} />
+                  <Route index element={<HomeRedirect />} />
                   <Route path="games" element={<Games />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="tito" element={<TitoDashboard />} />

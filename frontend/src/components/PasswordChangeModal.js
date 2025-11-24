@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
 const PasswordChangeModal = ({ isOpen, onClose, onFirstPasswordSet }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [hasPassword, setHasPassword] = useState(null); // null = checking, true/false = result
   const [formData, setFormData] = useState({
     current_password: '',
@@ -105,6 +105,9 @@ const PasswordChangeModal = ({ isOpen, onClose, onFirstPasswordSet }) => {
       toast.success(message);
       setFormData({ current_password: '', new_password: '', new_password_confirm: '' });
       setHasPassword(true); // Ahora tiene contraseña
+      if (user && updateUser) {
+        updateUser({ ...user, must_change_password: false });
+      }
       if (isFirstPassword && typeof onFirstPasswordSet === 'function') {
         onFirstPasswordSet();
       } else {

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin, CreditCard, Banknote, Flame } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import './StoreFront.css'; // Custom styles
@@ -17,6 +17,16 @@ const StoreFront = () => {
     const [showCart, setShowCart] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null); // For modal
 
+    const initialPayments = {
+        cash_usdt: 0,
+        zelle: 0,
+        bs: 0,
+        fires: 0
+    };
+    const [payments, setPayments] = useState(initialPayments);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [giveChangeInFires, setGiveChangeInFires] = useState(false);
+
     // Fetch Store Data
     const { data: storeData, isLoading } = useQuery({
         queryKey: ['store', slug],
@@ -25,6 +35,32 @@ const StoreFront = () => {
             return response.data;
         }
     });
+
+    const { data: fiatContext } = useQuery({
+        queryKey: ['fiat-context'],
+        queryFn: async () => {
+            const response = await axios.get('/api/economy/fiat-context');
+            return response.data;
+        }
+    });
+
+    const vesPerUsdt = fiatContext?.operationalRate?.rate;
+    const firesPerUsdt = fiatContext?.config?.fires_per_usdt;
+
+    const bsRate = typeof vesPerUsdt === 'number' && isFinite(vesPerUsdt) && vesPerUsdt > 0 ? vesPerUsdt : 38.5;
+    const firesRate = typeof firesPerUsdt === 'number' && isFinite(firesPerUsdt) && firesPerUsdt > 0 ? firesPerUsdt : 10;
+
+    const rates = {
+        bs: bsRate,
+        fires: firesRate
+    };
+
+    const parseAmount = (value) => {
+        const n = typeof value === 'number'
+            ? value
+            : parseFloat(String(value ?? '').replace(',', '.'));
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
 
     const addToCart = (product, quantity = 1, modifiers = []) => {
         setCart(prev => {
@@ -58,6 +94,26 @@ const StoreFront = () => {
 
     const cartTotalUSDT = cart.reduce((sum, item) => sum + (parseFloat(item.product.price_usdt) * item.quantity), 0);
 
+    const cashUsdt = parseAmount(payments.cash_usdt);
+    const zelleUsdt = parseAmount(payments.zelle);
+    const bsAmount = parseAmount(payments.bs);
+    const firesAmount = parseAmount(payments.fires);
+
+    const totalPaidUSDT =
+        cashUsdt +
+        zelleUsdt +
+        (bsAmount / rates.bs) +
+        (firesAmount / rates.fires);
+
+    const remainingUSDT = Math.max(0, cartTotalUSDT - totalPaidUSDT);
+    const changeUSDT = Math.max(0, totalPaidUSDT - cartTotalUSDT);
+
+    const isPaid = totalPaidUSDT >= cartTotalUSDT - 0.01;
+
+    const totalBs = cartTotalUSDT * rates.bs;
+    const totalFires = cartTotalUSDT * rates.fires;
+    const changeFires = changeUSDT * rates.fires;
+
     const createOrderMutation = useMutation({
         mutationFn: async (orderData) => {
             const response = await axios.post('/api/store/order/create', orderData);
@@ -67,6 +123,9 @@ const StoreFront = () => {
             toast.success('Pedido creado exitosamente');
             setCart([]);
             setShowCart(false);
+            setPaymentModalOpen(false);
+            setPayments(initialPayments);
+            setGiveChangeInFires(false);
         },
         onError: (error) => {
             const message = error?.response?.data?.error || 'Error al crear pedido';
@@ -85,6 +144,10 @@ const StoreFront = () => {
             toast.error('El carrito está vacío');
             return;
         }
+        if (!isPaid) {
+            toast.error('Falta completar el pago');
+            return;
+        }
 
         const orderData = {
             store_id: storeData.store.id,
@@ -96,13 +159,20 @@ const StoreFront = () => {
             type: 'pickup',
             payment_method: {
                 source: 'storefront',
-                currency: 'USDT',
-                total_usdt: cartTotalUSDT
+                cash_usdt: cashUsdt,
+                zelle: zelleUsdt,
+                bs: bsAmount,
+                fires: firesAmount
             },
-            currency_snapshot: {
-                base: 'USDT',
-                rates: { USDT: 1 }
-            }
+            currency_snapshot: rates,
+            customer_id: user?.id || null,
+            change_to_fires: giveChangeInFires && changeUSDT > 0 && user?.id
+                ? {
+                    enabled: true,
+                    change_usdt: changeUSDT,
+                    change_fires: changeFires
+                }
+                : { enabled: false }
         };
 
         await createOrderMutation.mutateAsync(orderData);
@@ -298,7 +368,7 @@ const StoreFront = () => {
 
                                 <button
                                     className="w-full btn-primary py-4 text-lg flex justify-between items-center px-6 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={handleCheckout}
+                                    onClick={() => setPaymentModalOpen(true)}
                                     disabled={cart.length === 0 || createOrderMutation.isLoading}
                                 >
                                     <span>{createOrderMutation.isLoading ? 'Procesando...' : 'Pagar'}</span>
@@ -309,6 +379,153 @@ const StoreFront = () => {
                     </>
                 )}
             </AnimatePresence>
+            {paymentModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <CreditCard size={20} />
+                                Confirmar pago
+                            </h2>
+                            <button
+                                onClick={() => setPaymentModalOpen(false)}
+                                className="text-white/60 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-2 mb-4 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-white/60">Total a pagar</span>
+                                <span className="font-bold">${cartTotalUSDT.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-white/60">
+                                <span>
+                                    ≈ {totalBs.toLocaleString('es-VE', {
+                                        style: 'currency',
+                                        currency: 'VES'
+                                    })}
+                                </span>
+                                <span>≈ {totalFires.toFixed(0)} 🔥</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs text-white/60 mb-1">Efectivo (USDT)</label>
+                                <div className="relative">
+                                    <Banknote className="absolute left-3 top-2.5 text-green-400" size={18} />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        value={payments.cash_usdt}
+                                        onChange={(e) => setPayments({ ...payments, cash_usdt: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-white/60 mb-1">Zelle / Transf. (USDT)</label>
+                                <div className="relative">
+                                    <CreditCard className="absolute left-3 top-2.5 text-accent" size={18} />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        value={payments.zelle}
+                                        onChange={(e) => setPayments({ ...payments, zelle: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-white/60 mb-1">Pago en Bs</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        value={payments.bs}
+                                        onChange={(e) => setPayments({ ...payments, bs: e.target.value })}
+                                    />
+                                </div>
+                                <div className="text-[11px] text-white/40 mt-1">
+                                    Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-white/60 mb-1">Pago con Fuegos</label>
+                                <div className="relative">
+                                    <Flame className="absolute left-3 top-2.5 text-fire-orange" size={18} />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        value={payments.fires}
+                                        onChange={(e) => setPayments({ ...payments, fires: e.target.value })}
+                                    />
+                                </div>
+                                <div className="text-[11px] text-white/40 mt-1">
+                                    1 USDT ≈ {rates.fires.toFixed(0)} 🔥
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 rounded-lg p-3 mb-4 text-xs space-y-1">
+                            <div className="flex justify-between">
+                                <span className="text-white/60">Pagado</span>
+                                <span className="font-semibold">${totalPaidUSDT.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-white/60">Falta por pagar</span>
+                                <span className={remainingUSDT > 0 ? 'text-orange-400 font-semibold' : 'text-white/60'}>
+                                    ${remainingUSDT.toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-white/60">Cambio estimado</span>
+                                <span className={changeUSDT > 0 ? 'text-emerald-400 font-semibold' : 'text-white/60'}>
+                                    ${changeUSDT.toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-4 text-xs">
+                            <input
+                                id="give-change-fires"
+                                type="checkbox"
+                                className="w-4 h-4"
+                                checked={giveChangeInFires}
+                                onChange={(e) => setGiveChangeInFires(e.target.checked)}
+                                disabled={changeUSDT <= 0 || !user}
+                            />
+                            <label htmlFor="give-change-fires" className="flex-1 text-white/70 flex items-center gap-1">
+                                <Flame size={14} className="text-fire-orange" />
+                                Convertir el cambio ({changeFires.toFixed(0)} 🔥) en Fuegos para mi billetera
+                            </label>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setPaymentModalOpen(false)}
+                                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCheckout}
+                                disabled={!isPaid || createOrderMutation.isLoading}
+                                className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {createOrderMutation.isLoading ? 'Enviando...' : 'Confirmar pedido'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

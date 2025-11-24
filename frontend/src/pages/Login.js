@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Sparkles, Zap, UserPlus, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PasswordChangeModal from '../components/PasswordChangeModal';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const Login = () => {
   const { loginWithTelegram, loginWithCredentials, user, loading } = useAuth();
   const [isDevMode, setIsDevMode] = useState(false);
   const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const nextParam = searchParams.get('next');
@@ -18,9 +20,14 @@ const Login = () => {
 
   useEffect(() => {
     if (user) {
-      navigate(safeNext, { replace: true });
+      const defaultTarget = user.home_store_slug ? `/store/${user.home_store_slug}` : safeNext;
+      if (isDevMode && user.must_change_password) {
+        setShowPasswordModal(true);
+        return;
+      }
+      navigate(defaultTarget, { replace: true });
     }
-  }, [user, navigate, safeNext]);
+  }, [user, navigate, safeNext, isDevMode]);
 
   useEffect(() => {
     // Check if running in Telegram WebApp
@@ -45,7 +52,13 @@ const Login = () => {
     }
     const result = await loginWithCredentials(credentials.username, credentials.password);
     if (result.success) {
-      navigate(safeNext, { replace: true });
+      const loggedUser = result.user || user;
+      const target = loggedUser?.home_store_slug ? `/store/${loggedUser.home_store_slug}` : safeNext;
+      if (isDevMode && loggedUser?.must_change_password) {
+        setShowPasswordModal(true);
+      } else {
+        navigate(target, { replace: true });
+      }
     }
   };
 
@@ -117,7 +130,7 @@ const Login = () => {
                   <div>
                     <input
                       type="text"
-                      placeholder="Usuario o Email"
+                      placeholder="Usuario, Email o CI (v20123123)"
                       value={credentials.username}
                       onChange={(e) => setCredentials({...credentials, username: e.target.value})}
                       className="input-glass w-full"
@@ -204,6 +217,21 @@ const Login = () => {
           </motion.div>
         </div>
       </motion.div>
+      <PasswordChangeModal 
+        isOpen={showPasswordModal} 
+        onClose={() => {
+          if (user?.must_change_password) {
+            toast.error('Debes cambiar tu contraseña para continuar');
+            return;
+          }
+          setShowPasswordModal(false);
+        }} 
+        onFirstPasswordSet={() => {
+          setShowPasswordModal(false);
+          const target = user?.home_store_slug ? `/store/${user.home_store_slug}` : safeNext;
+          navigate(target, { replace: true });
+        }} 
+      />
     </div>
   );
 };

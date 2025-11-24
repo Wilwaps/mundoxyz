@@ -20,6 +20,8 @@ router.post('/create', verifyToken, async (req, res) => {
             change_to_fires
         } = req.body;
         const userId = req.user.id;
+        const source = payment_method && typeof payment_method === 'object' ? payment_method.source : null;
+        const isStorefront = source === 'storefront';
 
         // 1. Calculate Totals & Validate Stock (Simplified for now)
         let subtotal_usdt = 0;
@@ -184,16 +186,19 @@ router.post('/create', verifyToken, async (req, res) => {
                 }
             }
 
-            // Create Kitchen Ticket
-            await client.query(
-                `INSERT INTO kitchen_tickets (order_id, station, status)
+            // Para pedidos del POS, crear ticket de cocina y notificar al KDS.
+            // Para pedidos del StoreFront (clientes), solo dejar el pedido en estado 'pending'
+            // sin enviarlo directamente a cocina.
+            if (!isStorefront) {
+                await client.query(
+                    `INSERT INTO kitchen_tickets (order_id, station, status)
          VALUES ($1, 'main', 'pending')`,
-                [order.id]
-            );
+                    [order.id]
+                );
 
-            // Notify KDS via Socket
-            if (req.io) {
-                req.io.to(`store:${store_id}:kitchen`).emit('store:new-order', { order });
+                if (req.io) {
+                    req.io.to(`store:${store_id}:kitchen`).emit('store:new-order', { order });
+                }
             }
 
             return order;
@@ -384,7 +389,9 @@ router.get('/:storeId/orders/active', verifyToken, async (req, res) => {
        FROM orders o
        JOIN order_items oi ON o.id = oi.order_id
        JOIN products p ON oi.product_id = p.id
-       WHERE o.store_id = $1 AND o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+       WHERE o.store_id = $1 
+         AND o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+         AND (o.payment_method->>'source' IS NULL OR o.payment_method->>'source' <> 'storefront')
        GROUP BY o.id
        ORDER BY o.created_at ASC`,
             [storeId]

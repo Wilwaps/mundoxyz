@@ -5,6 +5,7 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 
 const FIRES_PER_USDT = 300; // Peg interno: 300🔥 ≈ 1 USDT
 
@@ -38,6 +39,15 @@ const Market = () => {
     queryKey: ['fiat-context'],
     queryFn: async () => {
       const response = await axios.get('/api/economy/fiat-context');
+      return response.data;
+    }
+  });
+
+  // Fetch public stores list for Market
+  const { data: stores } = useQuery({
+    queryKey: ['public-stores'],
+    queryFn: async () => {
+      const response = await axios.get('/api/store/public-list');
       return response.data;
     }
   });
@@ -169,14 +179,20 @@ const Market = () => {
           </div>
           <div className="flex-1">
             <h2 className="text-xl font-bold text-text">Canjear Fuegos</h2>
-            <p className="text-text/60">Convierte 100 🔥 en dinero real</p>
+            <p className="text-text/60">Convierte 100  en dinero real</p>
           </div>
         </div>
+
+        <p className="text-xs text-text/60 mb-2">
+          {redeems?.length > 0
+            ? `Has realizado ${redeems.length} canje${redeems.length === 1 ? '' : 's'} de Fuegos. ́ltimo: ${new Date(redeems[0].created_at).toLocaleDateString()} (${getStatusText(redeems[0].status)}).`
+            : 'Án no has realizado canjes de Fuegos.'}
+        </p>
 
         <div className="bg-glass/50 rounded-lg p-4 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-text/60">Tu balance:</span>
-            <span className="text-2xl font-bold text-fire-orange">🔥 {user?.fires_balance || 0}</span>
+            <span className="text-2xl font-bold text-fire-orange"> {user?.fires_balance || 0}</span>
           </div>
         </div>
 
@@ -194,7 +210,7 @@ const Market = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="card-glass"
+        className="card-glass hidden"
       >
         <h3 className="text-lg font-bold mb-4">Historial de Canjes</h3>
         
@@ -233,6 +249,42 @@ const Market = () => {
           </div>
         )}
       </motion.div>
+
+      {stores && stores.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="card-glass mt-6"
+        >
+          <h3 className="text-lg font-bold mb-4">Tiendas disponibles</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stores.map((store) => (
+              <div key={store.id} className="glass-panel p-4 flex gap-3 items-center">
+                <img
+                  src={store.logo_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(store.name)}
+                  alt={store.name}
+                  className="w-12 h-12 rounded-lg object-cover bg-white/10 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-text truncate">{store.name}</h4>
+                  {store.description && (
+                    <p className="text-xs text-text/60 line-clamp-2">{store.description}</p>
+                  )}
+                  <div className="mt-2">
+                    <Link
+                      to={`/store/${store.slug}`}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      Entrar a la tienda
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Redeem Modal */}
       {showRedeemModal && (

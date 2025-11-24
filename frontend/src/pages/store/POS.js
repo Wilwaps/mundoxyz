@@ -33,6 +33,11 @@ const POS = () => {
     const [isInvoiceHistoryOpen, setIsInvoiceHistoryOpen] = useState(false);
     const [giveChangeInFires, setGiveChangeInFires] = useState(false);
 
+    const [draftInvoices, setDraftInvoices] = useState([]);
+    const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+
+    const draftsStorageKey = slug ? `pos_drafts_${slug}` : 'pos_drafts_default';
+
     // Fetch Store & Products
     const { data: storeData } = useQuery({
         queryKey: ['store-pos', slug],
@@ -209,6 +214,20 @@ const POS = () => {
         }
     }, []);
 
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(draftsStorageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    setDraftInvoices(parsed);
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }, [draftsStorageKey]);
+
     const handleCheckout = () => {
         if (!isPaid) return toast.error('Falta completar el pago');
 
@@ -254,6 +273,81 @@ const POS = () => {
         setCustomerPhone('');
         setCustomerSearch('');
         setSelectedCustomer(null);
+    };
+
+    const handleSaveDraftAndNewInvoice = () => {
+        const hasData =
+            cart.length > 0 ||
+            !!customerName ||
+            !!customerPhone ||
+            !!selectedCustomer;
+
+        if (!hasData) {
+            handleNewBilling();
+            return;
+        }
+
+        const draft = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            created_at: new Date().toISOString(),
+            store_id: storeData?.store?.id || null,
+            slug,
+            cart: cart.map((item) => ({ ...item })),
+            customerName,
+            customerPhone,
+            selectedCustomer,
+            payments: { ...payments },
+            giveChangeInFires
+        };
+
+        const nextDrafts = [draft, ...draftInvoices].slice(0, 50);
+
+        setDraftInvoices(nextDrafts);
+        try {
+            localStorage.setItem(draftsStorageKey, JSON.stringify(nextDrafts));
+        } catch {
+            // ignore
+        }
+
+        handleNewBilling();
+        toast.success('Factura guardada en curso');
+    };
+
+    const handleOpenDrafts = () => {
+        setIsDraftsModalOpen(true);
+    };
+
+    const handleLoadDraft = (draftId) => {
+        const draft = draftInvoices.find((d) => d.id === draftId);
+        if (!draft) return;
+
+        setCart(Array.isArray(draft.cart) ? draft.cart : []);
+        setCustomerName(draft.customerName || '');
+        setCustomerPhone(draft.customerPhone || '');
+        setSelectedCustomer(draft.selectedCustomer || null);
+        setPayments(draft.payments || initialPayments);
+        setGiveChangeInFires(!!draft.giveChangeInFires);
+
+        const nextDrafts = draftInvoices.filter((d) => d.id !== draftId);
+        setDraftInvoices(nextDrafts);
+        try {
+            localStorage.setItem(draftsStorageKey, JSON.stringify(nextDrafts));
+        } catch {
+            // ignore
+        }
+
+        setIsDraftsModalOpen(false);
+        toast.success('Factura recuperada');
+    };
+
+    const handleClearDrafts = () => {
+        setDraftInvoices([]);
+        try {
+            localStorage.setItem(draftsStorageKey, JSON.stringify([]));
+        } catch {
+            // ignore
+        }
+        setIsDraftsModalOpen(false);
     };
 
     const storeId = storeData?.store?.id;
@@ -559,6 +653,24 @@ const POS = () => {
                             Cotización
                         </button>
                     </div>
+                    <div className="mt-2 flex gap-2 text-[11px]">
+                        <button
+                            type="button"
+                            onClick={handleSaveDraftAndNewInvoice}
+                            className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={cart.length === 0 && !customerName && !customerPhone && !selectedCustomer}
+                        >
+                            Factura adicional
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleOpenDrafts}
+                            className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={draftInvoices.length === 0}
+                        >
+                            Recuperar facturas
+                        </button>
+                    </div>
                     <div className="mt-2">
                         <button
                             type="button"
@@ -761,6 +873,15 @@ const POS = () => {
                     products={products}
                     rates={rates}
                     onClose={() => setIsQuoteModalOpen(false)}
+                />
+            )}
+
+            {isDraftsModalOpen && (
+                <POSDraftInvoicesModal
+                    drafts={draftInvoices}
+                    onClose={() => setIsDraftsModalOpen(false)}
+                    onLoadDraft={handleLoadDraft}
+                    onClearAll={handleClearDrafts}
                 />
             )}
 
@@ -1276,7 +1397,7 @@ const QuoteModal = ({ products, rates, onClose }) => {
                         )}
                     </div>
 
-                    <div className="w-full md:w-72 lg:w-80 bg-white/5 rounded-xl p-3 flex flex-col justify-between text-xs">
+                    <div className="w-full md:w-72 lg:w-80 bg-white/5 rounded-xl p-3 flex flex-col justify-between text-xs sticky top-0 self-start">
                         <div>
                             <h3 className="text-sm font-semibold mb-2">Detalle de cotización</h3>
                             {quoteItems.length === 0 ? (
@@ -1357,6 +1478,103 @@ const QuoteModal = ({ products, rates, onClose }) => {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+};
+
+const POSDraftInvoicesModal = ({ drafts, onClose, onLoadDraft, onClearAll }) => {
+    const list = Array.isArray(drafts)
+        ? [...drafts].sort((a, b) => {
+            const aDate = a.created_at || '';
+            const bDate = b.created_at || '';
+            return bDate.localeCompare(aDate);
+        })
+        : [];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[80vh] overflow-y-auto text-xs">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h2 className="text-sm md:text-base font-semibold">Facturas en proceso</h2>
+                        <p className="text-[11px] text-white/60">
+                            Estas facturas solo se guardan en este dispositivo. Selecciona una para recuperarla.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px]"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+
+                {list.length === 0 && (
+                    <p className="text-white/60 text-xs">No hay facturas en proceso guardadas.</p>
+                )}
+
+                {list.length > 0 && (
+                    <table className="min-w-full text-[11px] align-middle">
+                        <thead>
+                            <tr className="text-white/60 border-b border-white/10">
+                                <th className="py-1 pr-3 text-left">Cliente</th>
+                                <th className="py-1 pr-3 text-right">Items</th>
+                                <th className="py-1 pr-3 text-right">Total aprox (USDT)</th>
+                                <th className="py-1 pr-3 text-left">Creada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {list.map((draft) => {
+                                const items = Array.isArray(draft.cart) ? draft.cart : [];
+                                const itemsCount = items.reduce(
+                                    (sum, item) => sum + (Number(item.quantity) || 0),
+                                    0
+                                );
+                                const totalUsdt = items.reduce(
+                                    (sum, item) =>
+                                        sum +
+                                        (Number(item.price_usdt || 0) * (Number(item.quantity) || 0)),
+                                    0
+                                );
+
+                                return (
+                                    <tr
+                                        key={draft.id}
+                                        className="border-b border-white/10 cursor-pointer hover:bg-white/5"
+                                        onClick={() => onLoadDraft(draft.id)}
+                                    >
+                                        <td className="py-1 pr-3 text-white/80">
+                                            {draft.customerName || 'Sin nombre'}
+                                        </td>
+                                        <td className="py-1 pr-3 text-right text-white/80">{itemsCount}</td>
+                                        <td className="py-1 pr-3 text-right text-white/80">
+                                            {totalUsdt.toFixed(2)}
+                                        </td>
+                                        <td className="py-1 pr-3 text-white/60">
+                                            {draft.created_at
+                                                ? new Date(draft.created_at).toLocaleString()
+                                                : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+
+                {list.length > 0 && (
+                    <div className="mt-3 flex justify-end">
+                        <button
+                            type="button"
+                            onClick={onClearAll}
+                            className="px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[11px] text-white/70"
+                        >
+                            Eliminar todas
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

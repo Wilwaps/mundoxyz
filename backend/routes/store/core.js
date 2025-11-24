@@ -94,6 +94,23 @@ router.get('/public/:slug', async (req, res) => {
     }
 });
 
+// GET /api/store/public-list
+// Lista pública de tiendas para el Mercado (clientes)
+router.get('/public-list', verifyToken, async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT id, slug, name, description, logo_url, cover_url
+       FROM stores
+       ORDER BY name ASC`
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching public stores list:', error);
+        res.status(500).json({ error: 'Failed to fetch stores list' });
+    }
+});
+
 // --- POS CUSTOMERS (CI-based) ---
 
 // POST /api/store/:storeId/customers
