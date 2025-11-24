@@ -16,7 +16,8 @@ router.post('/create', verifyToken, async (req, res) => {
             payment_method,
             delivery_info,
             currency_snapshot,
-            customer_id
+            customer_id,
+            change_to_fires
         } = req.body;
         const userId = req.user.id;
 
@@ -116,6 +117,71 @@ router.post('/create', verifyToken, async (req, res) => {
            VALUES ($1, $2, $3, $4, $5)`,
                     [order.id, item.product_id, item.quantity, item.price_at_time_usdt, JSON.stringify(item.modifiers)]
                 );
+            }
+
+            // Opcional: acreditar cambio en Fires al cliente si está habilitado
+            if (change_to_fires && change_to_fires.enabled && customer_id && change_to_fires.change_fires) {
+                const firesAmountRaw = Number(change_to_fires.change_fires);
+                const firesAmount = Number.isFinite(firesAmountRaw) && firesAmountRaw > 0 ? firesAmountRaw : 0;
+
+                if (firesAmount > 0) {
+                    // Asegurar que exista wallet para el cliente
+                    let walletRes = await client.query(
+                        'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+                        [customer_id]
+                    );
+
+                    if (walletRes.rows.length === 0) {
+                        await client.query(
+                            `INSERT INTO wallets (user_id, coins_balance, fires_balance, created_at, updated_at)
+                     VALUES ($1, 0, 0, NOW(), NOW())
+                     ON CONFLICT (user_id) DO NOTHING`,
+                            [customer_id]
+                        );
+
+                        walletRes = await client.query(
+                            'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+                            [customer_id]
+                        );
+                    }
+
+                    if (walletRes.rows.length > 0) {
+                        const wallet = walletRes.rows[0];
+                        const beforeRaw = parseFloat(wallet.fires_balance);
+                        const balanceBefore = Number.isFinite(beforeRaw) ? beforeRaw : 0;
+                        const balanceAfter = balanceBefore + firesAmount;
+
+                        await client.query(
+                            `UPDATE wallets 
+                     SET fires_balance = fires_balance + $1,
+                         total_fires_earned = total_fires_earned + $1,
+                         updated_at = NOW()
+                     WHERE id = $2`,
+                            [firesAmount, wallet.id]
+                        );
+
+                        await client.query(
+                            `INSERT INTO wallet_transactions 
+                     (wallet_id, type, currency, amount, balance_before, balance_after, description, reference, metadata)
+                     VALUES ($1, 'pos_change_to_fires', 'fires', $2, $3, $4, $5, $6, $7)`,
+                            [
+                                wallet.id,
+                                firesAmount,
+                                balanceBefore,
+                                balanceAfter,
+                                `Cambio en Fires por compra en tienda ${store_id}`,
+                                `store_order_${order.id}`,
+                                JSON.stringify({
+                                    store_id,
+                                    order_id: order.id,
+                                    invoice_number: order.invoice_number,
+                                    change_usdt: change_to_fires.change_usdt || null,
+                                    rate_fires: currency_snapshot && currency_snapshot.fires != null ? currency_snapshot.fires : null
+                                })
+                            ]
+                        );
+                    }
+                }
             }
 
             // Create Kitchen Ticket

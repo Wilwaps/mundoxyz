@@ -270,6 +270,7 @@ router.post('/:storeId/customers', verifyToken, async (req, res) => {
 });
 
 // GET /api/store/:storeId/customers/search?q=
+// Búsqueda GLOBAL de clientes (usuarios) para POS, con marca de clientes de tienda y CAI
 router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
@@ -293,25 +294,35 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
         const ciNumberLike = digitsOnly ? `${digitsOnly}%` : null;
 
         const result = await query(
-            `SELECT u.id,
-                    u.ci_full,
-                    u.display_name,
-                    u.username,
-                    u.phone,
-                    u.email
-       FROM store_customers sc
-       JOIN users u ON u.id = sc.user_id
-       WHERE sc.store_id = $1
-         AND (
-              (u.ci_full ILIKE $2)
-           OR ($3 IS NOT NULL AND u.ci_number LIKE $3)
-           OR (u.display_name ILIKE $4)
-           OR (u.username ILIKE $4)
-           OR (u.email ILIKE $4)
-           OR (u.phone ILIKE $4)
-         )
-       ORDER BY u.display_name NULLS LAST, u.username
-       LIMIT 20`,
+            `SELECT 
+                u.id,
+                u.ci_full,
+                u.display_name,
+                u.username,
+                u.phone,
+                u.email,
+                (sc.user_id IS NOT NULL) AS is_store_customer,
+                EXISTS (
+                    SELECT 1
+                    FROM caida_rooms cr
+                    WHERE cr.host_id = u.id
+                       OR u.id::text IN (
+                            SELECT jsonb_array_elements_text(cr.player_ids)
+                        )
+                ) AS is_cai
+           FROM users u
+           LEFT JOIN store_customers sc
+             ON sc.user_id = u.id
+            AND sc.store_id = $1
+           WHERE 
+                (u.ci_full ILIKE $2)
+             OR ($3 IS NOT NULL AND u.ci_number LIKE $3)
+             OR (u.display_name ILIKE $4)
+             OR (u.username ILIKE $4)
+             OR (u.email ILIKE $4)
+             OR (u.phone ILIKE $4)
+           ORDER BY u.display_name NULLS LAST, u.username
+           LIMIT 20`,
             [storeId, ciFullLike, ciNumberLike, likeAny]
         );
 
@@ -320,7 +331,9 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
             ci_full: row.ci_full,
             full_name: row.display_name || row.username,
             phone: row.phone,
-            email: row.email
+            email: row.email,
+            is_store_customer: !!row.is_store_customer,
+            is_cai: !!row.is_cai
         }));
 
         res.json(mapped);

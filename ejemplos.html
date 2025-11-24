@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ejemplos UI MundoXYZ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: radial-gradient(circle at top, #101827 0, #050816 40%, #02010a 100%);
+      color: #e5e7eb;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    .title {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(90deg,#38bdf8,#a855f7,#f97316);
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: rgba(15,23,42,0.85);
+      border-radius: 16px;
+      border: 1px solid rgba(148,163,184,0.25);
+      box-shadow: 0 18px 40px rgba(15,23,42,0.7);
+      padding: 14px 16px 16px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #e5e7eb;
+    }
+    .chip {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.4);
+      color: #7dd3fc;
+    }
+    .preview {
+      margin-top: 6px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: radial-gradient(circle at top left,rgba(36,99,235,0.4),rgba(15,23,42,0.9));
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .preview.badge span.label {
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.1);
+      border: 1px solid rgba(56,189,248,0.5);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .preview.toast {
+      background: radial-gradient(circle at top left,rgba(16,185,129,0.35),rgba(15,23,42,0.95));
+      border: 1px solid rgba(16,185,129,0.4);
+      border-left-width: 3px;
+      border-radius: 12px;
+      justify-content: space-between;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .preview.toast .title { font-size: 13px; color: #bbf7d0; margin: 0; }
+    .preview.toast .message { font-size: 11px; color: #a7f3d0; margin-top: 2px; }
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin: 20px 0 6px;
+    }
+    .hint {
+      margin-top: 24px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px dashed rgba(148,163,184,0.4);
+      background: rgba(15,23,42,0.6);
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      padding: 2px 4px;
+      border-radius: 6px;
+      background: rgba(15,23,42,0.8);
+      border: 1px solid rgba(31,41,55,0.9);
+      color: #e5e7eb;
+    }
+    /* Checklist */
+    .checklist-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer; }
+    .custom-checkbox { width: 20px; height: 20px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .custom-checkbox.checked { background: #3b82f6; border-color: #3b82f6; }
+    .custom-checkbox svg { width: 14px; height: 14px; color: white; opacity: 0; transform: scale(0.8); transition: all 0.2s; }
+    .custom-checkbox.checked svg { opacity: 1; transform: scale(1); }
+
+    /* Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 1000; }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+    .modal { background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; transform: translateY(20px); transition: all 0.3s; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    .modal-overlay.active .modal { transform: translateY(0); }
+
+    /* Scroll Area */
+    .scroll-area { height: 200px; overflow-y: auto; padding-right: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; background: rgba(0,0,0,0.2); }
+    .scroll-area::-webkit-scrollbar { width: 6px; }
+    .scroll-area::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+    .scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    .scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+    /* Buttons */
+    .btn-primary { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-secondary:hover { border-color: #94a3b8; color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1 class="title">Catálogo de Ejemplos UI</h1>
+    <p class="subtitle">Guía rápida para pedir componentes a la IA de MundoXYZ (esta página es solo de referencia local).</p>
+
+    <div class="section-title">Componentes Básicos</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">badge</div>
+          <span class="chip">Etiqueta / Estado</span>
+        </div>
+        <div class="preview badge">
+          <span class="label">EN VIVO</span>
+          <span style="font-size:12px;color:#bae6fd;">Bingo XYZ</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">pill-button</div>
+          <span class="chip">Botón redondeado</span>
+        </div>
+        <div class="preview">
+          <span style="padding:4px 14px;border-radius:999px;background:rgba(248,250,252,0.06);border:1px solid rgba(148,163,184,0.5);">Jugar ahora</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">stat-card</div>
+          <span class="chip">Tarjeta de métrica</span>
+        </div>
+        <div class="preview" style="flex-direction:column;align-items:flex-start;min-width:180px;">
+          <span style="font-size:11px;color:#9ca3af;">Fuegos generados hoy</span>
+          <span style="font-size:20px;font-weight:700;color:#f97316;">12 450 🔥</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Feedback &amp; Mensajes</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">toast-success</div>
+          <span class="chip">Notificación</span>
+        </div>
+        <div class="preview toast">
+          <div>
+            <p class="title">Compra completada</p>
+            <p class="message">Tus fuegos ya están en la billetera.</p>
+          </div>
+          <span style="font-size:14px;">✅</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">toast-error</div>
+          <span class="chip">Notificación</span>
+        </div>
+        <div class="preview toast" style="border-color:rgba(248,113,113,0.6);background:radial-gradient(circle at top left,rgba(248,113,113,0.45),rgba(15,23,42,0.98));">
+          <div>
+            <p class="title" style="color:#fecaca;">Algo salió mal</p>
+            <p class="message" style="color:#fecaca;">No se pudo crear la sala, intenta de nuevo.</p>
+          </div>
+          <span style="font-size:14px;">⚠️</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Layouts &amp; Contenedores</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">glass-card</div>
+          <span class="chip">Tarjeta principal</span>
+        </div>
+        <div class="preview" style="width:100%;justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:600;">Sala de Pool</div>
+            <div style="font-size:11px;color:#9ca3af;">Apuesta: 10 🔥 · 2/2 jugadores</div>
+          </div>
+          <span style="font-size:11px;padding:3px 10px;border-radius:999px;background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.6);color:#bbf7d0;">EN JUEGO</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">chip-filter</div>
+          <span class="chip">Filtro / Tag</span>
+        </div>
+        <div class="preview" style="gap:8px;flex-wrap:wrap;">
+          <span style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.8);font-size:11px;">Todos</span>
+          <span style="padding:3px 10px;border-radius:999px;background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.7);font-size:11px;color:#bfdbfe;">En lobby</span>
+          <span style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(75,85,99,0.9);font-size:11px;">En juego</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint">
+      Para pedir algo a la IA puedes usar el nombre del ejemplo, por ejemplo:
+      <br />
+      <br />
+      · <code>"Hazme un componente React tipo badge como el ejemplo badge"</code><br />
+      · <code>"Quiero un toast-success como en el ejemplo de toasts"</code><br />
+      · <code>"Diseña una glass-card para mostrar el estado de una sala"</code>
+    </div>
+  </div>
+    <div style="margin-top: 40px;" class="section-title">Componentes Interactivos</div>
+    <div class="grid">
+      <!-- Checklist -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Checklist</div>
+          <span class="chip">Interactivo</span>
+        </div>
+        <div class="checklist-item" onclick="toggleCheckbox(this)">
+          <div class="custom-checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <span style="font-size:14px;color:#cbd5e1;">Tarea completada</span>
+        </div>
+        <div class="checklist-item" onclick="toggleCheckbox(this)">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <span style="font-size:14px;color:#cbd5e1;">Tarea pendiente</span>
+        </div>
+        <div class="checklist-item" onclick="toggleCheckbox(this)">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <span style="font-size:14px;color:#cbd5e1;">Otra tarea</span>
+        </div>
+      </div>
+
+      <!-- Modal Trigger -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Modal</div>
+          <span class="chip">Overlay</span>
+        </div>
+        <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
+          Ejemplo de modal con backdrop blur y animaciÃ³n de entrada.
+        </p>
+        <button class="btn-primary" onclick="openModal()">Abrir Modal</button>
+      </div>
+
+      <!-- Scroll Area -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Scroll Area</div>
+          <span class="chip">Custom Scroll</span>
+        </div>
+        <div class="scroll-area">
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 1 - Contenido scrolleable</div>
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 2 - Estilo personalizado</div>
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 3 - Webkit scrollbar</div>
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 4 - Transparencias</div>
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 5 - MÃ¡s contenido</div>
+          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 6 - Final de la lista</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Element -->
+    <div class="modal-overlay" id="demoModal" onclick="if(event.target === this) closeModal()">
+      <div class="modal">
+        <h3 style="margin:0 0 10px 0;font-size:18px;font-weight:600;color:white;">TÃ­tulo del Modal</h3>
+        <p style="color:#94a3b8;font-size:14px;line-height:1.5;margin-bottom:24px;">
+          Este es un ejemplo de modal con efecto glassmorphism. Haz clic fuera o en los botones para cerrar.
+        </p>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+          <button class="btn-primary" onclick="closeModal()">Aceptar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function toggleCheckbox(el) {
+        const checkbox = el.querySelector('.custom-checkbox');
+        checkbox.classList.toggle('checked');
+      }
+      function openModal() {
+        document.getElementById('demoModal').classList.add('active');
+      }
+      function closeModal() {
+        document.getElementById('demoModal').classList.remove('active');
+      }
+    </script>
+</body>
+</html>

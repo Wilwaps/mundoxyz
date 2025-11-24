@@ -31,6 +31,7 @@ const POS = () => {
     const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
     const [invoiceModal, setInvoiceModal] = useState(null);
     const [isInvoiceHistoryOpen, setIsInvoiceHistoryOpen] = useState(false);
+    const [giveChangeInFires, setGiveChangeInFires] = useState(false);
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -113,6 +114,7 @@ const POS = () => {
             setCustomerName('');
             setCustomerPhone('');
             setCustomerSearch('');
+            setGiveChangeInFires(false);
 
             if (createdOrder?.store_id && createdOrder?.invoice_number != null) {
                 setInvoiceModal({
@@ -190,6 +192,8 @@ const POS = () => {
     const totalFires = totalUSDT * rates.fires;
     const remainingBs = remainingUSDT * rates.bs;
     const changeBs = changeUSDT * rates.bs;
+    const remainingFires = remainingUSDT * rates.fires;
+    const changeFires = changeUSDT * rates.fires;
 
     useEffect(() => {
         try {
@@ -229,7 +233,14 @@ const POS = () => {
             currency_snapshot: rates,
             table_number: 'POS-1',
             delivery_info: customerInfo,
-            customer_id: selectedCustomer?.id || null
+            customer_id: selectedCustomer?.id || null,
+            change_to_fires: giveChangeInFires && changeUSDT > 0 && selectedCustomer?.id
+                ? {
+                    enabled: true,
+                    change_usdt: changeUSDT,
+                    change_fires: changeFires
+                }
+                : { enabled: false }
         };
 
         createOrderMutation.mutate(orderData);
@@ -367,11 +378,16 @@ const POS = () => {
 
                     <div className="space-y-2">
                         {selectedCustomer && (
-                            <div className="text-[11px] text-white/70 flex flex-wrap gap-1">
+                            <div className="text-[11px] text-white/70 flex flex-wrap items-center gap-1">
                                 <span className="font-semibold">Seleccionado:</span>
                                 <span>{selectedCustomer.full_name || selectedCustomer.ci_full}</span>
                                 {selectedCustomer.ci_full && (
                                     <span className="text-white/50">({selectedCustomer.ci_full})</span>
+                                )}
+                                {selectedCustomer.is_cai && (
+                                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                                        CAI
+                                    </span>
                                 )}
                             </div>
                         )}
@@ -410,7 +426,14 @@ const POS = () => {
                                                         }}
                                                         className="w-full flex flex-col items-start px-3 py-2 hover:bg-white/5 text-left"
                                                     >
-                                                        <span className="font-medium">{c.full_name || c.ci_full || 'Sin nombre'}</span>
+                                                        <span className="font-medium flex items-center gap-1">
+                                                            {c.full_name || c.ci_full || 'Sin nombre'}
+                                                            {c.is_cai && (
+                                                                <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                                                                    CAI
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                         <span className="text-white/60">
                                                             {c.ci_full}
                                                             {c.phone ? ` • ${c.phone}` : ''}
@@ -551,7 +574,7 @@ const POS = () => {
             {/* Payment Modal */}
             {paymentModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="bg-dark border border-white/10 p-6 rounded-2xl w-full max-w-2xl shadow-2xl">
+                    <div className="bg-dark border border-white/10 p-6 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
                         <h2 className="text-2xl font-bold mb-6">Procesar Pago</h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
@@ -665,9 +688,37 @@ const POS = () => {
                                                         {`$${changeUSDT.toFixed(2)}`}
                                                     </span>
                                                 </div>
+                                                <div className="flex justify-between text-xs text-white/70">
+                                                    <span>Cambio en Fires</span>
+                                                    <span className="text-orange-300">
+                                                        {changeFires.toFixed(0)} Fires
+                                                    </span>
+                                                </div>
                                             </>
                                         )}
                                     </div>
+
+                                    {changeUSDT > 0 && selectedCustomer && (
+                                        <div className="mt-4 pt-3 border-t border-white/10 space-y-1 text-xs">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-white/80">Dar vuelto en Fires</p>
+                                                    <p className="text-white/60 text-[11px]">
+                                                        Se acreditarán aproximadamente {changeFires.toFixed(0)} Fires al cliente.
+                                                    </p>
+                                                </div>
+                                                <label className="inline-flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="form-checkbox h-4 w-4 text-accent"
+                                                        checked={giveChangeInFires}
+                                                        onChange={(e) => setGiveChangeInFires(e.target.checked)}
+                                                    />
+                                                    <span>Activar</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-4 mt-8">
