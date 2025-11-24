@@ -666,7 +666,7 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             is_menu_item,
             has_modifiers,
             accepts_fires
-        } = req.body;
+        } = req.body || {};
 
         const normalizedAcceptsFires = accepts_fires === true;
         let normalizedStock = 0;
@@ -679,6 +679,25 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
         }
 
         const normalizedSku = sku && String(sku).trim() !== '' ? String(sku).trim() : null;
+
+        // Normalizar precios para evitar errores "invalid input syntax for type numeric: \"\""
+        // price_usdt: por defecto 0 si no es un número válido o viene vacío
+        let normalizedPriceUsdt = 0;
+        if (price_usdt !== undefined && price_usdt !== null && String(price_usdt).trim() !== '') {
+            const parsed = Number(String(price_usdt).replace(',', '.'));
+            if (Number.isFinite(parsed) && parsed >= 0) {
+                normalizedPriceUsdt = parsed;
+            }
+        }
+
+        // price_fires: permitir NULL si viene vacío o no es válido
+        let normalizedPriceFires = null;
+        if (price_fires !== undefined && price_fires !== null && String(price_fires).trim() !== '') {
+            const parsedFires = Number(String(price_fires).replace(',', '.'));
+            if (Number.isFinite(parsedFires) && parsedFires >= 0) {
+                normalizedPriceFires = parsedFires;
+            }
+        }
 
         const result = await query(
             `INSERT INTO products 
@@ -693,8 +712,8 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 name,
                 description,
                 image_url,
-                price_usdt,
-                price_fires,
+                normalizedPriceUsdt,
+                normalizedPriceFires,
                 normalizedStock,
                 is_menu_item,
                 has_modifiers,
