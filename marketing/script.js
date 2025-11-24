@@ -31,7 +31,8 @@ const GAMES = ['Bingo', 'Pool', 'Truco'];
 let state = {
     currentMonth: 1,
     calendarData: [], // Will hold 90 days of generated content
-    filters: ['instagram', 'twitter', 'tiktok', 'email']
+    filters: ['instagram', 'twitter', 'tiktok', 'email'],
+    currentDayId: null // Track which day is being edited
 };
 
 // --- Content Generation Engine ---
@@ -42,25 +43,20 @@ function generateCampaign() {
     for (let i = 1; i <= 90; i++) {
         const month = Math.ceil(i / 30);
         const phase = PHASES[month];
-
-        // Rotate channels to ensure variety
         const channel = CHANNELS[(i - 1) % CHANNELS.length];
-
-        // Pick random content type
         const contentType = CONTENT_TYPES[Math.floor(Math.random() * CONTENT_TYPES.length)];
 
-        // Generate Copy
         let copy = contentType.template;
         copy = copy.replace('{feature}', FEATURES[Math.floor(Math.random() * FEATURES.length)]);
         copy = copy.replace('{number}', Math.floor(Math.random() * 10) + ',000');
         copy = copy.replace('{game}', GAMES[Math.floor(Math.random() * GAMES.length)]);
         copy = copy.replace('{item}', 'el bono diario');
 
-        // Add Phase Keywords
         const keyword = phase.keywords[Math.floor(Math.random() * phase.keywords.length)];
         copy += ` #${keyword}`;
 
         days.push({
+            id: `day-${i}`, // Unique ID for persistence
             day: i,
             month: month,
             channel: channel.id,
@@ -69,13 +65,30 @@ function generateCampaign() {
             type: contentType.type,
             objective: phase.focus,
             copy: copy,
-            visual: `Imagen estilo ${contentType.type} mostrando ${phase.focus}. Usar paleta ${month === 1 ? 'Dark/Neon' : 'Bright/Glass'}.`,
+            visual: `Imagen estilo ${contentType.type} mostrando ${phase.focus}.`,
             hashtags: `#MundoXYZ #${keyword} #Gaming`,
-            status: i < 5 ? 'posted' : (i < 15 ? 'scheduled' : 'draft') // Simulate some progress
+            status: i < 5 ? 'posted' : (i < 15 ? 'scheduled' : 'draft'),
+            image: null // Store image DataURL here
         });
     }
 
     return days;
+}
+
+// --- Persistence (LocalStorage) ---
+
+function loadState() {
+    const savedData = localStorage.getItem('mundoXYZ_calendar_data');
+    if (savedData) {
+        state.calendarData = JSON.parse(savedData);
+    } else {
+        state.calendarData = generateCampaign();
+        saveState();
+    }
+}
+
+function saveState() {
+    localStorage.setItem('mundoXYZ_calendar_data', JSON.stringify(state.calendarData));
 }
 
 // --- UI Rendering ---
@@ -84,7 +97,6 @@ function renderCalendar() {
     const grid = document.getElementById('calendar-grid');
     grid.innerHTML = '';
 
-    // Filter data by month and channel
     const filteredDays = state.calendarData.filter(day =>
         day.month === state.currentMonth &&
         state.filters.includes(day.channel)
@@ -95,12 +107,19 @@ function renderCalendar() {
         card.className = 'day-card';
         card.onclick = () => openModal(day);
 
+        // Show image thumbnail if exists
+        let imageThumb = '';
+        if (day.image) {
+            imageThumb = `<div style="height:4px; background:var(--primary); width:100%; border-radius:2px; margin-bottom:8px;"></div>`;
+        }
+
         card.innerHTML = `
             <div class="day-header" style="display:flex;justify-content:space-between;">
                 <span class="day-number">Día ${day.day}</span>
                 <span class="channel-icon">${day.channelIcon}</span>
             </div>
             <div class="day-content">
+                ${imageThumb}
                 <strong>${day.type}</strong><br>
                 ${day.copy}
             </div>
@@ -127,39 +146,91 @@ function updateProgress() {
 
 function openModal(day) {
     const modal = document.getElementById('brief-modal');
+    state.currentDayId = day.id;
 
     document.getElementById('modal-day').innerText = `Día ${day.day} - ${PHASES[day.month].name}`;
     document.getElementById('modal-channel').innerText = day.channelName;
-    document.getElementById('modal-objective').innerText = day.objective;
-    document.getElementById('modal-copy').innerText = day.copy;
-    document.getElementById('modal-visual').innerText = day.visual;
-    document.getElementById('modal-tags').innerText = day.hashtags;
+
+    // Fill Inputs
+    document.getElementById('modal-objective').value = day.objective;
+    document.getElementById('modal-copy').value = day.copy;
+    document.getElementById('modal-visual-text').innerText = day.visual;
+    document.getElementById('modal-tags').value = day.hashtags;
     document.getElementById('modal-status').value = day.status;
+
+    // Handle Image Preview
+    const previewContainer = document.getElementById('image-preview');
+    previewContainer.innerHTML = '';
+    if (day.image) {
+        const img = document.createElement('img');
+        img.src = day.image;
+        previewContainer.appendChild(img);
+    }
 
     modal.classList.add('active');
 }
 
+function saveModalChanges() {
+    if (!state.currentDayId) return;
+
+    const dayIndex = state.calendarData.findIndex(d => d.id === state.currentDayId);
+    if (dayIndex === -1) return;
+
+    // Update Data
+    state.calendarData[dayIndex].objective = document.getElementById('modal-objective').value;
+    state.calendarData[dayIndex].copy = document.getElementById('modal-copy').value;
+    state.calendarData[dayIndex].hashtags = document.getElementById('modal-tags').value;
+    state.calendarData[dayIndex].status = document.getElementById('modal-status').value;
+
+    // Image is handled separately by the change event, but we save state here
+    saveState();
+    renderCalendar();
+    updateProgress();
+    closeModal();
+}
+
+function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+        const dataUrl = event.target.result;
+
+        // Update Preview
+        const previewContainer = document.getElementById('image-preview');
+        previewContainer.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        previewContainer.appendChild(img);
+
+        // Update State
+        const dayIndex = state.calendarData.findIndex(d => d.id === state.currentDayId);
+        if (dayIndex !== -1) {
+            state.calendarData[dayIndex].image = dataUrl;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
 function closeModal() {
     document.getElementById('brief-modal').classList.remove('active');
+    state.currentDayId = null;
 }
 
 // --- Event Listeners ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Data
-    state.calendarData = generateCampaign();
+    loadState();
     renderCalendar();
     updateProgress();
 
     // Month Navigation
     document.querySelectorAll('.month-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Remove active class from all
             document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
-            // Add to clicked (traverse up in case span clicked)
             const target = e.target.closest('.month-btn');
             target.classList.add('active');
-
             state.currentMonth = parseInt(target.dataset.month);
             renderCalendar();
         });
@@ -177,16 +248,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Modal Close
+    // Modal Actions
     document.querySelector('.close-modal').addEventListener('click', closeModal);
     document.querySelector('.modal-overlay').addEventListener('click', (e) => {
         if (e.target === document.querySelector('.modal-overlay')) closeModal();
     });
+
+    document.getElementById('save-modal').addEventListener('click', saveModalChanges);
+    document.getElementById('image-upload').addEventListener('change', handleImageUpload);
 });
 
 // Utility
 window.copyToClipboard = function () {
-    const text = document.getElementById('modal-copy').innerText;
+    const text = document.getElementById('modal-copy').value;
     navigator.clipboard.writeText(text).then(() => {
         alert('Copy copiado al portapapeles!');
     });

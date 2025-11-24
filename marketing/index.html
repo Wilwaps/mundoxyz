@@ -116,27 +116,34 @@
             <div class="modal-body">
                 <div class="brief-section">
                     <h3>🎯 Objetivo</h3>
-                    <p id="modal-objective">Generar expectativa sobre el lanzamiento.</p>
+                    <input type="text" class="edit-input" id="modal-objective" placeholder="Objetivo del post...">
                 </div>
 
                 <div class="brief-section">
                     <h3>📝 Copy / Guion</h3>
-                    <div class="copy-box" id="modal-copy">
-                        "Algo grande está por llegar..."
-                    </div>
+                    <textarea class="edit-textarea" id="modal-copy" placeholder="Escribe el copy aquí..."></textarea>
                     <button class="btn-copy" onclick="copyToClipboard()">Copiar Texto</button>
                 </div>
 
                 <div class="brief-section">
                     <h3>🖼️ Referencia Visual</h3>
-                    <div class="visual-ref" id="modal-visual">
-                        Mostrar logo con efecto glitch.
+                    <div class="image-upload-container">
+                        <div class="visual-ref" id="modal-visual-text">
+                            <!-- Visual description text -->
+                        </div>
+                        <div class="image-preview" id="image-preview">
+                            <!-- Image will be shown here -->
+                        </div>
+                        <label class="upload-btn">
+                            📷 Cargar Imagen
+                            <input type="file" id="image-upload" accept="image/*">
+                        </label>
                     </div>
                 </div>
 
                 <div class="brief-section">
                     <h3>#️⃣ Hashtags</h3>
-                    <div class="hashtags" id="modal-tags">#MundoXYZ #Gaming</div>
+                    <input type="text" class="edit-input" id="modal-tags" placeholder="#Hashtags...">
                 </div>
             </div>
 
