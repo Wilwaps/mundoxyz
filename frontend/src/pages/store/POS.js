@@ -198,21 +198,24 @@ const POS = () => {
         createOrderMutation.mutate(orderData);
     };
 
-    if (!storeData) return <div className="p-10">Cargando POS...</div>;
-
-    const { products, categories } = storeData;
+    const storeId = storeData?.store?.id;
 
     // Remote search of customers by CI / nombre / correo
-    const { data: customerSearchResults } = useQuery({
-        queryKey: ['pos-customers-search', storeData.store.id, customerSearch],
-        enabled: !!storeData?.store?.id && customerSearch.trim().length >= 2,
+    const { data: customerSearchResults = [] } = useQuery({
+        queryKey: ['pos-customers-search', storeId, customerSearch],
+        enabled: !!storeId && customerSearch.trim().length >= 2,
         queryFn: async () => {
-            const response = await axios.get(`/api/store/${storeData.store.id}/customers/search`, {
+            const response = await axios.get(`/api/store/${storeId}/customers/search`, {
                 params: { q: customerSearch.trim() }
             });
             return response.data || [];
         }
     });
+
+    if (!storeData) return <div className="p-10">Cargando POS...</div>;
+
+    const { products, categories } = storeData;
+
     const filteredProducts = products.filter(p =>
         (selectedCategory === 'all' || p.category_id === selectedCategory) &&
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
