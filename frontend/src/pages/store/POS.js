@@ -57,6 +57,14 @@ const POS = () => {
         fires: firesRate // 1 USDT = firesRate Fires
     };
 
+    // Normaliza montos de entrada (strings, vacío, etc.) a números >= 0
+    const parseAmount = (value) => {
+        const n = typeof value === 'number'
+            ? value
+            : parseFloat(String(value ?? '').replace(',', '.'));
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+
     const createOrderMutation = useMutation({
         mutationFn: async (orderData) => {
             return axios.post('/api/store/order/create', orderData);
@@ -141,12 +149,22 @@ const POS = () => {
         });
     };
 
-    const totalUSDT = cart.reduce((sum, item) => sum + (parseFloat(item.price_usdt) * item.quantity), 0);
+    const totalUSDT = cart.reduce((sum, item) => {
+        const price = parseAmount(item.price_usdt);
+        const qty = parseAmount(item.quantity || 0);
+        return sum + price * qty;
+    }, 0);
+
+    const cashUsdt = parseAmount(payments.cash_usdt);
+    const zelleUsdt = parseAmount(payments.zelle);
+    const bsAmount = parseAmount(payments.bs);
+    const firesAmount = parseAmount(payments.fires);
+
     const totalPaidUSDT =
-        parseFloat(payments.cash_usdt) +
-        parseFloat(payments.zelle) +
-        (parseFloat(payments.bs) / rates.bs) +
-        (parseFloat(payments.fires) / rates.fires);
+        cashUsdt +
+        zelleUsdt +
+        (bsAmount / rates.bs) +
+        (firesAmount / rates.fires);
 
     const remainingUSDT = Math.max(0, totalUSDT - totalPaidUSDT);
     const isPaid = totalPaidUSDT >= totalUSDT - 0.01; // Tolerance
@@ -200,13 +218,19 @@ const POS = () => {
 
     const storeId = storeData?.store?.id;
 
-    // Remote search of customers by CI / nombre / correo
-    const { data: customerSearchResults = [] } = useQuery({
+    // Remote search of customers por CI / nombre / correo / teléfono / email
+    const {
+        data: customerSearchResults = [],
+        isLoading: isSearchingCustomers,
+        error: customerSearchError
+    } = useQuery({
         queryKey: ['pos-customers-search', storeId, customerSearch],
-        enabled: !!storeId && customerSearch.trim().length >= 2,
+        enabled: !!storeId && customerSearch.trim().length > 0,
         queryFn: async () => {
+            const query = customerSearch.trim();
+            if (!query) return [];
             const response = await axios.get(`/api/store/${storeId}/customers/search`, {
-                params: { q: customerSearch.trim() }
+                params: { q: query }
             });
             return response.data || [];
         }
@@ -325,42 +349,54 @@ const POS = () => {
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Buscar cliente (CI, nombre o correo)..."
+                                placeholder="Buscar cliente (CI, nombre, correo o teléfono)..."
                                 className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={customerSearch}
                                 onChange={(e) => setCustomerSearch(e.target.value)}
                             />
                             {customerSearch && (
                                 <div className="absolute left-0 right-0 mt-1 bg-dark border border-white/10 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 text-xs">
-                                    {customerSearchResults && customerSearchResults.length > 0 ? (
-                                        customerSearchResults.map((c) => (
-                                            <button
-                                                key={c.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedCustomer(c);
-                                                    setCustomerName(c.full_name || '');
-                                                    setCustomerPhone(c.phone || '');
-                                                    setCustomerSearch('');
-                                                }}
-                                                className="w-full flex flex-col items-start px-3 py-2 hover:bg-white/5 text-left"
-                                            >
-                                                <span className="font-medium">{c.full_name || c.ci_full || 'Sin nombre'}</span>
-                                                <span className="text-white/60">
-                                                    {c.ci_full}
-                                                    {c.phone ? ` • ${c.phone}` : ''}
-                                                </span>
-                                                {c.email && (
-                                                    <span className="text-white/40 truncate max-w-full">{c.email}</span>
-                                                )}
-                                            </button>
-                                        ))
-                                    ) : (
+                                    {isSearchingCustomers && (
                                         <div className="px-3 py-2 text-white/50">
-                                            {customerSearch.trim().length < 2
-                                                ? 'Escribe al menos 2 caracteres'
-                                                : 'Sin resultados'}
+                                            Buscando clientes...
                                         </div>
+                                    )}
+                                    {!isSearchingCustomers && customerSearchError && (
+                                        <div className="px-3 py-2 text-red-400">
+                                            Error al buscar clientes
+                                        </div>
+                                    )}
+                                    {!isSearchingCustomers && !customerSearchError && (
+                                        <>
+                                            {customerSearchResults && customerSearchResults.length > 0 ? (
+                                                customerSearchResults.map((c) => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedCustomer(c);
+                                                            setCustomerName(c.full_name || '');
+                                                            setCustomerPhone(c.phone || '');
+                                                            setCustomerSearch('');
+                                                        }}
+                                                        className="w-full flex flex-col items-start px-3 py-2 hover:bg-white/5 text-left"
+                                                    >
+                                                        <span className="font-medium">{c.full_name || c.ci_full || 'Sin nombre'}</span>
+                                                        <span className="text-white/60">
+                                                            {c.ci_full}
+                                                            {c.phone ? ` • ${c.phone}` : ''}
+                                                        </span>
+                                                        {c.email && (
+                                                            <span className="text-white/40 truncate max-w-full">{c.email}</span>
+                                                        )}
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-2 text-white/50">
+                                                    Sin resultados
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -499,7 +535,7 @@ const POS = () => {
                                             onChange={e => setPayments({ ...payments, bs: e.target.value })}
                                         />
                                         <div className="absolute right-3 top-3 text-xs text-white/40">
-                                            = ${(payments.bs / rates.bs).toFixed(2)}
+                                            = ${(bsAmount / rates.bs).toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
@@ -514,7 +550,7 @@ const POS = () => {
                                             onChange={e => setPayments({ ...payments, fires: e.target.value })}
                                         />
                                         <div className="absolute right-3 top-3 text-xs text-white/40">
-                                            = ${(payments.fires / rates.fires).toFixed(2)}
+                                            = ${(firesAmount / rates.fires).toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
