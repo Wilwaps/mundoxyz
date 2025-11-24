@@ -249,16 +249,6 @@ const StoreOwnerDashboard = () => {
     enabled: !!store?.id
   });
 
-  if (isLoading) {
-    return <div className="p-6 text-sm">Cargando panel de tienda...</div>;
-  }
-
-  if (error || !store) {
-    return <div className="p-6 text-sm">No se pudo cargar la información de la tienda.</div>;
-  }
-
-  const orders = Array.isArray(activeOrders) ? activeOrders : [];
-
   const {
     data: ordersHistoryData,
     isLoading: loadingOrdersHistory
@@ -274,6 +264,15 @@ const StoreOwnerDashboard = () => {
     enabled: !!store?.id
   });
 
+  if (isLoading) {
+    return <div className="p-6 text-sm">Cargando panel de tienda...</div>;
+  }
+
+  if (error || !store) {
+    return <div className="p-6 text-sm">No se pudo cargar la información de la tienda.</div>;
+  }
+
+  const orders = Array.isArray(activeOrders) ? activeOrders : [];
   const ordersHistory = Array.isArray(ordersHistoryData) ? ordersHistoryData : [];
 
   const currencyConfigLabel = (() => {

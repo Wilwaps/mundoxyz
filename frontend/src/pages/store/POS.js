@@ -29,6 +29,8 @@ const POS = () => {
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false);
     const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+    const [invoiceModal, setInvoiceModal] = useState(null);
+    const [isInvoiceHistoryOpen, setIsInvoiceHistoryOpen] = useState(false);
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -71,7 +73,9 @@ const POS = () => {
         mutationFn: async (orderData) => {
             return axios.post('/api/store/order/create', orderData);
         },
-        onSuccess: () => {
+        onSuccess: (response) => {
+            const createdOrder = response?.data?.order || response?.data;
+
             toast.success('Orden creada exitosamente');
             setCart([]);
             setPaymentModalOpen(false);
@@ -109,6 +113,13 @@ const POS = () => {
             setCustomerName('');
             setCustomerPhone('');
             setCustomerSearch('');
+
+            if (createdOrder?.store_id && createdOrder?.invoice_number != null) {
+                setInvoiceModal({
+                    storeId: createdOrder.store_id,
+                    invoiceNumber: createdOrder.invoice_number
+                });
+            }
         },
         onError: (err) => toast.error('Error al crear orden')
     });
@@ -525,6 +536,15 @@ const POS = () => {
                             Cotización
                         </button>
                     </div>
+                    <div className="mt-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsInvoiceHistoryOpen(true)}
+                            className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs"
+                        >
+                            Ver facturas recientes
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -612,27 +632,41 @@ const POS = () => {
                                     <div className="h-px bg-white/10 my-4"></div>
                                     <div className="space-y-1">
                                         <div className="flex justify-between text-sm font-semibold">
-                                            <span>{changeUSDT > 0 ? 'Cambio' : 'Restante'}</span>
+                                            <span>Restante</span>
                                             <span className={remainingUSDT > 0 ? 'text-red-400' : 'text-green-400'}>
-                                                {changeUSDT > 0
-                                                    ? changeBs.toLocaleString('es-VE', {
-                                                        style: 'currency',
-                                                        currency: 'VES'
-                                                    })
-                                                    : remainingBs.toLocaleString('es-VE', {
-                                                        style: 'currency',
-                                                        currency: 'VES'
-                                                    })}
+                                                {remainingBs.toLocaleString('es-VE', {
+                                                    style: 'currency',
+                                                    currency: 'VES'
+                                                })}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-xs text-white/70">
-                                            <span>{changeUSDT > 0 ? 'Cambio en USDT' : 'Restante en USDT'}</span>
+                                            <span>Restante en USDT</span>
                                             <span className={remainingUSDT > 0 ? 'text-red-300' : 'text-green-300'}>
-                                                {changeUSDT > 0
-                                                    ? `$${changeUSDT.toFixed(2)}`
-                                                    : `$${remainingUSDT.toFixed(2)}`}
+                                                {`$${remainingUSDT.toFixed(2)}`}
                                             </span>
                                         </div>
+
+                                        {changeUSDT > 0 && (
+                                            <>
+                                                <div className="h-px bg-white/10 my-1" />
+                                                <div className="flex justify-between text-sm font-semibold">
+                                                    <span>Cambio</span>
+                                                    <span className="text-green-400">
+                                                        {changeBs.toLocaleString('es-VE', {
+                                                            style: 'currency',
+                                                            currency: 'VES'
+                                                        })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-white/70">
+                                                    <span>Cambio en USDT</span>
+                                                    <span className="text-green-300">
+                                                        {`$${changeUSDT.toFixed(2)}`}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -678,6 +712,339 @@ const POS = () => {
                     onClose={() => setIsQuoteModalOpen(false)}
                 />
             )}
+
+            {isInvoiceHistoryOpen && storeData?.store?.id && (
+                <POSInvoiceHistoryModal
+                    storeId={storeData.store.id}
+                    onClose={() => setIsInvoiceHistoryOpen(false)}
+                    onSelectInvoice={(invoiceNumber) => {
+                        setInvoiceModal({
+                            storeId: storeData.store.id,
+                            invoiceNumber
+                        });
+                    }}
+                />
+            )}
+
+            {invoiceModal && (
+                <POSInvoiceDetailModal
+                    storeId={invoiceModal.storeId}
+                    invoiceNumber={invoiceModal.invoiceNumber}
+                    vesPerUsdt={vesPerUsdt}
+                    onClose={() => setInvoiceModal(null)}
+                />
+            )}
+        </div>
+    );
+};
+
+const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) => {
+    const { data, isLoading, error } = useQuery({
+        queryKey: ['pos-invoice-detail', storeId, invoiceNumber],
+        queryFn: async () => {
+            const response = await axios.get(`/api/store/order/${storeId}/invoice/${invoiceNumber}`);
+            return response.data?.order || null;
+        }
+    });
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const order = data;
+
+    let subtotalBs = null;
+    let taxBs = null;
+    let deliveryBs = null;
+    let discountBs = null;
+    let totalBs = null;
+
+    if (order && vesPerUsdt) {
+        subtotalBs = order.subtotal_usdt * vesPerUsdt;
+        taxBs = order.tax_usdt * vesPerUsdt;
+        deliveryBs = order.delivery_fee_usdt * vesPerUsdt;
+        discountBs = order.discount_usdt * vesPerUsdt;
+        totalBs = order.total_usdt * vesPerUsdt;
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="w-full max-w-3xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto text-xs">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-bold">Factura #{invoiceNumber}</h2>
+                        {order && (
+                            <p className="text-[11px] text-white/60">
+                                Emitida el {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={handlePrint}
+                            className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px]"
+                        >
+                            Imprimir / PDF
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px]"
+                        >
+                            Aceptar
+                        </button>
+                    </div>
+                </div>
+
+                {isLoading && <p className="text-white/60 text-xs">Cargando factura...</p>}
+                {error && !isLoading && (
+                    <p className="text-red-400 text-xs">Error al cargar la factura.</p>
+                )}
+                {!isLoading && !error && !order && (
+                    <p className="text-white/60 text-xs">Factura no encontrada.</p>
+                )}
+
+                {order && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <p className="text-[11px] text-white/60">Cliente</p>
+                                <p className="text-xs font-semibold">{order.customer?.name || 'Consumidor final'}</p>
+                                {order.customer?.ci && (
+                                    <p className="text-[11px] text-white/70">CI: {order.customer.ci}</p>
+                                )}
+                                {order.customer?.phone && (
+                                    <p className="text-[11px] text-white/70">Teléfono: {order.customer.phone}</p>
+                                )}
+                                {order.customer?.email && (
+                                    <p className="text-[11px] text-white/70">Email: {order.customer.email}</p>
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[11px] text-white/60">Detalles</p>
+                                <p className="text-[11px] text-white/70">Tipo: {order.type}</p>
+                                {order.table_number && (
+                                    <p className="text-[11px] text-white/70">Mesa / Ref: {order.table_number}</p>
+                                )}
+                                {order.seller && (
+                                    <p className="text-[11px] text-white/70">
+                                        Vendedor: {order.seller.name || order.seller.username || '-'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <table className="min-w-full text-[11px] align-middle">
+                                <thead>
+                                    <tr className="text-white/60 border-b border-white/10">
+                                        <th className="py-1 pr-3 text-left">Producto</th>
+                                        <th className="py-1 pr-3 text-right">Cant.</th>
+                                        <th className="py-1 pr-3 text-right">P. unit USDT</th>
+                                        <th className="py-1 pr-3 text-right">Total USDT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {order.items.map((item, idx) => (
+                                        <tr key={`${item.product_id || idx}-${idx}`} className="border-b border-white/10">
+                                            <td className="py-1 pr-3 text-white/80">
+                                                <div>{item.product_name || 'Producto'}</div>
+                                            </td>
+                                            <td className="py-1 pr-3 text-right text-white/80">{item.quantity}</td>
+                                            <td className="py-1 pr-3 text-right text-white/80">
+                                                {Number(item.price_usdt || 0).toFixed(2)}
+                                            </td>
+                                            <td className="py-1 pr-3 text-right text-white/80">
+                                                {(Number(item.price_usdt || 0) * Number(item.quantity || 0)).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="space-y-1 text-[11px] max-w-xs ml-auto">
+                            <div className="flex justify-between">
+                                <span>Subtotal (USDT)</span>
+                                <span>{order.subtotal_usdt.toFixed(2)}</span>
+                            </div>
+                            {subtotalBs != null && (
+                                <div className="flex justify-between text-white/60">
+                                    <span>Subtotal (Bs)</span>
+                                    <span>
+                                        {subtotalBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex justify-between">
+                                <span>IVA (USDT)</span>
+                                <span>{order.tax_usdt.toFixed(2)}</span>
+                            </div>
+                            {taxBs != null && (
+                                <div className="flex justify-between text-white/60">
+                                    <span>IVA (Bs)</span>
+                                    <span>
+                                        {taxBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}
+                                    </span>
+                                </div>
+                            )}
+                            {order.delivery_fee_usdt > 0 && (
+                                <div className="flex justify-between">
+                                    <span>Delivery (USDT)</span>
+                                    <span>{order.delivery_fee_usdt.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {deliveryBs != null && order.delivery_fee_usdt > 0 && (
+                                <div className="flex justify-between text-white/60">
+                                    <span>Delivery (Bs)</span>
+                                    <span>
+                                        {deliveryBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}
+                                    </span>
+                                </div>
+                            )}
+                            {order.discount_usdt > 0 && (
+                                <div className="flex justify-between">
+                                    <span>Descuento (USDT)</span>
+                                    <span>-{order.discount_usdt.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {discountBs != null && order.discount_usdt > 0 && (
+                                <div className="flex justify-between text-white/60">
+                                    <span>Descuento (Bs)</span>
+                                    <span>
+                                        -
+                                        {discountBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="h-px bg-white/10 my-1" />
+                            <div className="flex justify-between font-semibold text-sm">
+                                <span>Total (USDT)</span>
+                                <span>{order.total_usdt.toFixed(2)}</span>
+                            </div>
+                            {totalBs != null && (
+                                <div className="flex justify-between text-[11px] text-white/80">
+                                    <span>Total (Bs)</span>
+                                    <span>
+                                        {totalBs.toLocaleString('es-VE', {
+                                            style: 'currency',
+                                            currency: 'VES'
+                                        })}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
+    const { data, isLoading, error } = useQuery({
+        queryKey: ['pos-invoice-history', storeId],
+        queryFn: async () => {
+            const response = await axios.get(`/api/store/order/${storeId}/orders/history`, {
+                params: { limit: 50, offset: 0 }
+            });
+            return Array.isArray(response.data) ? response.data : [];
+        }
+    });
+
+    const orders = Array.isArray(data) ? data : [];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[80vh] overflow-y-auto text-xs">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h2 className="text-sm md:text-base font-semibold">Facturas recientes</h2>
+                        <p className="text-[11px] text-white/60">Toca una factura para ver el detalle.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px]"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+
+                {isLoading && <p className="text-white/60 text-xs">Cargando historial...</p>}
+                {error && !isLoading && (
+                    <p className="text-red-400 text-xs">Error al cargar el historial.</p>
+                )}
+                {!isLoading && !error && orders.length === 0 && (
+                    <p className="text-white/60 text-xs">Aún no hay facturas registradas.</p>
+                )}
+
+                {orders.length > 0 && (
+                    <table className="min-w-full text-[11px] align-middle">
+                        <thead>
+                            <tr className="text-white/60 border-b border-white/10">
+                                <th className="py-1 pr-3 text-left">Factura #</th>
+                                <th className="py-1 pr-3 text-left">Cliente</th>
+                                <th className="py-1 pr-3 text-left">Vendedor</th>
+                                <th className="py-1 pr-3 text-right">Total USDT</th>
+                                <th className="py-1 pr-3 text-left">Fecha / hora</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {orders.map((order) => {
+                                const totalUsdt = Number(order.total_usdt || 0);
+                                const sellerLabel =
+                                    order.seller_display_name || order.seller_username || '-';
+
+                                const canOpen = order.invoice_number != null;
+
+                                return (
+                                    <tr
+                                        key={order.id}
+                                        className={`border-b border-white/10 ${
+                                            canOpen ? 'cursor-pointer hover:bg-white/5' : ''
+                                        }`}
+                                        onClick={() => {
+                                            if (!canOpen) return;
+                                            onSelectInvoice(order.invoice_number);
+                                            onClose();
+                                        }}
+                                    >
+                                        <td className="py-1 pr-3 text-white/80">
+                                            {order.invoice_number || '-'}
+                                        </td>
+                                        <td className="py-1 pr-3 text-white/80">
+                                            {order.customer_name || '-'}
+                                        </td>
+                                        <td className="py-1 pr-3 text-white/70">{sellerLabel}</td>
+                                        <td className="py-1 pr-3 text-right text-white/80">
+                                            {totalUsdt.toFixed(2)}
+                                        </td>
+                                        <td className="py-1 pr-3 text-white/60">
+                                            {order.created_at
+                                                ? new Date(order.created_at).toLocaleString()
+                                                : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     );
 };
