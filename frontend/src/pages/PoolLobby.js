@@ -15,7 +15,9 @@ const PoolLobby = () => {
     const [createForm, setCreateForm] = useState({
         mode: 'coins',
         bet_amount: 100,
-        visibility: 'public'
+        visibility: 'public',
+        opponent_type: 'player',
+        ai_difficulty: 'easy'
     });
     const [modeFilter, setModeFilter] = useState('all');
     const [joinCode, setJoinCode] = useState('');
@@ -121,28 +123,40 @@ const PoolLobby = () => {
             return;
         }
 
-        if (createForm.mode === 'coins') {
-            if (createForm.bet_amount < 1 || createForm.bet_amount > 10000) {
-                toast.error('La apuesta debe ser entre 1 y 10000 coins');
-                return;
-            }
-            if (balance?.coins_balance < createForm.bet_amount) {
-                toast.error('No tienes suficientes coins');
-                return;
-            }
-        } else if (createForm.mode === 'fires') {
-            const firesBalance = parseFloat(balance?.fires_balance || 0);
-            if (firesBalance < 1) {
-                setMissingFires(1 - firesBalance);
-                setShowInsufficientFiresModal(true);
-                return;
+        // Validaciones económicas SOLO para partidas vs jugador
+        if (createForm.opponent_type === 'player') {
+            if (createForm.mode === 'coins') {
+                if (createForm.bet_amount < 1 || createForm.bet_amount > 10000) {
+                    toast.error('La apuesta debe ser entre 1 y 10000 coins');
+                    return;
+                }
+                if (balance?.coins_balance < createForm.bet_amount) {
+                    toast.error('No tienes suficientes coins');
+                    return;
+                }
+            } else if (createForm.mode === 'fires') {
+                const firesBalance = parseFloat(balance?.fires_balance || 0);
+                if (firesBalance < 1) {
+                    setMissingFires(1 - firesBalance);
+                    setShowInsufficientFiresModal(true);
+                    return;
+                }
             }
         }
 
-        const dataToSend = {
-            ...createForm,
-            bet_amount: createForm.mode === 'fires' ? 1 : createForm.bet_amount
-        };
+        let dataToSend;
+        if (createForm.opponent_type === 'ron_ai') {
+            // Modo práctica: sin apuesta real
+            dataToSend = {
+                ...createForm,
+                bet_amount: 0
+            };
+        } else {
+            dataToSend = {
+                ...createForm,
+                bet_amount: createForm.mode === 'fires' ? 1 : createForm.bet_amount
+            };
+        }
 
         createRoomMutation.mutate(dataToSend);
     };
@@ -341,7 +355,7 @@ const PoolLobby = () => {
 
                             <h2 className="text-2xl font-bold mb-4 text-text">Crear Sala - Pool</h2>
 
-                            {/* Mode Selection */}
+                            {/* Mode Selection (moneda) */}
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-text/80 mb-2">Modo</label>
                                 <div className="grid grid-cols-2 gap-2">
@@ -364,29 +378,84 @@ const PoolLobby = () => {
                                 </div>
                             </div>
 
-                            {/* Bet Amount */}
+                            {/* Tipo de partida: vs jugador o RON-IA */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-text/80 mb-2">Apuesta</label>
-                                {createForm.mode === 'coins' ? (
-                                    <div>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="10000"
-                                            value={createForm.bet_amount}
-                                            onChange={(e) => setCreateForm({ ...createForm, bet_amount: parseInt(e.target.value) || 1 })}
-                                            className="w-full p-3 rounded-lg bg-dark border border-white/10 focus:border-accent text-black"
-                                        />
-                                        <div className="mt-2 text-xs text-text/60">
-                                            Balance: {balance?.coins_balance?.toFixed(2) || '0.00'} 💰
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-3 rounded-lg bg-fire-orange/10 border border-fire-orange/30">
-                                        <span className="text-fire-orange font-bold">1 Fire (Fijo)</span>
-                                    </div>
-                                )}
+                                <label className="block text-sm font-medium text-text/80 mb-2">Tipo de partida</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setCreateForm({ ...createForm, opponent_type: 'player' })}
+                                        className={`p-3 rounded-lg border transition-all ${
+                                            createForm.opponent_type === 'player'
+                                                ? 'border-success bg-success/20 text-success'
+                                                : 'border-white/10 text-text/60'
+                                        }`}
+                                    >
+                                        <Users className="mx-auto mb-1" size={20} />
+                                        <div className="text-sm">Vs Jugador</div>
+                                    </button>
+                                    <button
+                                        onClick={() => setCreateForm({ ...createForm, opponent_type: 'ron_ai', ai_difficulty: 'easy' })}
+                                        className={`p-3 rounded-lg border transition-all ${
+                                            createForm.opponent_type === 'ron_ai'
+                                                ? 'border-violet bg-violet/20 text-violet'
+                                                : 'border-white/10 text-text/60'
+                                        }`}
+                                    >
+                                        <span className="mx-auto mb-1 text-lg">🤖</span>
+                                        <div className="text-sm">Vs RON-IA (Práctica)</div>
+                                    </button>
+                                </div>
                             </div>
+
+                            {/* Dificultad RON-IA */}
+                            {createForm.opponent_type === 'ron_ai' && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-text/80 mb-2">Dificultad RON-IA</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['easy', 'medium', 'hard'].map((level) => (
+                                            <button
+                                                key={level}
+                                                onClick={() => setCreateForm({ ...createForm, ai_difficulty: level })}
+                                                className={`p-2 rounded-lg border text-xs font-semibold transition-all ${
+                                                    createForm.ai_difficulty === level
+                                                        ? 'border-accent bg-accent/20 text-accent'
+                                                        : 'border-white/10 text-text/60'
+                                                }`}
+                                            >
+                                                {level === 'easy' && 'Fácil'}
+                                                {level === 'medium' && 'Medio'}
+                                                {level === 'hard' && 'Difícil'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bet Amount (solo aplica vs jugador) */}
+                            {createForm.opponent_type === 'player' && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-text/80 mb-2">Apuesta</label>
+                                    {createForm.mode === 'coins' ? (
+                                        <div>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="10000"
+                                                value={createForm.bet_amount}
+                                                onChange={(e) => setCreateForm({ ...createForm, bet_amount: parseInt(e.target.value) || 1 })}
+                                                className="w-full p-3 rounded-lg bg-dark border border-white/10 focus:border-accent text-black"
+                                            />
+                                            <div className="mt-2 text-xs text-text/60">
+                                                Balance: {balance?.coins_balance?.toFixed(2) || '0.00'} 💰
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="p-3 rounded-lg bg-fire-orange/10 border border-fire-orange/30">
+                                            <span className="text-fire-orange font-bold">1 Fire (Fijo)</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Visibility */}
                             <div className="mb-6">

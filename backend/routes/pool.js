@@ -8,10 +8,10 @@ const RoomCodeService = require('../services/roomCodeService');
 const { closeUserPreviousRooms } = require('../utils/tictactoe-cleanup'); // Reuse cleanup logic
 const { refundBet } = require('../utils/tictactoe');
 
-// POST /api/pool/create - Create new room
+// POST /api/pool/create - Create new room (incluye soporte para RON-IA en modo práctica)
 router.post('/create', verifyToken, async (req, res) => {
     try {
-        const { mode, bet_amount, visibility = 'public' } = req.body;
+        const { mode, bet_amount, visibility = 'public', opponent_type = 'player', ai_difficulty = null } = req.body;
         const userId = req.user.id;
 
         // Validate inputs
@@ -19,72 +19,101 @@ router.post('/create', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Modo debe ser "coins" o "fires"' });
         }
 
-        let betAmount = parseFloat(bet_amount);
-        if (mode === 'coins') {
-            if (isNaN(betAmount) || betAmount < 1 || betAmount > 10000) {
-                return res.status(400).json({ error: 'Apuesta coins debe ser entre 1-10000' });
+        if (!['player', 'ron_ai'].includes(opponent_type)) {
+            return res.status(400).json({ error: 'Tipo de oponente inválido' });
+        }
+
+        let aiDifficulty = ai_difficulty;
+        if (opponent_type === 'ron_ai') {
+            if (!['easy', 'medium', 'hard'].includes(aiDifficulty || '')) {
+                return res.status(400).json({ error: 'Dificultad inválida para RON-IA' });
             }
         } else {
-            betAmount = 1; // Fixed for fires
+            aiDifficulty = null;
+        }
+
+        // Para RON-IA usamos modo práctica: sin apuesta ni movimientos de wallet
+        let betAmount = parseFloat(bet_amount);
+        const isRonAI = opponent_type === 'ron_ai';
+
+        if (isRonAI) {
+            betAmount = 0;
+        } else {
+            if (mode === 'coins') {
+                if (isNaN(betAmount) || betAmount < 1 || betAmount > 10000) {
+                    return res.status(400).json({ error: 'Apuesta coins debe ser entre 1-10000' });
+                }
+            } else {
+                betAmount = 1; // Fixed for fires
+            }
         }
 
         const result = await transaction(async (client) => {
-            // Check balance
-            const walletResult = await client.query(
-                'SELECT fires_balance, coins_balance FROM wallets WHERE user_id = $1',
-                [userId]
-            );
+            // Solo para PvP: verificar balance y deducir apuesta
+            let balance = 0;
+            if (!isRonAI && betAmount > 0) {
+                const walletResult = await client.query(
+                    'SELECT fires_balance, coins_balance FROM wallets WHERE user_id = $1',
+                    [userId]
+                );
 
-            if (walletResult.rows.length === 0) throw new Error('Wallet no encontrado');
+                if (walletResult.rows.length === 0) throw new Error('Wallet no encontrado');
 
-            const balance = mode === 'fires'
-                ? parseFloat(walletResult.rows[0].fires_balance)
-                : parseFloat(walletResult.rows[0].coins_balance);
+                balance = mode === 'fires'
+                    ? parseFloat(walletResult.rows[0].fires_balance)
+                    : parseFloat(walletResult.rows[0].coins_balance);
 
-            if (balance < betAmount) {
-                throw new Error(`Balance insuficiente. Tienes ${balance} ${mode}, necesitas ${betAmount}`);
+                if (balance < betAmount) {
+                    throw new Error(`Balance insuficiente. Tienes ${balance} ${mode}, necesitas ${betAmount}`);
+                }
+
+                // Deduct bet
+                await client.query(
+                    `UPDATE wallets 
+                     SET ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} = 
+                         ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} - $1,
+                         ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} = 
+                         ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} + $1,
+                         updated_at = NOW()
+                     WHERE user_id = $2`,
+                    [betAmount, userId]
+                );
+
+                // Log transaction
+                await client.query(
+                    `INSERT INTO wallet_transactions 
+                     (wallet_id, type, currency, amount, balance_before, balance_after, description)
+                     VALUES (
+                       (SELECT id FROM wallets WHERE user_id = $1),
+                       'game_bet', $2, $3, $4, $5,
+                       'Apuesta Pool 8-Ball'
+                     )`,
+                    [userId, mode, -betAmount, balance, balance - betAmount]
+                );
             }
 
-            // Deduct bet
-            await client.query(
-                `UPDATE wallets 
-         SET ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} = 
-             ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} - $1,
-             ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} = 
-             ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} + $1,
-             updated_at = NOW()
-         WHERE user_id = $2`,
-                [betAmount, userId]
-            );
-
-            // Log transaction
-            await client.query(
-                `INSERT INTO wallet_transactions 
-         (wallet_id, type, currency, amount, balance_before, balance_after, description)
-         VALUES (
-           (SELECT id FROM wallets WHERE user_id = $1),
-           'game_bet', $2, $3, $4, $5,
-           'Apuesta Pool 8-Ball'
-         )`,
-                [userId, mode, -betAmount, balance, balance - betAmount]
-            );
-
-            // Cleanup old rooms
-            // Note: We might need a specific cleanup for pool, but generic cleanup works for now if we extend it
-            // For now, let's just create the room
+            // Opcional: limpiar salas anteriores del usuario (usamos helper genérico)
+            await closeUserPreviousRooms(userId, client);
 
             const roomId = uuidv4();
 
             const roomResult = await client.query(
                 `INSERT INTO pool_rooms 
-         (id, code, host_id, mode, bet_amount, visibility, current_turn, 
-          pot_coins, pot_fires, status, player_host_ready)
-         VALUES ($1, 'TEMP', $2, $3, $4, $5, $2, $6, $7, 'waiting', TRUE)
-         RETURNING *`,
+                 (id, code, host_id, mode, bet_amount, visibility, opponent_type, ai_difficulty,
+                  current_turn, pot_coins, pot_fires, status, player_host_ready)
+                 VALUES ($1, 'TEMP', $2, $3, $4, $5, $6, $7, $2, $8, $9, $10, TRUE)
+                 RETURNING *`,
                 [
-                    roomId, userId, mode, betAmount, visibility,
-                    mode === 'coins' ? betAmount : 0,
-                    mode === 'fires' ? betAmount : 0
+                    roomId,
+                    userId,
+                    mode,
+                    betAmount,
+                    visibility,
+                    opponent_type,
+                    aiDifficulty,
+                    !isRonAI && mode === 'coins' ? betAmount : 0,
+                    !isRonAI && mode === 'fires' ? betAmount : 0,
+                    isRonAI ? 'ready' : 'waiting'
                 ]
             );
 
@@ -121,6 +150,10 @@ router.post('/join/:code', verifyToken, async (req, res) => {
 
             if (roomResult.rows.length === 0) throw new Error('Sala no encontrada');
             const room = roomResult.rows[0];
+
+            if (room.opponent_type === 'ron_ai') {
+                throw new Error('Esta sala es contra RON-IA y no acepta invitados humanos');
+            }
 
             if (room.status !== 'waiting') throw new Error('Sala no disponible');
             if (room.player_opponent_id) throw new Error('Sala llena');
@@ -258,6 +291,7 @@ router.get('/rooms/public', verifyToken, async (req, res) => {
       WHERE r.status = 'waiting'
         AND r.visibility = 'public'
         AND r.player_opponent_id IS NULL
+        AND r.opponent_type = 'player'
     `;
 
         const params = [];
