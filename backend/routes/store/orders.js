@@ -233,6 +233,7 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
                 su.username AS seller_username,
                 su.display_name AS seller_display_name
            FROM orders o
+           JOIN stores s ON s.id = o.store_id
            LEFT JOIN users u ON u.id = o.customer_id
            LEFT JOIN users su ON su.id = o.user_id
            WHERE o.store_id = $1
@@ -258,6 +259,7 @@ router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => 
             `SELECT 
                 o.id,
                 o.store_id,
+                s.name AS store_name,
                 o.user_id,
                 o.customer_id,
                 o.code,
@@ -297,6 +299,7 @@ router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => 
                     '[]'::json
                 ) AS items
            FROM orders o
+           JOIN stores s ON s.id = o.store_id
            LEFT JOIN users u ON u.id = o.customer_id
            LEFT JOIN users su ON su.id = o.user_id
            LEFT JOIN order_items oi ON oi.order_id = o.id
@@ -305,6 +308,7 @@ router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => 
              AND o.invoice_number = $2
            GROUP BY 
                 o.id,
+                s.name,
                 u.display_name,
                 u.ci_full,
                 u.phone,
@@ -324,6 +328,7 @@ router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => 
         const order = {
             id: row.id,
             store_id: row.store_id,
+            store_name: row.store_name,
             user_id: row.user_id,
             customer_id: row.customer_id,
             code: row.code,

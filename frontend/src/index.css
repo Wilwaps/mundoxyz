@@ -237,3 +237,27 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Estilos de impresión para facturas generadas desde el POS */
+@media print {
+  body.print-invoice {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  body.print-invoice * {
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+
+  body.print-invoice .bg-dark,
+  body.print-invoice .bg-dark-lighter,
+  body.print-invoice .bg-card,
+  body.print-invoice .bg-glass,
+  body.print-invoice .bg-black,
+  body.print-invoice .bg-black\/70,
+  body.print-invoice .bg-black\/80 {
+    background-color: #ffffff !important;
+  }
+}

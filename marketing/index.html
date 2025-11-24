@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MundoXYZ - Marketing Command Center</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">🔥</div>
+                <span>MundoXYZ</span>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="calendar">
+                    <span class="icon">📅</span> Calendario
+                </button>
+                <button class="nav-item" data-view="stats">
+                    <span class="icon">📊</span> Métricas
+                </button>
+                <button class="nav-item" data-view="assets">
+                    <span class="icon">🎨</span> Assets
+                </button>
+            </nav>
+
+            <div class="filters">
+                <h3>Filtros de Canal</h3>
+                <label class="filter-checkbox">
+                    <input type="checkbox" checked value="instagram">
+                    <span class="checkmark"></span>
+                    Instagram
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" checked value="twitter">
+                    <span class="checkmark"></span>
+                    Twitter / X
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" checked value="tiktok">
+                    <span class="checkmark"></span>
+                    TikTok
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" checked value="email">
+                    <span class="checkmark"></span>
+                    Email
+                </label>
+            </div>
+
+            <div class="campaign-progress">
+                <div class="progress-header">
+                    <span>Progreso Campaña</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="header-info">
+                    <h1>Ignite the Future</h1>
+                    <p>Plan Estratégico Q1 2025</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" id="export-btn">Exportar PDF</button>
+                    <button class="btn-primary" id="today-btn">Ir a Hoy</button>
+                </div>
+            </header>
+
+            <div class="calendar-wrapper">
+                <!-- Month Navigation -->
+                <div class="month-nav">
+                    <button class="month-btn active" data-month="1">
+                        <span class="month-label">MES 1</span>
+                        <span class="month-name">Awareness</span>
+                    </button>
+                    <button class="month-btn" data-month="2">
+                        <span class="month-label">MES 2</span>
+                        <span class="month-name">Consideration</span>
+                    </button>
+                    <button class="month-btn" data-month="3">
+                        <span class="month-label">MES 3</span>
+                        <span class="month-name">Conversion</span>
+                    </button>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="calendar-grid" id="calendar-grid">
+                    <!-- Days will be injected here by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Briefing Modal -->
+    <div class="modal-overlay" id="brief-modal">
+        <div class="modal-content glass-panel">
+            <button class="close-modal">&times;</button>
+
+            <div class="modal-header">
+                <div class="day-badge" id="modal-day">Día 1</div>
+                <div class="channel-badge" id="modal-channel">Instagram</div>
+            </div>
+
+            <div class="modal-body">
+                <div class="brief-section">
+                    <h3>🎯 Objetivo</h3>
+                    <p id="modal-objective">Generar expectativa sobre el lanzamiento.</p>
+                </div>
+
+                <div class="brief-section">
+                    <h3>📝 Copy / Guion</h3>
+                    <div class="copy-box" id="modal-copy">
+                        "Algo grande está por llegar..."
+                    </div>
+                    <button class="btn-copy" onclick="copyToClipboard()">Copiar Texto</button>
+                </div>
+
+                <div class="brief-section">
+                    <h3>🖼️ Referencia Visual</h3>
+                    <div class="visual-ref" id="modal-visual">
+                        Mostrar logo con efecto glitch.
+                    </div>
+                </div>
+
+                <div class="brief-section">
+                    <h3>#️⃣ Hashtags</h3>
+                    <div class="hashtags" id="modal-tags">#MundoXYZ #Gaming</div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="status-control">
+                    <label>Estado:</label>
+                    <select id="modal-status">
+                        <option value="draft">Borrador</option>
+                        <option value="scheduled">Programado</option>
+                        <option value="posted">Publicado</option>
+                    </select>
+                </div>
+                <button class="btn-primary" id="save-modal">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

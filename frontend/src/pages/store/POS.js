@@ -400,7 +400,7 @@ const POS = () => {
                                 onChange={(e) => setCustomerSearch(e.target.value)}
                             />
                             {customerSearch && (
-                                <div className="absolute left-0 right-0 mt-1 bg-dark border border-white/10 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 text-xs">
+                                <div className="absolute left-0 right-0 mt-1 bg-black/95 border border-white/10 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 text-xs">
                                     {isSearchingCustomers && (
                                         <div className="px-3 py-2 text-white/50">
                                             Buscando clientes...
@@ -806,7 +806,23 @@ const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) 
     };
 
     const handlePrint = () => {
-        window.print();
+        const order = data;
+        const storeName = order?.store_name || 'Factura';
+        const formattedNumber = formatInvoiceNumber(invoiceNumber);
+        const previousTitle = document.title;
+
+        // Ajustar título del documento para que el PDF tenga un nombre útil
+        document.title = `${storeName} - Factura ${formattedNumber}`;
+
+        // Añadir clase a body para estilos de impresión (texto negro / fondo blanco)
+        document.body.classList.add('print-invoice');
+
+        try {
+            window.print();
+        } finally {
+            document.body.classList.remove('print-invoice');
+            document.title = previousTitle;
+        }
     };
 
     const order = data;
@@ -830,7 +846,10 @@ const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) 
             <div className="w-full max-w-3xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto text-xs">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-lg font-bold">Factura #{formatInvoiceNumber(invoiceNumber)}</h2>
+                        <h2 className="text-lg font-bold">
+                            {order?.store_name ? `${order.store_name} – ` : ''}
+                            Factura #{formatInvoiceNumber(invoiceNumber)}
+                        </h2>
                         {order && (
                             <p className="text-[11px] text-white/60">
                                 Emitida el {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
