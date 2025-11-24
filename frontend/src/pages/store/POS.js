@@ -176,25 +176,25 @@ const POS = () => {
     );
 
     return (
-        <div className="flex h-screen bg-dark text-white overflow-hidden">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-dark text-white">
             {/* Left: Product Catalog */}
-            <div className="flex-1 flex flex-col border-r border-white/10">
+            <div className="flex-1 flex flex-col lg:border-r border-white/10">
                 {/* Header / Search */}
-                <div className="p-4 border-b border-white/10 flex gap-4">
+                <div className="px-3 py-2 md:p-4 border-b border-white/10 flex flex-col md:flex-row gap-2 md:gap-4">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-3 text-white/40" size={20} />
+                        <Search className="absolute left-3 top-2.5 text-white/40" size={18} />
                         <input
                             type="text"
                             placeholder="Buscar producto..."
-                            className="w-full bg-white/5 rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-accent"
+                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="flex gap-2 overflow-x-auto max-w-md no-scrollbar">
+                    <div className="flex gap-2 overflow-x-auto mt-1 md:mt-0 md:max-w-md no-scrollbar text-xs">
                         <button
                             onClick={() => setSelectedCategory('all')}
-                            className={`px-4 py-2 rounded-lg whitespace-nowrap ${selectedCategory === 'all' ? 'bg-accent text-dark' : 'bg-white/5'}`}
+                            className={`px-3 py-1.5 rounded-full whitespace-nowrap ${selectedCategory === 'all' ? 'bg-accent text-dark' : 'bg-white/5'}`}
                         >
                             Todos
                         </button>
@@ -202,7 +202,7 @@ const POS = () => {
                             <button
                                 key={cat.id}
                                 onClick={() => setSelectedCategory(cat.id)}
-                                className={`px-4 py-2 rounded-lg whitespace-nowrap ${selectedCategory === cat.id ? 'bg-accent text-dark' : 'bg-white/5'}`}
+                                className={`px-3 py-1.5 rounded-full whitespace-nowrap ${selectedCategory === cat.id ? 'bg-accent text-dark' : 'bg-white/5'}`}
                             >
                                 {cat.name}
                             </button>
@@ -211,16 +211,16 @@ const POS = () => {
                 </div>
 
                 {/* Grid */}
-                <div className="flex-1 overflow-y-auto p-4">
-                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="flex-1 overflow-y-auto px-3 py-3 md:p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         {filteredProducts.map(product => (
                             <button
                                 key={product.id}
                                 onClick={() => addToCart(product)}
-                                className="bg-white/5 p-4 rounded-xl hover:bg-white/10 transition-colors text-left flex flex-col h-32 justify-between group"
+                                className="bg-white/5 rounded-lg hover:bg-white/10 transition-colors text-left flex flex-col justify-between px-2.5 py-2.5 sm:px-3 sm:py-3 min-h-[84px]"
                             >
-                                <span className="font-medium line-clamp-2">{product.name}</span>
-                                <span className="text-accent font-bold">${product.price_usdt}</span>
+                                <span className="font-medium text-xs sm:text-sm line-clamp-2">{product.name}</span>
+                                <span className="text-accent font-bold text-xs sm:text-sm">${product.price_usdt}</span>
                             </button>
                         ))}
                     </div>
@@ -228,8 +228,8 @@ const POS = () => {
             </div>
 
             {/* Right: Cart, Customer & Payment */}
-            <div className="w-96 flex flex-col bg-dark-lighter">
-                <div className="p-4 border-b border-white/10 font-bold text-lg">
+            <div className="w-full lg:w-96 flex flex-col bg-dark-lighter border-t border-white/10 lg:border-t-0">
+                <div className="p-4 border-b border-white/10 font-bold text-base md:text-lg">
                     Orden Actual
                 </div>
 
@@ -366,7 +366,7 @@ const POS = () => {
                     <div className="bg-dark border border-white/10 p-6 rounded-2xl w-full max-w-2xl shadow-2xl">
                         <h2 className="text-2xl font-bold mb-6">Procesar Pago</h2>
 
-                        <div className="grid grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm text-white/60 mb-1">Efectivo (USDT)</label>

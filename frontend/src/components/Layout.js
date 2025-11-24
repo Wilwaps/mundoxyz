@@ -86,6 +86,10 @@ const Layout = () => {
     navItems.push({ path: '/admin', icon: Settings, label: 'Admin' });
   }
 
+  const hideChat =
+    location.pathname.startsWith('/store/') &&
+    location.pathname.includes('/pos');
+
   return (
     <div className="flex flex-col min-h-screen bg-background-dark">
       {/* Header */}
@@ -236,7 +240,7 @@ const Layout = () => {
       />
 
       {/* Unified Chat System */}
-      <UnifiedChat />
+      {!hideChat && <UnifiedChat />}
     </div>
   );
 };
