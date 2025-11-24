@@ -4,6 +4,7 @@ const { query, transaction } = require('../../db');
 const { verifyToken, verifyRole } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
 
 async function userCanManageStoreProducts(user, storeId) {
     if (!user || !storeId) return false;
@@ -90,6 +91,238 @@ router.get('/public/:slug', async (req, res) => {
     } catch (error) {
         logger.error('Error fetching store:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// --- POS CUSTOMERS (CI-based) ---
+
+// POST /api/store/:storeId/customers
+// Crea (o reutiliza) un usuario basado en CI y lo asocia a la tienda
+router.post('/:storeId/customers', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const {
+            ci_prefix,
+            ci_number,
+            full_name,
+            phone,
+            email
+        } = req.body || {};
+
+        const prefix = (ci_prefix || '').trim().toUpperCase();
+        const rawNumber = String(ci_number || '').trim();
+        const number = rawNumber.replace(/[^0-9]/g, '');
+
+        if (!['V', 'E', 'J'].includes(prefix)) {
+            return res.status(400).json({ error: 'Prefijo de CI inválido (V/E/J)' });
+        }
+        if (!number) {
+            return res.status(400).json({ error: 'Número de CI obligatorio' });
+        }
+
+        const name = (full_name || '').trim();
+        if (!name) {
+            return res.status(400).json({ error: 'El nombre completo es obligatorio' });
+        }
+
+        const ciFull = `${prefix}-${number}`;
+
+        let emailNormalized = (email || '').trim();
+        if (emailNormalized === '') {
+            emailNormalized = null;
+        }
+
+        const phoneNormalized = (phone || '').trim() || null;
+
+        const result = await transaction(async (client) => {
+            // 1) Buscar usuario existente por CI
+            const existingUserResult = await client.query(
+                `SELECT id, username, display_name, ci_prefix, ci_number, ci_full, phone, email
+           FROM users
+           WHERE ci_full = $1
+           LIMIT 1`,
+                [ciFull]
+            );
+
+            let userId;
+            let userRow;
+
+            if (existingUserResult.rows.length > 0) {
+                // Reutilizar usuario existente, actualizar datos básicos si vienen
+                userRow = existingUserResult.rows[0];
+
+                const fields = [];
+                const values = [];
+                let idx = 1;
+
+                if (!userRow.display_name && name) {
+                    fields.push(`display_name = $${idx++}`);
+                    values.push(name);
+                }
+                if (!userRow.phone && phoneNormalized) {
+                    fields.push(`phone = $${idx++}`);
+                    values.push(phoneNormalized);
+                }
+                if (!userRow.email && emailNormalized) {
+                    fields.push(`email = $${idx++}`);
+                    values.push(emailNormalized.toLowerCase());
+                }
+                if (!userRow.ci_prefix || !userRow.ci_number || !userRow.ci_full) {
+                    fields.push(`ci_prefix = $${idx++}`);
+                    values.push(prefix);
+                    fields.push(`ci_number = $${idx++}`);
+                    values.push(number);
+                    fields.push(`ci_full = $${idx++}`);
+                    values.push(ciFull);
+                }
+
+                if (fields.length > 0) {
+                    values.push(userRow.id);
+                    const updated = await client.query(
+                        `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
+                        values
+                    );
+                    userRow = updated.rows[0];
+                }
+
+                userId = userRow.id;
+            } else {
+                // 2) Crear nuevo usuario con CI como username y login
+                const username = ciFull;
+
+                // Contraseña por defecto 123456
+                const passwordHash = await bcrypt.hash('123456', 10);
+
+                const userInsert = await client.query(
+                    `INSERT INTO users 
+             (username, display_name, email, ci_prefix, ci_number, ci_full, phone, must_change_password,
+              is_verified, first_seen_at, last_seen_at, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, FALSE, NOW(), NOW(), NOW(), NOW())
+             RETURNING *`,
+                    [
+                        username,
+                        name,
+                        emailNormalized ? emailNormalized.toLowerCase() : null,
+                        prefix,
+                        number,
+                        ciFull,
+                        phoneNormalized
+                    ]
+                );
+
+                userRow = userInsert.rows[0];
+                userId = userRow.id;
+
+                // Crear auth_identity para provider 'ci'
+                await client.query(
+                    `INSERT INTO auth_identities (user_id, provider, provider_uid, password_hash, created_at)
+             VALUES ($1, 'ci', $2, $3, NOW())
+             ON CONFLICT (provider, provider_uid) DO NOTHING`,
+                    [userId, ciFull, passwordHash]
+                );
+
+                // Crear wallet
+                await client.query(
+                    `INSERT INTO wallets (user_id, coins_balance, fires_balance, created_at, updated_at)
+             VALUES ($1, 0, 0, NOW(), NOW())
+             ON CONFLICT (user_id) DO NOTHING`,
+                    [userId]
+                );
+
+                // Asignar rol 'user'
+                await client.query(
+                    `INSERT INTO user_roles (user_id, role_id)
+             SELECT $1, id FROM roles WHERE name = 'user'
+             ON CONFLICT DO NOTHING`,
+                    [userId]
+                );
+            }
+
+            // 3) Asociar cliente a la tienda
+            await client.query(
+                `INSERT INTO store_customers (store_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (store_id, user_id) DO NOTHING`,
+                [storeId, userId]
+            );
+
+            return {
+                id: userRow.id,
+                ci_full: userRow.ci_full || ciFull,
+                full_name: userRow.display_name || name,
+                phone: userRow.phone || phoneNormalized,
+                email: userRow.email || emailNormalized,
+                store_id: storeId
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        logger.error('Error creating POS customer:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/:storeId/customers/search?q=
+router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const qRaw = (req.query.q || '').toString().trim();
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        if (!qRaw) {
+            return res.json([]);
+        }
+
+        const isNumeric = /^[0-9]+$/.test(qRaw);
+        const likeAny = `%${qRaw}%`;
+        const ciLike = isNumeric ? `${qRaw}%` : `${qRaw}%`;
+
+        const result = await query(
+            `SELECT u.id,
+                    u.ci_full,
+                    u.display_name,
+                    u.username,
+                    u.phone,
+                    u.email
+       FROM store_customers sc
+       JOIN users u ON u.id = sc.user_id
+       WHERE sc.store_id = $1
+         AND (
+              (u.ci_full ILIKE $2)
+           OR (u.ci_number LIKE $3)
+           OR (u.display_name ILIKE $4)
+           OR (u.username ILIKE $4)
+           OR (u.email ILIKE $4)
+           OR (u.phone ILIKE $4)
+         )
+       ORDER BY u.display_name NULLS LAST, u.username
+       LIMIT 20`,
+            [storeId, `${ciLike}`, isNumeric ? `${qRaw}%` : qRaw, likeAny]
+        );
+
+        const mapped = result.rows.map((row) => ({
+            id: row.id,
+            ci_full: row.ci_full,
+            full_name: row.display_name || row.username,
+            phone: row.phone,
+            email: row.email
+        }));
+
+        res.json(mapped);
+    } catch (error) {
+        logger.error('Error searching POS customers:', error);
+        res.status(400).json({ error: error.message });
     }
 });
 

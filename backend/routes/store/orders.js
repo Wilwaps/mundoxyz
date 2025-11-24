@@ -9,8 +9,14 @@ const { v4: uuidv4 } = require('uuid');
 router.post('/create', verifyToken, async (req, res) => {
     try {
         const {
-            store_id, items, type, table_number,
-            payment_method, delivery_info, currency_snapshot
+            store_id,
+            items,
+            type,
+            table_number,
+            payment_method,
+            delivery_info,
+            currency_snapshot,
+            customer_id
         } = req.body;
         const userId = req.user.id;
 
@@ -60,20 +66,29 @@ router.post('/create', verifyToken, async (req, res) => {
 
             const orderResult = await client.query(
                 `INSERT INTO orders 
-         (store_id, user_id, code, type, status, 
+         (store_id, user_id, customer_id, code, type, status, 
           payment_status, payment_method, currency_snapshot,
           subtotal_usdt, tax_usdt, delivery_fee_usdt, total_usdt,
           table_number, delivery_info)
-         VALUES ($1, $2, $3, $4, 'pending', 
-                 'unpaid', $5, $6, 
-                 $7, $8, $9, $10,
-                 $11, $12)
+         VALUES ($1, $2, $3, $4, $5, 'pending', 
+                 'unpaid', $6, $7, 
+                 $8, $9, $10, $11,
+                 $12, $13)
          RETURNING *`,
                 [
-                    store_id, userId, orderCode, type,
-                    JSON.stringify(payment_method), JSON.stringify(currency_snapshot),
-                    subtotal_usdt, tax_usdt, delivery_fee_usdt, total_usdt,
-                    table_number, JSON.stringify(delivery_info)
+                    store_id,
+                    userId,
+                    customer_id || null,
+                    orderCode,
+                    type,
+                    JSON.stringify(payment_method || {}),
+                    JSON.stringify(currency_snapshot || {}),
+                    subtotal_usdt,
+                    tax_usdt,
+                    delivery_fee_usdt,
+                    total_usdt,
+                    table_number,
+                    JSON.stringify(delivery_info || null)
                 ]
             );
 

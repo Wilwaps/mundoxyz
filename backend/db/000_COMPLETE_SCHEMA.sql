@@ -26,16 +26,29 @@ CREATE TABLE IF NOT EXISTS users (
   roles TEXT[] DEFAULT ARRAY['user'],
   is_verified BOOLEAN DEFAULT false,
   security_answer TEXT,
+  ci_prefix VARCHAR(1) CHECK (ci_prefix IN ('V','E','J')),
+  ci_number VARCHAR(16),
+  ci_full VARCHAR(32),
+  phone VARCHAR(32),
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   last_password_change TIMESTAMP,
   first_seen_at TIMESTAMP DEFAULT NOW(),
   last_seen_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT users_ci_prefix_number_consistent
+    CHECK (
+      (ci_prefix IS NULL AND ci_number IS NULL)
+      OR (ci_prefix IS NOT NULL AND ci_number IS NOT NULL)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_tg_id ON users(tg_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci_full_unique
+  ON users(ci_full)
+  WHERE ci_full IS NOT NULL;
 
 -- 2. AUTH_IDENTITIES (Multi-provider authentication)
 CREATE TABLE IF NOT EXISTS auth_identities (

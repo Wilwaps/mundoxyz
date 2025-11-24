@@ -156,7 +156,8 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID REFERENCES stores(id),
-    user_id UUID REFERENCES users(id), -- Nullable for guest
+    user_id UUID REFERENCES users(id), -- Usuario que realiza la orden (si aplica)
+    customer_id UUID REFERENCES users(id), -- Cliente POS asociado (CI)
     code VARCHAR(10) NOT NULL, -- Short code for kitchen/customer
     
     type VARCHAR(20) NOT NULL CHECK (type IN ('dine_in', 'pickup', 'delivery')),
@@ -214,6 +215,14 @@ CREATE TABLE IF NOT EXISTS customer_profiles (
     UNIQUE(store_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS store_customers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (store_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS loyalty_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID REFERENCES stores(id),
@@ -228,7 +237,9 @@ CREATE INDEX idx_products_store ON products(store_id);
 CREATE UNIQUE INDEX idx_products_store_sku_unique ON products(store_id, sku) WHERE sku IS NOT NULL;
 CREATE INDEX idx_orders_store_status ON orders(store_id, status);
 CREATE INDEX idx_orders_user ON orders(user_id);
+CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_ingredients_store ON ingredients(store_id);
+CREATE INDEX idx_store_customers_store ON store_customers(store_id);
 CREATE INDEX idx_suppliers_store ON suppliers(store_id);
 CREATE INDEX idx_purchase_invoices_store ON purchase_invoices(store_id);
 CREATE INDEX idx_purchase_invoice_items_invoice ON purchase_invoice_items(invoice_id);

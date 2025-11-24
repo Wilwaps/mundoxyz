@@ -94,3 +94,8 @@ roles.md
 tito/
 ejemplos.html
 .gitignore
+backend/db/000_COMPLETE_SCHEMA.sql
+backend/db/migrations/060_create_divorare04_store.sql
+backend/db/migrations/069_add_ci_fields_to_users.sql
+backend/db/migrations/070_create_store_customers.sql
+backend/db/migrations/071_add_customer_id_to_orders.sql
