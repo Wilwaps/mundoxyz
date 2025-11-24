@@ -26,7 +26,9 @@ router.post('/create', verifyToken, async (req, res) => {
     const {
       mode,
       bet_amount,
-      visibility = 'public'
+      visibility = 'public',
+      opponent_type = 'player',
+      ai_difficulty = null
     } = req.body;
     
     const userId = req.user.id;
@@ -35,16 +37,38 @@ router.post('/create', verifyToken, async (req, res) => {
     if (!['coins', 'fires'].includes(mode)) {
       return res.status(400).json({ error: 'Modo debe ser "coins" o "fires"' });
     }
+
+    // Validar tipo de oponente (jugador vs RON-IA)
+    if (!['player', 'ron_ai'].includes(opponent_type)) {
+      return res.status(400).json({ error: 'Tipo de oponente inválido' });
+    }
+
+    // Si es RON-IA y se envía dificultad, validarla
+    let aiDifficulty = ai_difficulty;
+    if (opponent_type === 'ron_ai') {
+      if (!['easy', 'medium', 'hard'].includes(aiDifficulty || '')) {
+        return res.status(400).json({ error: 'Dificultad inválida para RON-IA' });
+      }
+    } else {
+      aiDifficulty = null;
+    }
     
     // Validar apuesta según modo
     let betAmount = parseFloat(bet_amount);
-    
-    if (mode === 'coins') {
-      if (isNaN(betAmount) || betAmount < 1 || betAmount > 1000) {
-        return res.status(400).json({ error: 'Apuesta coins debe ser entre 1-1000' });
+
+    // Para modo RON-IA, empezamos como modo práctica: sin apuesta real (bet=0, sin tocar wallet)
+    const isRonAI = opponent_type === 'ron_ai';
+
+    if (isRonAI) {
+      betAmount = 0;
+    } else {
+      if (mode === 'coins') {
+        if (isNaN(betAmount) || betAmount < 1 || betAmount > 1000) {
+          return res.status(400).json({ error: 'Apuesta coins debe ser entre 1-1000' });
+        }
+      } else if (mode === 'fires') {
+        betAmount = 1; // Fijo en 1
       }
-    } else if (mode === 'fires') {
-      betAmount = 1; // Fijo en 1
     }
     
     // Validar visibilidad
@@ -53,49 +77,52 @@ router.post('/create', verifyToken, async (req, res) => {
     }
     
     const result = await transaction(async (client) => {
-      // Verificar balance
-      const walletResult = await client.query(
-        'SELECT fires_balance, coins_balance FROM wallets WHERE user_id = $1',
-        [userId]
-      );
-      
-      if (walletResult.rows.length === 0) {
-        throw new Error('Wallet no encontrado');
-      }
-      
-      const rawBalance = mode === 'fires' 
-        ? parseFloat(walletResult.rows[0].fires_balance)
-        : parseFloat(walletResult.rows[0].coins_balance);
+      // Si es PvP, verificar balance y deducir apuesta
+      let balance = 0;
+      if (!isRonAI && betAmount > 0) {
+        const walletResult = await client.query(
+          'SELECT fires_balance, coins_balance FROM wallets WHERE user_id = $1',
+          [userId]
+        );
 
-      const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
-      
-      if (balance < betAmount) {
-        throw new Error(`Balance insuficiente. Tienes ${balance} ${mode}, necesitas ${betAmount}`);
+        if (walletResult.rows.length === 0) {
+          throw new Error('Wallet no encontrado');
+        }
+
+        const rawBalance = mode === 'fires'
+          ? parseFloat(walletResult.rows[0].fires_balance)
+          : parseFloat(walletResult.rows[0].coins_balance);
+
+        balance = Number.isFinite(rawBalance) ? rawBalance : 0;
+
+        if (balance < betAmount) {
+          throw new Error(`Balance insuficiente. Tienes ${balance} ${mode}, necesitas ${betAmount}`);
+        }
+
+        // Deducir apuesta del host
+        await client.query(
+          `UPDATE wallets 
+           SET ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} = 
+               ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} - $1,
+               ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} = 
+               ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} + $1,
+               updated_at = NOW()
+           WHERE user_id = $2`,
+          [betAmount, userId]
+        );
+
+        // Registrar transacción (amount negativo para apuestas)
+        await client.query(
+          `INSERT INTO wallet_transactions 
+           (wallet_id, type, currency, amount, balance_before, balance_after, description)
+           VALUES (
+             (SELECT id FROM wallets WHERE user_id = $1),
+             'game_bet', $2, $3, $4, $5,
+             'Apuesta La Vieja'
+           )`,
+          [userId, mode, -betAmount, balance, balance - betAmount]
+        );
       }
-      
-      // Deducir apuesta del host
-      await client.query(
-        `UPDATE wallets 
-         SET ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} = 
-             ${mode === 'fires' ? 'fires_balance' : 'coins_balance'} - $1,
-             ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} = 
-             ${mode === 'fires' ? 'total_fires_spent' : 'total_coins_spent'} + $1,
-             updated_at = NOW()
-         WHERE user_id = $2`,
-        [betAmount, userId]
-      );
-      
-      // Registrar transacción (amount negativo para apuestas)
-      await client.query(
-        `INSERT INTO wallet_transactions 
-         (wallet_id, type, currency, amount, balance_before, balance_after, description)
-         VALUES (
-           (SELECT id FROM wallets WHERE user_id = $1),
-           'game_bet', $2, $3, $4, $5,
-           'Apuesta La Vieja'
-         )`,
-        [userId, mode, -betAmount, balance, balance - betAmount]
-      );
       
       // Cerrar salas anteriores del usuario
       await closeUserPreviousRooms(userId, client);
@@ -105,9 +132,9 @@ router.post('/create', verifyToken, async (req, res) => {
       
       const roomResult = await client.query(
         `INSERT INTO tictactoe_rooms 
-         (id, code, host_id, mode, bet_amount, visibility, player_x_id, 
-          pot_coins, pot_fires, status, current_turn, player_x_ready)
-         VALUES ($1, 'TEMP', $2, $3, $4, $5, $2, $6, $7, 'waiting', 'X', TRUE)
+         (id, code, host_id, mode, bet_amount, visibility, opponent_type, ai_difficulty,
+          player_x_id, pot_coins, pot_fires, status, current_turn, player_x_ready)
+         VALUES ($1, 'TEMP', $2, $3, $4, $5, $6, $7, $2, $8, $9, 'waiting', 'X', TRUE)
          RETURNING *`,
         [
           roomId,
@@ -115,8 +142,10 @@ router.post('/create', verifyToken, async (req, res) => {
           mode,
           betAmount,
           visibility,
-          mode === 'coins' ? betAmount : 0,
-          mode === 'fires' ? betAmount : 0
+          opponent_type,
+          aiDifficulty,
+          !isRonAI && mode === 'coins' ? betAmount : 0,
+          !isRonAI && mode === 'fires' ? betAmount : 0
         ]
       );
       
