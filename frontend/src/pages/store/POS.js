@@ -798,6 +798,13 @@ const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) 
         }
     });
 
+    const formatInvoiceNumber = (n) => {
+        if (n === null || n === undefined) return '-';
+        const numeric = typeof n === 'number' ? n : parseInt(n, 10);
+        if (!Number.isFinite(numeric)) return String(n);
+        return String(numeric).padStart(7, '0');
+    };
+
     const handlePrint = () => {
         window.print();
     };
@@ -823,7 +830,7 @@ const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) 
             <div className="w-full max-w-3xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto text-xs">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-lg font-bold">Factura #{invoiceNumber}</h2>
+                        <h2 className="text-lg font-bold">Factura #{formatInvoiceNumber(invoiceNumber)}</h2>
                         {order && (
                             <p className="text-[11px] text-white/60">
                                 Emitida el {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
@@ -1018,6 +1025,13 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
 
     const orders = Array.isArray(data) ? data : [];
 
+    const formatInvoiceNumber = (n) => {
+        if (n === null || n === undefined) return '-';
+        const numeric = typeof n === 'number' ? n : parseInt(n, 10);
+        if (!Number.isFinite(numeric)) return String(n);
+        return String(numeric).padStart(7, '0');
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
             <div className="w-full max-w-2xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 max-h-[80vh] overflow-y-auto text-xs">
@@ -1075,7 +1089,7 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
                                         }}
                                     >
                                         <td className="py-1 pr-3 text-white/80">
-                                            {order.invoice_number || '-'}
+                                            {formatInvoiceNumber(order.invoice_number)}
                                         </td>
                                         <td className="py-1 pr-3 text-white/80">
                                             {order.customer_name || '-'}
@@ -1103,6 +1117,7 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
 const QuoteModal = ({ products, rates, onClose }) => {
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [quoteItems, setQuoteItems] = useState([]);
 
     const filtered = products.filter((p) => {
         const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -1110,13 +1125,59 @@ const QuoteModal = ({ products, rates, onClose }) => {
         return matchesSearch && matchesCategory;
     });
 
+    const addToQuote = (product) => {
+        setQuoteItems((prev) => {
+            const existing = prev.find((item) => item.id === product.id);
+            if (existing) {
+                return prev.map((item) =>
+                    item.id === product.id
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
+                );
+            }
+            return [
+                ...prev,
+                {
+                    id: product.id,
+                    name: product.name,
+                    price_usdt: Number(product.price_usdt || 0),
+                    quantity: 1
+                }
+            ];
+        });
+    };
+
+    const changeQuoteQuantity = (productId, delta) => {
+        setQuoteItems((prev) => {
+            return prev
+                .map((item) => {
+                    if (item.id !== productId) return item;
+                    const nextQty = Math.max(0, (Number(item.quantity) || 0) + delta);
+                    return { ...item, quantity: nextQty };
+                })
+                .filter((item) => (Number(item.quantity) || 0) > 0);
+        });
+    };
+
+    const totalQuoteUSDT = quoteItems.reduce((sum, item) => {
+        const price = Number(item.price_usdt || 0);
+        const qty = Number(item.quantity || 0);
+        return sum + price * qty;
+    }, 0);
+
+    const totalQuoteBs = totalQuoteUSDT * rates.bs;
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-3xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col max-h-[90vh]">
+            <div className="w-full max-w-4xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-lg md:text-xl font-bold">Cotización rápida</h2>
-                        <p className="text-[11px] text-white/60">Explora precios sin afectar la orden actual.</p>
+                        <p className="text-[11px] text-white/60">Explora y arma una cotización sin afectar la orden actual.</p>
                     </div>
                     <button
                         type="button"
@@ -1140,54 +1201,141 @@ const QuoteModal = ({ products, rates, onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto mt-1">
-                    {filtered.length === 0 && (
-                        <div className="text-center text-white/50 text-xs py-8">
-                            Sin productos que coincidan con la búsqueda.
-                        </div>
-                    )}
+                <div className="flex-1 overflow-y-auto mt-1 flex flex-col md:flex-row gap-3">
+                    <div className="flex-1">
+                        {filtered.length === 0 && (
+                            <div className="text-center text-white/50 text-xs py-8">
+                                Sin productos que coincidan con la búsqueda.
+                            </div>
+                        )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
-                        {filtered.map((product) => {
-                            const priceUsdt = Number(product.price_usdt || 0);
-                            const priceBs = priceUsdt * rates.bs;
-                            const priceFires = priceUsdt * rates.fires;
+                        {filtered.length > 0 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                                {filtered.map((product) => {
+                                    const priceUsdt = Number(product.price_usdt || 0);
+                                    const priceBs = priceUsdt * rates.bs;
 
-                            return (
-                                <div
-                                    key={product.id}
-                                    className="bg-white/5 rounded-lg p-3 flex flex-col justify-between text-xs"
-                                >
-                                    <div>
-                                        <div className="font-semibold text-sm mb-1 line-clamp-2">{product.name}</div>
-                                        {product.description && (
-                                            <div className="text-[10px] text-white/50 line-clamp-2">
-                                                {product.description}
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className="bg-white/5 rounded-lg p-3 flex flex-col justify-between text-xs"
+                                        >
+                                            <div>
+                                                <div className="font-semibold text-sm mb-1 line-clamp-2">{product.name}</div>
+                                                {product.description && (
+                                                    <div className="text-[10px] text-white/50 line-clamp-2">
+                                                        {product.description}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="mt-2 space-y-0.5">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-white/60">USDT</span>
-                                            <span className="font-bold text-accent">${priceUsdt.toFixed(2)}</span>
+                                            <div className="mt-2 space-y-0.5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-white/60">Bolívares</span>
+                                                    <span className="font-semibold">
+                                                        {priceBs.toLocaleString('es-VE', {
+                                                            style: 'currency',
+                                                            currency: 'VES'
+                                                        })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-white/60">USDT</span>
+                                                    <span className="font-bold text-accent">${priceUsdt.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="mt-2 w-full py-1.5 rounded-lg bg-accent/90 text-dark text-[11px] font-semibold hover:bg-accent"
+                                                onClick={() => addToQuote(product)}
+                                            >
+                                                Agregar a cotización
+                                            </button>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-white/60">Bolívares</span>
-                                            <span className="font-semibold">
-                                                {priceBs.toLocaleString('es-VE', {
-                                                    style: 'currency',
-                                                    currency: 'VES'
-                                                })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-white/60">Fires</span>
-                                            <span className="font-semibold">{priceFires.toFixed(0)}</span>
-                                        </div>
-                                    </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="w-full md:w-72 lg:w-80 bg-white/5 rounded-xl p-3 flex flex-col justify-between text-xs">
+                        <div>
+                            <h3 className="text-sm font-semibold mb-2">Detalle de cotización</h3>
+                            {quoteItems.length === 0 ? (
+                                <p className="text-white/60 text-[11px]">No hay productos seleccionados.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {quoteItems.map((item) => {
+                                        const lineTotalUsdt = Number(item.price_usdt || 0) * Number(item.quantity || 0);
+                                        const lineTotalBs = lineTotalUsdt * rates.bs;
+
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="flex items-start justify-between gap-2 border-b border-white/10 pb-1"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-semibold truncate">
+                                                        {item.name}
+                                                    </div>
+                                                    <div className="text-[10px] text-white/60">
+                                                        {lineTotalBs.toLocaleString('es-VE', {
+                                                            style: 'currency',
+                                                            currency: 'VES'
+                                                        })}{' '}
+                                                        ({lineTotalUsdt.toFixed(2)} USDT)
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => changeQuoteQuantity(item.id, -1)}
+                                                            className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] hover:bg-white/20"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <span className="min-w-[18px] text-center text-[11px]">
+                                                            {item.quantity}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => changeQuoteQuantity(item.id, 1)}
+                                                            className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] hover:bg-white/20"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-white/10 space-y-1 text-[11px]">
+                            <div className="flex justify-between">
+                                <span>Total cotización (Bs)</span>
+                                <span>
+                                    {totalQuoteBs.toLocaleString('es-VE', {
+                                        style: 'currency',
+                                        currency: 'VES'
+                                    })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-white/70">
+                                <span>Total cotización (USDT)</span>
+                                <span>{totalQuoteUSDT.toFixed(2)} USDT</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handlePrint}
+                                disabled={quoteItems.length === 0}
+                                className="mt-2 w-full py-2 rounded-lg bg-accent text-dark font-semibold text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Imprimir / PDF
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

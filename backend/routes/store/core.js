@@ -276,11 +276,6 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
         const { storeId } = req.params;
         const qRaw = (req.query.q || '').toString().trim();
 
-        const canManage = await userCanManageStoreProducts(req.user, storeId);
-        if (!canManage) {
-            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
-        }
-
         if (!qRaw) {
             return res.json([]);
         }

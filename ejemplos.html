@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <title>Ejemplos UI MundoXYZ</title>
@@ -11,42 +12,50 @@
       background: radial-gradient(circle at top, #101827 0, #050816 40%, #02010a 100%);
       color: #e5e7eb;
     }
+
     .page {
       max-width: 1100px;
       margin: 0 auto;
       padding: 24px 16px 48px;
     }
+
     .title {
       font-size: 28px;
       font-weight: 800;
-      background: linear-gradient(90deg,#38bdf8,#a855f7,#f97316);
+      background: linear-gradient(90deg, #38bdf8, #a855f7, #f97316);
       -webkit-background-clip: text;
+      background-clip: text;
       color: transparent;
       margin-bottom: 4px;
     }
+
     .subtitle {
       font-size: 13px;
       color: #9ca3af;
       margin-bottom: 24px;
     }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 16px;
     }
+
     .card {
-      background: rgba(15,23,42,0.85);
+      background: rgba(15, 23, 42, 0.85);
       border-radius: 16px;
-      border: 1px solid rgba(148,163,184,0.25);
-      box-shadow: 0 18px 40px rgba(15,23,42,0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.7);
       padding: 14px 16px 16px;
     }
+
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
+
     .card-title {
       font-size: 14px;
       font-weight: 600;
@@ -54,44 +63,59 @@
       text-transform: uppercase;
       color: #e5e7eb;
     }
+
     .chip {
       font-size: 10px;
       padding: 3px 8px;
       border-radius: 999px;
-      background: rgba(56,189,248,0.08);
-      border: 1px solid rgba(56,189,248,0.4);
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.4);
       color: #7dd3fc;
     }
+
     .preview {
       margin-top: 6px;
       padding: 10px 12px;
       border-radius: 12px;
-      background: radial-gradient(circle at top left,rgba(36,99,235,0.4),rgba(15,23,42,0.9));
+      background: radial-gradient(circle at top left, rgba(36, 99, 235, 0.4), rgba(15, 23, 42, 0.9));
       display: inline-flex;
       gap: 6px;
       align-items: center;
       font-size: 13px;
     }
+
     .preview.badge span.label {
       padding: 2px 10px;
       border-radius: 999px;
-      background: rgba(56,189,248,0.1);
-      border: 1px solid rgba(56,189,248,0.5);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.5);
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
+
     .preview.toast {
-      background: radial-gradient(circle at top left,rgba(16,185,129,0.35),rgba(15,23,42,0.95));
-      border: 1px solid rgba(16,185,129,0.4);
+      background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.35), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(16, 185, 129, 0.4);
       border-left-width: 3px;
       border-radius: 12px;
       justify-content: space-between;
       width: 100%;
       box-sizing: border-box;
     }
-    .preview.toast .title { font-size: 13px; color: #bbf7d0; margin: 0; }
-    .preview.toast .message { font-size: 11px; color: #a7f3d0; margin-top: 2px; }
+
+    .preview.toast .title {
+      font-size: 13px;
+      color: #bbf7d0;
+      margin: 0;
+    }
+
+    .preview.toast .message {
+      font-size: 11px;
+      color: #a7f3d0;
+      margin-top: 2px;
+    }
+
     .section-title {
       font-size: 12px;
       font-weight: 600;
@@ -100,55 +124,390 @@
       color: #9ca3af;
       margin: 20px 0 6px;
     }
+
     .hint {
       margin-top: 24px;
       padding: 10px 12px;
       border-radius: 12px;
-      border: 1px dashed rgba(148,163,184,0.4);
-      background: rgba(15,23,42,0.6);
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.6);
       font-size: 11px;
       color: #9ca3af;
     }
+
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 11px;
       padding: 2px 4px;
       border-radius: 6px;
-      background: rgba(15,23,42,0.8);
-      border: 1px solid rgba(31,41,55,0.9);
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(31, 41, 55, 0.9);
       color: #e5e7eb;
     }
+
     /* Checklist */
-    .checklist-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer; }
-    .custom-checkbox { width: 20px; height: 20px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-    .custom-checkbox.checked { background: #3b82f6; border-color: #3b82f6; }
-    .custom-checkbox svg { width: 14px; height: 14px; color: white; opacity: 0; transform: scale(0.8); transition: all 0.2s; }
-    .custom-checkbox.checked svg { opacity: 1; transform: scale(1); }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .custom-checkbox {
+      width: 20px;
+      height: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .custom-checkbox.checked {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    .custom-checkbox svg {
+      width: 14px;
+      height: 14px;
+      color: white;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.2s;
+    }
+
+    .custom-checkbox.checked svg {
+      opacity: 1;
+      transform: scale(1);
+    }
 
     /* Modal */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 1000; }
-    .modal-overlay.active { opacity: 1; pointer-events: all; }
-    .modal { background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; transform: translateY(20px); transition: all 0.3s; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-    .modal-overlay.active .modal { transform: translateY(0); }
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-overlay.active .modal {
+      transform: translateY(0);
+    }
 
     /* Scroll Area */
-    .scroll-area { height: 200px; overflow-y: auto; padding-right: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; background: rgba(0,0,0,0.2); }
-    .scroll-area::-webkit-scrollbar { width: 6px; }
-    .scroll-area::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
-    .scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-    .scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    .scroll-area {
+      height: 200px;
+      overflow-y: auto;
+      padding-right: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .scroll-area::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .scroll-area::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    .scroll-area::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    .scroll-area::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
 
     /* Buttons */
-    .btn-primary { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-secondary { background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .btn-secondary:hover { border-color: #94a3b8; color: #e2e8f0; }
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #475569;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: #94a3b8;
+      color: #e2e8f0;
+    }
+
+    /* Inputs */
+    .input-group {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .custom-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: white;
+      font-size: 14px;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .custom-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .input-label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .toggle-switch.active {
+      background: #3b82f6;
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch.active .toggle-thumb {
+      transform: translateX(20px);
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 1s ease-out;
+    }
+
+    /* Avatars */
+    .avatar-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid #0f172a;
+      background: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      margin-left: -8px;
+      position: relative;
+    }
+
+    .avatar:first-child {
+      margin-left: 0;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .status-dot {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1.5px solid #0f172a;
+    }
+
+    .status-online {
+      background: #22c55e;
+    }
+
+    .status-offline {
+      background: #94a3b8;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .alert-success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      color: #86efac;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 4px;
+      border-radius: 8px;
+      gap: 4px;
+    }
+
+    .tab-item {
+      flex: 1;
+      text-align: center;
+      padding: 6px;
+      font-size: 12px;
+      color: #94a3b8;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-item.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-item:hover:not(.active) {
+      color: #cbd5e1;
+    }
+
+    /* Tooltip */
+    [data-tooltip] {
+      position: relative;
+      cursor: help;
+    }
+
+    [data-tooltip]:before {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-4px);
+      padding: 4px 8px;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 11px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s;
+      z-index: 10;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    [data-tooltip]:hover:before {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-8px);
+    }
   </style>
 </head>
+
 <body>
   <div class="page">
     <h1 class="title">Catálogo de Ejemplos UI</h1>
-    <p class="subtitle">Guía rápida para pedir componentes a la IA de MundoXYZ (esta página es solo de referencia local).</p>
+    <p class="subtitle">Guía rápida para pedir componentes a la IA de MundoXYZ (esta página es solo de referencia
+      local).</p>
 
     <div class="section-title">Componentes Básicos</div>
     <div class="grid">
@@ -169,7 +528,9 @@
           <span class="chip">Botón redondeado</span>
         </div>
         <div class="preview">
-          <span style="padding:4px 14px;border-radius:999px;background:rgba(248,250,252,0.06);border:1px solid rgba(148,163,184,0.5);">Jugar ahora</span>
+          <span
+            style="padding:4px 14px;border-radius:999px;background:rgba(248,250,252,0.06);border:1px solid rgba(148,163,184,0.5);">Jugar
+            ahora</span>
         </div>
       </div>
 
@@ -206,7 +567,8 @@
           <div class="card-title">toast-error</div>
           <span class="chip">Notificación</span>
         </div>
-        <div class="preview toast" style="border-color:rgba(248,113,113,0.6);background:radial-gradient(circle at top left,rgba(248,113,113,0.45),rgba(15,23,42,0.98));">
+        <div class="preview toast"
+          style="border-color:rgba(248,113,113,0.6);background:radial-gradient(circle at top left,rgba(248,113,113,0.45),rgba(15,23,42,0.98));">
           <div>
             <p class="title" style="color:#fecaca;">Algo salió mal</p>
             <p class="message" style="color:#fecaca;">No se pudo crear la sala, intenta de nuevo.</p>
@@ -228,7 +590,9 @@
             <div style="font-size:13px;font-weight:600;">Sala de Pool</div>
             <div style="font-size:11px;color:#9ca3af;">Apuesta: 10 🔥 · 2/2 jugadores</div>
           </div>
-          <span style="font-size:11px;padding:3px 10px;border-radius:999px;background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.6);color:#bbf7d0;">EN JUEGO</span>
+          <span
+            style="font-size:11px;padding:3px 10px;border-radius:999px;background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.6);color:#bbf7d0;">EN
+            JUEGO</span>
         </div>
       </div>
 
@@ -238,9 +602,14 @@
           <span class="chip">Filtro / Tag</span>
         </div>
         <div class="preview" style="gap:8px;flex-wrap:wrap;">
-          <span style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.8);font-size:11px;">Todos</span>
-          <span style="padding:3px 10px;border-radius:999px;background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.7);font-size:11px;color:#bfdbfe;">En lobby</span>
-          <span style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(75,85,99,0.9);font-size:11px;">En juego</span>
+          <span
+            style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.8);font-size:11px;">Todos</span>
+          <span
+            style="padding:3px 10px;border-radius:999px;background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.7);font-size:11px;color:#bfdbfe;">En
+            lobby</span>
+          <span
+            style="padding:3px 10px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(75,85,99,0.9);font-size:11px;">En
+            juego</span>
         </div>
       </div>
     </div>
@@ -254,82 +623,171 @@
       · <code>"Diseña una glass-card para mostrar el estado de una sala"</code>
     </div>
   </div>
-    <div style="margin-top: 40px;" class="section-title">Componentes Interactivos</div>
-    <div class="grid">
-      <!-- Checklist -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Checklist</div>
-          <span class="chip">Interactivo</span>
-        </div>
-        <div class="checklist-item" onclick="toggleCheckbox(this)">
-          <div class="custom-checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
-          <span style="font-size:14px;color:#cbd5e1;">Tarea completada</span>
-        </div>
-        <div class="checklist-item" onclick="toggleCheckbox(this)">
-          <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
-          <span style="font-size:14px;color:#cbd5e1;">Tarea pendiente</span>
-        </div>
-        <div class="checklist-item" onclick="toggleCheckbox(this)">
-          <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
-          <span style="font-size:14px;color:#cbd5e1;">Otra tarea</span>
-        </div>
+  <div style="margin-top: 40px;" class="section-title">Componentes Interactivos</div>
+  <div class="grid">
+    <!-- Checklist -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Checklist</div>
+        <span class="chip">Interactivo</span>
       </div>
-
-      <!-- Modal Trigger -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Modal</div>
-          <span class="chip">Overlay</span>
-        </div>
-        <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
-          Ejemplo de modal con backdrop blur y animaciÃ³n de entrada.
-        </p>
-        <button class="btn-primary" onclick="openModal()">Abrir Modal</button>
+      <div class="checklist-item" onclick="toggleCheckbox(this)">
+        <div class="custom-checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg></div>
+        <span style="font-size:14px;color:#cbd5e1;">Tarea completada</span>
       </div>
+      <div class="checklist-item" onclick="toggleCheckbox(this)">
+        <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg></div>
+        <span style="font-size:14px;color:#cbd5e1;">Tarea pendiente</span>
+      </div>
+      <div class="checklist-item" onclick="toggleCheckbox(this)">
+        <div class="custom-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg></div>
+        <span style="font-size:14px;color:#cbd5e1;">Otra tarea</span>
+      </div>
+    </div>
 
-      <!-- Scroll Area -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Scroll Area</div>
-          <span class="chip">Custom Scroll</span>
-        </div>
-        <div class="scroll-area">
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 1 - Contenido scrolleable</div>
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 2 - Estilo personalizado</div>
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 3 - Webkit scrollbar</div>
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 4 - Transparencias</div>
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 5 - MÃ¡s contenido</div>
-          <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">Item 6 - Final de la lista</div>
+    <!-- Modal Trigger -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Modal</div>
+        <span class="chip">Overlay</span>
+      </div>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
+        Ejemplo de modal con backdrop blur y animaciÃ³n de entrada.
+      </p>
+      <button class="btn-primary" onclick="openModal()">Abrir Modal</button>
+    </div>
+
+    <!-- Scroll Area -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Scroll Area</div>
+        <span class="chip">Custom Scroll</span>
+      </div>
+      <div class="scroll-area">
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 1 - Contenido scrolleable</div>
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 2 - Estilo personalizado</div>
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 3 - Webkit scrollbar</div>
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 4 - Transparencias</div>
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 5 - MÃ¡s contenido</div>
+        <div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;">
+          Item 6 - Final de la lista</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Element -->
+  <div class="modal-overlay" id="demoModal" onclick="if(event.target === this) closeModal()">
+    <div class="modal">
+      <h3 style="margin:0 0 10px 0;font-size:18px;font-weight:600;color:white;">TÃ­tulo del Modal</h3>
+      <p style="color:#94a3b8;font-size:14px;line-height:1.5;margin-bottom:24px;">
+        Este es un ejemplo de modal con efecto glassmorphism. Haz clic fuera o en los botones para cerrar.
+      </p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button class="btn-primary" onclick="closeModal()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 40px;" class="section-title">UI Kit Profesional</div>
+  <div class="grid">
+    <!-- Forms & Inputs -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Formularios</div>
+        <span class="chip">Inputs</span>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Usuario</label>
+        <input type="text" class="custom-input" placeholder="nombre@ejemplo.com">
+      </div>
+      <div class="input-group" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+        <span style="font-size:13px;color:#cbd5e1;">Notificaciones</span>
+        <div class="toggle-switch" onclick="this.classList.toggle('active')">
+          <div class="toggle-thumb"></div>
         </div>
       </div>
     </div>
 
-    <!-- Modal Element -->
-    <div class="modal-overlay" id="demoModal" onclick="if(event.target === this) closeModal()">
-      <div class="modal">
-        <h3 style="margin:0 0 10px 0;font-size:18px;font-weight:600;color:white;">TÃ­tulo del Modal</h3>
-        <p style="color:#94a3b8;font-size:14px;line-height:1.5;margin-bottom:24px;">
-          Este es un ejemplo de modal con efecto glassmorphism. Haz clic fuera o en los botones para cerrar.
-        </p>
-        <div style="display:flex;justify-content:flex-end;gap:10px;">
-          <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-          <button class="btn-primary" onclick="closeModal()">Aceptar</button>
+    <!-- Feedback & Status -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Estado</div>
+        <span class="chip">Feedback</span>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:4px;">
+          <span>Cargando recursos...</span>
+          <span>75%</span>
         </div>
+        <div class="progress-container">
+          <div class="progress-bar" style="width: 75%"></div>
+        </div>
+      </div>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>Operación completada con éxito</span>
       </div>
     </div>
 
-    <script>
-      function toggleCheckbox(el) {
-        const checkbox = el.querySelector('.custom-checkbox');
-        checkbox.classList.toggle('checked');
-      }
-      function openModal() {
-        document.getElementById('demoModal').classList.add('active');
-      }
-      function closeModal() {
-        document.getElementById('demoModal').classList.remove('active');
-      }
-    </script>
+    <!-- Users & Navigation -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Usuarios & Nav</div>
+        <span class="chip">Social</span>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label class="input-label" style="margin-bottom:8px;">Participantes</label>
+        <div class="avatar-group">
+          <div class="avatar" data-tooltip="Juan Pérez">JP<div class="status-dot status-online"></div>
+          </div>
+          <div class="avatar" data-tooltip="Ana García">AG<div class="status-dot status-offline"></div>
+          </div>
+          <div class="avatar" data-tooltip="Carlos Ruiz">CR<div class="status-dot status-online"></div>
+          </div>
+          <div class="avatar" style="background:#1e293b;color:#94a3b8;font-size:10px;">+3</div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab-item active" onclick="selectTab(this)">Cuenta</div>
+        <div class="tab-item" onclick="selectTab(this)">Seguridad</div>
+        <div class="tab-item" onclick="selectTab(this)">Ajustes</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function selectTab(el) {
+      const tabs = el.parentElement.querySelectorAll('.tab-item');
+      tabs.forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function toggleCheckbox(el) {
+      const checkbox = el.querySelector('.custom-checkbox');
+      checkbox.classList.toggle('checked');
+    }
+    function openModal() {
+      document.getElementById('demoModal').classList.add('active');
+    }
+    function closeModal() {
+      document.getElementById('demoModal').classList.remove('active');
+    }
+  </script>
 </body>
+
 </html>

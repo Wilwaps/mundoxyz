@@ -808,6 +808,13 @@ const StoreOwnerDashboard = () => {
 
                     const canOpenInvoice = order.invoice_number != null;
 
+                    const formatInvoiceNumber = (n) => {
+                      if (n === null || n === undefined) return '-';
+                      const numeric = typeof n === 'number' ? n : parseInt(n, 10);
+                      if (!Number.isFinite(numeric)) return String(n);
+                      return String(numeric).padStart(7, '0');
+                    };
+
                     return (
                       <tr
                         key={order.id}
@@ -823,7 +830,7 @@ const StoreOwnerDashboard = () => {
                         }}
                       >
                         <td className="py-1 pr-3 text-text/80">
-                          {order.invoice_number || '-'}
+                          {formatInvoiceNumber(order.invoice_number)}
                         </td>
                         <td className="py-1 pr-3 text-text/80">
                           {order.customer_name || '-'}
