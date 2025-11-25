@@ -148,8 +148,8 @@ router.post('/create', verifyToken, async (req, res) => {
           !isRonAI && mode === 'fires' ? betAmount : 0
         ]
       );
-      
-      const room = roomResult.rows[0];
+
+      let room = roomResult.rows[0];
       
       // Generar código único usando sistema unificado
       const code = await RoomCodeService.reserveCode('tictactoe', roomId, client);
@@ -159,8 +159,26 @@ router.post('/create', verifyToken, async (req, res) => {
         'UPDATE tictactoe_rooms SET code = $1 WHERE id = $2',
         [code, roomId]
       );
-      
+
       room.code = code;
+
+      // Si la sala es contra RON-IA, iniciarla de inmediato en modo práctica
+      if (isRonAI) {
+        const updatedRoomResult = await client.query(
+          `UPDATE tictactoe_rooms
+           SET status = 'playing',
+               player_x_ready = TRUE,
+               player_o_ready = TRUE,
+               started_at = NOW(),
+               last_move_at = NOW(),
+               time_left_seconds = 15
+           WHERE id = $1
+           RETURNING *`,
+          [room.id]
+        );
+
+        room = updatedRoomResult.rows[0];
+      }
       
       logger.info('🎮 TicTacToe sala creada con código unificado', { 
         roomId: room.id, 

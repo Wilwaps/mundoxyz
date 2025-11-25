@@ -671,7 +671,9 @@ const TicTacToeRoom = () => {
             )}
           </div>
           <p className="font-semibold text-text">
-            {room?.player_o_username || 'Esperando...'}
+            {room?.opponent_type === 'ron_ai'
+              ? 'RON-IA'
+              : room?.player_o_username || 'Esperando...'}
           </p>
           <p className="text-xs text-text/60">
             {room?.player_o_id === user?.id ? '(Tú)' : ''}
