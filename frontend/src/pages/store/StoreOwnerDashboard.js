@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { BarChart3, ShoppingBag, Megaphone, ListChecks, ExternalLink, ArrowLeft } from 'lucide-react';
+import { BarChart3, ShoppingBag, Megaphone, ListChecks, ExternalLink, ArrowLeft, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const MAX_PRODUCT_IMAGE_MB = 5;
@@ -75,6 +75,14 @@ const StoreOwnerDashboard = () => {
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+
+  const [headerLayout, setHeaderLayout] = useState('normal');
+  const [logoUrlInput, setLogoUrlInput] = useState('');
+  const [coverUrlInput, setCoverUrlInput] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
+  const [locationMapsUrl, setLocationMapsUrl] = useState('');
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
 
   const {
     data: storeData,
@@ -91,6 +99,27 @@ const StoreOwnerDashboard = () => {
   const store = storeData?.store;
   const categories = storeData?.categories || [];
   const products = storeData?.products || [];
+
+  useEffect(() => {
+    if (!store || settingsInitialized) return;
+
+    try {
+      const rawSettings = store.settings || {};
+      const rawLocation = store.location || {};
+
+      setHeaderLayout(rawSettings.header_layout || 'normal');
+      setLogoUrlInput(store.logo_url || '');
+      setCoverUrlInput(store.cover_url || '');
+      setLocationAddress(rawLocation.address || '');
+      setLocationMapsUrl(
+        rawLocation.maps_url || rawLocation.google_maps_url || ''
+      );
+    } catch (e) {
+      // noop
+    }
+
+    setSettingsInitialized(true);
+  }, [store, settingsInitialized]);
 
   const {
     data: suppliersData,
@@ -151,6 +180,16 @@ const StoreOwnerDashboard = () => {
   const firesPerUsdt = fiatContext?.config?.fires_per_usdt || null;
 
   const queryClient = useQueryClient();
+
+  const { data: storeMetrics } = useQuery({
+    queryKey: ['store-metrics', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const response = await axios.get(`/api/store/${store.id}/metrics`);
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ productId, data }) => {
@@ -233,6 +272,43 @@ const StoreOwnerDashboard = () => {
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al duplicar producto';
+      toast.error(message);
+    }
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async (data) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.post(`/api/store/${store.id}/category`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Categor creada');
+      queryClient.invalidateQueries(['store-owner', slug]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al crear categor';
+      toast.error(message);
+    }
+  });
+
+  const updateStoreSettingsMutation = useMutation({
+    mutationFn: async (payload) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.patch(`/api/store/${store.id}/settings`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Configuracin de tienda actualizada');
+      queryClient.invalidateQueries(['store-owner', slug]);
+      queryClient.invalidateQueries(['store-metrics', store?.id]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al actualizar configuracin de tienda';
       toast.error(message);
     }
   });
@@ -320,7 +396,8 @@ const StoreOwnerDashboard = () => {
     { id: 'products', label: 'Productos', icon: ShoppingBag },
     { id: 'inventory', label: 'Inventario', icon: ListChecks },
     { id: 'reports', label: 'Pedidos / Informes', icon: ListChecks },
-    { id: 'marketing', label: 'Marketing', icon: Megaphone }
+    { id: 'marketing', label: 'Marketing', icon: Megaphone },
+    { id: 'settings', label: 'Configuración', icon: Settings }
   ];
 
   return (
@@ -396,6 +473,15 @@ const StoreOwnerDashboard = () => {
           </div>
         </div>
       )}
+      {isNewCategoryModalOpen && (
+        <NewCategoryModal
+          onClose={() => setIsNewCategoryModalOpen(false)}
+          onSave={async (data) => {
+            await createCategoryMutation.mutateAsync(data);
+          }}
+          loading={createCategoryMutation.isLoading}
+        />
+      )}
 
       {activeTab === 'inventory' && (
         <div className="card-glass p-4 space-y-4 overflow-x-auto">
@@ -407,6 +493,13 @@ const StoreOwnerDashboard = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setIsNewCategoryModalOpen(true)}
+                className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover whitespace-nowrap"
+              >
+                Nueva categoría
+              </button>
               <button
                 type="button"
                 onClick={() => setIsNewSupplierModalOpen(true)}
@@ -876,6 +969,129 @@ const StoreOwnerDashboard = () => {
             En esta primera versión, usa el POS y la vista de pedidos para entender qué se vende mejor y planificar
             tus próximas promociones.
           </p>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="card-glass p-4 space-y-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-text/60 mb-1">Vistas de la tienda</p>
+              <p className="text-2xl font-bold text-accent">
+                {storeMetrics?.views_count != null ? Number(storeMetrics.views_count) : 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-text/60 mb-1">Clientes registrados</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                {storeMetrics?.customers_count != null ? Number(storeMetrics.customers_count) : 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-text/60 mb-1">Link público</p>
+              <p className="text-[11px] text-text/80 break-all">/store/{store.slug}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-text/60 mb-1">Tamaño del header</p>
+                <div className="flex gap-2">
+                  {[
+                    { id: 'compact', label: 'Compacto' },
+                    { id: 'normal', label: 'Normal' },
+                    { id: 'full', label: 'Completo' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setHeaderLayout(opt.id)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] border transition-colors ${
+                        headerLayout === opt.id
+                          ? 'bg-accent text-background-dark border-accent'
+                          : 'bg-glass text-text/70 border-glass hover:text-text'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-text/60 mb-1">URL del logo (perfil)</p>
+                <input
+                  type="text"
+                  value={logoUrlInput}
+                  onChange={(e) => setLogoUrlInput(e.target.value)}
+                  className="input-glass w-full"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div>
+                <p className="text-text/60 mb-1">URL del banner (header)</p>
+                <input
+                  type="text"
+                  value={coverUrlInput}
+                  onChange={(e) => setCoverUrlInput(e.target.value)}
+                  className="input-glass w-full"
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-text/60 mb-1">Dirección pública</p>
+                <textarea
+                  value={locationAddress}
+                  onChange={(e) => setLocationAddress(e.target.value)}
+                  className="input-glass w-full h-20 resize-none"
+                />
+              </div>
+              <div>
+                <p className="text-text/60 mb-1">Link de Google Maps / ubicación</p>
+                <input
+                  type="text"
+                  value={locationMapsUrl}
+                  onChange={(e) => setLocationMapsUrl(e.target.value)}
+                  className="input-glass w-full"
+                  placeholder="https://maps.google.com/..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                const settingsPatch = {
+                  header_layout: headerLayout
+                };
+
+                const locationPatch = {
+                  address: locationAddress || null,
+                  maps_url: locationMapsUrl || null
+                };
+
+                const payload = {
+                  logo_url: logoUrlInput || null,
+                  cover_url: coverUrlInput || null,
+                  settings_patch: settingsPatch,
+                  location_patch: locationPatch
+                };
+
+                await updateStoreSettingsMutation.mutateAsync(payload);
+              }}
+              disabled={updateStoreSettingsMutation.isLoading}
+              className="px-4 py-2 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {updateStoreSettingsMutation.isLoading ? 'Guardando…' : 'Guardar configuración de tienda'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -1628,6 +1844,81 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
               className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Guardando…' : 'Registrar compra'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const NewCategoryModal = ({ onClose, onSave, loading }) => {
+  const [name, setName] = useState('');
+  const [sortOrder, setSortOrder] = useState('0');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error('El nombre de la categoría es obligatorio');
+      return;
+    }
+
+    let parsedSort = parseInt(sortOrder, 10);
+    if (!Number.isFinite(parsedSort)) {
+      parsedSort = 0;
+    }
+
+    await onSave({ name: trimmedName, sort_order: parsedSort });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm card-glass p-6 space-y-4"
+      >
+        <h3 className="text-lg font-bold">Nueva categoría</h3>
+
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <div className="text-text/60 mb-1">Nombre</div>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-glass w-full"
+              required
+            />
+          </div>
+          <div>
+            <div className="text-text/60 mb-1">Orden (opcional)</div>
+            <input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="input-glass w-full"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-glass hover:bg-glass-hover"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Guardando…' : 'Guardar categoría'}
             </button>
           </div>
         </form>

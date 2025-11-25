@@ -50,16 +50,18 @@ router.get('/list', verifyToken, async (req, res) => {
 });
 
 // GET /api/store/public/:slug
-// Get store details for customer view
+// Get store details for customer view and increment views counter
 router.get('/public/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
 
         const storeResult = await query(
-            `SELECT id, name, slug, description, logo_url, cover_url, 
-              currency_config, settings, location
-       FROM stores 
-       WHERE slug = $1`,
+            `UPDATE stores
+         SET views_count = views_count + 1,
+             updated_at = NOW()
+         WHERE slug = $1
+         RETURNING id, name, slug, description, logo_url, cover_url,
+                   currency_config, settings, location, views_count`,
             [slug]
         );
 
@@ -282,6 +284,116 @@ router.post('/:storeId/customers', verifyToken, async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error('Error creating POS customer:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/:storeId/metrics - basic metrics for store owner panel
+router.get('/:storeId/metrics', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT 
+                s.id,
+                COALESCE(s.views_count, 0) AS views_count,
+                COALESCE(c.customers_count, 0) AS customers_count
+           FROM stores s
+           LEFT JOIN (
+                SELECT store_id, COUNT(*)::BIGINT AS customers_count
+                FROM store_customers
+                GROUP BY store_id
+           ) c ON c.store_id = s.id
+           WHERE s.id = $1`,
+            [storeId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tienda no encontrada' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error fetching store metrics:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// PATCH /api/store/:storeId/settings - update store public settings and branding
+router.patch('/:storeId/settings', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const {
+            name,
+            description,
+            logo_url,
+            cover_url,
+            settings_patch: settingsPatch,
+            location_patch: locationPatch
+        } = req.body || {};
+
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        if (name !== undefined) {
+            fields.push(`name = $${idx++}`);
+            values.push(name);
+        }
+        if (description !== undefined) {
+            fields.push(`description = $${idx++}`);
+            values.push(description);
+        }
+        if (logo_url !== undefined) {
+            fields.push(`logo_url = $${idx++}`);
+            values.push(logo_url);
+        }
+        if (cover_url !== undefined) {
+            fields.push(`cover_url = $${idx++}`);
+            values.push(cover_url);
+        }
+        if (settingsPatch && typeof settingsPatch === 'object') {
+            fields.push(`settings = COALESCE(settings, '{}'::jsonb) || $${idx++}::jsonb`);
+            values.push(JSON.stringify(settingsPatch));
+        }
+        if (locationPatch && typeof locationPatch === 'object') {
+            fields.push(`location = COALESCE(location, '{}'::jsonb) || $${idx++}::jsonb`);
+            values.push(JSON.stringify(locationPatch));
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay cambios para aplicar' });
+        }
+
+        fields.push('updated_at = NOW()');
+
+        values.push(storeId);
+
+        const result = await query(
+            `UPDATE stores SET ${fields.join(', ')} WHERE id = $${idx}
+       RETURNING id, name, slug, description, logo_url, cover_url,
+                 currency_config, settings, location, views_count`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tienda no encontrada' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error updating store settings:', error);
         res.status(400).json({ error: error.message });
     }
 });

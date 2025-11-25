@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin, CreditCard, Banknote, Flame } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin, CreditCard, Banknote, Flame, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import './StoreFront.css'; // Custom styles
@@ -182,6 +182,36 @@ const StoreFront = () => {
     if (!storeData) return <div className="text-center p-20">Tienda no encontrada</div>;
 
     const { store, categories, products } = storeData;
+
+    const handleShareStore = async () => {
+        const slugValue = store?.slug || slug;
+        if (!slugValue) return;
+
+        const url = `${window.location.origin}/store/${slugValue}`;
+        const title = store?.name || 'Tienda';
+        const text = `Mira la tienda ${title} en MundoXYZ`;
+
+        try {
+            if (navigator.share && typeof navigator.share === 'function') {
+                await navigator.share({ title, text, url });
+                return;
+            }
+
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(url);
+                toast.success('Link de tienda copiado');
+                return;
+            }
+
+            window.prompt('Copia este link de la tienda:', url);
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+            console.error('Error al compartir tienda:', error);
+            toast.error('No se pudo compartir la tienda');
+        }
+    };
     const activeCategory = selectedCategory || categories[0]?.id;
     const filteredProducts = products.filter(p => p.category_id === activeCategory);
 
@@ -195,6 +225,13 @@ const StoreFront = () => {
                     alt="Cover"
                     className="w-full h-full object-cover"
                 />
+                <button
+                    type="button"
+                    onClick={handleShareStore}
+                    className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-dark/70 hover:bg-dark/90 border border-white/20 flex items-center justify-center text-white/80 text-xs shadow-lg"
+                >
+                    <Share2 size={16} />
+                </button>
                 <div className="absolute bottom-0 left-0 right-0 p-6 z-20 container mx-auto">
                     <div className="flex items-end gap-4">
                         <img

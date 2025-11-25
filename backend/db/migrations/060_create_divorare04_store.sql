@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS stores (
     currency_config JSONB DEFAULT '{"base": "USDT", "accepted": ["USDT", "Fires", "BS"], "rates_source": "manual"}',
     settings JSONB DEFAULT '{"tax_rate": 0, "service_fee": 0, "open_hours": {}}',
     location JSONB DEFAULT '{}', -- Address, coords, geofences
+    views_count BIGINT NOT NULL DEFAULT 0,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

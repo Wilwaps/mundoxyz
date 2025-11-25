@@ -14,7 +14,8 @@ import {
   TrendingUp,
   LogOut,
   Lock,
-  Key
+  Key,
+  Share2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
@@ -205,6 +206,35 @@ const Profile = () => {
     if (role === 'seller') return 'Vendedor';
     if (role === 'marketing') return 'Marketing';
     return role;
+  };
+
+  const handleShareStore = async (row) => {
+    if (!row || !row.store_slug) return;
+
+    const url = `${window.location.origin}/store/${row.store_slug}`;
+    const title = row.store_name || 'Mi tienda';
+    const text = `Mira la tienda ${title} en MundoXYZ`;
+
+    try {
+      if (navigator.share && typeof navigator.share === 'function') {
+        await navigator.share({ title, text, url });
+        return;
+      }
+
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link de tienda copiado');
+        return;
+      }
+
+      window.prompt('Copia este link de tu tienda:', url);
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return;
+      }
+      console.error('Error al compartir tienda:', error);
+      toast.error('No se pudo compartir la tienda');
+    }
   };
 
   const handleLogout = async () => {
@@ -841,6 +871,14 @@ const Profile = () => {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleShareStore(row)}
+                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover flex items-center gap-1"
+                  >
+                    <Share2 size={12} />
+                    Compartir
+                  </button>
                   <button
                     type="button"
                     onClick={() => navigate(`/store/${row.store_slug}`)}
