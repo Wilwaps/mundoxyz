@@ -73,15 +73,15 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
         balls.push(cueBall);
         cueBallRef.current = cueBall;
 
-        // Triángulo básico de bolas
+        // Triángulo básico de bolas (rack 8-ball)
         let ballId = 1;
         for (let row = 0; row < 5; row++) {
             for (let i = 0; i <= row; i++) {
                 const x = rackX - row * BALL_RADIUS + i * BALL_RADIUS * 2;
-                const y = rackY - row * BALL_RADIUS * 1.7;
+                const y = rackY + row * BALL_RADIUS * 1.7;
                 const color = ballId === 8 ? '#000000' : '#f97316';
                 balls.push(
-                    Bodies.circle(x, y + row * BALL_RADIUS * 1.7, BALL_RADIUS, {
+                    Bodies.circle(x, y, BALL_RADIUS, {
                         label: `ball-${ballId}`,
                         restitution: 0.9,
                         friction: 0.01,
@@ -237,9 +237,38 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
                 className="rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border-4 border-emerald-900 overflow-hidden touch-none"
                 onMouseDown={handlePointerDown}
                 onMouseMove={handlePointerMove}
+                onMouseUp={handlePointerUp}
                 onTouchStart={handlePointerDown}
                 onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
             />
+
+            {/* Pockets overlay (visual only, 6 troneras) */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <svg
+                    viewBox={`0 0 ${TABLE_WIDTH} ${TABLE_HEIGHT}`}
+                    className="w-full h-full"
+                >
+                    {[
+                        { x: 24, y: 24 },
+                        { x: TABLE_WIDTH / 2, y: 18 },
+                        { x: TABLE_WIDTH - 24, y: 24 },
+                        { x: 24, y: TABLE_HEIGHT - 24 },
+                        { x: TABLE_WIDTH / 2, y: TABLE_HEIGHT - 18 },
+                        { x: TABLE_WIDTH - 24, y: TABLE_HEIGHT - 24 },
+                    ].map((pocket, index) => (
+                        <circle
+                            key={index}
+                            cx={pocket.x}
+                            cy={pocket.y}
+                            r={14}
+                            fill="#020617"
+                            stroke="#000000"
+                            strokeWidth="4"
+                        />
+                    ))}
+                </svg>
+            </div>
 
             {/* Cue Overlay */}
             {isMyTurn && cueState.visible && (

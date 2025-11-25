@@ -19,6 +19,7 @@ const StoreFront = () => {
     const [selectedProduct, setSelectedProduct] = useState(null); // For modal
     const [productModalQuantity, setProductModalQuantity] = useState(1);
     const [productModalModifiers, setProductModalModifiers] = useState({});
+    const [deliveryLocation, setDeliveryLocation] = useState('');
 
     const initialPayments = {
         cash_usdt: 0,
@@ -222,6 +223,13 @@ const StoreFront = () => {
             transfer_reference: transferReference.trim() || null
         };
 
+        const deliveryInfo = guestInfo || deliveryLocation
+            ? {
+                ...(guestInfo ? { guest: guestInfo } : {}),
+                ...(deliveryLocation ? { address: deliveryLocation } : {})
+            }
+            : null;
+
         const orderData = {
             store_id: storeData.store.id,
             items: cart.map((item) => ({
@@ -240,7 +248,7 @@ const StoreFront = () => {
             },
             currency_snapshot: rates,
             customer_id: user?.id || null,
-            delivery_info: guestInfo ? { guest: guestInfo } : null,
+            delivery_info: deliveryInfo,
             change_to_fires: giveChangeInFires && changeUSDT > 0 && user?.id
                 ? {
                     enabled: true,
@@ -527,12 +535,12 @@ const StoreFront = () => {
                                                     addToCart(product);
                                                 }
                                             }}
-                                            className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all"
+                                            className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg transition-transform"
                                         >
                                             <Plus size={20} />
                                         </button>
                                     ) : (
-                                        <div className="absolute bottom-3 right-3 flex items-center bg-dark/80 rounded-full shadow-lg overflow-hidden transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                                        <div className="absolute bottom-3 right-3 flex items-center bg-dark/80 rounded-full shadow-lg overflow-hidden">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -603,14 +611,14 @@ const StoreFront = () => {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1100]"
                             onClick={() => setShowCart(false)}
                         />
                         <motion.div
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
-                            className="fixed inset-y-0 right-0 w-full max-w-md bg-dark border-l border-white/10 z-50 flex flex-col"
+                            className="fixed inset-y-0 right-0 w-full max-w-md bg-dark border-l border-white/10 z-[1101] flex flex-col"
                         >
                             <div className="p-6 border-b border-white/10 flex justify-between items-center">
                                 <h2 className="text-xl font-bold">Tu Pedido</h2>
@@ -623,13 +631,31 @@ const StoreFront = () => {
                                 {cart.map((item, idx) => (
                                     <div key={`${item.product.id}-${idx}`} className="flex gap-4">
                                         <img
-                                            src={item.product.image_url}
+                                            src={item.product.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1000&auto=format&fit=crop'}
+                                            alt={item.product.name}
                                             className="w-16 h-16 rounded-lg object-cover bg-white/5"
                                         />
                                         <div className="flex-1">
                                             <div className="flex justify-between mb-1">
                                                 <h4 className="font-medium">{item.product.name}</h4>
-                                                <span className="text-white/80">${(getItemUnitPriceUSDT(item) * item.quantity).toFixed(2)}</span>
+                                                <div className="text-right">
+                                                    <span className="block text-white/80">
+                                                        ${(
+                                                            getItemUnitPriceUSDT(item) *
+                                                            item.quantity
+                                                        ).toFixed(2)}
+                                                    </span>
+                                                    <span className="block text-[11px] text-white/50">
+                                                        {(
+                                                            getItemUnitPriceUSDT(item) *
+                                                            item.quantity *
+                                                            rates.bs
+                                                        ).toLocaleString('es-VE', {
+                                                            style: 'currency',
+                                                            currency: 'VES'
+                                                        })}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-3 mt-2">
                                                 <button
@@ -657,13 +683,45 @@ const StoreFront = () => {
                                         <span>Subtotal</span>
                                         <span>${cartTotalUSDT.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between text-white/60">
-                                        <span>Delivery</span>
+                                    <div className="flex justify-between items-center text-white/60">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const value = window.prompt(
+                                                    'Ingresa tu ubicación o dirección para el delivery',
+                                                    deliveryLocation || ''
+                                                );
+                                                if (value !== null) {
+                                                    setDeliveryLocation(value.trim());
+                                                }
+                                            }}
+                                            className="text-xs text-accent underline-offset-2 hover:underline"
+                                        >
+                                            {deliveryLocation
+                                                ? 'Editar ubicación de delivery'
+                                                : 'Agregar ubicación de delivery'}
+                                        </button>
                                         <span>$0.00</span>
                                     </div>
+                                    {deliveryLocation && (
+                                        <div className="text-[11px] text-white/50 mt-1 line-clamp-2">
+                                            {deliveryLocation}
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-xl font-bold text-accent pt-2 border-t border-white/10">
                                         <span>Total</span>
                                         <span>${cartTotalUSDT.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-white/60 mt-1">
+                                        <span>Referencia en Bs</span>
+                                        <span>
+                                            {(
+                                                cartTotalUSDT * rates.bs
+                                            ).toLocaleString('es-VE', {
+                                                style: 'currency',
+                                                currency: 'VES'
+                                            })}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -681,7 +739,7 @@ const StoreFront = () => {
                 )}
             </AnimatePresence>
             {selectedProduct && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[1101] flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -840,7 +898,7 @@ const StoreFront = () => {
                 </div>
             )}
             {paymentModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[1101] flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold flex items-center gap-2">

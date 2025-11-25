@@ -922,7 +922,70 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
         throw new Error('No eres parte de esta sala');
       }
       
-      // Marcar solicitud de revancha
+      // Caso especial: salas contra RON-IA (modo práctica)
+      if (room.opponent_type === 'ron_ai') {
+        // Solo el jugador humano (X) puede solicitar revancha
+        if (!isPlayerX) {
+          throw new Error('La revancha contra RON-IA solo puede ser solicitada por el jugador humano');
+        }
+        
+        const newRematchCount = room.rematch_count + 1;
+        const initialTurn = newRematchCount % 2 === 0 ? 'X' : 'O';
+        
+        // Limpiar movimientos previos
+        await client.query(
+          'DELETE FROM tictactoe_moves WHERE room_id = $1',
+          [room.id]
+        );
+        
+        // Resetear sala para nueva partida sin tocar wallets ni potes (bet_amount = 0 en RON-IA)
+        await client.query(
+          `UPDATE tictactoe_rooms 
+           SET status = 'playing',
+               current_turn = $1,
+               board = '[[null,null,null],[null,null,null],[null,null,null]]',
+               winner_id = NULL,
+               finished_at = NULL,
+               rematch_requested_by_x = FALSE,
+               rematch_requested_by_o = FALSE,
+               player_x_left = FALSE,
+               player_o_left = FALSE,
+               player_x_ready = TRUE,
+               player_o_ready = TRUE,
+               rematch_count = $2,
+               pot_coins = 0,
+               pot_fires = 0,
+               xp_awarded = FALSE,
+               last_move_at = NOW()
+           WHERE id = $3`,
+          [initialTurn, newRematchCount, room.id]
+        );
+        
+        const updatedRoomResult = await client.query(
+          'SELECT * FROM tictactoe_rooms WHERE id = $1',
+          [room.id]
+        );
+        const fullUpdatedRoom = updatedRoomResult.rows[0];
+        
+        const io = req.app.get('io');
+        io.to(`tictactoe:${code}`).emit('room:rematch-accepted', {
+          roomCode: code,
+          sameRoom: true,
+          rematchCount: newRematchCount,
+          initialTurn,
+          room: fullUpdatedRoom
+        });
+        
+        return {
+          rematchAccepted: true,
+          sameRoom: true,
+          roomCode: code,
+          rematchCount: newRematchCount,
+          initialTurn
+        };
+      }
+      
+      // Caso PvP tradicional: marcar solicitudes y esperar a ambos jugadores
       if (isPlayerX) {
         await client.query(
           'UPDATE tictactoe_rooms SET rematch_requested_by_x = TRUE WHERE id = $1',
