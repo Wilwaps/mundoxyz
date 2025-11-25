@@ -260,7 +260,7 @@ const StoreStaffModal = ({ user, onClose }) => {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg card-glass p-6"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto card-glass p-6"
       >
         <h3 className="text-xl font-bold mb-2">Roles de tienda</h3>
         <p className="text-xs text-text/60 mb-4">
@@ -1578,7 +1578,7 @@ const CreateStoreModal = ({ onClose, onCreated }) => {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg card-glass p-6"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto card-glass p-6"
       >
         <h3 className="text-xl font-bold mb-2">Crear tienda</h3>
         <p className="text-xs text-text/60 mb-4">

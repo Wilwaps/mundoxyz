@@ -1254,6 +1254,8 @@ const ProductEditModal = ({
   const [stock, setStock] = useState(
     product?.stock != null ? String(product.stock) : '0'
   );
+  const existingModifiers = Array.isArray(product?.modifiers) ? product.modifiers : [];
+  const [modifierGroups, setModifierGroups] = useState([]);
 
   const priceUsdtNumber = parseFloat(priceUsdt || '0');
   const priceFiresNumber = parseFloat(priceFires || '0');
@@ -1275,12 +1277,135 @@ const ProductEditModal = ({
     }
   }
 
+  const addModifierGroup = () => {
+    setModifierGroups((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${prev.length}`,
+        groupName: '',
+        maxSelection: 1,
+        options: [
+          {
+            id: `${Date.now()}_${prev.length}_0`,
+            name: '',
+            priceAdjustmentUsdt: ''
+          }
+        ]
+      }
+    ]);
+  };
+
+  const updateModifierGroup = (groupId, changes) => {
+    setModifierGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, ...changes } : g))
+    );
+  };
+
+  const removeModifierGroup = (groupId) => {
+    setModifierGroups((prev) => prev.filter((g) => g.id !== groupId));
+  };
+
+  const addModifierOption = (groupId) => {
+    setModifierGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: [
+                ...g.options,
+                {
+                  id: `${Date.now()}_${g.options.length}`,
+                  name: '',
+                  priceAdjustmentUsdt: ''
+                }
+              ]
+            }
+          : g
+      )
+    );
+  };
+
+  const updateModifierOption = (groupId, optionId, changes) => {
+    setModifierGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: g.options.map((opt) =>
+                opt.id === optionId ? { ...opt, ...changes } : opt
+              )
+            }
+          : g
+      )
+    );
+  };
+
+  const removeModifierOption = (groupId, optionId) => {
+    setModifierGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: g.options.filter((opt) => opt.id !== optionId)
+            }
+          : g
+      )
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     let normalizedStock = parseInt(stock, 10);
     if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
       normalizedStock = 0;
+    }
+
+    const cleanedModifierGroups = modifierGroups
+      .map((group) => {
+        const groupName = (group.groupName || '').trim();
+        if (!groupName) return null;
+
+        let maxSelection = parseInt(group.maxSelection, 10);
+        if (!Number.isFinite(maxSelection) || maxSelection <= 0) {
+          maxSelection = 1;
+        }
+
+        const options = Array.isArray(group.options) ? group.options : [];
+        const cleanedOptions = options
+          .map((opt) => {
+            const optName = (opt.name || '').trim();
+            if (!optName) return null;
+
+            const rawAdj = opt.priceAdjustmentUsdt;
+            const parsedAdj =
+              rawAdj === '' || rawAdj === null || rawAdj === undefined
+                ? 0
+                : Number(String(rawAdj).replace(',', '.'));
+            const priceAdjustmentUsdt =
+              Number.isFinite(parsedAdj) && parsedAdj >= 0 ? parsedAdj : 0;
+
+            return {
+              name: optName,
+              priceAdjustmentUsdt,
+              maxSelection
+            };
+          })
+          .filter(Boolean);
+
+        if (cleanedOptions.length === 0) return null;
+
+        return {
+          groupName,
+          maxSelection,
+          options: cleanedOptions
+        };
+      })
+      .filter(Boolean);
+
+    if (hasModifiers && cleanedModifierGroups.length === 0 && existingModifiers.length === 0) {
+      toast.error('Agrega al menos un modificador o desactiva "Usa modificadores".');
+      return;
     }
 
     const payload = {
@@ -1294,7 +1419,8 @@ const ProductEditModal = ({
       has_modifiers: hasModifiers,
       accepts_fires: acceptsFires,
       image_url: imageUrl,
-      stock: normalizedStock
+      stock: normalizedStock,
+      modifierGroups: cleanedModifierGroups
     };
 
     await onSave(payload);
@@ -1307,7 +1433,7 @@ const ProductEditModal = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md card-glass p-6 space-y-4"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto card-glass p-6 space-y-4"
       >
         <h3 className="text-lg font-bold">
           {mode === 'create' ? 'Nuevo producto' : 'Editar producto'}
@@ -1502,6 +1628,108 @@ const ProductEditModal = ({
               <span>Acepta pagos en Fires</span>
             </label>
           </div>
+
+          {hasModifiers && (
+            <div className="mt-3 border-t border-white/10 pt-3 space-y-3 text-[11px]">
+              <div className="flex items-center justify-between">
+                <span className="text-text/70 font-semibold">Configuración de modificadores</span>
+                <button
+                  type="button"
+                  onClick={addModifierGroup}
+                  className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[10px]"
+                >
+                  + Agregar grupo
+                </button>
+              </div>
+
+              {modifierGroups.length === 0 && (
+                <p className="text-[11px] text-text/60">
+                  Define grupos como <span className="font-semibold">Tamaño</span> (Carta, Oficio) o
+                  <span className="font-semibold"> Ingredientes</span> (maíz, jamón, tocineta).
+                </p>
+              )}
+
+              {modifierGroups.map((group) => (
+                <div key={group.id} className="border border-white/10 rounded-lg p-2 space-y-2">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <div className="text-[10px] text-text/60 mb-0.5">Nombre del modificador</div>
+                      <input
+                        type="text"
+                        value={group.groupName}
+                        onChange={(e) =>
+                          updateModifierGroup(group.id, { groupName: e.target.value })
+                        }
+                        className="input-glass w-full text-[11px] py-1"
+                        placeholder="Ej: Tamaño, Ingredientes"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <div className="text-[10px] text-text/60 mb-0.5">Máx. seleccionables</div>
+                      <input
+                        type="number"
+                        min="1"
+                        value={group.maxSelection}
+                        onChange={(e) =>
+                          updateModifierGroup(group.id, { maxSelection: e.target.value })
+                        }
+                        className="input-glass w-full text-[11px] py-1"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeModifierGroup(group.id)}
+                      className="px-2 py-1 rounded-full bg-error/20 text-error hover:bg-error/30 text-[10px]"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    {group.options.map((opt) => (
+                      <div key={opt.id} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={opt.name}
+                          onChange={(e) =>
+                            updateModifierOption(group.id, opt.id, { name: e.target.value })
+                          }
+                          className="flex-1 input-glass text-[11px] py-1"
+                          placeholder="Nombre del elemento (Ej: Carta, Oficio)"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={opt.priceAdjustmentUsdt}
+                          onChange={(e) =>
+                            updateModifierOption(group.id, opt.id, {
+                              priceAdjustmentUsdt: e.target.value
+                            })
+                          }
+                          className="w-24 input-glass text-[11px] py-1"
+                          placeholder="+ USDT"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeModifierOption(group.id, opt.id)}
+                          className="px-2 py-1 rounded-full bg-glass text-text/70 hover:bg-glass-hover text-[10px]"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addModifierOption(group.id)}
+                      className="mt-1 px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[10px]"
+                    >
+                      + Agregar elemento
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
