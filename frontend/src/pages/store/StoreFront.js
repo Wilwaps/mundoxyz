@@ -29,6 +29,12 @@ const StoreFront = () => {
     const [payments, setPayments] = useState(initialPayments);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [giveChangeInFires, setGiveChangeInFires] = useState(false);
+    const [guestName, setGuestName] = useState('');
+    const [guestPhone, setGuestPhone] = useState('');
+    const [guestEmail, setGuestEmail] = useState('');
+    const [cashProofBase64, setCashProofBase64] = useState('');
+    const [cashProofName, setCashProofName] = useState('');
+    const [transferReference, setTransferReference] = useState('');
 
     // Fetch Store Data
     const { data: storeData, isLoading } = useQuery({
@@ -63,6 +69,21 @@ const StoreFront = () => {
             ? value
             : parseFloat(String(value ?? '').replace(',', '.'));
         return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (typeof reader.result === 'string') {
+                    resolve(reader.result);
+                } else {
+                    reject(new Error('No se pudo leer el archivo'));
+                }
+            };
+            reader.onerror = () => reject(reader.error || new Error('Error leyendo archivo'));
+            reader.readAsDataURL(file);
+        });
     };
 
     const addToCart = (product, quantity = 1, modifiers = []) => {
@@ -169,12 +190,6 @@ const StoreFront = () => {
     });
 
     const handleCheckout = async () => {
-        if (!user) {
-            toast.error('Debes iniciar sesión para confirmar tu pedido');
-            navigate('/login');
-            return;
-        }
-
         if (cart.length === 0) {
             toast.error('El carrito está vacío');
             return;
@@ -183,6 +198,29 @@ const StoreFront = () => {
             toast.error('Falta completar el pago');
             return;
         }
+
+        if (!user) {
+            const nameTrimmed = guestName.trim();
+            const phoneTrimmed = guestPhone.trim();
+
+            if (!nameTrimmed || !phoneTrimmed) {
+                toast.error('Ingresa al menos tu nombre y teléfono para continuar sin registrarte');
+                return;
+            }
+        }
+
+        const guestInfo = !user
+            ? {
+                name: guestName.trim() || null,
+                phone: guestPhone.trim() || null,
+                email: guestEmail.trim() || null
+            }
+            : null;
+
+        const paymentMeta = {
+            proof_cash_bill_image_base64: cashProofBase64 || null,
+            transfer_reference: transferReference.trim() || null
+        };
 
         const orderData = {
             store_id: storeData.store.id,
@@ -197,10 +235,12 @@ const StoreFront = () => {
                 cash_usdt: cashUsdt,
                 zelle: zelleUsdt,
                 bs: bsAmount,
-                fires: firesAmount
+                fires: firesAmount,
+                meta: paymentMeta
             },
             currency_snapshot: rates,
             customer_id: user?.id || null,
+            delivery_info: guestInfo ? { guest: guestInfo } : null,
             change_to_fires: giveChangeInFires && changeUSDT > 0 && user?.id
                 ? {
                     enabled: true,
@@ -356,10 +396,17 @@ const StoreFront = () => {
                                 <div className="flex flex-wrap gap-4 text-sm text-white/80">
                                     <span className="flex items-center gap-1"><Star size={14} className="text-yellow-400 fill-yellow-400" /> 4.8 (120+)</span>
                                     <span className="flex items-center gap-1"><Clock size={14} /> 30-45 min</span>
-                                    {mapsUrl && (
+                                    {(mapsUrl || locationAddress) && (
                                         <button
                                             type="button"
-                                            onClick={() => window.open(mapsUrl, '_blank', 'noopener,noreferrer')}
+                                            onClick={() => {
+                                                if (mapsUrl) {
+                                                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                                                } else if (locationAddress) {
+                                                    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`;
+                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                }
+                                            }}
                                             className="flex items-center gap-1 hover:text-white underline-offset-2 hover:underline"
                                         >
                                             <span role="img" aria-label="Ubicación">📍</span>
@@ -369,6 +416,54 @@ const StoreFront = () => {
                                             )}
                                         </button>
                                     )}
+                                </div>
+                            )}
+
+                            {!user && (
+                                <div className="mb-4 text-xs bg-white/5 rounded-lg p-3 space-y-2">
+                                    <div className="font-semibold text-white/80">Compra sin registrarte</div>
+                                    <p className="text-white/60">
+                                        Puedes completar tu pedido como invitado. Solo necesitamos tus datos de contacto para que la tienda pueda confirmarlo.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[11px] text-white/60 mb-1">Nombre</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={guestName}
+                                                onChange={(e) => setGuestName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] text-white/60 mb-1">Teléfono / contacto</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={guestPhone}
+                                                onChange={(e) => setGuestPhone(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[11px] text-white/60 mb-1">Correo (opcional)</label>
+                                            <input
+                                                type="email"
+                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={guestEmail}
+                                                onChange={(e) => setGuestEmail(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="text-[11px] text-white/50 flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/login')}
+                                            className="px-2 py-1 rounded-full bg-white/10 hover:bg-white/20"
+                                        >
+                                            Ingresar con mi cuenta
+                                        </button>
+                                        <span>o continúa como invitado completando los campos.</span>
+                                    </div>
                                 </div>
                             )}
                         </div>
