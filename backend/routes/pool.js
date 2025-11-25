@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireGameAccess } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const RoomCodeService = require('../services/roomCodeService');
@@ -9,7 +9,7 @@ const { closeUserPreviousRooms } = require('../utils/tictactoe-cleanup'); // Reu
 const { refundBet } = require('../utils/tictactoe');
 
 // POST /api/pool/create - Create new room (incluye soporte para RON-IA en modo práctica)
-router.post('/create', verifyToken, async (req, res) => {
+router.post('/create', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { mode, bet_amount, visibility = 'public', opponent_type = 'player', ai_difficulty = null } = req.body;
         const userId = req.user.id;
@@ -137,7 +137,7 @@ router.post('/create', verifyToken, async (req, res) => {
 });
 
 // POST /api/pool/join/:code
-router.post('/join/:code', verifyToken, async (req, res) => {
+router.post('/join/:code', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { code } = req.params;
         const userId = req.user.id;
@@ -216,7 +216,7 @@ router.post('/join/:code', verifyToken, async (req, res) => {
 });
 
 // GET /api/pool/room/:code
-router.get('/room/:code', verifyToken, async (req, res) => {
+router.get('/room/:code', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { code } = req.params;
         const result = await query(
@@ -239,7 +239,7 @@ router.get('/room/:code', verifyToken, async (req, res) => {
 });
 
 // POST /api/pool/room/:code/start
-router.post('/room/:code/start', verifyToken, async (req, res) => {
+router.post('/room/:code/start', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { code } = req.params;
         const userId = req.user.id;
@@ -278,7 +278,7 @@ router.post('/room/:code/start', verifyToken, async (req, res) => {
     }
 });
 // GET /api/pool/rooms/public - List public lobby rooms
-router.get('/rooms/public', verifyToken, async (req, res) => {
+router.get('/rooms/public', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { mode, limit = 50, offset = 0 } = req.query;
 
@@ -315,7 +315,7 @@ router.get('/rooms/public', verifyToken, async (req, res) => {
 });
 
 // GET /api/pool/rooms/admin - List active rooms for admin/tote (including private)
-router.get('/rooms/admin', verifyToken, async (req, res) => {
+router.get('/rooms/admin', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const roles = req.user.roles || [];
         const isAdmin = roles.includes('admin') || roles.includes('tote');
@@ -345,7 +345,7 @@ router.get('/rooms/admin', verifyToken, async (req, res) => {
 });
 
 // DELETE /api/pool/rooms/:code - Close room and refund players (admin/tote)
-router.delete('/rooms/:code', verifyToken, async (req, res) => {
+router.delete('/rooms/:code', verifyToken, requireGameAccess, async (req, res) => {
     try {
         const { code } = req.params;
         const userId = req.user.id;

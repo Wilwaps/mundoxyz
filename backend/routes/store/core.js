@@ -37,7 +37,17 @@ router.get('/list', verifyToken, async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, slug, name, logo_url
+            `SELECT 
+                id, 
+                slug, 
+                name, 
+                logo_url,
+                description,
+                currency_config,
+                commission_percentage,
+                store_type,
+                allowed_currencies,
+                level
        FROM stores
        ORDER BY name ASC`
         );
@@ -116,7 +126,8 @@ router.get('/public-list', verifyToken, async (req, res) => {
 // --- POS CUSTOMERS (CI-based) ---
 
 // POST /api/store/:storeId/customers
-// Crea (o reutiliza) un usuario basado en CI y lo asocia a la tienda
+// Crea (o reutiliza) un usuario basado en CI y lo asocia a la tienda.
+// IMPORTANTE: solo los usuarios NUEVOS creados desde este flujo reciben home_store_id = storeId.
 router.post('/:storeId/customers', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
@@ -162,7 +173,7 @@ router.post('/:storeId/customers', verifyToken, async (req, res) => {
         const result = await transaction(async (client) => {
             // 1) Buscar usuario existente por CI
             const existingUserResult = await client.query(
-                `SELECT id, username, display_name, ci_prefix, ci_number, ci_full, phone, email
+                `SELECT id, username, display_name, ci_prefix, ci_number, ci_full, phone, email, home_store_id
            FROM users
            WHERE ci_full = $1
            LIMIT 1`,
@@ -221,8 +232,8 @@ router.post('/:storeId/customers', verifyToken, async (req, res) => {
                 const userInsert = await client.query(
                     `INSERT INTO users 
              (username, display_name, email, ci_prefix, ci_number, ci_full, phone, must_change_password,
-              is_verified, first_seen_at, last_seen_at, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, FALSE, NOW(), NOW(), NOW(), NOW())
+              is_verified, first_seen_at, last_seen_at, created_at, updated_at, home_store_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, FALSE, NOW(), NOW(), NOW(), NOW(), $8)
              RETURNING *`,
                     [
                         username,
@@ -231,7 +242,8 @@ router.post('/:storeId/customers', verifyToken, async (req, res) => {
                         prefix,
                         number,
                         ciFull,
-                        phoneNormalized
+                        phoneNormalized,
+                        storeId
                     ]
                 );
 
@@ -334,13 +346,20 @@ router.patch('/:storeId/settings', verifyToken, async (req, res) => {
             return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
         }
 
+        const roles = Array.isArray(req.user.roles) ? req.user.roles : [];
+        const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
+
         const {
             name,
             description,
             logo_url,
             cover_url,
             settings_patch: settingsPatch,
-            location_patch: locationPatch
+            location_patch: locationPatch,
+            commission_percentage,
+            store_type,
+            allowed_currencies,
+            level
         } = req.body || {};
 
         const fields = [];
@@ -370,6 +389,48 @@ router.patch('/:storeId/settings', verifyToken, async (req, res) => {
         if (locationPatch && typeof locationPatch === 'object') {
             fields.push(`location = COALESCE(location, '{}'::jsonb) || $${idx++}::jsonb`);
             values.push(JSON.stringify(locationPatch));
+        }
+
+        // Solo admin global puede modificar nivel, comisión y monedas permitidas
+        if (isGlobalAdmin && commission_percentage !== undefined) {
+            const raw = Number(commission_percentage);
+            let commission = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+            if (commission > 100) commission = 100;
+            fields.push(`commission_percentage = $${idx++}`);
+            values.push(commission);
+        }
+
+        if (isGlobalAdmin && store_type !== undefined) {
+            const allowedTypes = ['papeleria', 'restaurante', 'joyeria', 'otro'];
+            let normalizedType = typeof store_type === 'string' ? store_type.toLowerCase() : 'papeleria';
+            if (!allowedTypes.includes(normalizedType)) {
+                normalizedType = 'papeleria';
+            }
+            fields.push(`store_type = $${idx++}`);
+            values.push(normalizedType);
+        }
+
+        if (isGlobalAdmin && allowed_currencies !== undefined) {
+            const baseSet = ['coins', 'fires', 'usdt', 'ves'];
+            let normalized = Array.isArray(allowed_currencies)
+                ? allowed_currencies
+                      .map((c) => (c != null ? String(c).toLowerCase() : ''))
+                      .filter((c) => baseSet.includes(c))
+                : null;
+            if (!normalized || normalized.length === 0) {
+                normalized = baseSet;
+            }
+            fields.push(`allowed_currencies = $${idx++}::jsonb`);
+            values.push(JSON.stringify(normalized));
+        }
+
+        if (isGlobalAdmin && level !== undefined) {
+            let lvl = parseInt(level, 10);
+            if (!Number.isFinite(lvl)) lvl = 3;
+            if (lvl < 1) lvl = 1;
+            if (lvl > 3) lvl = 3;
+            fields.push(`level = $${idx++}`);
+            values.push(lvl);
         }
 
         if (fields.length === 0) {
@@ -473,14 +534,70 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
 // POST /api/store/create (Super Admin or specific role)
 router.post('/create', verifyToken, async (req, res) => {
     try {
-        const { name, slug, description, currency_config } = req.body;
+        const roles = Array.isArray(req.user.roles) ? req.user.roles : [];
+        const isAdmin = roles.includes('tote') || roles.includes('admin');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'No autorizado para crear tiendas' });
+        }
+
+        const {
+            name,
+            slug,
+            description,
+            currency_config,
+            commission_percentage,
+            store_type,
+            allowed_currencies,
+            level
+        } = req.body || {};
+
         const ownerId = req.user.id; // Or assigned user
 
+        // Normalizar comisión
+        const rawCommission = Number(commission_percentage);
+        let commission = Number.isFinite(rawCommission) && rawCommission >= 0 ? rawCommission : 0;
+        if (commission > 100) commission = 100;
+
+        // Normalizar tipo de tienda
+        const allowedTypes = ['papeleria', 'restaurante', 'joyeria', 'otro'];
+        let normalizedType = typeof store_type === 'string' ? store_type.toLowerCase() : 'papeleria';
+        if (!allowedTypes.includes(normalizedType)) {
+            normalizedType = 'papeleria';
+        }
+
+        // Normalizar monedas permitidas
+        const baseCurrencies = ['coins', 'fires', 'usdt', 'ves'];
+        let normalizedAllowed = Array.isArray(allowed_currencies)
+            ? allowed_currencies
+                  .map((c) => (c != null ? String(c).toLowerCase() : ''))
+                  .filter((c) => baseCurrencies.includes(c))
+            : null;
+        if (!normalizedAllowed || normalizedAllowed.length === 0) {
+            normalizedAllowed = baseCurrencies;
+        }
+
+        // Normalizar nivel
+        let lvl = parseInt(level, 10);
+        if (!Number.isFinite(lvl)) lvl = 3;
+        if (lvl < 1) lvl = 1;
+        if (lvl > 3) lvl = 3;
+
         const result = await query(
-            `INSERT INTO stores (name, slug, description, owner_id, currency_config)
-       VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO stores (name, slug, description, owner_id, currency_config, commission_percentage, store_type, allowed_currencies, level)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-            [name, slug, description, ownerId, currency_config]
+            [
+                name,
+                slug,
+                description,
+                ownerId,
+                currency_config,
+                commission,
+                normalizedType,
+                JSON.stringify(normalizedAllowed),
+                lvl
+            ]
         );
 
         res.json(result.rows[0]);

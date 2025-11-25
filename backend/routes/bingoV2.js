@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireGameAccess } = require('../middleware/auth');
 const BingoV2Service = require('../services/bingoV2Service');
 const { query } = require('../db');
 const logger = require('../utils/logger');
@@ -48,7 +48,7 @@ router.get('/rooms', async (req, res) => {
 /**
  * Get all rooms (admin panel in profile - only for tote/admin roles)
  */
-router.get('/my-rooms', verifyToken, async (req, res) => {
+router.get('/my-rooms', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRoles = req.user.roles || [];
@@ -118,7 +118,7 @@ router.get('/my-rooms', verifyToken, async (req, res) => {
 /**
  * Create a new room
  */
-router.post('/rooms', verifyToken, async (req, res) => {
+router.post('/rooms', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const room = await BingoV2Service.createRoom(req.user.id, {
       ...req.body,
@@ -138,7 +138,7 @@ router.post('/rooms', verifyToken, async (req, res) => {
 /**
  * Join a room
  */
-router.post('/rooms/:code/join', verifyToken, async (req, res) => {
+router.post('/rooms/:code/join', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { cards_count = 1 } = req.body;
     const result = await BingoV2Service.joinRoom(
@@ -181,7 +181,7 @@ router.get('/rooms/:code', async (req, res) => {
 /**
  * Get user's active rooms (rooms where user has purchased cards and game is waiting/in_progress)
  */
-router.get('/active-rooms', verifyToken, async (req, res) => {
+router.get('/active-rooms', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const result = await query(
       `SELECT 
@@ -221,7 +221,7 @@ router.get('/active-rooms', verifyToken, async (req, res) => {
 /**
  * Get user messages/inbox
  */
-router.get('/messages', verifyToken, async (req, res) => {
+router.get('/messages', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const result = await query(
       `SELECT * FROM bingo_v2_messages 
@@ -252,7 +252,7 @@ router.get('/messages', verifyToken, async (req, res) => {
 /**
  * Mark message as read
  */
-router.put('/messages/:id/read', verifyToken, async (req, res) => {
+router.put('/messages/:id/read', verifyToken, requireGameAccess, async (req, res) => {
   try {
     await query(
       `UPDATE bingo_v2_messages 
@@ -271,7 +271,7 @@ router.put('/messages/:id/read', verifyToken, async (req, res) => {
 /**
  * Delete message
  */
-router.delete('/messages/:id', verifyToken, async (req, res) => {
+router.delete('/messages/:id', verifyToken, requireGameAccess, async (req, res) => {
   try {
     await query(
       `DELETE FROM bingo_v2_messages 
@@ -289,7 +289,7 @@ router.delete('/messages/:id', verifyToken, async (req, res) => {
 /**
  * Get user experience and stats
  */
-router.get('/stats', verifyToken, async (req, res) => {
+router.get('/stats', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const result = await query(
       `SELECT experience, total_games_played, total_games_won 
@@ -310,7 +310,7 @@ router.get('/stats', verifyToken, async (req, res) => {
 /**
  * Check if user can close a room
  */
-router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
+router.get('/rooms/:code/can-close', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     
@@ -342,7 +342,7 @@ router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
 /**
  * Close a room and refund all players (host or admin/tote)
  */
-router.delete('/rooms/:code', verifyToken, async (req, res) => {
+router.delete('/rooms/:code', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userRoles = req.user.roles || [];
@@ -392,7 +392,7 @@ router.delete('/rooms/:code', verifyToken, async (req, res) => {
 /**
  * ADMIN ONLY: Emergency refund for a room
  */
-router.post('/admin/rooms/:code/emergency-refund', verifyToken, async (req, res) => {
+router.post('/admin/rooms/:code/emergency-refund', verifyToken, requireGameAccess, async (req, res) => {
   try {
     // Check if user is admin
     const adminResult = await query(
@@ -442,7 +442,7 @@ router.post('/admin/rooms/:code/emergency-refund', verifyToken, async (req, res)
 /**
  * ADMIN ONLY: Detect and list system failures
  */
-router.get('/admin/detect-failures', verifyToken, async (req, res) => {
+router.get('/admin/detect-failures', verifyToken, requireGameAccess, async (req, res) => {
   try {
     // Check if user is admin
     const adminResult = await query(
@@ -472,7 +472,7 @@ router.get('/admin/detect-failures', verifyToken, async (req, res) => {
  * Update player's card count in waiting room
  * Allows players to add/remove cards and adjusts wallet accordingly
  */
-router.post('/rooms/:code/update-cards', verifyToken, async (req, res) => {
+router.post('/rooms/:code/update-cards', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const { cards_count, auto_ready } = req.body;

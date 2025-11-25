@@ -75,6 +75,29 @@ axios.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.error || '';
+      const level = error.response?.data?.store_level;
+
+      if (message.includes('Acceso a billetera y tokens no permitido para tu nivel de tienda')) {
+        const extra =
+          typeof level === 'number'
+            ? ` (nivel actual: ${level}. Se requiere nivel 2 o 3)`
+            : '';
+        toast.error(
+          `Tu tienda no tiene acceso a billetera y tokens.${extra}`
+        );
+      } else if (message.includes('Acceso a juegos no permitido para tu nivel de tienda')) {
+        const extra =
+          typeof level === 'number'
+            ? ` (nivel actual: ${level}. Se requiere nivel 3)`
+            : '';
+        toast.error(
+          `Tu tienda no tiene acceso a juegos.${extra}`
+        );
+      }
+    }
     return Promise.reject(error);
   }
 );

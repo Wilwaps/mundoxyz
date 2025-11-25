@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireGameAccess } = require('../middleware/auth');
 const RoomCodeService = require('../services/roomCodeService');
 const logger = require('../utils/logger');
 
@@ -111,7 +111,7 @@ router.get('/find/:code', async (req, res) => {
  * Obtiene salas activas del usuario autenticado
  * Incluye todas las salas donde el usuario participa (TicTacToe, Bingo, Rifas)
  */
-router.get('/active', verifyToken, async (req, res) => {
+router.get('/active', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -216,7 +216,7 @@ router.get('/active', verifyToken, async (req, res) => {
  * GET /api/rooms/stats
  * Estadísticas del sistema de códigos (admin/debug)
  */
-router.get('/stats', verifyToken, async (req, res) => {
+router.get('/stats', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const stats = await RoomCodeService.getStats();
     

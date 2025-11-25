@@ -517,6 +517,22 @@ CREATE INDEX IF NOT EXISTS idx_raffle_participants_raffle_user ON raffle_partici
 COMMENT ON TABLE raffle_participants IS 'Participantes de rifas con tracking de números y gastos';
 
 -- ============================================
+-- 14. AJUSTES FASE TIENDAS / STORES NIVELES
+-- Estos ALTER reflejan las migraciones de niveles, comisión y monedas permitidas por tienda.
+ALTER TABLE stores
+  ADD COLUMN IF NOT EXISTS commission_percentage NUMERIC(5,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS store_type VARCHAR(50) NOT NULL DEFAULT 'papeleria',
+  ADD COLUMN IF NOT EXISTS allowed_currencies JSONB NOT NULL DEFAULT '["coins","fires","usdt","ves"]'::jsonb,
+  ADD COLUMN IF NOT EXISTS level INTEGER NOT NULL DEFAULT 3;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS home_store_id UUID REFERENCES stores(id);
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS commission_percentage NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS platform_commission_usdt DECIMAL(20,2) NOT NULL DEFAULT 0;
+
+-- ============================================
 -- 14. RAFFLE_AUDIT_LOGS
 -- ============================================
 CREATE TABLE IF NOT EXISTS raffle_audit_logs (

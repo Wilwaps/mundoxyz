@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { verifyToken, requireAdmin, adminAuth } = require('../middleware/auth');
+const { verifyToken, requireAdmin, adminAuth, requireWalletAccess } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const telegramService = require('../services/telegramService');
 const fiatRateService = require('../services/fiatRateService');
 const { calculateAndLogCommission } = require('../services/commissionService');
 
 // Get user balance
-router.get('/balance', verifyToken, async (req, res) => {
+router.get('/balance', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -177,7 +177,7 @@ router.get('/fiat-context', async (req, res) => {
 });
 
 // Transfer between users
-router.post('/transfer', verifyToken, async (req, res) => {
+router.post('/transfer', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const { to_user_id, currency, amount, description } = req.body;
     const from_user_id = req.user.id;
@@ -468,7 +468,7 @@ router.get('/supply/stream', (req, res) => {
 });
 
 // Transfer fires between wallets
-router.post('/transfer-fires', verifyToken, async (req, res) => {
+router.post('/transfer-fires', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const { to_wallet_id, amount } = req.body;
     const from_user_id = req.user.id;
@@ -707,7 +707,7 @@ router.post('/transfer-fires', verifyToken, async (req, res) => {
 });
 
 // Request fires purchase
-router.post('/request-fires', verifyToken, async (req, res) => {
+router.post('/request-fires', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const { amount, bank_reference, payment_method, usdt_amount, tx_hash, network } = req.body || {};
     const user_id = req.user.id;

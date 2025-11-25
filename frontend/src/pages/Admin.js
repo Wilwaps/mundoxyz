@@ -1481,6 +1481,13 @@ const CreateStoreModal = ({ onClose, onCreated }) => {
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [currencyConfig, setCurrencyConfig] = useState('coins');
+  const [storeType, setStoreType] = useState('papeleria');
+  const [commissionPercentage, setCommissionPercentage] = useState('0');
+  const [level, setLevel] = useState('3');
+  const [allowedCoins, setAllowedCoins] = useState(true);
+  const [allowedFires, setAllowedFires] = useState(true);
+  const [allowedUsdt, setAllowedUsdt] = useState(true);
+  const [allowedVes, setAllowedVes] = useState(true);
   const [slugTouched, setSlugTouched] = useState(false);
   const queryClient = useQueryClient();
 
@@ -1534,11 +1541,31 @@ const CreateStoreModal = ({ onClose, onCreated }) => {
       return;
     }
 
+    const allowedCurrencies = [];
+    if (allowedCoins) allowedCurrencies.push('coins');
+    if (allowedFires) allowedCurrencies.push('fires');
+    if (allowedUsdt) allowedCurrencies.push('usdt');
+    if (allowedVes) allowedCurrencies.push('ves');
+
+    if (allowedCurrencies.length === 0) {
+      toast.error('Selecciona al menos una moneda permitida');
+      return;
+    }
+
+    const rawCommission = Number(commissionPercentage);
+    const normalizedCommission = Number.isFinite(rawCommission) && rawCommission >= 0
+      ? rawCommission
+      : 0;
+
     await createStoreMutation.mutateAsync({
       name: trimmedName,
       slug: trimmedSlug,
       description: description.trim(),
-      currency_config: currencyConfig
+      currency_config: currencyConfig,
+      store_type: storeType,
+      commission_percentage: normalizedCommission,
+      level: Number(level) || 3,
+      allowed_currencies: allowedCurrencies
     });
   };
 
@@ -1599,6 +1626,80 @@ const CreateStoreModal = ({ onClose, onCreated }) => {
               <option value="both">Coins y Fires</option>
             </select>
           </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Tipo de tienda</div>
+            <select
+              value={storeType}
+              onChange={(e) => setStoreType(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="papeleria">Papelería</option>
+              <option value="restaurante">Restaurante</option>
+              <option value="joyeria">Joyería</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Comisión plataforma (%)</div>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={commissionPercentage}
+              onChange={(e) => setCommissionPercentage(e.target.value)}
+              className="input-glass w-full"
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Monedas permitidas</div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={allowedCoins}
+                  onChange={(e) => setAllowedCoins(e.target.checked)}
+                />
+                <span>Coins</span>
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={allowedFires}
+                  onChange={(e) => setAllowedFires(e.target.checked)}
+                />
+                <span>Fires</span>
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={allowedUsdt}
+                  onChange={(e) => setAllowedUsdt(e.target.checked)}
+                />
+                <span>USDT</span>
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={allowedVes}
+                  onChange={(e) => setAllowedVes(e.target.checked)}
+                />
+                <span>VES</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-text/60 mb-1">Nivel de tienda</div>
+            <select
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="1">Nivel 1 - Sin wallet ni juegos</option>
+              <option value="2">Nivel 2 - Wallet, sin juegos</option>
+              <option value="3">Nivel 3 - Wallet y juegos</option>
+            </select>
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -1621,8 +1722,204 @@ const CreateStoreModal = ({ onClose, onCreated }) => {
   );
 };
 
+const StoreSettingsModal = ({ store, onClose }) => {
+  const queryClient = useQueryClient();
+
+  const baseCurrencies = ['coins', 'fires', 'usdt', 'ves'];
+
+  let initialAllowed = baseCurrencies;
+  if (Array.isArray(store.allowed_currencies)) {
+    initialAllowed = store.allowed_currencies;
+  } else if (typeof store.allowed_currencies === 'string') {
+    try {
+      const parsed = JSON.parse(store.allowed_currencies);
+      if (Array.isArray(parsed)) {
+        initialAllowed = parsed;
+      }
+    } catch (e) {
+      // noop
+    }
+  }
+
+  const initialSet = new Set();
+  initialAllowed.forEach((c) => {
+    const value = typeof c === 'string' ? c.toLowerCase() : '';
+    if (baseCurrencies.includes(value)) {
+      initialSet.add(value);
+    }
+  });
+  if (initialSet.size === 0) {
+    baseCurrencies.forEach((c) => initialSet.add(c));
+  }
+
+  const [storeType, setStoreType] = useState(store.store_type || 'papeleria');
+  const [commission, setCommission] = useState(
+    store.commission_percentage != null ? String(store.commission_percentage) : '0'
+  );
+  const [level, setLevel] = useState(
+    store.level != null ? String(store.level) : '3'
+  );
+  const [allowed, setAllowed] = useState(initialSet);
+
+  const toggleCurrency = (currency) => {
+    setAllowed((prev) => {
+      const next = new Set(prev);
+      if (next.has(currency)) {
+        next.delete(currency);
+      } else {
+        next.add(currency);
+      }
+      return next;
+    });
+  };
+
+  const updateStoreSettingsMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await axios.patch(`/api/store/${store.id}/settings`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Configuración de tienda actualizada');
+      queryClient.invalidateQueries(['stores-list']);
+      onClose();
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al actualizar tienda';
+      toast.error(message);
+    }
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const allowedArray = Array.from(allowed);
+    if (allowedArray.length === 0) {
+      toast.error('Selecciona al menos una moneda permitida');
+      return;
+    }
+
+    const rawCommission = Number(commission);
+    const normalizedCommission = Number.isFinite(rawCommission) && rawCommission >= 0
+      ? rawCommission
+      : 0;
+
+    const payload = {
+      store_type: storeType,
+      commission_percentage: normalizedCommission,
+      allowed_currencies: allowedArray,
+      level: Number(level) || 3
+    };
+
+    await updateStoreSettingsMutation.mutateAsync(payload);
+  };
+
+  const isSaving = updateStoreSettingsMutation.isLoading;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg card-glass p-6"
+      >
+        <h3 className="text-xl font-bold mb-2">Configuración de tienda</h3>
+        <p className="text-xs text-text/60 mb-4">
+          Ajusta el nivel, la comisión de plataforma y las monedas permitidas para esta tienda.
+        </p>
+
+        <div className="mb-4 text-xs text-text/60">
+          <div className="font-semibold text-sm text-text">{store.name}</div>
+          <div>@{store.slug}</div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <div className="text-xs text-text/60 mb-1">Tipo de tienda</div>
+            <select
+              value={storeType}
+              onChange={(e) => setStoreType(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="papeleria">Papelería</option>
+              <option value="restaurante">Restaurante</option>
+              <option value="joyeria">Joyería</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+
+          <div>
+            <div className="text-xs text-text/60 mb-1">Comisión plataforma (%)</div>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={commission}
+              onChange={(e) => setCommission(e.target.value)}
+              className="input-glass w-full"
+            />
+          </div>
+
+          <div>
+            <div className="text-xs text-text/60 mb-1">Monedas permitidas</div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {baseCurrencies.map((currency) => (
+                <label key={currency} className="inline-flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={allowed.has(currency)}
+                    onChange={() => toggleCurrency(currency)}
+                  />
+                  <span>{currency.toUpperCase()}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs text-text/60 mb-1">Nivel de tienda</div>
+            <select
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className="input-glass w-full"
+            >
+              <option value="1">Nivel 1 - Sin wallet ni juegos</option>
+              <option value="2">Nivel 2 - Wallet, sin juegos</option>
+              <option value="3">Nivel 3 - Wallet y juegos</option>
+            </select>
+            <p className="mt-1 text-[11px] text-text/50">
+              El nivel controla acceso a billetera y juegos para usuarios con esta tienda como principal.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-glass hover:bg-glass-hover text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
 const AdminStores = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingStore, setEditingStore] = useState(null);
 
   const { data: storesData, isLoading, error } = useQuery({
     queryKey: ['stores-list'],
@@ -1674,6 +1971,30 @@ const AdminStores = () => {
               <div className="flex-1">
                 <div className="font-semibold">{store.name}</div>
                 <div className="text-xs text-text/60">@{store.slug}</div>
+                <div className="mt-2 text-[11px] text-text/60 space-y-0.5">
+                  <div>Nivel: {store.level != null ? store.level : 3}</div>
+                  <div>
+                    Comisión: {store.commission_percentage != null
+                      ? `${store.commission_percentage}%`
+                      : '0%'}
+                  </div>
+                  <div>Tipo: {store.store_type || 'papeleria'}</div>
+                  <div>
+                    Monedas:{' '}
+                    {Array.isArray(store.allowed_currencies) && store.allowed_currencies.length > 0
+                      ? store.allowed_currencies.join(', ')
+                      : 'coins, fires, usdt, ves'}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setEditingStore(store)}
+                  className="px-3 py-1 rounded-lg bg-glass hover:bg-glass-hover text-xs"
+                >
+                  Configurar
+                </button>
               </div>
             </div>
           ))}
@@ -1684,6 +2005,13 @@ const AdminStores = () => {
         <CreateStoreModal
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {}}
+        />
+      )}
+
+      {editingStore && (
+        <StoreSettingsModal
+          store={editingStore}
+          onClose={() => setEditingStore(null)}
         />
       )}
     </div>

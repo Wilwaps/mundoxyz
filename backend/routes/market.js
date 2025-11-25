@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { verifyToken, adminAuth } = require('../middleware/auth');
+const { verifyToken, adminAuth, requireWalletAccess } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const config = require('../config/config');
 const telegramService = require('../services/telegramService');
 const { calculateAndLogCommission } = require('../services/commissionService');
 
 // Request to redeem fires for fiat (mínimo 100, con comisión 5%)
-router.post('/redeem-100-fire', verifyToken, async (req, res) => {
+router.post('/redeem-100-fire', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const {
       cedula,
@@ -558,7 +558,7 @@ router.post('/redeems/:id/reject', adminAuth, async (req, res) => {
 });
 
 // Get user's redemption history
-router.get('/my-redeems', verifyToken, async (req, res) => {
+router.get('/my-redeems', verifyToken, requireWalletAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     

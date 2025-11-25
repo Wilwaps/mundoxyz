@@ -33,6 +33,7 @@ import PoolRoom from './pages/PoolRoom';
 import CaidaLobby from './pages/CaidaLobby';
 import CaidaRoom from './pages/CaidaRoom';
 import StoreFront from './pages/store/StoreFront';
+import StoreFrontInvoicePage from './pages/store/StoreFrontInvoicePage';
 import POS from './pages/store/POS';
 import KitchenDisplay from './pages/store/KitchenDisplay';
 import StoreOwnerDashboard from './pages/store/StoreOwnerDashboard';
@@ -61,9 +62,13 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // Permitir acceso público al StoreFront (/store/:slug) sin obligar a login
+  // Permitir acceso público al StoreFront (/store/:slug) y a la página de factura (/store/:slug/invoice/:invoiceNumber)
   const path = location.pathname;
-  const isPublicStoreFront = /^\/store\/[^/]+$/.test(path);
+  const publicStorefrontRoutes = [
+    /^\/store\/[^/]+$/,
+    /^\/store\/[^/]+\/invoice\/[^/]+$/
+  ];
+  const isPublicStoreFront = publicStorefrontRoutes.some((re) => re.test(path));
 
   if (!user && !isPublicStoreFront) {
     const nextPath = `${location.pathname}${location.search}`;
@@ -166,6 +171,7 @@ function App() {
                   <Route path="caida/lobby" element={<CaidaLobby />} />
                   <Route path="caida/room/:code" element={<CaidaRoom />} />
                   <Route path="store/:slug" element={<StoreFront />} />
+                  <Route path="store/:slug/invoice/:invoiceNumber" element={<StoreFrontInvoicePage />} />
                   <Route path="store/:slug/dashboard" element={<StoreOwnerDashboard />} />
                   <Route path="store/:slug/pos" element={<POS />} />
                   <Route path="store/:slug/kitchen" element={<KitchenDisplay />} />

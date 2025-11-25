@@ -1,12 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../../db');
-const { verifyToken } = require('../../middleware/auth');
+const { verifyToken, optionalAuth } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
+const ubicacionService = require('../../services/ubicacion/ubicacionService');
 
 // POST /api/store/order/create
-router.post('/create', verifyToken, async (req, res) => {
+// Nota: usa optionalAuth para permitir pedidos del StoreFront sin sesión,
+// pero sigue exigiendo autenticación para POS / flujos internos.
+router.post('/create', optionalAuth, async (req, res) => {
     try {
         const {
             store_id,
@@ -19,9 +22,16 @@ router.post('/create', verifyToken, async (req, res) => {
             customer_id,
             change_to_fires
         } = req.body;
-        const userId = req.user.id;
         const source = payment_method && typeof payment_method === 'object' ? payment_method.source : null;
         const isStorefront = source === 'storefront';
+
+        // Para pedidos POS / internos, requerir autenticación fuerte.
+        if (!req.user && !isStorefront) {
+            return res.status(401).json({ error: 'Autenticación requerida para crear este pedido' });
+        }
+
+        // En StoreFront invitado, userId puede ser null.
+        const userId = req.user ? req.user.id : null;
 
         // 1. Calculate Totals & preparar datos para inventario
         let subtotal_usdt = 0;
@@ -101,15 +111,91 @@ router.post('/create', verifyToken, async (req, res) => {
             modifierQty: Array.from(entry.modifierQtyMap.entries()) // [modifierId, qty]
         }));
 
-        // 2. Calculate Fees/Tax
-        const storeSettingsResult = await query('SELECT settings FROM stores WHERE id = $1', [store_id]);
-        const settings = storeSettingsResult.rows[0].settings;
+        // 1.b Configuración de tienda: impuestos, comisión y monedas permitidas
+        const storeSettingsResult = await query(
+            'SELECT settings, commission_percentage, allowed_currencies FROM stores WHERE id = $1',
+            [store_id]
+        );
+
+        if (storeSettingsResult.rows.length === 0) {
+            return res.status(400).json({ error: 'Tienda no encontrada para crear el pedido' });
+        }
+
+        const storeRow = storeSettingsResult.rows[0];
+        const settings = storeRow.settings || {};
+
+        // Normalizar comisión de tienda (0-100)
+        const rawCommission = storeRow.commission_percentage;
+        let commission_percentage = Number(rawCommission);
+        if (!Number.isFinite(commission_percentage) || commission_percentage < 0) commission_percentage = 0;
+        if (commission_percentage > 100) commission_percentage = 100;
+
+        // Normalizar monedas permitidas
+        const baseCurrencies = ['coins', 'fires', 'usdt', 'ves'];
+        let allowedCurrencies = Array.isArray(storeRow.allowed_currencies)
+            ? storeRow.allowed_currencies
+                  .map((c) => (c != null ? String(c).toLowerCase() : ''))
+                  .filter((c) => baseCurrencies.includes(c))
+            : null;
+
+        if (!allowedCurrencies || allowedCurrencies.length === 0) {
+            allowedCurrencies = baseCurrencies;
+        }
+
+        // Validar monedas usadas en el pago contra allowed_currencies de la tienda
+        const pm = payment_method && typeof payment_method === 'object' ? payment_method : {};
+
+        const usedCurrencyAmounts = {
+            usdt: 0,
+            ves: 0,
+            fires: 0,
+            coins: 0
+        };
+
+        const addAmount = (currency, value) => {
+            const n = value != null ? Number(value) : 0;
+            if (Number.isFinite(n) && n > 0) {
+                usedCurrencyAmounts[currency] += n;
+            }
+        };
+
+        // POS: cash_usdt, zelle, bs, fires
+        // StoreFront: cash_usdt, zelle, bs, bs_cash, bs_transfer, fires
+        addAmount('usdt', pm.cash_usdt);
+        addAmount('usdt', pm.zelle);
+        addAmount('ves', pm.bs);
+        addAmount('ves', pm.bs_cash);
+        addAmount('ves', pm.bs_transfer);
+        addAmount('fires', pm.fires);
+
+        const usedCurrencies = Object.entries(usedCurrencyAmounts)
+            .filter(([, amount]) => amount > 0)
+            .map(([currency]) => currency);
+
+        const notAllowed = usedCurrencies.filter((c) => !allowedCurrencies.includes(c));
+        if (notAllowed.length > 0) {
+            return res.status(400).json({
+                error: 'Método de pago no permitido para esta tienda',
+                details: {
+                    notAllowed,
+                    allowed: allowedCurrencies
+                }
+            });
+        }
 
         const tax_usdt = subtotal_usdt * (settings.tax_rate || 0);
         const service_fee = subtotal_usdt * (settings.service_fee || 0);
-        const delivery_fee_usdt = type === 'delivery' ? 5.00 : 0; // Fixed for now, dynamic later
+        const delivery_fee_usdt = await ubicacionService.calculateDeliveryFee({
+            storeId: store_id,
+            type,
+            subtotalUsdt: subtotal_usdt,
+            deliveryInfo: delivery_info
+        }); // Fixed for now, dynamic later
 
         const total_usdt = subtotal_usdt + tax_usdt + service_fee + delivery_fee_usdt;
+
+        // Calcular comisión de plataforma (solo reporting, sin mover wallets en esta fase)
+        const platform_commission_usdt = total_usdt * (commission_percentage / 100);
 
         // 3. Create Order Transaction
         const result = await transaction(async (client) => {
@@ -159,6 +245,22 @@ router.post('/create', verifyToken, async (req, res) => {
             );
 
             const order = orderResult.rows[0];
+
+            // Persistir comisión calculada en la orden (reporting)
+            try {
+                await client.query(
+                    `UPDATE orders
+             SET commission_percentage = $1,
+                 platform_commission_usdt = $2
+             WHERE id = $3`,
+                    [commission_percentage, platform_commission_usdt, order.id]
+                );
+
+                order.commission_percentage = commission_percentage;
+                order.platform_commission_usdt = platform_commission_usdt;
+            } catch (err) {
+                logger.error('Error al guardar comisión de orden:', err);
+            }
 
             // Create Order Items
             for (const item of orderItemsData) {
@@ -295,10 +397,9 @@ router.post('/create', verifyToken, async (req, res) => {
                 }
             }
 
-            // Para pedidos del POS, crear ticket de cocina y notificar al KDS.
-            // Para pedidos del StoreFront (clientes), solo dejar el pedido en estado 'pending'
-            // sin enviarlo directamente a cocina.
-            if (!isStorefront) {
+            // Para pedidos del POS y StoreFront, crear ticket de cocina y notificar al KDS.
+            // Diferencia clave: en StoreFront, el origen se marca en payment_method.source = 'storefront'.
+            if (true) {
                 await client.query(
                     `INSERT INTO kitchen_tickets (order_id, station, status)
          VALUES ($1, 'main', 'pending')`,
@@ -365,7 +466,7 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
 
 // GET /api/store/order/:storeId/invoice/:invoiceNumber
 // Obtiene el detalle completo de una factura (orden + ítems)
-router.get('/:storeId/invoice/:invoiceNumber', verifyToken, async (req, res) => {
+router.get('/:storeId/invoice/:invoiceNumber', optionalAuth, async (req, res) => {
     try {
         const { storeId, invoiceNumber } = req.params;
 
@@ -500,7 +601,6 @@ router.get('/:storeId/orders/active', verifyToken, async (req, res) => {
        JOIN products p ON oi.product_id = p.id
        WHERE o.store_id = $1 
          AND o.status IN ('pending', 'confirmed', 'preparing', 'ready')
-         AND (o.payment_method->>'source' IS NULL OR o.payment_method->>'source' <> 'storefront')
        GROUP BY o.id
        ORDER BY o.created_at ASC`,
             [storeId]

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
-const { verifyToken, optionalAuth } = require('../middleware/auth');
+const { verifyToken, optionalAuth, requireGameAccess } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 // Get available games
@@ -101,7 +101,7 @@ router.get('/list', optionalAuth, async (req, res) => {
 });
 
 // Get user's game history
-router.get('/history', verifyToken, async (req, res) => {
+router.get('/history', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     const { game_type, limit = 20, offset = 0 } = req.query;

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../db');
-const { verifyToken, optionalAuth } = require('../middleware/auth');
+const { verifyToken, optionalAuth, requireGameAccess } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const { 
@@ -22,7 +22,7 @@ const { cleanupRoom } = require('../socket/tictactoe');
 // Socket IO will be accessed through req.io
 
 // POST /api/tictactoe/create - Crear nueva sala
-router.post('/create', verifyToken, async (req, res) => {
+router.post('/create', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const {
       mode,
@@ -211,7 +211,7 @@ router.post('/create', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/join/:code - Unirse a sala
-router.post('/join/:code', verifyToken, async (req, res) => {
+router.post('/join/:code', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -331,7 +331,7 @@ router.post('/join/:code', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/ready - Marcar como listo
-router.post('/room/:code/ready', verifyToken, async (req, res) => {
+router.post('/room/:code/ready', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -386,7 +386,7 @@ router.post('/room/:code/ready', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/start - Iniciar partida (solo host)
-router.post('/room/:code/start', verifyToken, async (req, res) => {
+router.post('/room/:code/start', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -464,7 +464,7 @@ router.post('/room/:code/start', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/move - Hacer movimiento
-router.post('/room/:code/move', verifyToken, async (req, res) => {
+router.post('/room/:code/move', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const { row, col } = req.body;
@@ -787,7 +787,7 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/timeout - Procesar timeout automáticamente
-router.post('/room/:code/timeout', verifyToken, async (req, res) => {
+router.post('/room/:code/timeout', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -892,7 +892,7 @@ router.post('/room/:code/timeout', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/rematch - Solicitar revancha
-router.post('/room/:code/rematch', verifyToken, async (req, res) => {
+router.post('/room/:code/rematch', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -1159,7 +1159,7 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/room/:code/leave - Abandonar sala (después de terminar)
-router.post('/room/:code/leave', verifyToken, async (req, res) => {
+router.post('/room/:code/leave', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -1244,7 +1244,7 @@ router.post('/room/:code/leave', verifyToken, async (req, res) => {
 });
 
 // GET /api/tictactoe/rooms/:code/can-close - Verificar si usuario puede cerrar sala
-router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
+router.get('/rooms/:code/can-close', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -1294,7 +1294,7 @@ router.get('/rooms/:code/can-close', verifyToken, async (req, res) => {
 });
 
 // DELETE /api/tictactoe/rooms/:code - Cerrar sala y reembolsar (admin/host)
-router.delete('/rooms/:code', verifyToken, async (req, res) => {
+router.delete('/rooms/:code', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const { code } = req.params;
     const userId = req.user.id;
@@ -1455,7 +1455,7 @@ router.delete('/rooms/:code', verifyToken, async (req, res) => {
 });
 
 // GET /api/tictactoe/rooms/admin - Listar salas activas para admin/tote
-router.get('/rooms/admin', verifyToken, async (req, res) => {
+router.get('/rooms/admin', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const roles = req.user.roles || [];
     const isAdmin = roles.includes('admin') || roles.includes('tote');
@@ -1646,7 +1646,7 @@ router.get('/room/:code', optionalAuth, async (req, res) => {
 });
 
 // GET /api/tictactoe/my-active-room - Obtener sala activa del usuario (para reconexión)
-router.get('/my-active-room', verifyToken, async (req, res) => {
+router.get('/my-active-room', verifyToken, requireGameAccess, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -1726,7 +1726,7 @@ router.get('/stats/:userId', optionalAuth, async (req, res) => {
 });
 
 // POST /api/tictactoe/cleanup/orphaned - Limpiar salas huérfanas (Admin)
-router.post('/cleanup/orphaned', verifyToken, async (req, res) => {
+router.post('/cleanup/orphaned', verifyToken, requireGameAccess, async (req, res) => {
   try {
     // Verificar que el usuario es admin
     const rolesResult = await query(
@@ -1757,7 +1757,7 @@ router.post('/cleanup/orphaned', verifyToken, async (req, res) => {
 });
 
 // POST /api/tictactoe/cleanup/old-finished - Limpiar salas finalizadas antiguas (Admin)
-router.post('/cleanup/old-finished', verifyToken, async (req, res) => {
+router.post('/cleanup/old-finished', verifyToken, requireGameAccess, async (req, res) => {
   try {
     // Verificar que el usuario es admin
     const rolesResult = await query(

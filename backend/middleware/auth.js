@@ -3,6 +3,31 @@ const config = require('../config/config');
 const logger = require('../utils/logger');
 const { query } = require('../db');
 
+function getBaseGlobalLevel(roles) {
+  if (!Array.isArray(roles)) return 3;
+  if (roles.includes('tote') || roles.includes('admin')) return 99;
+  return 3;
+}
+
+function computeEffectiveStoreLevel(userRow, roles) {
+  const baseLevel = getBaseGlobalLevel(roles);
+
+  // Admin/Tote no están restringidos por nivel de tienda
+  if (baseLevel >= 99) return baseLevel;
+
+  const raw = userRow && (userRow.store_level_raw ?? userRow.store_level);
+  let lvl = parseInt(raw, 10);
+
+  if (!Number.isFinite(lvl)) {
+    // Sin tienda asociada => nivel global completo
+    return 3;
+  }
+
+  if (lvl < 1) lvl = 1;
+  if (lvl > 3) lvl = 3;
+  return lvl;
+}
+
 // Verify JWT token
 async function verifyToken(req, res, next) {
   try {
@@ -21,11 +46,12 @@ async function verifyToken(req, res, next) {
 
     // Get user from database
     const result = await query(
-      'SELECT u.*, array_agg(r.name) as roles FROM users u ' +
+      'SELECT u.*, array_agg(r.name) as roles, s.level as store_level_raw FROM users u ' +
       'LEFT JOIN user_roles ur ON u.id = ur.user_id ' +
       'LEFT JOIN roles r ON ur.role_id = r.id ' +
+      'LEFT JOIN stores s ON s.id = u.home_store_id ' +
       'WHERE u.id = $1 ' +
-      'GROUP BY u.id',
+      'GROUP BY u.id, s.level',
       [decoded.userId]
     );
 
@@ -33,10 +59,15 @@ async function verifyToken(req, res, next) {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    const dbUser = result.rows[0];
+    const roles = dbUser.roles?.filter(Boolean) || [];
+    const store_level = computeEffectiveStoreLevel(dbUser, roles);
+
     // Attach user to request
     req.user = {
-      ...result.rows[0],
-      roles: result.rows[0].roles?.filter(Boolean) || []
+      ...dbUser,
+      roles,
+      store_level
     };
 
     // Update last seen
@@ -77,18 +108,24 @@ async function optionalAuth(req, res, next) {
 
     // Get user from database
     const result = await query(
-      'SELECT u.*, array_agg(r.name) as roles FROM users u ' +
+      'SELECT u.*, array_agg(r.name) as roles, s.level as store_level_raw FROM users u ' +
       'LEFT JOIN user_roles ur ON u.id = ur.user_id ' +
       'LEFT JOIN roles r ON ur.role_id = r.id ' +
+      'LEFT JOIN stores s ON s.id = u.home_store_id ' +
       'WHERE u.id = $1 ' +
-      'GROUP BY u.id',
+      'GROUP BY u.id, s.level',
       [decoded.userId]
     );
 
     if (result.rows.length > 0) {
+      const dbUser = result.rows[0];
+      const roles = dbUser.roles?.filter(Boolean) || [];
+      const store_level = computeEffectiveStoreLevel(dbUser, roles);
+
       req.user = {
-        ...result.rows[0],
-        roles: result.rows[0].roles?.filter(Boolean) || []
+        ...dbUser,
+        roles,
+        store_level
       };
     } else {
       req.user = null;
@@ -145,6 +182,44 @@ function requireTote(req, res, next) {
 
   if (!isTote) {
     return res.status(403).json({ error: 'Tote access required' });
+  }
+
+  next();
+}
+
+// Require minimum store level for wallet/economy features
+function requireWalletAccess(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const roles = req.user.roles || [];
+  const level = computeEffectiveStoreLevel(req.user, roles);
+
+  if (level < 2) {
+    return res.status(403).json({
+      error: 'Acceso a billetera y tokens no permitido para tu nivel de tienda',
+      store_level: level
+    });
+  }
+
+  next();
+}
+
+// Require minimum store level for games/lobbies
+function requireGameAccess(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const roles = req.user.roles || [];
+  const level = computeEffectiveStoreLevel(req.user, roles);
+
+  if (level < 3) {
+    return res.status(403).json({
+      error: 'Acceso a juegos no permitido para tu nivel de tienda',
+      store_level: level
+    });
   }
 
   next();
@@ -281,6 +356,8 @@ module.exports = {
   requireRole,
   requireTote,
   requireAdmin,
+  requireWalletAccess,
+  requireGameAccess,
   adminAuth,
   userRateLimit,
   generateToken,

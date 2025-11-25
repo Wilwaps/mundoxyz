@@ -11,7 +11,7 @@ import './StoreFront.css'; // Custom styles
 const StoreFront = () => {
     const { slug } = useParams(); // e.g., 'divorare04'
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, loginWithCredentials, loading: authLoading } = useAuth();
     const [cart, setCart] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [showCart, setShowCart] = useState(false);
@@ -24,10 +24,16 @@ const StoreFront = () => {
     const initialPayments = {
         cash_usdt: 0,
         zelle: 0,
-        bs: 0,
+        bs_cash: 0,
+        bs_transfer: 0,
         fires: 0
     };
     const [payments, setPayments] = useState(initialPayments);
+    const [enableCashUsdt, setEnableCashUsdt] = useState(false);
+    const [enableZelle, setEnableZelle] = useState(false);
+    const [enableBsCash, setEnableBsCash] = useState(false);
+    const [enableBsTransfer, setEnableBsTransfer] = useState(false);
+    const [enableFires, setEnableFires] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [giveChangeInFires, setGiveChangeInFires] = useState(false);
     const [guestName, setGuestName] = useState('');
@@ -35,6 +41,9 @@ const StoreFront = () => {
     const [guestEmail, setGuestEmail] = useState('');
     const [guestInfoModalOpen, setGuestInfoModalOpen] = useState(false);
     const [guestInfoConfirmed, setGuestInfoConfirmed] = useState(false);
+    const [guestAuthMode, setGuestAuthMode] = useState('guest'); // 'guest' | 'login'
+    const [loginUsername, setLoginUsername] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
     const [guestWantsDelivery, setGuestWantsDelivery] = useState(false);
     const [cashProofBase64, setCashProofBase64] = useState('');
     const [cashProofName, setCashProofName] = useState('');
@@ -154,10 +163,18 @@ const StoreFront = () => {
 
     const cartTotalUSDT = cart.reduce((sum, item) => sum + getItemUnitPriceUSDT(item) * item.quantity, 0);
 
-    const cashUsdt = parseAmount(payments.cash_usdt);
-    const zelleUsdt = parseAmount(payments.zelle);
-    const bsAmount = parseAmount(payments.bs);
-    const firesAmount = parseAmount(payments.fires);
+    const rawCashUsdt = parseAmount(payments.cash_usdt);
+    const rawZelleUsdt = parseAmount(payments.zelle);
+    const rawBsCash = parseAmount(payments.bs_cash);
+    const rawBsTransfer = parseAmount(payments.bs_transfer);
+    const rawFiresAmount = parseAmount(payments.fires);
+
+    const cashUsdt = enableCashUsdt ? rawCashUsdt : 0;
+    const zelleUsdt = enableZelle ? rawZelleUsdt : 0;
+    const bsCashAmount = enableBsCash ? rawBsCash : 0;
+    const bsTransferAmount = enableBsTransfer ? rawBsTransfer : 0;
+    const bsAmount = bsCashAmount + bsTransferAmount;
+    const firesAmount = enableFires ? rawFiresAmount : 0;
 
     const totalPaidUSDT =
         cashUsdt +
@@ -182,19 +199,55 @@ const StoreFront = () => {
             const response = await axios.post('/api/store/order/create', orderData);
             return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
+            const createdOrder = data?.order || data;
+
+            // Redirigir a la página de factura del StoreFront si hay invoice_number
+            if (createdOrder && createdOrder.store_id && createdOrder.invoice_number != null) {
+                navigate(`/store/${slug}/invoice/${createdOrder.invoice_number}`);
+            }
+
             toast.success('Pedido creado exitosamente');
             setCart([]);
             setShowCart(false);
             setPaymentModalOpen(false);
             setPayments(initialPayments);
             setGiveChangeInFires(false);
+            setEnableCashUsdt(false);
+            setEnableZelle(false);
+            setEnableBsCash(false);
+            setEnableBsTransfer(false);
+            setEnableFires(false);
+            setCashProofBase64('');
+            setCashProofName('');
+            setTransferReference('');
+            setGuestInfoConfirmed(false);
         },
         onError: (error) => {
             const message = error?.response?.data?.error || 'Error al crear pedido';
             toast.error(message);
         }
     });
+
+    const handleCashProofChange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) {
+            setCashProofBase64('');
+            setCashProofName('');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result;
+            if (typeof result === 'string') {
+                const base64 = result.includes(',') ? result.split(',')[1] : result;
+                setCashProofBase64(base64 || '');
+                setCashProofName(file.name || '');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleCheckout = async () => {
         if (cart.length === 0) {
@@ -254,6 +307,8 @@ const StoreFront = () => {
                 cash_usdt: cashUsdt,
                 zelle: zelleUsdt,
                 bs: bsAmount,
+                bs_cash: bsCashAmount,
+                bs_transfer: bsTransferAmount,
                 fires: firesAmount,
                 meta: paymentMeta
             },
@@ -298,6 +353,24 @@ const StoreFront = () => {
         setGuestInfoConfirmed(true);
         setGuestInfoModalOpen(false);
         await handleCheckout();
+    };
+
+    const handleInlineLogin = async () => {
+        const username = loginUsername.trim();
+        const password = loginPassword;
+
+        if (!username || !password) {
+            toast.error('Ingresa usuario y contraseña para iniciar sesión');
+            return;
+        }
+
+        const result = await loginWithCredentials(username, password);
+        if (result?.success) {
+            setGuestAuthMode('guest');
+            setGuestInfoModalOpen(false);
+            setGuestInfoConfirmed(false);
+            toast.success('Sesión iniciada. Ahora confirma tu pedido para continuar.');
+        }
     };
 
     if (isLoading) return <div className="flex justify-center p-20"><div className="spinner"></div></div>;
@@ -380,8 +453,16 @@ const StoreFront = () => {
 
         setShowShareMenu(false);
     };
+
     const activeCategory = selectedCategory || categories[0]?.id;
-    const filteredProducts = products.filter(p => p.category_id === activeCategory);
+    const filteredProducts = products
+        .filter((p) => p.category_id === activeCategory)
+        .filter((p) => {
+            const rawStock = p.stock;
+            const stockNumber = typeof rawStock === 'number' ? rawStock : parseFloat(rawStock);
+            if (!Number.isFinite(stockNumber)) return true;
+            return stockNumber > 0;
+        });
 
     return (
         <div className="store-front min-h-screen bg-dark pb-24">
@@ -889,7 +970,9 @@ const StoreFront = () => {
                 <div className="fixed inset-0 z-[1102] flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-white">Completa tus datos</h2>
+                            <h2 className="text-xl font-bold text-white">
+                                {guestAuthMode === 'guest' ? 'Completa tus datos' : 'Ingresar con mi cuenta'}
+                            </h2>
                             <button
                                 onClick={() => setGuestInfoModalOpen(false)}
                                 className="text-white/60 hover:text-white"
@@ -898,94 +981,156 @@ const StoreFront = () => {
                             </button>
                         </div>
 
-                        <p className="text-xs text-white/60 mb-4">
-                            Puedes completar tu pedido como invitado. Solo necesitamos tus datos de contacto para que la tienda pueda confirmarlo.
-                        </p>
+                        {guestAuthMode === 'guest' && (
+                            <>
+                                <p className="text-xs text-white/60 mb-4">
+                                    Puedes completar tu pedido como invitado. Solo necesitamos tus datos de contacto para que la tienda pueda confirmarlo.
+                                </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                            <div>
-                                <label className="block text-[11px] text-white/60 mb-1">Nombre</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                    value={guestName}
-                                    onChange={(e) => setGuestName(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[11px] text-white/60 mb-1">Teléfono / contacto</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                    value={guestPhone}
-                                    onChange={(e) => setGuestPhone(e.target.value)}
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-[11px] text-white/60 mb-1">Correo (opcional)</label>
-                                <input
-                                    type="email"
-                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                    value={guestEmail}
-                                    onChange={(e) => setGuestEmail(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="border-t border-white/10 pt-3 mb-4 space-y-2">
-                            <label className="flex items-center gap-2 text-xs text-white/70">
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4"
-                                    checked={guestWantsDelivery}
-                                    onChange={(e) => setGuestWantsDelivery(e.target.checked)}
-                                />
-                                <span>Quiero delivery para este pedido</span>
-                            </label>
-
-                            {guestWantsDelivery && (
-                                <div>
-                                    <label className="block text-[11px] text-white/60 mb-1">
-                                        Dirección o link de ubicación
-                                    </label>
-                                    <textarea
-                                        rows={3}
-                                        className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                                        placeholder="Escribe tu dirección, referencia o pega un link de Google Maps / WhatsApp"
-                                        value={deliveryLocation}
-                                        onChange={(e) => setDeliveryLocation(e.target.value)}
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                    <div>
+                                        <label className="block text-[11px] text-white/60 mb-1">Nombre</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={guestName}
+                                            onChange={(e) => setGuestName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] text-white/60 mb-1">Teléfono / contacto</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={guestPhone}
+                                            onChange={(e) => setGuestPhone(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[11px] text-white/60 mb-1">Correo (opcional)</label>
+                                        <input
+                                            type="email"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={guestEmail}
+                                            onChange={(e) => setGuestEmail(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="flex justify-between items-center text-[11px] text-white/50 mb-4">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/login')}
-                                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs"
-                            >
-                                Ingresar con mi cuenta
-                            </button>
-                            <span>o continúa como invitado completando los campos.</span>
-                        </div>
+                                <div className="border-t border-white/10 pt-3 mb-4 space-y-2">
+                                    <label className="flex items-center gap-2 text-xs text-white/70">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4"
+                                            checked={guestWantsDelivery}
+                                            onChange={(e) => setGuestWantsDelivery(e.target.checked)}
+                                        />
+                                        <span>Quiero delivery para este pedido</span>
+                                    </label>
 
-                        <div className="flex gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setGuestInfoModalOpen(false)}
-                                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleGuestConfirm}
-                                className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm flex items-center justify-center gap-2"
-                            >
-                                Continuar y enviar pedido
-                            </button>
-                        </div>
+                                    {guestWantsDelivery && (
+                                        <div>
+                                            <label className="block text-[11px] text-white/60 mb-1">
+                                                Dirección o link de ubicación
+                                            </label>
+                                            <textarea
+                                                rows={3}
+                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                                placeholder="Escribe tu dirección, referencia o pega un link de Google Maps / WhatsApp"
+                                                value={deliveryLocation}
+                                                onChange={(e) => setDeliveryLocation(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-between items-center text-[11px] text-white/50 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuestAuthMode('login')}
+                                        className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs"
+                                    >
+                                        Ingresar con mi cuenta
+                                    </button>
+                                    <span>o continúa como invitado completando los campos.</span>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuestInfoModalOpen(false)}
+                                        className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleGuestConfirm}
+                                        className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm flex items-center justify-center gap-2"
+                                    >
+                                        Continuar y enviar pedido
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {guestAuthMode === 'login' && (
+                            <>
+                                <p className="text-xs text-white/60 mb-4">
+                                    Inicia sesión para continuar con tu pedido sin perder el carrito.
+                                </p>
+
+                                <div className="space-y-3 mb-4">
+                                    <div>
+                                        <label className="block text-[11px] text-white/60 mb-1">Usuario, email o CI</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={loginUsername}
+                                            onChange={(e) => setLoginUsername(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] text-white/60 mb-1">Contraseña</label>
+                                        <input
+                                            type="password"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={loginPassword}
+                                            onChange={(e) => setLoginPassword(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleInlineLogin}
+                                        disabled={authLoading}
+                                        className="w-full py-2.5 rounded-lg bg-accent text-dark font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {authLoading ? 'Iniciando...' : 'Iniciar sesión y continuar pedido'}
+                                    </button>
+                                </div>
+
+                                <div className="flex justify-between items-center text-[11px] text-white/50 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuestAuthMode('guest')}
+                                        className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs"
+                                    >
+                                        Volver a invitado
+                                    </button>
+                                    <span>o usa tus datos para continuar.</span>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGuestInfoModalOpen(false)}
+                                        className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -1034,57 +1179,154 @@ const StoreFront = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
-                                <label className="block text-xs text-white/60 mb-1">Efectivo (USDT)</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs text-white/60">Efectivo (USDT)</label>
+                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
+                                        <input
+                                            type="checkbox"
+                                            className="w-3 h-3"
+                                            checked={enableCashUsdt}
+                                            onChange={(e) => setEnableCashUsdt(e.target.checked)}
+                                        />
+                                        <span>Habilitar</span>
+                                    </label>
+                                </div>
                                 <div className="relative">
                                     <Banknote className="absolute left-3 top-2.5 text-green-400" size={18} />
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableCashUsdt ? 'opacity-40 cursor-not-allowed' : ''}`}
                                         value={payments.cash_usdt}
                                         onChange={(e) => setPayments({ ...payments, cash_usdt: e.target.value })}
+                                        disabled={!enableCashUsdt}
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs text-white/60 mb-1">Zelle / Transf. (USDT)</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs text-white/60">Zelle / Transf. (USDT)</label>
+                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
+                                        <input
+                                            type="checkbox"
+                                            className="w-3 h-3"
+                                            checked={enableZelle}
+                                            onChange={(e) => setEnableZelle(e.target.checked)}
+                                        />
+                                        <span>Habilitar</span>
+                                    </label>
+                                </div>
                                 <div className="relative">
                                     <CreditCard className="absolute left-3 top-2.5 text-accent" size={18} />
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableZelle ? 'opacity-40 cursor-not-allowed' : ''}`}
                                         value={payments.zelle}
                                         onChange={(e) => setPayments({ ...payments, zelle: e.target.value })}
+                                        disabled={!enableZelle}
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs text-white/60 mb-1">Pago en Bs</label>
-                                <div className="relative">
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs text-white/60">Bs en efectivo</label>
+                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
+                                        <input
+                                            type="checkbox"
+                                            className="w-3 h-3"
+                                            checked={enableBsCash}
+                                            onChange={(e) => setEnableBsCash(e.target.checked)}
+                                        />
+                                        <span>Habilitar</span>
+                                    </label>
+                                </div>
+                                <div className="relative mb-2">
                                     <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                        value={payments.bs}
-                                        onChange={(e) => setPayments({ ...payments, bs: e.target.value })}
+                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsCash ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                        value={payments.bs_cash}
+                                        onChange={(e) => setPayments({ ...payments, bs_cash: e.target.value })}
+                                        disabled={!enableBsCash}
                                     />
                                 </div>
+                                <div className="space-y-1">
+                                    <label className="block text-[11px] text-white/60">Comprobante de efectivo (foto, opcional)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleCashProofChange}
+                                            className="text-[11px] text-white/70"
+                                        />
+                                        {cashProofName && (
+                                            <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
+                                                {cashProofName}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs text-white/60">Transferencia en Bs</label>
+                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
+                                        <input
+                                            type="checkbox"
+                                            className="w-3 h-3"
+                                            checked={enableBsTransfer}
+                                            onChange={(e) => setEnableBsTransfer(e.target.checked)}
+                                        />
+                                        <span>Habilitar</span>
+                                    </label>
+                                </div>
+                                <div className="relative mb-2">
+                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsTransfer ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                        value={payments.bs_transfer}
+                                        onChange={(e) => setPayments({ ...payments, bs_transfer: e.target.value })}
+                                        disabled={!enableBsTransfer}
+                                    />
+                                </div>
+                                <label className="block text-[11px] text-white/60 mb-1">Referencia bancaria (opcional)</label>
+                                <input
+                                    type="text"
+                                    className={`w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsTransfer ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                    value={transferReference}
+                                    onChange={(e) => setTransferReference(e.target.value)}
+                                    disabled={!enableBsTransfer}
+                                />
                                 <div className="text-[11px] text-white/40 mt-1">
                                     Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-xs text-white/60 mb-1">Pago con Fuegos</label>
+                            <div className="md:col-span-2">
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs text-white/60">Pago con Fuegos</label>
+                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
+                                        <input
+                                            type="checkbox"
+                                            className="w-3 h-3"
+                                            checked={enableFires}
+                                            onChange={(e) => setEnableFires(e.target.checked)}
+                                        />
+                                        <span>Habilitar</span>
+                                    </label>
+                                </div>
                                 <div className="relative">
                                     <Flame className="absolute left-3 top-2.5 text-fire-orange" size={18} />
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableFires ? 'opacity-40 cursor-not-allowed' : ''}`}
                                         value={payments.fires}
                                         onChange={(e) => setPayments({ ...payments, fires: e.target.value })}
+                                        disabled={!enableFires}
                                     />
                                 </div>
                                 <div className="text-[11px] text-white/40 mt-1">
