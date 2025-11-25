@@ -183,6 +183,34 @@ const StoreFront = () => {
 
     const { store, categories, products } = storeData;
 
+    const storeSettings = store?.settings && typeof store.settings === 'object'
+        ? store.settings
+        : {};
+    const headerLayout = storeSettings.header_layout || 'normal';
+
+    const heroHeightClass =
+        headerLayout === 'compact'
+            ? 'h-40 md:h-48'
+            : headerLayout === 'full'
+                ? 'h-80 md:h-96'
+                : 'h-64 md:h-80';
+
+    const logoSizeClass =
+        headerLayout === 'compact'
+            ? 'w-14 h-14'
+            : headerLayout === 'full'
+                ? 'w-24 h-24'
+                : 'w-20 h-20';
+
+    const titleSizeClass =
+        headerLayout === 'compact'
+            ? 'text-2xl md:text-3xl'
+            : headerLayout === 'full'
+                ? 'text-4xl md:text-5xl'
+                : 'text-3xl md:text-4xl';
+
+    const hideMetaOnCompact = headerLayout === 'compact';
+
     const handleShareStore = async () => {
         const slugValue = store?.slug || slug;
         if (!slugValue) return;
@@ -218,7 +246,7 @@ const StoreFront = () => {
     return (
         <div className="store-front min-h-screen bg-dark pb-24">
             {/* Hero Section */}
-            <div className="relative h-64 md:h-80 overflow-hidden">
+            <div className={`relative ${heroHeightClass} overflow-hidden`}>
                 <div className="absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent z-10"></div>
                 <img
                     src={store.cover_url || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?q=80&w=1974&auto=format&fit=crop'}
@@ -237,15 +265,17 @@ const StoreFront = () => {
                         <img
                             src={store.logo_url || 'https://ui-avatars.com/api/?name=Divorare&background=random'}
                             alt="Logo"
-                            className="w-20 h-20 rounded-xl shadow-lg border-2 border-accent"
+                            className={`${logoSizeClass} rounded-xl shadow-lg border-2 border-accent`}
                         />
                         <div className="flex-1">
-                            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">{store.name}</h1>
-                            <div className="flex flex-wrap gap-4 text-sm text-white/80">
-                                <span className="flex items-center gap-1"><Star size={14} className="text-yellow-400 fill-yellow-400" /> 4.8 (120+)</span>
-                                <span className="flex items-center gap-1"><Clock size={14} /> 30-45 min</span>
-                                <span className="flex items-center gap-1"><MapPin size={14} /> 1.2 km</span>
-                            </div>
+                            <h1 className={`${titleSizeClass} font-bold text-white mb-1`}>{store.name}</h1>
+                            {!hideMetaOnCompact && (
+                                <div className="flex flex-wrap gap-4 text-sm text-white/80">
+                                    <span className="flex items-center gap-1"><Star size={14} className="text-yellow-400 fill-yellow-400" /> 4.8 (120+)</span>
+                                    <span className="flex items-center gap-1"><Clock size={14} /> 30-45 min</span>
+                                    <span className="flex items-center gap-1"><MapPin size={14} /> 1.2 km</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

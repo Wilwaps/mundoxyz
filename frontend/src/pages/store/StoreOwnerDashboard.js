@@ -989,7 +989,14 @@ const StoreOwnerDashboard = () => {
             </div>
             <div>
               <p className="text-text/60 mb-1">Link público</p>
-              <p className="text-[11px] text-text/80 break-all">/store/{store.slug}</p>
+              <a
+                href={`/store/${store.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-accent break-all underline"
+              >
+                {`/store/${store.slug}`}
+              </a>
             </div>
           </div>
 
@@ -1021,24 +1028,98 @@ const StoreOwnerDashboard = () => {
 
               <div>
                 <p className="text-text/60 mb-1">URL del logo (perfil)</p>
-                <input
-                  type="text"
-                  value={logoUrlInput}
-                  onChange={(e) => setLogoUrlInput(e.target.value)}
-                  className="input-glass w-full"
-                  placeholder="https://..."
-                />
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={logoUrlInput}
+                    onChange={(e) => setLogoUrlInput(e.target.value)}
+                    className="input-glass w-full"
+                    placeholder="https://..."
+                  />
+                  <div>
+                    <input
+                      id="store-logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (!file) return;
+
+                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setLogoUrlInput(result.base64);
+                          toast.success('Logo cargado exitosamente');
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="store-logo-upload"
+                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
+                    >
+                      Subir logo desde archivo
+                    </label>
+                  </div>
+                  {logoUrlInput && (
+                    <div className="mt-1">
+                      <img
+                        src={logoUrlInput}
+                        alt={store.name || 'Logo de tienda'}
+                        className="w-16 h-16 rounded-full object-cover border border-glass"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
                 <p className="text-text/60 mb-1">URL del banner (header)</p>
-                <input
-                  type="text"
-                  value={coverUrlInput}
-                  onChange={(e) => setCoverUrlInput(e.target.value)}
-                  className="input-glass w-full"
-                  placeholder="https://..."
-                />
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={coverUrlInput}
+                    onChange={(e) => setCoverUrlInput(e.target.value)}
+                    className="input-glass w-full"
+                    placeholder="https://..."
+                  />
+                  <div>
+                    <input
+                      id="store-cover-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (!file) return;
+
+                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setCoverUrlInput(result.base64);
+                          toast.success('Banner cargado exitosamente');
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="store-cover-upload"
+                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
+                    >
+                      Subir banner desde archivo
+                    </label>
+                  </div>
+                  {coverUrlInput && (
+                    <div className="mt-1">
+                      <img
+                        src={coverUrlInput}
+                        alt={store.name || 'Banner de tienda'}
+                        className="w-full h-24 md:h-32 object-cover rounded-lg border border-glass"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
