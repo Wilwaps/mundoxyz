@@ -169,6 +169,22 @@ const TicTacToeRoom = () => {
       toast.error(error.response?.data?.error || 'Error al hacer movimiento');
     }
   });
+
+  // Close room mutation (host solo en sala en espera)
+  const closeRoomMutation = useMutation({
+    mutationFn: async () => {
+      const response = await axios.delete(`/api/tictactoe/rooms/${code}`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      const message = data?.message || 'Sala cerrada y, si aplicaba, reembolsada.';
+      toast.success(message);
+      navigate('/tictactoe/lobby');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al cerrar sala');
+    }
+  });
   
   // Request rematch mutation
   const rematchMutation = useMutation({
@@ -499,17 +515,41 @@ const TicTacToeRoom = () => {
     );
   }
   
+  const canCloseRoom =
+    room?.status === 'waiting' &&
+    !room?.player_o_id &&
+    room?.host_id === user?.id;
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => navigate('/tictactoe/lobby')}
-          className="flex items-center gap-2 text-text/60 hover:text-text transition-colors mb-4"
-        >
-          <ChevronLeft size={20} />
-          Volver al Lobby
-        </button>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <button
+            onClick={() => navigate('/tictactoe/lobby')}
+            className="flex items-center gap-2 text-text/60 hover:text-text transition-colors"
+          >
+            <ChevronLeft size={20} />
+            Volver al Lobby
+          </button>
+
+          {canCloseRoom && (
+            <button
+              type="button"
+              disabled={closeRoomMutation.isPending}
+              onClick={() => {
+                const confirmed = window.confirm(
+                  '¿Cerrar esta sala? Si hay apuesta, se reembolsará desde el pozo de la sala.'
+                );
+                if (!confirmed) return;
+                closeRoomMutation.mutate();
+              }}
+              className="px-3 py-1.5 rounded-full bg-error/20 text-error text-xs font-semibold hover:bg-error/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {closeRoomMutation.isPending ? 'Cerrando sala…' : 'Cerrar sala'}
+            </button>
+          )}
+        </div>
         
         <div className="card-glass p-4">
           <div className="flex justify-between items-center gap-4">

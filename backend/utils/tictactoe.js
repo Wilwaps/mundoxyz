@@ -82,6 +82,89 @@ function checkWinner(board) {
 }
 
 /**
+ * Calcula el movimiento de RON-IA en base al tablero actual y dificultad.
+ * Retorna [row, col] o null si no hay movimientos disponibles.
+ */
+function computeAIMove(board, difficulty = 'easy', aiSymbol = 'O') {
+  try {
+    if (!Array.isArray(board) || board.length !== 3) {
+      board = [[null, null, null], [null, null, null], [null, null, null]];
+    }
+
+    const emptyCells = [];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        if (board[row][col] === null) {
+          emptyCells.push([row, col]);
+        }
+      }
+    }
+
+    if (emptyCells.length === 0) {
+      return null;
+    }
+
+    const opponentSymbol = aiSymbol === 'X' ? 'O' : 'X';
+
+    const pickRandom = (cells) => {
+      if (!cells.length) return null;
+      const idx = Math.floor(Math.random() * cells.length);
+      return cells[idx];
+    };
+
+    // Dificultad fácil: simplemente elige una casilla libre al azar
+    if (difficulty === 'easy') {
+      return pickRandom(emptyCells);
+    }
+
+    // Para medium / hard usamos una heurística sencilla:
+    // 1) Intentar ganar en este turno
+    for (const [row, col] of emptyCells) {
+      board[row][col] = aiSymbol;
+      const result = checkWinner(board);
+      board[row][col] = null;
+      if (result && result.winner === aiSymbol) {
+        return [row, col];
+      }
+    }
+
+    // 2) Bloquear victoria inmediata del jugador humano
+    for (const [row, col] of emptyCells) {
+      board[row][col] = opponentSymbol;
+      const result = checkWinner(board);
+      board[row][col] = null;
+      if (result && result.winner === opponentSymbol) {
+        return [row, col];
+      }
+    }
+
+    // 3) Tomar el centro si está libre
+    if (board[1][1] === null) {
+      return [1, 1];
+    }
+
+    // 4) Tomar alguna esquina disponible
+    const cornerCells = emptyCells.filter(
+      ([row, col]) =>
+        (row === 0 && col === 0) ||
+        (row === 0 && col === 2) ||
+        (row === 2 && col === 0) ||
+        (row === 2 && col === 2)
+    );
+    const cornerMove = pickRandom(cornerCells);
+    if (cornerMove) {
+      return cornerMove;
+    }
+
+    // 5) Si no, cualquier casilla libre
+    return pickRandom(emptyCells);
+  } catch (error) {
+    logger.error('Error computing AI move for tictactoe', { error });
+    return null;
+  }
+}
+
+/**
  * Distribuye premios al finalizar partida
  */
 async function distributePrizes(room, query) {
@@ -422,6 +505,7 @@ module.exports = {
   generateRoomCode,
   isValidMove,
   checkWinner,
+  computeAIMove,
   distributePrizes,
   awardGameXP,
   refundBet,

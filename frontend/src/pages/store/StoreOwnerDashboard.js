@@ -1639,7 +1639,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const [contactEmail, setContactEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
-    { kind: 'product', productId: '', ingredientId: '', quantity: '', unitCost: '', description: '' }
+    { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
   ]);
 
   const updateItem = (index, changes) => {
@@ -1651,7 +1651,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { kind: 'product', productId: '', ingredientId: '', quantity: '', unitCost: '', description: '' }
+      { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
     ]);
   };
 
@@ -1678,6 +1678,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
         return {
           product_id: isProduct ? item.productId : null,
           ingredient_id: isIngredient ? item.ingredientId : null,
+          modifier_id: isProduct && item.modifierId ? item.modifierId : null,
           description: item.description?.trim() || null,
           quantity,
           unit_cost_usdt: unitCost
@@ -1838,7 +1839,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                         value={item.kind === 'product' ? item.productId : item.ingredientId}
                         onChange={(e) => {
                           if (item.kind === 'product') {
-                            updateItem(index, { productId: e.target.value, ingredientId: '' });
+                            updateItem(index, { productId: e.target.value, ingredientId: '', modifierId: '' });
                           } else {
                             updateItem(index, { ingredientId: e.target.value, productId: '' });
                           }
@@ -1861,6 +1862,40 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                             ))}
                       </select>
                     </div>
+                    {item.kind === 'product' && (() => {
+                      const product = products.find((p) => String(p.id) === String(item.productId));
+                      const mods = Array.isArray(product?.modifiers) ? product.modifiers : [];
+
+                      if (!mods.length) return null;
+
+                      return (
+                        <div className="md:col-span-2">
+                          <div className="text-[11px] text-text/60 mb-0.5">Variante (opcional)</div>
+                          <select
+                            value={item.modifierId || ''}
+                            onChange={(e) => updateItem(index, { modifierId: e.target.value })}
+                            className="input-glass w-full text-[11px]"
+                          >
+                            <option value="">Sin variante específica</option>
+                            {mods.map((mod) => {
+                              const extra = Number(mod.price_adjustment_usdt || 0);
+                              const extraLabel = Number.isFinite(extra) && extra !== 0
+                                ? ` (+$${extra.toFixed(2)})`
+                                : '';
+                              const baseLabel = mod.group_name
+                                ? `${mod.group_name}: ${mod.name}`
+                                : mod.name;
+                              return (
+                                <option key={mod.id} value={mod.id}>
+                                  {baseLabel}
+                                  {extraLabel}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      );
+                    })()}
                     <div>
                       <div className="text-[11px] text-text/60 mb-0.5">Cantidad</div>
                       <input

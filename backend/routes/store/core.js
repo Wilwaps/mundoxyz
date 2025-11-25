@@ -563,6 +563,7 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
 
                 const productId = rawItem.product_id || null;
                 const ingredientId = rawItem.ingredient_id || null;
+                const modifierId = rawItem.modifier_id || null;
 
                 if ((productId && ingredientId) || (!productId && !ingredientId)) {
                     throw new Error('Cada ítem debe referenciar únicamente un producto o un ingrediente');
@@ -584,6 +585,7 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
                 normalizedItems.push({
                     product_id: productId,
                     ingredient_id: ingredientId,
+                    modifier_id: modifierId,
                     description: rawItem.description || null,
                     quantity,
                     unit_cost_usdt: unitCost,
@@ -619,12 +621,13 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
             for (const item of normalizedItems) {
                 await client.query(
                     `INSERT INTO purchase_invoice_items
-             (invoice_id, product_id, ingredient_id, description, quantity, unit_cost_usdt, total_cost_usdt)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             (invoice_id, product_id, ingredient_id, modifier_id, description, quantity, unit_cost_usdt, total_cost_usdt)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                     [
                         invoice.id,
                         item.product_id,
                         item.ingredient_id,
+                        item.modifier_id,
                         item.description,
                         item.quantity,
                         item.unit_cost_usdt,
@@ -633,12 +636,25 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
                 );
 
                 if (item.product_id) {
+                    // Aumentar stock total del producto
                     await client.query(
                         `UPDATE products
                  SET stock = stock + $1, updated_at = NOW()
                  WHERE id = $2 AND store_id = $3`,
                         [item.quantity, item.product_id, storeId]
                     );
+
+                    // Si viene un modificador asociado, actualizar también stock por variante
+                    if (item.modifier_id) {
+                        await client.query(
+                            `INSERT INTO product_modifier_stock (store_id, product_id, modifier_id, stock, reserved, created_at, updated_at)
+                     VALUES ($1, $2, $3, $4, 0, NOW(), NOW())
+                     ON CONFLICT (product_id, modifier_id)
+                     DO UPDATE SET stock = product_modifier_stock.stock + EXCLUDED.stock,
+                                   updated_at = NOW()`,
+                            [storeId, item.product_id, item.modifier_id, item.quantity]
+                        );
+                    }
                 } else if (item.ingredient_id) {
                     await client.query(
                         `UPDATE ingredients

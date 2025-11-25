@@ -14,11 +14,11 @@ export const useAuth = () => {
 
 // Configure axios defaults
 // HARDCODED para Railway - detectar producción por hostname
-const isProduction = typeof window !== 'undefined' && 
+const isProduction = typeof window !== 'undefined' &&
   (window.location.hostname === 'mundoxyz-production.up.railway.app' ||
-   window.location.hostname.includes('railway.app'));
+    window.location.hostname.includes('railway.app'));
 
-const apiUrl = isProduction 
+const apiUrl = isProduction
   ? 'https://mundoxyz-production.up.railway.app'
   : (process.env.REACT_APP_API_URL || '');
 
@@ -60,13 +60,13 @@ axios.interceptors.response.use(
       // No redirigir ni limpiar sesión
       return Promise.reject(error);
     }
-    
+
     if (error.response?.status === 401) {
       // Excluir endpoints de contraseña del logout automático
       const url = error.config?.url || '';
-      const isPasswordEndpoint = url.includes('/check-password') || 
-                                  url.includes('/change-password');
-      
+      const isPasswordEndpoint = url.includes('/check-password') ||
+        url.includes('/change-password');
+
       // Solo hacer logout si NO es un endpoint de contraseña
       if (!isPasswordEndpoint) {
         // Token expired or invalid
@@ -82,31 +82,31 @@ axios.interceptors.response.use(
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Helper para normalizar roles siempre como array
   const normalizeUserData = (userData) => {
     return {
       ...userData,
       roles: Array.isArray(userData?.roles)
         ? userData.roles
-            .map(r => (typeof r === 'string' ? r : r?.name))
+          .map(r => (typeof r === 'string' ? r : r?.name))
+          .filter(Boolean)
+          .map(r => r.toLowerCase())
+        : (userData?.roles
+          ? [
+            (typeof userData.roles === 'string' ? userData.roles : userData.roles?.name)
+          ]
             .filter(Boolean)
             .map(r => r.toLowerCase())
-        : (userData?.roles
-            ? [
-                (typeof userData.roles === 'string' ? userData.roles : userData.roles?.name)
-              ]
-                .filter(Boolean)
-                .map(r => r.toLowerCase())
-            : ['user']),
+          : ['user']),
       // Normalizar security_answer: backend puede enviar has_security_answer o security_answer
-      security_answer: userData?.security_answer !== undefined 
-        ? userData.security_answer 
+      security_answer: userData?.security_answer !== undefined
+        ? userData.security_answer
         : (userData?.has_security_answer || false),
       must_change_password: !!userData?.must_change_password,
       home_store_slug: userData?.home_store_slug || null,
       home_store_name: userData?.home_store_name || null,
-      home_store: userData?.home_store_slug 
+      home_store: userData?.home_store_slug
         ? { slug: userData.home_store_slug, name: userData.home_store_name || null }
         : null
     };
@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
-      
+
       if (token && storedUser) {
         try {
           // Validate token with backend
@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
       }
-      
+
       setLoading(false);
     };
 
@@ -156,7 +156,7 @@ export const AuthProvider = ({ children }) => {
   const loginWithTelegram = async () => {
     try {
       setLoading(true);
-      
+
       // Get Telegram WebApp data
       const tg = window.Telegram?.WebApp;
       if (!tg?.initData) {
@@ -168,17 +168,17 @@ export const AuthProvider = ({ children }) => {
       });
 
       const { token, user: userData } = response.data;
-      
+
       // Normalizar datos del usuario
       const normalizedUser = normalizeUserData(userData);
-      
+
       // Store token and user
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
-      
+
       setUser(normalizedUser);
       toast.success('¡Bienvenido a MUNDOXYZ!');
-      
+
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
@@ -192,23 +192,23 @@ export const AuthProvider = ({ children }) => {
   const loginWithCredentials = async (username, password) => {
     try {
       setLoading(true);
-      
+
       const response = await axios.post('/api/auth/login-email', {
         email: username,
         password
       });
 
       const { token, user: userData } = response.data;
-      
+
       // Normalizar datos del usuario
       const normalizedUser = normalizeUserData(userData);
-      
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
-      
+
       setUser(normalizedUser);
       toast.success('¡Bienvenido a MUNDOXYZ!');
-      
+
       return { success: true, user: normalizedUser };
     } catch (error) {
       console.error('Login error:', error);
@@ -222,14 +222,14 @@ export const AuthProvider = ({ children }) => {
   const register = async (formData) => {
     try {
       setLoading(true);
-      
+
       // Validar que security_answer exista y tenga contenido
       const securityAnswer = (formData.security_answer || '').trim();
       if (!securityAnswer || securityAnswer.length < 3) {
         toast.error('La respuesta de seguridad debe tener al menos 3 caracteres');
         return { success: false, error: 'Respuesta de seguridad inválida' };
       }
-      
+
       const titoToken = typeof window !== 'undefined' ? localStorage.getItem('tito_token') : null;
 
       const response = await axios.post('/api/auth/register', {
@@ -258,12 +258,12 @@ export const AuthProvider = ({ children }) => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('tito_token');
         }
-      } catch (_) {}
+      } catch (_) { }
 
       setUser(normalizedUser);
 
       toast.success(response.data.message || '¡Registro exitoso!');
-      
+
       return { success: true, user: normalizedUser };
     } catch (error) {
       console.error('Registration error:', error);
@@ -298,7 +298,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`/api/profile/${user.id}`);
       const profileData = response.data;
-      
+
       // Construir usuario actualizado con TODOS los campos nuevos
       const updatedUser = {
         id: profileData.id,
@@ -313,8 +313,8 @@ export const AuthProvider = ({ children }) => {
         is_verified: profileData.is_verified,
         created_at: profileData.created_at,
         last_seen_at: profileData.last_seen_at,
-        roles: Array.isArray(profileData.roles) ? profileData.roles : 
-               Array.isArray(user.roles) ? user.roles : [],
+        roles: Array.isArray(profileData.roles) ? profileData.roles :
+          Array.isArray(user.roles) ? user.roles : [],
         wallet_id: profileData.wallet_id,
         wallet_address: profileData.wallet_address,
         // Seguridad
@@ -331,7 +331,7 @@ export const AuthProvider = ({ children }) => {
         total_games_played: profileData.total_games_played || 0,
         total_games_won: profileData.total_games_won || 0
       };
-      
+
       updateUser(updatedUser);
       return updatedUser;
     } catch (error) {

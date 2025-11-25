@@ -69,6 +69,22 @@ CREATE TABLE IF NOT EXISTS product_modifiers (
     is_required BOOLEAN DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS product_modifier_stock (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    modifier_id UUID NOT NULL REFERENCES product_modifiers(id) ON DELETE CASCADE,
+    stock DECIMAL(20, 2) NOT NULL DEFAULT 0,
+    reserved DECIMAL(20, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (product_id, modifier_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_modifier_stock_store ON product_modifier_stock(store_id);
+CREATE INDEX IF NOT EXISTS idx_product_modifier_stock_product ON product_modifier_stock(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_modifier_stock_modifier ON product_modifier_stock(modifier_id);
+
 -- 3. Inventory & Kitchen (The "Heart")
 CREATE TABLE IF NOT EXISTS ingredients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -150,6 +166,7 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
     invoice_id UUID REFERENCES purchase_invoices(id) ON DELETE CASCADE,
     product_id UUID REFERENCES products(id),
     ingredient_id UUID REFERENCES ingredients(id),
+    modifier_id UUID REFERENCES product_modifiers(id),
     description TEXT,
     quantity DECIMAL(20, 2) NOT NULL,
     unit_cost_usdt DECIMAL(20, 4) NOT NULL,

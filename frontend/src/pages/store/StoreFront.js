@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, MapPin, CreditCard, Banknote, Flame, Share2 } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Banknote, Flame, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import './StoreFront.css'; // Custom styles
@@ -15,7 +15,10 @@ const StoreFront = () => {
     const [cart, setCart] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [showCart, setShowCart] = useState(false);
+    const [showShareMenu, setShowShareMenu] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null); // For modal
+    const [productModalQuantity, setProductModalQuantity] = useState(1);
+    const [productModalModifiers, setProductModalModifiers] = useState({});
 
     const initialPayments = {
         cash_usdt: 0,
@@ -66,16 +69,25 @@ const StoreFront = () => {
         setCart(prev => {
             const existing = prev.find(item => item.product.id === product.id);
             if (existing) {
-                return prev.map(item =>
-                    item.product.id === product.id
-                        ? { ...item, quantity: item.quantity + quantity }
-                        : item
-                );
+                return prev.map(item => {
+                    if (item.product.id !== product.id) return item;
+
+                    const existingModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
+                    const newModifiers = Array.isArray(modifiers) ? modifiers : [];
+
+                    // Si vienen modificadores nuevos, los reemplazamos; si no, mantenemos los existentes
+                    const finalModifiers = newModifiers.length > 0 ? newModifiers : existingModifiers;
+
+                    return {
+                        ...item,
+                        quantity: item.quantity + quantity,
+                        modifiers: finalModifiers
+                    };
+                });
             }
             return [...prev, { product, quantity, modifiers }];
         });
         toast.success('Agregado al carrito');
-        setShowCart(true);
     };
 
     const removeFromCart = (productId) => {
@@ -92,7 +104,30 @@ const StoreFront = () => {
         }).filter(item => item.quantity > 0));
     };
 
-    const cartTotalUSDT = cart.reduce((sum, item) => sum + (parseFloat(item.product.price_usdt) * item.quantity), 0);
+    const getItemUnitPriceUSDT = (item) => {
+        const baseRaw = parseFloat(item.product?.price_usdt);
+        const base = Number.isFinite(baseRaw) && baseRaw >= 0 ? baseRaw : 0;
+
+        let modifiersExtra = 0;
+        if (Array.isArray(item.modifiers) && item.modifiers.length > 0) {
+            for (const mod of item.modifiers) {
+                if (!mod) continue;
+                const extraRaw =
+                    mod.price_adjustment_usdt != null
+                        ? Number(mod.price_adjustment_usdt)
+                        : mod.price_adjustment != null
+                        ? Number(mod.price_adjustment)
+                        : 0;
+                if (Number.isFinite(extraRaw)) {
+                    modifiersExtra += extraRaw;
+                }
+            }
+        }
+
+        return base + modifiersExtra;
+    };
+
+    const cartTotalUSDT = cart.reduce((sum, item) => sum + getItemUnitPriceUSDT(item) * item.quantity, 0);
 
     const cashUsdt = parseAmount(payments.cash_usdt);
     const zelleUsdt = parseAmount(payments.zelle);
@@ -188,6 +223,12 @@ const StoreFront = () => {
         : {};
     const headerLayout = storeSettings.header_layout || 'normal';
 
+    const location = store?.location && typeof store.location === 'object'
+        ? store.location
+        : {};
+    const mapsUrl = location.maps_url || location.google_maps_url || '';
+    const locationAddress = location.address || '';
+
     const heroHeightClass =
         headerLayout === 'compact'
             ? 'h-40 md:h-48'
@@ -211,33 +252,42 @@ const StoreFront = () => {
 
     const hideMetaOnCompact = headerLayout === 'compact';
 
-    const handleShareStore = async () => {
+    const shareStore = async (platform) => {
         const slugValue = store?.slug || slug;
         if (!slugValue) return;
 
-        const url = `${window.location.origin}/store/${slugValue}`;
-        const title = store?.name || 'Tienda';
-        const text = `Mira la tienda ${title} en MundoXYZ`;
+        const shareUrl = `${window.location.origin}/store/${slugValue}`;
+        const shareText = `Mira la tienda "${store?.name || 'MundoXYZ'}" en MundoXYZ`;
 
         try {
-            if (navigator.share && typeof navigator.share === 'function') {
-                await navigator.share({ title, text, url });
-                return;
+            switch (platform) {
+                case 'whatsapp': {
+                    const url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+                    window.open(url, '_blank');
+                    break;
+                }
+                case 'telegram': {
+                    const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+                    window.open(url, '_blank');
+                    break;
+                }
+                case 'copy': {
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        await navigator.clipboard.writeText(shareUrl);
+                        toast.success('Enlace copiado al portapapeles');
+                    } else {
+                        window.prompt('Copia este link de la tienda:', shareUrl);
+                    }
+                    break;
+                }
+                default:
+                    break;
             }
-
-            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                await navigator.clipboard.writeText(url);
-                toast.success('Link de tienda copiado');
-                return;
-            }
-
-            window.prompt('Copia este link de la tienda:', url);
         } catch (error) {
-            if (error && error.name === 'AbortError') {
-                return;
-            }
             console.error('Error al compartir tienda:', error);
             toast.error('No se pudo compartir la tienda');
+        } finally {
+            setShowShareMenu(false);
         }
     };
     const activeCategory = selectedCategory || categories[0]?.id;
@@ -253,13 +303,46 @@ const StoreFront = () => {
                     alt="Cover"
                     className="w-full h-full object-cover"
                 />
-                <button
-                    type="button"
-                    onClick={handleShareStore}
-                    className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-dark/70 hover:bg-dark/90 border border-white/20 flex items-center justify-center text-white/80 text-xs shadow-lg"
-                >
-                    <Share2 size={16} />
-                </button>
+                <div className="absolute top-4 right-4 z-30">
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setShowShareMenu((prev) => !prev)}
+                            className="w-9 h-9 rounded-full bg-dark/70 hover:bg-dark/90 border border-white/20 flex items-center justify-center text-white/80 text-xs shadow-lg"
+                        >
+                            <Share2 size={16} />
+                        </button>
+                        <AnimatePresence>
+                            {showShareMenu && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 mt-2 w-48 max-w-[calc(100vw-3rem)] bg-black/80 backdrop-blur-md rounded-lg shadow-xl border border-white/10 z-50"
+                                >
+                                    <button
+                                        onClick={() => shareStore('whatsapp')}
+                                        className="w-full px-4 py-2 text-left text-sm text-white flex items-center gap-2 hover:bg-white/10"
+                                    >
+                                        <span>WhatsApp</span>
+                                    </button>
+                                    <button
+                                        onClick={() => shareStore('telegram')}
+                                        className="w-full px-4 py-2 text-left text-sm text-white flex items-center gap-2 hover:bg-white/10"
+                                    >
+                                        <span>Telegram</span>
+                                    </button>
+                                    <button
+                                        onClick={() => shareStore('copy')}
+                                        className="w-full px-4 py-2 text-left text-sm text-white flex items-center gap-2 hover:bg-white/10"
+                                    >
+                                        <span>Copiar enlace</span>
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                </div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 z-20 container mx-auto">
                     <div className="flex items-end gap-4">
                         <img
@@ -273,7 +356,19 @@ const StoreFront = () => {
                                 <div className="flex flex-wrap gap-4 text-sm text-white/80">
                                     <span className="flex items-center gap-1"><Star size={14} className="text-yellow-400 fill-yellow-400" /> 4.8 (120+)</span>
                                     <span className="flex items-center gap-1"><Clock size={14} /> 30-45 min</span>
-                                    <span className="flex items-center gap-1"><MapPin size={14} /> 1.2 km</span>
+                                    {mapsUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => window.open(mapsUrl, '_blank', 'noopener,noreferrer')}
+                                            className="flex items-center gap-1 hover:text-white underline-offset-2 hover:underline"
+                                        >
+                                            <span role="img" aria-label="Ubicación">📍</span>
+                                            <span>Ubicación</span>
+                                            {locationAddress && (
+                                                <span className="hidden sm:inline truncate max-w-[10rem]">{locationAddress}</span>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -302,35 +397,79 @@ const StoreFront = () => {
             {/* Products Grid */}
             <div className="container mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProducts.map(product => (
-                        <motion.div
-                            key={product.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-glass rounded-xl overflow-hidden border border-white/5 hover:border-accent/30 transition-all group"
-                        >
-                            <div className="relative h-48 overflow-hidden">
-                                <img
-                                    src={product.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1000&auto=format&fit=crop'}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
-                                <button
-                                    onClick={() => addToCart(product)}
-                                    className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all"
-                                >
-                                    <Plus size={20} />
-                                </button>
-                            </div>
-                            <div className="p-4">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-lg text-white">{product.name}</h3>
-                                    <span className="font-bold text-accent">${product.price_usdt}</span>
+                    {filteredProducts.map((product) => {
+                        const cartItem = cart.find((item) => item.product.id === product.id);
+                        const quantityInCart = cartItem ? cartItem.quantity : 0;
+                        const hasModifiers = Array.isArray(product.modifiers) && product.modifiers.length > 0;
+
+                        return (
+                            <motion.div
+                                key={product.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-glass rounded-xl overflow-hidden border border-white/5 hover:border-accent/30 transition-all group cursor-pointer"
+                                onClick={() => {
+                                    setSelectedProduct(product);
+                                    setProductModalQuantity(1);
+                                    setProductModalModifiers({});
+                                }}
+                            >
+                                <div className="relative h-48 overflow-hidden">
+                                    <img
+                                        src={product.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1000&auto=format&fit=crop'}
+                                        alt={product.name}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    />
+                                    {quantityInCart === 0 ? (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (hasModifiers) {
+                                                    setSelectedProduct(product);
+                                                    setProductModalQuantity(1);
+                                                    setProductModalModifiers({});
+                                                } else {
+                                                    addToCart(product);
+                                                }
+                                            }}
+                                            className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all"
+                                        >
+                                            <Plus size={20} />
+                                        </button>
+                                    ) : (
+                                        <div className="absolute bottom-3 right-3 flex items-center bg-dark/80 rounded-full shadow-lg overflow-hidden transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateQuantity(product.id, -1);
+                                                }}
+                                                className="w-8 h-8 flex items-center justify-center text-white/80 hover:bg-white/10"
+                                            >
+                                                <Minus size={16} />
+                                            </button>
+                                            <span className="px-3 text-sm font-semibold text-white">{quantityInCart}</span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    addToCart(product, 1);
+                                                }}
+                                                className="w-8 h-8 flex items-center justify-center text-white/80 hover:bg-white/10"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                <p className="text-sm text-white/60 line-clamp-2 mb-4">{product.description}</p>
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div className="p-4">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-bold text-lg text-white">{product.name}</h3>
+                                        <span className="font-bold text-accent">${product.price_usdt}</span>
+                                    </div>
+                                    <p className="text-sm text-white/60 line-clamp-2 mb-4">{product.description}</p>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -395,7 +534,7 @@ const StoreFront = () => {
                                         <div className="flex-1">
                                             <div className="flex justify-between mb-1">
                                                 <h4 className="font-medium">{item.product.name}</h4>
-                                                <span className="text-white/80">${(item.product.price_usdt * item.quantity).toFixed(2)}</span>
+                                                <span className="text-white/80">${(getItemUnitPriceUSDT(item) * item.quantity).toFixed(2)}</span>
                                             </div>
                                             <div className="flex items-center gap-3 mt-2">
                                                 <button
@@ -446,6 +585,165 @@ const StoreFront = () => {
                     </>
                 )}
             </AnimatePresence>
+            {selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-1">{selectedProduct.name}</h2>
+                                {selectedProduct.category_name && (
+                                    <p className="text-xs text-white/50">{selectedProduct.category_name}</p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setSelectedProduct(null)}
+                                className="text-white/60 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="mb-4 rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                            <img
+                                src={selectedProduct.image_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1000&auto=format&fit=crop'}
+                                alt={selectedProduct.name}
+                                className="w-full h-56 object-cover"
+                            />
+                        </div>
+
+                        <p className="text-sm text-white/70 mb-4">
+                            {selectedProduct.description || 'Sin descripción detallada.'}
+                        </p>
+
+                        {Array.isArray(selectedProduct.modifiers) && selectedProduct.modifiers.length > 0 && (
+                            <div className="mb-4 space-y-3">
+                                {Object.entries(
+                                    selectedProduct.modifiers.reduce((groups, mod) => {
+                                        if (!mod || !mod.group_name) return groups;
+                                        if (!groups[mod.group_name]) groups[mod.group_name] = [];
+                                        groups[mod.group_name].push(mod);
+                                        return groups;
+                                    }, {})
+                                ).map(([groupName, mods]) => {
+                                    const options = Array.isArray(mods) ? mods : [];
+                                    if (options.length === 0) return null;
+
+                                    const maxSelection = options[0]?.max_selection || 1;
+                                    const selectedIds = productModalModifiers[groupName] || [];
+
+                                    return (
+                                        <div key={groupName} className="border border-white/10 rounded-lg p-3">
+                                            <div className="text-xs font-semibold text-white/70 mb-2">
+                                                {groupName}
+                                                {maxSelection === 1
+                                                    ? ' (elige una opción)'
+                                                    : maxSelection > 0
+                                                    ? ` (hasta ${maxSelection})`
+                                                    : ''}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {options.map((mod) => {
+                                                    const id = mod.id;
+                                                    const isSelected = selectedIds.includes(id);
+                                                    const label = mod.name;
+                                                    const extraPrice = Number(mod.price_adjustment_usdt || 0);
+
+                                                    return (
+                                                        <button
+                                                            key={id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setProductModalModifiers((prev) => {
+                                                                    const current = Array.isArray(prev[groupName]) ? prev[groupName] : [];
+
+                                                                    // Selección única
+                                                                    if (maxSelection === 1) {
+                                                                        return {
+                                                                            ...prev,
+                                                                            [groupName]: [id]
+                                                                        };
+                                                                    }
+
+                                                                    // Selección múltiple
+                                                                    let next;
+                                                                    if (current.includes(id)) {
+                                                                        next = current.filter((mId) => mId !== id);
+                                                                    } else {
+                                                                        next = [...current, id];
+                                                                        if (maxSelection > 0 && next.length > maxSelection) {
+                                                                            toast.error(`Máximo ${maxSelection} opciones para ${groupName}`);
+                                                                            return prev;
+                                                                        }
+                                                                    }
+
+                                                                    return {
+                                                                        ...prev,
+                                                                        [groupName]: next
+                                                                    };
+                                                                });
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                                                                isSelected
+                                                                    ? 'bg-accent text-dark border-accent'
+                                                                    : 'bg-white/5 text-white/80 border-white/10 hover:bg-white/10'
+                                                            }`}
+                                                        >
+                                                            <span>{label}</span>
+                                                            {extraPrice > 0 && (
+                                                                <span className="ml-1 text-[10px] opacity-80">(+${extraPrice})</span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setProductModalQuantity((prev) => Math.max(1, prev - 1))}
+                                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
+                                >
+                                    <Minus size={16} />
+                                </button>
+                                <span className="text-lg font-semibold text-white">{productModalQuantity}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setProductModalQuantity((prev) => prev + 1)}
+                                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                            <span className="text-xl font-bold text-accent">${selectedProduct.price_usdt}</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const mods = Array.isArray(selectedProduct.modifiers) ? selectedProduct.modifiers : [];
+                                const selectedGroups = Object.values(productModalModifiers || {});
+                                const selectedIds = new Set(
+                                    selectedGroups.flat().filter((id) => id != null)
+                                );
+                                const selectedModifiers = mods.filter((mod) => selectedIds.has(mod.id));
+
+                                addToCart(selectedProduct, productModalQuantity, selectedModifiers);
+                                setSelectedProduct(null);
+                            }}
+                            className="w-full py-3 rounded-lg bg-accent text-dark font-semibold text-sm flex items-center justify-center gap-2 mt-2"
+                        >
+                            <ShoppingBag size={18} />
+                            <span>Agregar al carrito</span>
+                        </button>
+                    </div>
+                </div>
+            )}
             {paymentModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">

@@ -976,7 +976,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
               )}
               
               {/* Botón compartir */}
-              <div className="relative">
+              <div className="relative z-30">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -992,7 +992,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                       initial={{ opacity: 0, scale: 0.95, y: -10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 max-w-[calc(100vw-3rem)] bg-dark rounded-lg shadow-xl border border-white/10 overflow-hidden z-20"
+                      className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 max-w-[calc(100vw-3rem)] bg-black/80 backdrop-blur-md rounded-lg shadow-xl border border-white/10 overflow-hidden z-50"
                     >
                       <button
                         onClick={() => shareRaffle('whatsapp')}

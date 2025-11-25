@@ -23,9 +23,12 @@ router.post('/create', verifyToken, async (req, res) => {
         const source = payment_method && typeof payment_method === 'object' ? payment_method.source : null;
         const isStorefront = source === 'storefront';
 
-        // 1. Calculate Totals & Validate Stock (Simplified for now)
+        // 1. Calculate Totals & preparar datos para inventario
         let subtotal_usdt = 0;
         const orderItemsData = [];
+
+        // Agrupar cantidades por producto y por modificador para control de stock
+        const inventoryAdjustmentsMap = new Map();
 
         for (const item of items) {
             const productResult = await query(
@@ -35,22 +38,68 @@ router.post('/create', verifyToken, async (req, res) => {
             if (productResult.rows.length === 0) throw new Error(`Product ${item.product_id} not found`);
             const product = productResult.rows[0];
 
-            let itemPrice = parseFloat(product.price_usdt);
+            let basePriceRaw = parseFloat(product.price_usdt);
+            const basePrice = Number.isFinite(basePriceRaw) && basePriceRaw >= 0 ? basePriceRaw : 0;
 
-            // Add modifiers cost
-            if (item.modifiers && item.modifiers.length > 0) {
-                // ... logic to fetch modifier prices and add to itemPrice
+            let modifiersExtra = 0;
+            if (Array.isArray(item.modifiers) && item.modifiers.length > 0) {
+                for (const mod of item.modifiers) {
+                    if (!mod) continue;
+                    const extraRaw =
+                        mod.price_adjustment_usdt != null
+                            ? Number(mod.price_adjustment_usdt)
+                            : mod.price_adjustment != null
+                            ? Number(mod.price_adjustment)
+                            : 0;
+                    if (Number.isFinite(extraRaw)) {
+                        modifiersExtra += extraRaw;
+                    }
+                }
             }
 
-            subtotal_usdt += itemPrice * item.quantity;
+            const itemPrice = basePrice + modifiersExtra;
+
+            const quantityNumber = Number(item.quantity) || 0;
+
+            subtotal_usdt += itemPrice * quantityNumber;
 
             orderItemsData.push({
                 product_id: product.id,
-                quantity: item.quantity,
+                quantity: quantityNumber,
                 price_at_time_usdt: itemPrice,
-                modifiers: item.modifiers || []
+                modifiers: Array.isArray(item.modifiers) ? item.modifiers : []
             });
+
+            // Preparar ajustes de inventario
+            if (product.id && quantityNumber > 0) {
+                let entry = inventoryAdjustmentsMap.get(product.id);
+                if (!entry) {
+                    entry = {
+                        product_id: product.id,
+                        totalQty: 0,
+                        modifierQtyMap: new Map()
+                    };
+                    inventoryAdjustmentsMap.set(product.id, entry);
+                }
+
+                entry.totalQty += quantityNumber;
+
+                if (Array.isArray(item.modifiers)) {
+                    for (const mod of item.modifiers) {
+                        if (!mod || !mod.id) continue;
+                        const modId = mod.id;
+                        const current = entry.modifierQtyMap.get(modId) || 0;
+                        entry.modifierQtyMap.set(modId, current + quantityNumber);
+                    }
+                }
+            }
         }
+
+        const inventoryAdjustments = Array.from(inventoryAdjustmentsMap.values()).map((entry) => ({
+            product_id: entry.product_id,
+            totalQty: entry.totalQty,
+            modifierQty: Array.from(entry.modifierQtyMap.entries()) // [modifierId, qty]
+        }));
 
         // 2. Calculate Fees/Tax
         const storeSettingsResult = await query('SELECT settings FROM stores WHERE id = $1', [store_id]);
@@ -119,6 +168,66 @@ router.post('/create', verifyToken, async (req, res) => {
            VALUES ($1, $2, $3, $4, $5)`,
                     [order.id, item.product_id, item.quantity, item.price_at_time_usdt, JSON.stringify(item.modifiers)]
                 );
+            }
+
+            // Ajuste de stock por producto y por modificador (si aplica)
+            for (const adj of inventoryAdjustments) {
+                // Bloquear y validar stock del producto
+                const prodRes = await client.query(
+                    'SELECT stock FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
+                    [adj.product_id, store_id]
+                );
+
+                if (prodRes.rows.length === 0) {
+                    throw new Error('Producto no encontrado para ajuste de inventario');
+                }
+
+                const currentStockRaw = prodRes.rows[0].stock;
+                const currentStock = Number(currentStockRaw ?? 0);
+
+                if (Number.isFinite(currentStock) && currentStock < adj.totalQty) {
+                    throw new Error('Stock insuficiente para uno de los productos');
+                }
+
+                await client.query(
+                    `UPDATE products 
+             SET stock = GREATEST(0, stock - $1), updated_at = NOW()
+             WHERE id = $2 AND store_id = $3`,
+                    [adj.totalQty, adj.product_id, store_id]
+                );
+
+                // Bloquear y ajustar stock por modificador solo si existe configuración en product_modifier_stock
+                if (Array.isArray(adj.modifierQty) && adj.modifierQty.length > 0) {
+                    for (const [modifierId, qty] of adj.modifierQty) {
+                        if (!modifierId || !Number.isFinite(qty) || qty <= 0) continue;
+
+                        const modRes = await client.query(
+                            `SELECT stock FROM product_modifier_stock 
+                     WHERE store_id = $1 AND product_id = $2 AND modifier_id = $3 
+                     FOR UPDATE`,
+                            [store_id, adj.product_id, modifierId]
+                        );
+
+                        if (modRes.rows.length === 0) {
+                            // Si no hay configuración de stock por modificador, no controlamos inventario a ese nivel
+                            continue;
+                        }
+
+                        const currentModStockRaw = modRes.rows[0].stock;
+                        const currentModStock = Number(currentModStockRaw ?? 0);
+
+                        if (Number.isFinite(currentModStock) && currentModStock < qty) {
+                            throw new Error('Stock insuficiente para una variante de producto');
+                        }
+
+                        await client.query(
+                            `UPDATE product_modifier_stock 
+                     SET stock = GREATEST(0, stock - $1), updated_at = NOW()
+                     WHERE store_id = $2 AND product_id = $3 AND modifier_id = $4`,
+                            [qty, store_id, adj.product_id, modifierId]
+                        );
+                    }
+                }
             }
 
             // Opcional: acreditar cambio en Fires al cliente si está habilitado

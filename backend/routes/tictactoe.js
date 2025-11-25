@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const { 
   isValidMove, 
   checkWinner, 
+  computeAIMove,
   distributePrizes,
   awardGameXP 
 } = require('../utils/tictactoe');
@@ -651,7 +652,114 @@ router.post('/room/:code/move', verifyToken, async (req, res) => {
       
       // Cambiar turno
       const nextTurn = playerSymbol === 'X' ? 'O' : 'X';
-      
+
+      // Si la sala es contra RON-IA y ahora es turno de la IA (O), realizar jugada automática
+      if (room.opponent_type === 'ron_ai' && nextTurn === 'O') {
+        const aiMove = computeAIMove(board, room.ai_difficulty || 'easy', 'O');
+
+        if (aiMove) {
+          const [aiRow, aiCol] = aiMove;
+
+          if (isValidMove(board, aiRow, aiCol)) {
+            // Aplicar movimiento de la IA
+            board[aiRow][aiCol] = 'O';
+
+            const aiMoveNumber = moveNumber + 1;
+
+            // Registrar movimiento de IA en historial usando al host como player_id
+            await client.query(
+              `INSERT INTO tictactoe_moves 
+               (room_id, player_id, symbol, row, col, move_number)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [room.id, room.player_x_id, 'O', aiRow, aiCol, aiMoveNumber]
+            );
+
+            // Verificar si la IA ganó o hubo empate
+            const aiWinResult = checkWinner(board);
+
+            if (aiWinResult) {
+              const isWin = aiWinResult.winner !== null;
+              const winnerId = isWin
+                ? (aiWinResult.winner === 'X' ? room.player_x_id : room.player_o_id)
+                : null;
+
+              await client.query(
+                `UPDATE tictactoe_rooms 
+                 SET board = $1,
+                     status = 'finished',
+                     winner_id = $2,
+                     winner_symbol = $3,
+                     winning_line = $4,
+                     is_draw = $5,
+                     finished_at = NOW()
+                 WHERE id = $6`,
+                [
+                  JSON.stringify(board),
+                  winnerId,
+                  aiWinResult.winner,
+                  aiWinResult.line ? JSON.stringify(aiWinResult.line) : null,
+                  aiWinResult.isDraw || false,
+                  room.id
+                ]
+              );
+
+              const finishedRoom = (await client.query('SELECT * FROM tictactoe_rooms WHERE id = $1', [room.id])).rows[0];
+
+              await distributePrizes(finishedRoom, client.query.bind(client));
+
+              const { awardXpBatch } = require('../utils/xp');
+              await awardGameXP(finishedRoom, awardXpBatch);
+
+              await client.query(
+                'UPDATE tictactoe_rooms SET xp_awarded = TRUE WHERE id = $1',
+                [room.id]
+              );
+
+              if (req.io) {
+                req.io.to(`tictactoe:${code}`).emit('room:game-over', {
+                  roomCode: code,
+                  winner: aiWinResult.winner,
+                  winnerId,
+                  isDraw: aiWinResult.isDraw,
+                  winningLine: aiWinResult.line
+                });
+              }
+
+              return {
+                gameOver: true,
+                winner: aiWinResult.winner,
+                winnerId,
+                isDraw: aiWinResult.isDraw,
+                winningLine: aiWinResult.line,
+                board
+              };
+            }
+
+            // No terminó el juego: vuelve el turno al jugador X
+            const backToX = 'X';
+
+            await client.query(
+              `UPDATE tictactoe_rooms 
+               SET board = $1,
+                   current_turn = $2,
+                   last_move_at = NOW(),
+                   time_left_seconds = 15
+               WHERE id = $3`,
+              [JSON.stringify(board), backToX, room.id]
+            );
+
+            return {
+              success: true,
+              board,
+              nextTurn: backToX,
+              moveNumber: aiMoveNumber
+            };
+          }
+        }
+
+        // Si por alguna razón no hay movimiento válido, continuar con flujo normal
+      }
+
       await client.query(
         `UPDATE tictactoe_rooms 
          SET board = $1,
