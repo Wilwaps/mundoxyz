@@ -302,41 +302,44 @@ const StoreFront = () => {
 
     const shareStore = async (platform) => {
         const slugValue = store?.slug || slug;
-        if (!slugValue) return;
+        if (!slugValue || typeof window === 'undefined') {
+            toast.error('No se pudo generar el enlace de la tienda');
+            return;
+        }
 
         const shareUrl = `${window.location.origin}/store/${slugValue}`;
         const shareText = `Mira la tienda "${store?.name || 'MundoXYZ'}" en MundoXYZ`;
 
-        try {
-            switch (platform) {
-                case 'whatsapp': {
-                    const url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
-                    window.open(url, '_blank');
-                    break;
-                }
-                case 'telegram': {
-                    const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
-                    window.open(url, '_blank');
-                    break;
-                }
-                case 'copy': {
+        switch (platform) {
+            case 'whatsapp': {
+                const url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+                break;
+            }
+            case 'telegram': {
+                const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+                break;
+            }
+            case 'copy': {
+                try {
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                         await navigator.clipboard.writeText(shareUrl);
                         toast.success('Enlace copiado al portapapeles');
                     } else {
                         window.prompt('Copia este link de la tienda:', shareUrl);
                     }
-                    break;
+                } catch (err) {
+                    console.error('Error copiando enlace de tienda:', err);
+                    window.prompt('Copia este link de la tienda:', shareUrl);
                 }
-                default:
-                    break;
+                break;
             }
-        } catch (error) {
-            console.error('Error al compartir tienda:', error);
-            toast.error('No se pudo compartir la tienda');
-        } finally {
-            setShowShareMenu(false);
+            default:
+                break;
         }
+
+        setShowShareMenu(false);
     };
     const activeCategory = selectedCategory || categories[0]?.id;
     const filteredProducts = products.filter(p => p.category_id === activeCategory);
@@ -527,15 +530,9 @@ const StoreFront = () => {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (hasModifiers) {
-                                                    setSelectedProduct(product);
-                                                    setProductModalQuantity(1);
-                                                    setProductModalModifiers({});
-                                                } else {
-                                                    addToCart(product);
-                                                }
+                                                addToCart(product);
                                             }}
-                                            className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg transition-transform"
+                                            className="absolute bottom-3 right-3 w-10 h-10 bg-accent text-dark rounded-full flex items-center justify-center shadow-lg"
                                         >
                                             <Plus size={20} />
                                         </button>

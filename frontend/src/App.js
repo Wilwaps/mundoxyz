@@ -61,7 +61,11 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) {
+  // Permitir acceso público al StoreFront (/store/:slug) sin obligar a login
+  const path = location.pathname;
+  const isPublicStoreFront = /^\/store\/[^/]+$/.test(path);
+
+  if (!user && !isPublicStoreFront) {
     const nextPath = `${location.pathname}${location.search}`;
     const target = `/login?next=${encodeURIComponent(nextPath)}`;
     return <Navigate to={target} replace />;
