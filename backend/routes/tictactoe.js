@@ -929,8 +929,9 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
           throw new Error('La revancha contra RON-IA solo puede ser solicitada por el jugador humano');
         }
         
-        const newRematchCount = room.rematch_count + 1;
-        const initialTurn = newRematchCount % 2 === 0 ? 'X' : 'O';
+        const newRematchCount = (room.rematch_count || 0) + 1;
+        // En partidas contra RON-IA siempre comienza el jugador humano (X)
+        const initialTurn = 'X';
         
         // Limpiar movimientos previos
         await client.query(
@@ -956,7 +957,8 @@ router.post('/room/:code/rematch', verifyToken, async (req, res) => {
                pot_coins = 0,
                pot_fires = 0,
                xp_awarded = FALSE,
-               last_move_at = NOW()
+               last_move_at = NOW(),
+               time_left_seconds = 15
            WHERE id = $3`,
           [initialTurn, newRematchCount, room.id]
         );

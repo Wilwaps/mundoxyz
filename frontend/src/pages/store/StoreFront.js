@@ -33,6 +33,9 @@ const StoreFront = () => {
     const [guestName, setGuestName] = useState('');
     const [guestPhone, setGuestPhone] = useState('');
     const [guestEmail, setGuestEmail] = useState('');
+    const [guestInfoModalOpen, setGuestInfoModalOpen] = useState(false);
+    const [guestInfoConfirmed, setGuestInfoConfirmed] = useState(false);
+    const [guestWantsDelivery, setGuestWantsDelivery] = useState(false);
     const [cashProofBase64, setCashProofBase64] = useState('');
     const [cashProofName, setCashProofName] = useState('');
     const [transferReference, setTransferReference] = useState('');
@@ -171,6 +174,9 @@ const StoreFront = () => {
     const totalFires = cartTotalUSDT * rates.fires;
     const changeFires = changeUSDT * rates.fires;
 
+    const hasDeliveryLocation = !!(deliveryLocation && deliveryLocation.trim());
+    const wantsDelivery = guestWantsDelivery || hasDeliveryLocation;
+
     const createOrderMutation = useMutation({
         mutationFn: async (orderData) => {
             const response = await axios.post('/api/store/order/create', orderData);
@@ -210,6 +216,11 @@ const StoreFront = () => {
             }
         }
 
+        if (!user && guestWantsDelivery && !hasDeliveryLocation) {
+            toast.error('Ingresa una dirección o link para el delivery');
+            return;
+        }
+
         const guestInfo = !user
             ? {
                 name: guestName.trim() || null,
@@ -237,7 +248,7 @@ const StoreFront = () => {
                 quantity: item.quantity,
                 modifiers: item.modifiers || []
             })),
-            type: 'pickup',
+            type: wantsDelivery ? 'delivery' : 'pickup',
             payment_method: {
                 source: 'storefront',
                 cash_usdt: cashUsdt,
@@ -259,6 +270,34 @@ const StoreFront = () => {
         };
 
         await createOrderMutation.mutateAsync(orderData);
+    };
+
+    const handleConfirmClick = async () => {
+        if (!user && !guestInfoConfirmed) {
+            setGuestInfoModalOpen(true);
+            return;
+        }
+
+        await handleCheckout();
+    };
+
+    const handleGuestConfirm = async () => {
+        const nameTrimmed = guestName.trim();
+        const phoneTrimmed = guestPhone.trim();
+
+        if (!nameTrimmed || !phoneTrimmed) {
+            toast.error('Ingresa al menos tu nombre y teléfono para continuar sin registrarte');
+            return;
+        }
+
+        if (guestWantsDelivery && !hasDeliveryLocation) {
+            toast.error('Ingresa una dirección o link para el delivery');
+            return;
+        }
+
+        setGuestInfoConfirmed(true);
+        setGuestInfoModalOpen(false);
+        await handleCheckout();
     };
 
     if (isLoading) return <div className="flex justify-center p-20"><div className="spinner"></div></div>;
@@ -427,54 +466,6 @@ const StoreFront = () => {
                                             )}
                                         </button>
                                     )}
-                                </div>
-                            )}
-
-                            {!user && (
-                                <div className="mb-4 text-xs bg-white/5 rounded-lg p-3 space-y-2">
-                                    <div className="font-semibold text-white/80">Compra sin registrarte</div>
-                                    <p className="text-white/60">
-                                        Puedes completar tu pedido como invitado. Solo necesitamos tus datos de contacto para que la tienda pueda confirmarlo.
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        <div>
-                                            <label className="block text-[11px] text-white/60 mb-1">Nombre</label>
-                                            <input
-                                                type="text"
-                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={guestName}
-                                                onChange={(e) => setGuestName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] text-white/60 mb-1">Teléfono / contacto</label>
-                                            <input
-                                                type="text"
-                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={guestPhone}
-                                                onChange={(e) => setGuestPhone(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label className="block text-[11px] text-white/60 mb-1">Correo (opcional)</label>
-                                            <input
-                                                type="email"
-                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={guestEmail}
-                                                onChange={(e) => setGuestEmail(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="text-[11px] text-white/50 flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate('/login')}
-                                            className="px-2 py-1 rounded-full bg-white/10 hover:bg-white/20"
-                                        >
-                                            Ingresar con mi cuenta
-                                        </button>
-                                        <span>o continúa como invitado completando los campos.</span>
-                                    </div>
                                 </div>
                             )}
                         </div>
@@ -894,6 +885,110 @@ const StoreFront = () => {
                     </div>
                 </div>
             )}
+            {guestInfoModalOpen && !user && (
+                <div className="fixed inset-0 z-[1102] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-white">Completa tus datos</h2>
+                            <button
+                                onClick={() => setGuestInfoModalOpen(false)}
+                                className="text-white/60 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-white/60 mb-4">
+                            Puedes completar tu pedido como invitado. Solo necesitamos tus datos de contacto para que la tienda pueda confirmarlo.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <label className="block text-[11px] text-white/60 mb-1">Nombre</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={guestName}
+                                    onChange={(e) => setGuestName(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[11px] text-white/60 mb-1">Teléfono / contacto</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={guestPhone}
+                                    onChange={(e) => setGuestPhone(e.target.value)}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-[11px] text-white/60 mb-1">Correo (opcional)</label>
+                                <input
+                                    type="email"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={guestEmail}
+                                    onChange={(e) => setGuestEmail(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="border-t border-white/10 pt-3 mb-4 space-y-2">
+                            <label className="flex items-center gap-2 text-xs text-white/70">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4"
+                                    checked={guestWantsDelivery}
+                                    onChange={(e) => setGuestWantsDelivery(e.target.checked)}
+                                />
+                                <span>Quiero delivery para este pedido</span>
+                            </label>
+
+                            {guestWantsDelivery && (
+                                <div>
+                                    <label className="block text-[11px] text-white/60 mb-1">
+                                        Dirección o link de ubicación
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                        placeholder="Escribe tu dirección, referencia o pega un link de Google Maps / WhatsApp"
+                                        value={deliveryLocation}
+                                        onChange={(e) => setDeliveryLocation(e.target.value)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-between items-center text-[11px] text-white/50 mb-4">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/login')}
+                                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs"
+                            >
+                                Ingresar con mi cuenta
+                            </button>
+                            <span>o continúa como invitado completando los campos.</span>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setGuestInfoModalOpen(false)}
+                                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleGuestConfirm}
+                                className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm flex items-center justify-center gap-2"
+                            >
+                                Continuar y enviar pedido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {paymentModalOpen && (
                 <div className="fixed inset-0 z-[1101] flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="bg-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
@@ -924,6 +1019,17 @@ const StoreFront = () => {
                                 </span>
                                 <span>≈ {totalFires.toFixed(0)} 🔥</span>
                             </div>
+                            {hasDeliveryLocation && (
+                                <div className="mt-2 text-xs text-white/70">
+                                    <div className="flex justify-between">
+                                        <span>Entrega</span>
+                                        <span>Delivery</span>
+                                    </div>
+                                    <div className="mt-1 max-h-16 overflow-y-auto text-[11px] text-white/60 whitespace-pre-wrap">
+                                        {deliveryLocation}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1031,7 +1137,7 @@ const StoreFront = () => {
                             </button>
                             <button
                                 type="button"
-                                onClick={handleCheckout}
+                                onClick={handleConfirmClick}
                                 disabled={!isPaid || createOrderMutation.isLoading}
                                 className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
