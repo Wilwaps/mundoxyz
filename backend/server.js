@@ -40,6 +40,7 @@ const storeCoreRoutes = require('./routes/store/core');
 const storeOrderRoutes = require('./routes/store/orders');
 const storeInventoryRoutes = require('./routes/store/inventory');
 const storeStaffRoutes = require('./routes/admin/store-staff');
+const referralRoutes = require('./routes/referrals');
 
 // Create Express app
 const app = express();
@@ -289,6 +290,7 @@ app.use('/api/bingo/v2', (req, res, next) => {
 app.use('/api/market', marketRoutes);
 app.use('/api/rooms', roomsRoutes);
 app.use('/api/commissions', commissionsRoutes);
+app.use('/api/referrals', referralRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/diagnostic', diagnosticRoutes);
 app.use('/api/debug-xp', debugXpRoutes);

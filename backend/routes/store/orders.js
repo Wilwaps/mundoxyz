@@ -5,6 +5,7 @@ const { verifyToken, optionalAuth } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const ubicacionService = require('../../services/ubicacion/ubicacionService');
+const { distributeCommissions } = require('../../services/referralService');
 
 // POST /api/store/order/create
 // Nota: usa optionalAuth para permitir pedidos del StoreFront sin sesión,
@@ -395,6 +396,38 @@ router.post('/create', optionalAuth, async (req, res) => {
                         );
                     }
                 }
+            }
+
+            // Hook de sistema de referidos: comisiones por orden de tienda (solo log, sin tocar wallets)
+            try {
+                const actorUserId = customer_id || userId || null;
+                const firesRateRaw = currency_snapshot && currency_snapshot.fires;
+                const firesRate = Number(firesRateRaw);
+                const hasFiresRate = Number.isFinite(firesRate) && firesRate > 0;
+
+                if (actorUserId && hasFiresRate && platform_commission_usdt > 0) {
+                    const baseFires = platform_commission_usdt * firesRate;
+
+                    await distributeCommissions({
+                        client,
+                        source: 'store',
+                        actorUserId,
+                        baseAmount: baseFires,
+                        currency: 'fires',
+                        operationType: 'store_order',
+                        operationId: order.id,
+                        metadata: {
+                            store_id,
+                            order_id: order.id,
+                            invoice_number: order.invoice_number
+                        }
+                    });
+                }
+            } catch (err) {
+                logger.error('[Referrals] Error distributing store order commissions', {
+                    store_id,
+                    error: err?.message || err
+                });
             }
 
             // Para pedidos del POS y StoreFront, crear ticket de cocina y notificar al KDS.

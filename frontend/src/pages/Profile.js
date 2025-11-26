@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
@@ -15,7 +15,8 @@ import {
   LogOut,
   Lock,
   Key,
-  Share2
+  Share2,
+  Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
@@ -58,6 +59,7 @@ const Profile = () => {
   });
   const [creatingGiftLink, setCreatingGiftLink] = useState(false);
   const [generatedLink, setGeneratedLink] = useState(null);
+  const [showReferralsModal, setShowReferralsModal] = useState(false);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -186,6 +188,64 @@ const Profile = () => {
   });
 
   const myStores = Array.isArray(storeStaff) ? storeStaff : [];
+
+  const {
+    data: referralsInfo,
+    isLoading: referralsLoading,
+    error: referralsError,
+    refetch: refetchReferrals
+  } = useQuery({
+    queryKey: ['my-referrals', user?.id],
+    queryFn: async () => {
+      const response = await axios.get('/api/referrals/me');
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
+  const tapMutation = useMutation({
+    mutationFn: async (targetUserId) => {
+      const response = await axios.post('/api/referrals/tap', {
+        target_user_id: targetUserId
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Tap enviado');
+      refetchReferrals();
+    },
+    onError: (error) => {
+      const status = error?.response?.status;
+      if (status === 429) {
+        const data = error.response?.data || {};
+        const next = data.next_available_at;
+        let message = data.error || 'Solo puedes enviar un tap cada 24 horas';
+        if (next) {
+          try {
+            const dt = new Date(next);
+            message += ` (próximo tap: ${dt.toLocaleString('es-ES')})`;
+          } catch (e) {}
+        }
+        toast.error(message);
+      } else {
+        const msg = error?.response?.data?.error || 'Error al enviar tap';
+        toast.error(msg);
+      }
+    }
+  });
+
+  const referralsEnabled =
+    referralsInfo?.user?.referrals_enabled !== undefined
+      ? !!referralsInfo.user.referrals_enabled
+      : true;
+  const myReferrer = referralsInfo?.referrer || null;
+  const myReferrals = Array.isArray(referralsInfo?.referrals) ? referralsInfo.referrals : [];
+  const myCommissions = Array.isArray(referralsInfo?.commissions)
+    ? referralsInfo.commissions
+    : [];
+  const tapsLast24h = referralsInfo?.taps_last_24h || { sent: 0, received: 0 };
+  const myReferralLink = referralsInfo?.referral_link || '';
+  const canSendTap = tapsLast24h.sent === 0 && !tapMutation.isLoading;
 
   // Rifas del usuario (como host)
   const {
@@ -620,6 +680,142 @@ const Profile = () => {
               </div>
             )}
           </div>
+        </motion.div>
+      )}
+
+      {referralsInfo && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13 }}
+          className="card-glass mb-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Users size={20} className="text-accent" />
+              Referidos
+            </h3>
+            {referralsLoading && (
+              <span className="text-[11px] text-text/60">Cargando...</span>
+            )}
+          </div>
+
+          {!referralsEnabled && (
+            <div className="mb-4 text-xs text-text/60">
+              Tienes los referidos desactivados. No generarás nuevas comisiones por ahora.
+            </div>
+          )}
+
+          {myReferralLink && (
+            <div className="mb-4 text-xs">
+              <div className="text-text/60 mb-1">Tu link de invitación</div>
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={myReferralLink}
+                  className="flex-1 px-3 py-2 bg-background-dark rounded-lg text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(myReferralLink);
+                      toast.success('Link de referido copiado');
+                    } catch (e) {
+                      toast.error('No se pudo copiar el link');
+                    }
+                  }}
+                  className="px-3 py-2 text-xs rounded-full bg-accent text-dark font-semibold"
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2 text-xs">
+              <div className="font-semibold text-text/80">Mi líder</div>
+              {myReferrer ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-sm text-text">
+                      {myReferrer.display_name || myReferrer.username}
+                    </div>
+                    <div className="text-[11px] text-text/60">@{myReferrer.username}</div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!canSendTap}
+                    onClick={() => tapMutation.mutate(myReferrer.id)}
+                    className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {canSendTap ? 'Enviar Tap' : 'Tap en 24h'}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-text/60">
+                  Aún no tienes líder asignado.
+                </div>
+              )}
+
+              <div className="mt-3">
+                <div className="font-semibold text-text/80 mb-1">Actividad de taps (24h)</div>
+                <div className="flex justify-between">
+                  <span className="text-text/60">Enviados</span>
+                  <span className="font-semibold">{tapsLast24h.sent}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text/60">Recibidos</span>
+                  <span className="font-semibold">{tapsLast24h.received}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="font-semibold text-text/80">Mis comisiones</div>
+              {myCommissions.length === 0 ? (
+                <div className="text-text/60">
+                  Aún no tienes comisiones generadas.
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {myCommissions.map((row) => (
+                    <div key={row.currency} className="flex justify-between">
+                      <span className="text-text/60">{row.currency}</span>
+                      <span className="font-semibold">
+                        {Number(row.total || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs">
+            <div>
+              <div className="font-semibold text-text/80">Mis referidos directos</div>
+              <div className="text-text/60">
+                {myReferrals.length} usuarios
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowReferralsModal(true)}
+              disabled={myReferrals.length === 0}
+              className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-text/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Ver detalle
+            </button>
+          </div>
+
+          {referralsError && (
+            <div className="mt-3 text-[11px] text-red-400">
+              Error al cargar tus datos de referidos.
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -1085,6 +1281,52 @@ const Profile = () => {
           setShowMyData(false);
         }}
       />
+      {showReferralsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md card-glass p-6 max-h-[90vh] overflow-y-auto"
+          >
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Users size={18} className="text-accent" />
+              Mis referidos
+            </h3>
+            {myReferrals.length === 0 ? (
+              <p className="text-sm text-text/60">Aún no tienes usuarios referidos.</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {myReferrals.map((r) => (
+                  <div key={r.id} className="glass-panel p-2 flex flex-col">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-text">
+                          {r.display_name || r.username}
+                        </div>
+                        <div className="text-[11px] text-text/60">@{r.username}</div>
+                      </div>
+                      <div className="text-[11px] text-text/60">
+                        {r.created_at
+                          ? new Date(r.created_at).toLocaleDateString('es-ES')
+                          : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReferralsModal(false)}
+                className="px-4 py-2 rounded-lg bg-glass hover:bg-glass-hover text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

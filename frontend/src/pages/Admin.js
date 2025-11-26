@@ -24,6 +24,7 @@ import toast from 'react-hot-toast';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
+import AdminReferrals from '../components/admin/AdminReferrals';
 
 // Stats Component
 const AdminStats = () => {
@@ -2020,7 +2021,7 @@ const AdminStores = () => {
 
 // Main Admin Component
 const Admin = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isTote } = useAuth();
 
   if (!isAdmin()) {
     return <Navigate to="/games" replace />;
@@ -2109,6 +2110,19 @@ const Admin = () => {
             <DollarSign size={18} />
             FIAT
           </NavLink>
+          {isTote() && (
+            <NavLink
+              to="/admin/referrals"
+              className={({ isActive }) => 
+                `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                  isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+                }`
+              }
+            >
+              <Users size={18} />
+              Referidos
+            </NavLink>
+          )}
         </div>
       </nav>
 
@@ -2121,6 +2135,7 @@ const Admin = () => {
         <Route path="fire-requests" element={<AdminFireRequests />} />
         <Route path="redemptions" element={<AdminRedemptions />} />
         <Route path="fiat" element={<AdminFiat />} />
+        <Route path="referrals" element={<AdminReferrals />} />
       </Routes>
     </div>
   );

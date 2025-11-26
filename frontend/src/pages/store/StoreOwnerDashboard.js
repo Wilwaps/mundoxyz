@@ -74,7 +74,6 @@ const StoreOwnerDashboard = () => {
   const [editingMode, setEditingMode] = useState('edit');
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
 
   const [headerLayout, setHeaderLayout] = useState('normal');
@@ -82,6 +81,7 @@ const StoreOwnerDashboard = () => {
   const [coverUrlInput, setCoverUrlInput] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [locationMapsUrl, setLocationMapsUrl] = useState('');
+  const [locationPreview, setLocationPreview] = useState(null);
   const [settingsInitialized, setSettingsInitialized] = useState(false);
 
   const {
@@ -120,6 +120,52 @@ const StoreOwnerDashboard = () => {
 
     setSettingsInitialized(true);
   }, [store, settingsInitialized]);
+
+  useEffect(() => {
+    if (!locationMapsUrl || !locationMapsUrl.trim()) {
+      setLocationPreview(null);
+      return;
+    }
+
+    const urlStr = locationMapsUrl.trim();
+    let lat = null;
+    let lng = null;
+
+    try {
+      // Patron @lat,lng
+      const atMatch = urlStr.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+      if (atMatch) {
+        lat = parseFloat(atMatch[1]);
+        lng = parseFloat(atMatch[2]);
+      }
+
+      // Patron q=lat,lng en querystring
+      if (lat === null || !Number.isFinite(lat)) {
+        const qMatch = urlStr.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+        if (qMatch) {
+          lat = parseFloat(qMatch[1]);
+          lng = parseFloat(qMatch[2]);
+        }
+      }
+
+      // Patron !3dLAT!4dLNG (links generados por Google Maps)
+      if (lat === null || !Number.isFinite(lat)) {
+        const dMatch = urlStr.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+        if (dMatch) {
+          lat = parseFloat(dMatch[1]);
+          lng = parseFloat(dMatch[2]);
+        }
+      }
+    } catch (e) {
+      // Ignorar errores de parseo
+    }
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setLocationPreview({ lat, lng });
+    } else {
+      setLocationPreview(null);
+    }
+  }, [locationMapsUrl]);
 
   const {
     data: suppliersData,
@@ -916,10 +962,7 @@ const StoreOwnerDashboard = () => {
                         }`}
                         onClick={() => {
                           if (!canOpenInvoice) return;
-                          setSelectedInvoice({
-                            storeId: store.id,
-                            invoiceNumber: order.invoice_number
-                          });
+                          navigate(`/store/${store.slug}/invoice/${order.invoice_number}`);
                         }}
                       >
                         <td className="py-1 pr-3 text-text/80">
@@ -1141,6 +1184,23 @@ const StoreOwnerDashboard = () => {
                   className="input-glass w-full"
                   placeholder="https://maps.google.com/..."
                 />
+                {locationMapsUrl && (
+                  <div className="mt-1 text-[11px] text-text/60">
+                    {locationPreview ? (
+                      <>
+                        Coordenadas detectadas:{' '}
+                        <span className="font-mono">
+                          {locationPreview.lat.toFixed(6)}, {locationPreview.lng.toFixed(6)}
+                        </span>
+                      </>
+                    ) : (
+                      <span>
+                        No se pudieron leer coordenadas del enlace. Copia la URL completa desde Google Maps
+                        (barra de direcciones) para mejorar la precisión.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1157,6 +1217,14 @@ const StoreOwnerDashboard = () => {
                   address: locationAddress || null,
                   maps_url: locationMapsUrl || null
                 };
+
+                if (locationPreview) {
+                  locationPatch.lat = locationPreview.lat;
+                  locationPatch.lng = locationPreview.lng;
+                  // Campos alternativos por compatibilidad
+                  locationPatch.latitude = locationPreview.lat;
+                  locationPatch.longitude = locationPreview.lng;
+                }
 
                 const payload = {
                   logo_url: logoUrlInput || null,
