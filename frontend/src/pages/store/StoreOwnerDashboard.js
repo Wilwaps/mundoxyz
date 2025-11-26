@@ -136,6 +136,7 @@ const StoreOwnerDashboard = () => {
   const [locationAddress, setLocationAddress] = useState('');
   const [locationMapsUrl, setLocationMapsUrl] = useState('');
   const [locationPreview, setLocationPreview] = useState(null);
+  const [tablesCountInput, setTablesCountInput] = useState('0');
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState({});
   const [settingsInitialized, setSettingsInitialized] = useState(false);
 
@@ -176,6 +177,13 @@ const StoreOwnerDashboard = () => {
           ? rawSettings.payment_methods
           : {};
 
+      const rawTablesCount =
+        rawSettings.tables_count ?? rawSettings.tablesCount ?? 0;
+      let normalizedTables = parseInt(rawTablesCount, 10);
+      if (!Number.isFinite(normalizedTables) || normalizedTables < 0) {
+        normalizedTables = 0;
+      }
+
       setHeaderLayout(rawSettings.header_layout || 'normal');
       setLogoUrlInput(store.logo_url || '');
       setCoverUrlInput(store.cover_url || '');
@@ -183,6 +191,7 @@ const StoreOwnerDashboard = () => {
       setLocationMapsUrl(
         rawLocation.maps_url || rawLocation.google_maps_url || ''
       );
+      setTablesCountInput(String(normalizedTables));
 
       const defaultPaymentMethods = {
         bs_transfer: {
@@ -1326,6 +1335,23 @@ const StoreOwnerDashboard = () => {
               </div>
 
               <div>
+                <p className="text-text/60 mb-1">Número de mesas (modo restaurante)</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={tablesCountInput}
+                    onChange={(e) => setTablesCountInput(e.target.value)}
+                    className="input-glass w-24"
+                  />
+                  <span className="text-[11px] text-text/60">
+                    0 desactiva el modo restaurante en el POS.
+                  </span>
+                </div>
+              </div>
+
+              <div>
                 <p className="text-text/60 mb-1">URL del logo (perfil)</p>
                 <div className="flex flex-col gap-2">
                   <input
@@ -1563,6 +1589,12 @@ const StoreOwnerDashboard = () => {
                   header_layout: headerLayout,
                   payment_methods: paymentMethodsConfig
                 };
+
+                let normalizedTables = parseInt(tablesCountInput, 10);
+                if (!Number.isFinite(normalizedTables) || normalizedTables < 0) {
+                  normalizedTables = 0;
+                }
+                settingsPatch.tables_count = normalizedTables;
 
                 const locationPatch = {
                   address: locationAddress || null,

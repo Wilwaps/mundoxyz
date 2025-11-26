@@ -36,6 +36,8 @@ const POS = () => {
     const [draftInvoices, setDraftInvoices] = useState([]);
     const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
 
+    const [currentTable, setCurrentTable] = useState(null);
+
     const draftsStorageKey = slug ? `pos_drafts_${slug}` : 'pos_drafts_default';
 
     // Fetch Store & Products
@@ -66,6 +68,19 @@ const POS = () => {
         bs: bsRate, // 1 USDT = bsRate Bs
         fires: firesRate // 1 USDT = firesRate Fires
     };
+
+    const storeSettingsRaw =
+        storeData?.store && typeof storeData.store.settings === 'object'
+            ? storeData.store.settings
+            : {};
+    const rawTablesCount =
+        storeSettingsRaw.tables_count ?? storeSettingsRaw.tablesCount ?? 0;
+    let tablesCount = parseInt(rawTablesCount, 10);
+    if (!Number.isFinite(tablesCount) || tablesCount < 0) {
+        tablesCount = 0;
+    }
+    const isRestaurantMode = tablesCount > 0;
+    const effectiveTable = currentTable || (isRestaurantMode ? 'Mesa 1' : 'POS-1');
 
     // Normaliza montos de entrada (strings, vacío, etc.) a números >= 0
     const parseAmount = (value) => {
@@ -253,7 +268,7 @@ const POS = () => {
                 source: 'pos'
             },
             currency_snapshot: rates,
-            table_number: 'POS-1',
+            table_number: effectiveTable,
             delivery_info: customerInfo,
             customer_id: selectedCustomer?.id || null,
             change_to_fires: giveChangeInFires && changeUSDT > 0 && selectedCustomer?.id
@@ -295,6 +310,7 @@ const POS = () => {
             created_at: new Date().toISOString(),
             store_id: storeData?.store?.id || null,
             slug,
+            table_label: effectiveTable,
             cart: cart.map((item) => ({ ...item })),
             customerName,
             customerPhone,
@@ -330,6 +346,10 @@ const POS = () => {
         setSelectedCustomer(draft.selectedCustomer || null);
         setPayments(draft.payments || initialPayments);
         setGiveChangeInFires(!!draft.giveChangeInFires);
+
+        if (draft.table_label) {
+            setCurrentTable(draft.table_label);
+        }
 
         const nextDrafts = draftInvoices.filter((d) => d.id !== draftId);
         setDraftInvoices(nextDrafts);
@@ -417,6 +437,39 @@ const POS = () => {
                     </div>
                 </div>
 
+                {isRestaurantMode && (
+                    <div className="px-3 py-2 md:px-4 border-b border-white/10 bg-black/10">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-[11px] uppercase tracking-wide text-white/50">
+                                Mesas
+                            </span>
+                            <span className="text-[11px] text-white/70">
+                                {effectiveTable}
+                            </span>
+                        </div>
+                        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                            {Array.from({ length: tablesCount }, (_, index) => {
+                                const label = `Mesa ${index + 1}`;
+                                const isActive = effectiveTable === label;
+                                return (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        onClick={() => setCurrentTable(label)}
+                                        className={`px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap border ${
+                                            isActive
+                                                ? 'bg-accent text-dark border-accent'
+                                                : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {index + 1}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Grid */}
                 <div className="flex-1 overflow-y-auto px-3 py-3 md:p-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
@@ -459,8 +512,13 @@ const POS = () => {
 
             {/* Right: Cart, Customer & Payment */}
             <div className="w-full lg:w-96 flex flex-col bg-dark-lighter border-t border-white/10 lg:border-t-0">
-                <div className="p-4 border-b border-white/10 font-bold text-base md:text-lg">
-                    Orden Actual
+                <div className="p-4 border-b border-white/10 flex items-center justify-between gap-2">
+                    <div className="font-bold text-base md:text-lg">Orden Actual</div>
+                    {isRestaurantMode && (
+                        <div className="text-xs text-white/60">
+                            {effectiveTable}
+                        </div>
+                    )}
                 </div>
 
                 {/* Cliente */}
@@ -1534,6 +1592,7 @@ const POSDraftInvoicesModal = ({ drafts, onClose, onLoadDraft, onClearAll }) => 
                         <thead>
                             <tr className="text-white/60 border-b border-white/10">
                                 <th className="py-1 pr-3 text-left">Cliente</th>
+                                <th className="py-1 pr-3 text-left">Mesa</th>
                                 <th className="py-1 pr-3 text-right">Items</th>
                                 <th className="py-1 pr-3 text-right">Total aprox (USDT)</th>
                                 <th className="py-1 pr-3 text-left">Creada</th>
@@ -1561,6 +1620,9 @@ const POSDraftInvoicesModal = ({ drafts, onClose, onLoadDraft, onClearAll }) => 
                                     >
                                         <td className="py-1 pr-3 text-white/80">
                                             {draft.customerName || 'Sin nombre'}
+                                        </td>
+                                        <td className="py-1 pr-3 text-white/80">
+                                            {draft.table_label || '-'}
                                         </td>
                                         <td className="py-1 pr-3 text-right text-white/80">{itemsCount}</td>
                                         <td className="py-1 pr-3 text-right text-white/80">

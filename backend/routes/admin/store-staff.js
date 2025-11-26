@@ -79,7 +79,7 @@ router.post('/assign', verifyToken, requireTote, async (req, res) => {
       return res.status(400).json({ error: 'user_id, store_id y role son requeridos' });
     }
 
-    const validRoles = ['owner', 'admin', 'manager', 'seller', 'marketing'];
+    const validRoles = ['owner', 'admin', 'manager', 'seller', 'marketing', 'mesonero', 'delivery'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Rol de tienda inválido' });
     }
