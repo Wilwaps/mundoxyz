@@ -108,6 +108,49 @@ const StoreFront = () => {
         });
     };
 
+    const buildDefaultModifiersForProduct = (product) => {
+        const modsArray = Array.isArray(product?.modifiers) ? product.modifiers : [];
+        if (!modsArray.length) return {};
+
+        const grouped = modsArray.reduce((acc, mod) => {
+            if (!mod || !mod.group_name) return acc;
+            const groupName = mod.group_name;
+            if (!acc[groupName]) acc[groupName] = [];
+            acc[groupName].push(mod);
+            return acc;
+        }, {});
+
+        const initialSelection = {};
+
+        Object.entries(grouped).forEach(([groupName, mods]) => {
+            if (!Array.isArray(mods) || mods.length === 0) return;
+
+            const maxSelection = mods[0]?.max_selection || 1;
+
+            const requiredIds = mods
+                .filter((m) => m && m.is_required === true)
+                .map((m) => m.id)
+                .filter((id) => id != null);
+
+            let ids = [];
+
+            if (requiredIds.length > 0) {
+                ids = requiredIds;
+            } else if (maxSelection > 1) {
+                // Para grupos multi-selección sin requeridos, seleccionar todos por defecto
+                ids = mods
+                    .map((m) => m && m.id)
+                    .filter((id) => id != null);
+            }
+
+            if (ids.length > 0) {
+                initialSelection[groupName] = ids;
+            }
+        });
+
+        return initialSelection;
+    };
+
     const addToCart = (product, quantity = 1, modifiers = []) => {
         setCart(prev => {
             const existing = prev.find(item => item.product.id === product.id);
@@ -691,7 +734,7 @@ const StoreFront = () => {
                                 onClick={() => {
                                     setSelectedProduct(product);
                                     setProductModalQuantity(1);
-                                    setProductModalModifiers({});
+                                    setProductModalModifiers(buildDefaultModifiersForProduct(product));
                                 }}
                             >
                                 <div className="relative h-48 overflow-hidden">

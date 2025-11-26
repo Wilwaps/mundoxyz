@@ -121,11 +121,16 @@ if (!token) {
       chatId,
       `👋 ¡Hola ${firstName}!\n\n` +
       `Soy el bot oficial de **MundoXYZ** 🎮\n\n` +
-      `Para vincular tu cuenta de Telegram con MundoXYZ:\n` +
+      `**Comandos disponibles:**\n` +
+      `/start - Ver este mensaje\n` +
+      `/help - Ayuda y más detalles\n` +
+      `/id - Ver tu Telegram ID\n` +
+      `/bcv - Tasa de referencia BCV\n\n` +
+      `**Cómo vincular tu cuenta con MundoXYZ:**\n` +
       `1️⃣ Ve a tu perfil en MundoXYZ\n` +
       `2️⃣ Click en "Mis Datos"\n` +
       `3️⃣ Ve a la pestaña "Telegram"\n` +
-      `4️⃣ Click en "Vincular con Bot"\n\n` +
+      `4️⃣ Click en "Vincular con Bot" y sigue las instrucciones\n\n` +
       `¡Nos vemos en el juego! 🔥`,
       { parse_mode: 'Markdown' }
     );
@@ -196,9 +201,10 @@ if (!token) {
       chatId,
       `📖 **Ayuda - MundoXYZ Bot**\n\n` +
       `**Comandos disponibles:**\n` +
-      `/start - Iniciar bot\n` +
+      `/start - Ver mensaje de bienvenida\n` +
       `/help - Ver esta ayuda\n` +
-      `/myid - Ver tu Telegram ID\n\n` +
+      `/id - Ver tu Telegram ID\n` +
+      `/bcv - Ver tasa de referencia BCV\n\n` +
       `**¿Cómo vincular mi cuenta?**\n` +
       `1. Ve a MundoXYZ\n` +
       `2. Perfil → Mis Datos → Telegram\n` +
@@ -208,8 +214,8 @@ if (!token) {
     );
   });
 
-  // Handle /myid command (useful for manual linking)
-  bot.onText(/\/myid/, (msg) => {
+  // Handle /id command (useful for manual linking)
+  bot.onText(/\/id(?:@[^\s]+)?/, (msg) => {
     const chatId = msg.chat.id;
     const tgId = msg.from.id;
     const username = msg.from.username;
