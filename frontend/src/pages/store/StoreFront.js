@@ -1230,6 +1230,17 @@ const StoreFront = () => {
                                                                         [groupName]: next
                                                                     };
                                                                 });
+
+                                                                // Opción B: cada click en un color agrega 1 unidad de ese color al carrito
+                                                                if (color && maxSelection === 1) {
+                                                                    const allMods = Array.isArray(selectedProduct.modifiers)
+                                                                        ? selectedProduct.modifiers
+                                                                        : [];
+                                                                    const selectedModifier = allMods.find((m) => m && m.id === id);
+                                                                    if (selectedModifier) {
+                                                                        addToCart(selectedProduct, 1, [selectedModifier]);
+                                                                    }
+                                                                }
                                                             }}
                                                             className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
                                                                 isSelected
