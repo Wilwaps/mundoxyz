@@ -124,7 +124,7 @@ const KitchenDisplay = () => {
                 </div>
 
                 <div className="flex gap-2 mt-2">
-                    {order.status === 'pending' && (
+                    {(order.status === 'pending' || order.status === 'confirmed') && (
                         <button
                             onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: 'preparing' })}
                             className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm flex items-center justify-center gap-2"

@@ -198,6 +198,13 @@ router.post('/create', optionalAuth, async (req, res) => {
         // Calcular comisión de plataforma (solo reporting, sin mover wallets en esta fase)
         const platform_commission_usdt = total_usdt * (commission_percentage / 100);
 
+        let initialStatus = 'pending';
+        let initialPaymentStatus = 'unpaid';
+        if (!isStorefront) {
+            initialStatus = 'confirmed';
+            initialPaymentStatus = 'paid';
+        }
+
         // 3. Create Order Transaction
         const result = await transaction(async (client) => {
             // Generate per-store invoice number atomically
@@ -222,10 +229,10 @@ router.post('/create', optionalAuth, async (req, res) => {
           payment_status, payment_method, currency_snapshot,
           subtotal_usdt, tax_usdt, delivery_fee_usdt, total_usdt,
           table_number, delivery_info)
-         VALUES ($1, $2, $3, $4, $5, $6, 'pending', 
-                 'unpaid', $7, $8, 
-                 $9, $10, $11, $12,
-                 $13, $14)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 
+                 $8, $9, $10, 
+                 $11, $12, $13, $14,
+                 $15, $16)
          RETURNING *`,
                 [
                     store_id,
@@ -234,6 +241,8 @@ router.post('/create', optionalAuth, async (req, res) => {
                     orderCode,
                     invoiceNumber,
                     type,
+                    initialStatus,
+                    initialPaymentStatus,
                     JSON.stringify(payment_method || {}),
                     JSON.stringify(currency_snapshot || {}),
                     subtotal_usdt,

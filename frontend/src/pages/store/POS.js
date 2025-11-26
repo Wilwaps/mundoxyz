@@ -248,7 +248,10 @@ const POS = () => {
                 modifiers: [] // TODO: Add modifier support in POS
             })),
             type: 'dine_in', // Default
-            payment_method: payments,
+            payment_method: {
+                ...payments,
+                source: 'pos'
+            },
             currency_snapshot: rates,
             table_number: 'POS-1',
             delivery_info: customerInfo,

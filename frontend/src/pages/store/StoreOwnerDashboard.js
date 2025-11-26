@@ -1698,6 +1698,53 @@ const ProductEditModal = ({
   const existingModifiers = Array.isArray(product?.modifiers) ? product.modifiers : [];
   const [modifierGroups, setModifierGroups] = useState([]);
 
+  useEffect(() => {
+    if (!Array.isArray(existingModifiers) || existingModifiers.length === 0) return;
+
+    setModifierGroups((prev) => {
+      if (Array.isArray(prev) && prev.length > 0) {
+        return prev;
+      }
+
+      const groupsMap = new Map();
+
+      for (const mod of existingModifiers) {
+        if (!mod || !mod.group_name) continue;
+        const groupName = String(mod.group_name).trim();
+        if (!groupName) continue;
+
+        let group = groupsMap.get(groupName);
+        if (!group) {
+          const maxSelRaw = mod.max_selection;
+          let maxSel = parseInt(maxSelRaw, 10);
+          if (!Number.isFinite(maxSel) || maxSel <= 0) {
+            maxSel = 1;
+          }
+
+          group = {
+            id: groupName,
+            groupName,
+            maxSelection: maxSel,
+            color: '#00E5FF',
+            options: []
+          };
+          groupsMap.set(groupName, group);
+        }
+
+        const hasAdj = mod.price_adjustment_usdt !== undefined && mod.price_adjustment_usdt !== null;
+        const priceAdjValue = hasAdj ? String(mod.price_adjustment_usdt) : '';
+
+        group.options.push({
+          id: mod.id || `${groupName}_${group.options.length}`,
+          name: mod.name || '',
+          priceAdjustmentUsdt: priceAdjValue
+        });
+      }
+
+      return Array.from(groupsMap.values());
+    });
+  }, [existingModifiers]);
+
   const priceUsdtNumber = parseFloat(priceUsdt || '0');
   const priceFiresNumber = parseFloat(priceFires || '0');
 
