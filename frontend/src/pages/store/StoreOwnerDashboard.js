@@ -1195,8 +1195,9 @@ const StoreOwnerDashboard = () => {
                       </>
                     ) : (
                       <span>
-                        No se pudieron leer coordenadas del enlace. Copia la URL completa desde Google Maps
-                        (barra de direcciones) para mejorar la precisión.
+                        No se pudieron leer coordenadas del enlace. Evita usar links cortos como
+                        share.google o maps.app.goo.gl. Abre el mapa y copia la URL completa desde la barra
+                        de direcciones de Google Maps para mejorar la precisión.
                       </span>
                     )}
                   </div>

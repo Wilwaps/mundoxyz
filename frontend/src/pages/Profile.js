@@ -29,6 +29,7 @@ import AdminRoomsManager from '../components/bingo/AdminRoomsManager';
 import * as raffleApi from '../features/raffles/api';
 import { useUserRaffles } from '../features/raffles/hooks/useRaffleData';
 import RaffleCard from '../features/raffles/components/RaffleCard';
+import { downloadQrForUrl } from '../utils/qr';
 
 const Profile = () => {
   const queryClient = useQueryClient();
@@ -730,6 +731,19 @@ const Profile = () => {
                 >
                   Copiar
                 </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await downloadQrForUrl(myReferralLink, 'mundoxyz-referral-qr.png');
+                    } catch (e) {
+                      // Errores ya manejados en la utilidad
+                    }
+                  }}
+                  className="px-3 py-2 text-xs rounded-full bg-glass hover:bg-glass-hover text-text/80"
+                >
+                  QR
+                </button>
               </div>
             </div>
           )}
@@ -1074,6 +1088,21 @@ const Profile = () => {
                   >
                     <Share2 size={12} />
                     Compartir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!row.store_slug || typeof window === 'undefined') return;
+                      const url = `${window.location.origin}/store/${row.store_slug}`;
+                      try {
+                        await downloadQrForUrl(url, `tienda-${row.store_slug}-qr.png`);
+                      } catch (e) {
+                        // Errores ya manejados en la utilidad
+                      }
+                    }}
+                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover"
+                  >
+                    QR
                   </button>
                   <button
                     type="button"

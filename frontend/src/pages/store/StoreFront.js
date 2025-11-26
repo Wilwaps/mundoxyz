@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Banknote, Flame, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { downloadQrForUrl } from '../../utils/qr';
 import './StoreFront.css'; // Custom styles
 
 const StoreFront = () => {
@@ -447,6 +448,14 @@ const StoreFront = () => {
                 }
                 break;
             }
+            case 'qr': {
+                try {
+                    await downloadQrForUrl(shareUrl, `tienda-${slugValue}-qr.png`);
+                } catch (err) {
+                    console.error('Error generando QR de tienda:', err);
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -508,6 +517,12 @@ const StoreFront = () => {
                                         className="w-full px-4 py-2 text-left text-sm text-white flex items-center gap-2 hover:bg-white/10"
                                     >
                                         <span>Copiar enlace</span>
+                                    </button>
+                                    <button
+                                        onClick={() => shareStore('qr')}
+                                        className="w-full px-4 py-2 text-left text-sm text-white flex items-center gap-2 hover:bg-white/10"
+                                    >
+                                        <span>Descargar QR</span>
                                     </button>
                                 </motion.div>
                             )}
@@ -1191,17 +1206,18 @@ const StoreFront = () => {
                                         <span>Habilitar</span>
                                     </label>
                                 </div>
-                                <div className="relative">
-                                    <Banknote className="absolute left-3 top-2.5 text-green-400" size={18} />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableCashUsdt ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                        value={payments.cash_usdt}
-                                        onChange={(e) => setPayments({ ...payments, cash_usdt: e.target.value })}
-                                        disabled={!enableCashUsdt}
-                                    />
-                                </div>
+                                {enableCashUsdt && (
+                                    <div className="relative">
+                                        <Banknote className="absolute left-3 top-2.5 text-green-400" size={18} />
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={payments.cash_usdt}
+                                            onChange={(e) => setPayments({ ...payments, cash_usdt: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -1216,17 +1232,18 @@ const StoreFront = () => {
                                         <span>Habilitar</span>
                                     </label>
                                 </div>
-                                <div className="relative">
-                                    <CreditCard className="absolute left-3 top-2.5 text-accent" size={18} />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableZelle ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                        value={payments.zelle}
-                                        onChange={(e) => setPayments({ ...payments, zelle: e.target.value })}
-                                        disabled={!enableZelle}
-                                    />
-                                </div>
+                                {enableZelle && (
+                                    <div className="relative">
+                                        <CreditCard className="absolute left-3 top-2.5 text-accent" size={18} />
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={payments.zelle}
+                                            onChange={(e) => setPayments({ ...payments, zelle: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -1241,33 +1258,36 @@ const StoreFront = () => {
                                         <span>Habilitar</span>
                                     </label>
                                 </div>
-                                <div className="relative mb-2">
-                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsCash ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                        value={payments.bs_cash}
-                                        onChange={(e) => setPayments({ ...payments, bs_cash: e.target.value })}
-                                        disabled={!enableBsCash}
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="block text-[11px] text-white/60">Comprobante de efectivo (foto, opcional)</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleCashProofChange}
-                                            className="text-[11px] text-white/70"
-                                        />
-                                        {cashProofName && (
-                                            <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
-                                                {cashProofName}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
+                                {enableBsCash && (
+                                    <>
+                                        <div className="relative mb-2">
+                                            <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={payments.bs_cash}
+                                                onChange={(e) => setPayments({ ...payments, bs_cash: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="block text-[11px] text-white/60">Comprobante de efectivo (foto, opcional)</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleCashProofChange}
+                                                    className="text-[11px] text-white/70"
+                                                />
+                                                {cashProofName && (
+                                                    <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
+                                                        {cashProofName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -1282,28 +1302,30 @@ const StoreFront = () => {
                                         <span>Habilitar</span>
                                     </label>
                                 </div>
-                                <div className="relative mb-2">
-                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsTransfer ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                        value={payments.bs_transfer}
-                                        onChange={(e) => setPayments({ ...payments, bs_transfer: e.target.value })}
-                                        disabled={!enableBsTransfer}
-                                    />
-                                </div>
-                                <label className="block text-[11px] text-white/60 mb-1">Referencia bancaria (opcional)</label>
-                                <input
-                                    type="text"
-                                    className={`w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent ${!enableBsTransfer ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                    value={transferReference}
-                                    onChange={(e) => setTransferReference(e.target.value)}
-                                    disabled={!enableBsTransfer}
-                                />
-                                <div className="text-[11px] text-white/40 mt-1">
-                                    Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
-                                </div>
+                                {enableBsTransfer && (
+                                    <>
+                                        <div className="relative mb-2">
+                                            <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={payments.bs_transfer}
+                                                onChange={(e) => setPayments({ ...payments, bs_transfer: e.target.value })}
+                                            />
+                                        </div>
+                                        <label className="block text-[11px] text-white/60 mb-1">Referencia bancaria (opcional)</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                            value={transferReference}
+                                            onChange={(e) => setTransferReference(e.target.value)}
+                                        />
+                                        <div className="text-[11px] text-white/40 mt-1">
+                                            Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="md:col-span-2">
                                 <div className="flex items-center justify-between mb-1">
@@ -1318,20 +1340,23 @@ const StoreFront = () => {
                                         <span>Habilitar</span>
                                     </label>
                                 </div>
-                                <div className="relative">
-                                    <Flame className="absolute left-3 top-2.5 text-fire-orange" size={18} />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className={`w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent ${!enableFires ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                        value={payments.fires}
-                                        onChange={(e) => setPayments({ ...payments, fires: e.target.value })}
-                                        disabled={!enableFires}
-                                    />
-                                </div>
-                                <div className="text-[11px] text-white/40 mt-1">
-                                    1 USDT ≈ {rates.fires.toFixed(0)} 🔥
-                                </div>
+                                {enableFires && (
+                                    <>
+                                        <div className="relative">
+                                            <Flame className="absolute left-3 top-2.5 text-fire-orange" size={18} />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={payments.fires}
+                                                onChange={(e) => setPayments({ ...payments, fires: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="text-[11px] text-white/40 mt-1">
+                                            1 USDT ≈ {rates.fires.toFixed(0)} 🔥
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 

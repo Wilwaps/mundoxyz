@@ -13,6 +13,7 @@ const logger = require('./utils/logger');
 const config = require('./config/config');
 const { initDatabase } = require('./db');
 const { initRedis } = require('./services/redis');
+const fiatRatesScheduler = require('./jobs/fiatRatesScheduler');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -376,6 +377,14 @@ async function startServer() {
           }
         }, 3600000); // Run every hour
         logger.info('✅ Gift Expiration Job started - runs every hour');
+
+        // Start FIAT rates scheduler (BCV diario, Binance/MundoXYZ cada hora)
+        try {
+          fiatRatesScheduler.start();
+          logger.info('✅ FIAT Rates Scheduler started');
+        } catch (fiatError) {
+          logger.error('Failed to start FIAT Rates Scheduler:', fiatError);
+        }
 
       } catch (error) {
         logger.error('Failed to initialize database:', error);
