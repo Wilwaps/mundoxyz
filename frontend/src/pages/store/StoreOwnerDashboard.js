@@ -83,6 +83,7 @@ const StoreOwnerDashboard = () => {
   const [locationAddress, setLocationAddress] = useState('');
   const [locationMapsUrl, setLocationMapsUrl] = useState('');
   const [locationPreview, setLocationPreview] = useState(null);
+  const [paymentMethodsConfig, setPaymentMethodsConfig] = useState({});
   const [settingsInitialized, setSettingsInitialized] = useState(false);
 
   const {
@@ -117,6 +118,10 @@ const StoreOwnerDashboard = () => {
     try {
       const rawSettings = store.settings || {};
       const rawLocation = store.location || {};
+      const rawPaymentMethods =
+        rawSettings.payment_methods && typeof rawSettings.payment_methods === 'object'
+          ? rawSettings.payment_methods
+          : {};
 
       setHeaderLayout(rawSettings.header_layout || 'normal');
       setLogoUrlInput(store.logo_url || '');
@@ -125,6 +130,52 @@ const StoreOwnerDashboard = () => {
       setLocationMapsUrl(
         rawLocation.maps_url || rawLocation.google_maps_url || ''
       );
+
+      const defaultPaymentMethods = {
+        bs_transfer: {
+          label: 'Pago mvil / Transferencia en Bs',
+          instructions: ''
+        },
+        bs_cash: {
+          label: 'Bs en efectivo',
+          instructions: ''
+        },
+        zelle: {
+          label: 'Zelle / Transf. (USDT)',
+          instructions: ''
+        },
+        cash_usdt: {
+          label: 'Efectivo (USDT)',
+          instructions: ''
+        },
+        fires: {
+          label: 'Pago con Fuegos',
+          instructions: ''
+        }
+      };
+
+      const mergedConfig = {};
+      Object.entries(defaultPaymentMethods).forEach(([key, def]) => {
+        const existing =
+          rawPaymentMethods[key] && typeof rawPaymentMethods[key] === 'object'
+            ? rawPaymentMethods[key]
+            : {};
+
+        const labelSource =
+          typeof existing.label === 'string' && existing.label.trim()
+            ? existing.label.trim()
+            : def.label;
+
+        mergedConfig[key] = {
+          label: labelSource,
+          instructions:
+            typeof existing.instructions === 'string'
+              ? existing.instructions
+              : ''
+        };
+      });
+
+      setPaymentMethodsConfig(mergedConfig);
     } catch (e) {
       // noop
     }
@@ -1241,12 +1292,106 @@ const StoreOwnerDashboard = () => {
             </div>
           </div>
 
+          <div className="mt-4 border-t border-glass pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-text/80 flex items-center gap-1">
+                Métodos de pago (checkout tienda)
+              </h3>
+            </div>
+            <p className="text-[11px] text-text/60">
+              Configura cómo verán los métodos de pago tus clientes al hacer checkout en tu tienda pública.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                {
+                  key: 'bs_transfer',
+                  title: 'Pago mvil / Transferencia en Bs',
+                  placeholder:
+                    'Datos de pago mvil o transferencia en Bs (banco, alias, CI, teléfono, etc.)'
+                },
+                {
+                  key: 'bs_cash',
+                  title: 'Bs en efectivo',
+                  placeholder: 'Instrucciones para pagar en efectivo en Bs (caja, mostrador, etc.)'
+                },
+                {
+                  key: 'zelle',
+                  title: 'Zelle / Transf. (USDT)',
+                  placeholder:
+                    'Correo o datos de cuenta Zelle / transferencia en USDT que verá el cliente'
+                },
+                {
+                  key: 'cash_usdt',
+                  title: 'Efectivo (USDT)',
+                  placeholder: 'Notas para pagos en efectivo en USDT (en tienda, delivery, etc.)'
+                },
+                {
+                  key: 'fires',
+                  title: 'Pago con Fuegos',
+                  placeholder:
+                    'Explica cómo funciona el pago con Fuegos en tu tienda o si aplica alguna condición especial'
+                }
+              ].map((cfg) => {
+                const current = paymentMethodsConfig[cfg.key] || {
+                  label: cfg.title,
+                  instructions: ''
+                };
+
+                return (
+                  <div
+                    key={cfg.key}
+                    className="border border-glass rounded-lg p-3 space-y-2 bg-glass/40"
+                  >
+                    <div>
+                      <p className="text-[11px] text-text/60 mb-1">Nombre que verá el cliente</p>
+                      <input
+                        type="text"
+                        value={current.label}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPaymentMethodsConfig((prev) => ({
+                            ...prev,
+                            [cfg.key]: {
+                              label: value,
+                              instructions: prev[cfg.key]?.instructions || ''
+                            }
+                          }));
+                        }}
+                        className="input-glass w-full text-xs"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-text/60 mb-1">Datos e instrucciones</p>
+                      <textarea
+                        value={current.instructions}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPaymentMethodsConfig((prev) => ({
+                            ...prev,
+                            [cfg.key]: {
+                              label: prev[cfg.key]?.label || current.label,
+                              instructions: value
+                            }
+                          }));
+                        }}
+                        className="input-glass w-full h-20 resize-none text-[11px]"
+                        placeholder={cfg.placeholder}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex justify-end">
             <button
               type="button"
               onClick={async () => {
                 const settingsPatch = {
-                  header_layout: headerLayout
+                  header_layout: headerLayout,
+                  payment_methods: paymentMethodsConfig
                 };
 
                 const locationPatch = {

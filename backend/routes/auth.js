@@ -291,7 +291,7 @@ router.post('/login-email', async (req, res) => {
       '   OR LOWER(u.username) = LOWER($1) ' +
       '   OR ai_email.provider_uid = $1 ' +
       '   OR ai_ci.provider_uid = $1 ' +
-      '   OR ($2 IS NOT NULL AND u.ci_full = $2) ' +
+      '   OR ($2::text IS NOT NULL AND u.ci_full = $2::text) ' +
       'GROUP BY u.id, u.must_change_password, ai_email.password_hash, ai_ci.password_hash, w.id, w.coins_balance, w.fires_balance, u.security_answer, u.experience, u.total_games_played, u.total_games_won',
       [identifier, ciFull]
     );

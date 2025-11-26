@@ -30,11 +30,6 @@ const StoreFront = () => {
         fires: 0
     };
     const [payments, setPayments] = useState(initialPayments);
-    const [enableCashUsdt, setEnableCashUsdt] = useState(false);
-    const [enableZelle, setEnableZelle] = useState(false);
-    const [enableBsCash, setEnableBsCash] = useState(false);
-    const [enableBsTransfer, setEnableBsTransfer] = useState(false);
-    const [enableFires, setEnableFires] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [giveChangeInFires, setGiveChangeInFires] = useState(false);
     const [guestName, setGuestName] = useState('');
@@ -49,6 +44,19 @@ const StoreFront = () => {
     const [cashProofBase64, setCashProofBase64] = useState('');
     const [cashProofName, setCashProofName] = useState('');
     const [transferReference, setTransferReference] = useState('');
+
+    const basePaymentMethodOptions = [
+        { id: 'bs_transfer', defaultLabel: 'Pago móvil / Transferencia en Bs', field: 'bs_transfer' },
+        { id: 'bs_cash', defaultLabel: 'Bs en efectivo', field: 'bs_cash' },
+        { id: 'zelle', defaultLabel: 'Zelle / Transf. (USDT)', field: 'zelle' },
+        { id: 'cash_usdt', defaultLabel: 'Efectivo (USDT)', field: 'cash_usdt' },
+        { id: 'fires', defaultLabel: 'Pago con Fuegos', field: 'fires' }
+    ];
+
+    const [paymentLines, setPaymentLines] = useState(() => [
+        { id: 1, method: 'bs_transfer' }
+    ]);
+    const [nextPaymentLineId, setNextPaymentLineId] = useState(2);
 
     // Fetch Store Data
     const { data: storeData, isLoading } = useQuery({
@@ -162,6 +170,42 @@ const StoreFront = () => {
         return base + modifiersExtra;
     };
 
+    const getSelectedProductUnitPriceUSDT = () => {
+        if (!selectedProduct) return 0;
+
+        const baseRaw = parseFloat(selectedProduct.price_usdt);
+        const base = Number.isFinite(baseRaw) && baseRaw >= 0 ? baseRaw : 0;
+
+        let modifiersExtra = 0;
+        if (
+            Array.isArray(selectedProduct.modifiers) &&
+            selectedProduct.modifiers.length > 0 &&
+            productModalModifiers &&
+            typeof productModalModifiers === 'object'
+        ) {
+            const mods = selectedProduct.modifiers;
+            const selectedGroups = Object.values(productModalModifiers);
+            const selectedIds = new Set(
+                selectedGroups.flat().filter((id) => id != null)
+            );
+
+            for (const mod of mods) {
+                if (!mod || !selectedIds.has(mod.id)) continue;
+                const extraRaw =
+                    mod.price_adjustment_usdt != null
+                        ? Number(mod.price_adjustment_usdt)
+                        : mod.price_adjustment != null
+                        ? Number(mod.price_adjustment)
+                        : 0;
+                if (Number.isFinite(extraRaw)) {
+                    modifiersExtra += extraRaw;
+                }
+            }
+        }
+
+        return base + modifiersExtra;
+    };
+
     const cartTotalUSDT = cart.reduce((sum, item) => sum + getItemUnitPriceUSDT(item) * item.quantity, 0);
 
     const rawCashUsdt = parseAmount(payments.cash_usdt);
@@ -170,12 +214,14 @@ const StoreFront = () => {
     const rawBsTransfer = parseAmount(payments.bs_transfer);
     const rawFiresAmount = parseAmount(payments.fires);
 
-    const cashUsdt = enableCashUsdt ? rawCashUsdt : 0;
-    const zelleUsdt = enableZelle ? rawZelleUsdt : 0;
-    const bsCashAmount = enableBsCash ? rawBsCash : 0;
-    const bsTransferAmount = enableBsTransfer ? rawBsTransfer : 0;
+    const enabledMethods = new Set(paymentLines.map((l) => l.method));
+
+    const cashUsdt = enabledMethods.has('cash_usdt') ? rawCashUsdt : 0;
+    const zelleUsdt = enabledMethods.has('zelle') ? rawZelleUsdt : 0;
+    const bsCashAmount = enabledMethods.has('bs_cash') ? rawBsCash : 0;
+    const bsTransferAmount = enabledMethods.has('bs_transfer') ? rawBsTransfer : 0;
     const bsAmount = bsCashAmount + bsTransferAmount;
-    const firesAmount = enableFires ? rawFiresAmount : 0;
+    const firesAmount = enabledMethods.has('fires') ? rawFiresAmount : 0;
 
     const totalPaidUSDT =
         cashUsdt +
@@ -214,11 +260,8 @@ const StoreFront = () => {
             setPaymentModalOpen(false);
             setPayments(initialPayments);
             setGiveChangeInFires(false);
-            setEnableCashUsdt(false);
-            setEnableZelle(false);
-            setEnableBsCash(false);
-            setEnableBsTransfer(false);
-            setEnableFires(false);
+            setPaymentLines([{ id: 1, method: 'bs_transfer' }]);
+            setNextPaymentLineId(2);
             setCashProofBase64('');
             setCashProofName('');
             setTransferReference('');
@@ -382,6 +425,34 @@ const StoreFront = () => {
     const storeSettings = store?.settings && typeof store.settings === 'object'
         ? store.settings
         : {};
+    const storePaymentMethodsSettings =
+        storeSettings.payment_methods && typeof storeSettings.payment_methods === 'object'
+            ? storeSettings.payment_methods
+            : {};
+
+    const paymentMethodOptions = basePaymentMethodOptions.map((opt) => {
+        const cfg =
+            storePaymentMethodsSettings[opt.id] &&
+            typeof storePaymentMethodsSettings[opt.id] === 'object'
+                ? storePaymentMethodsSettings[opt.id]
+                : {};
+
+        const label =
+            typeof cfg.label === 'string' && cfg.label.trim()
+                ? cfg.label.trim()
+                : opt.defaultLabel;
+
+        const instructions =
+            typeof cfg.instructions === 'string' ? cfg.instructions : '';
+
+        return {
+            id: opt.id,
+            field: opt.field,
+            label,
+            instructions
+        };
+    });
+
     const headerLayout = storeSettings.header_layout || 'normal';
 
     const location = store?.location && typeof store.location === 'object'
@@ -973,7 +1044,14 @@ const StoreFront = () => {
                                     <Plus size={16} />
                                 </button>
                             </div>
-                            <span className="text-xl font-bold text-accent">${selectedProduct.price_usdt}</span>
+                            <div className="text-right">
+                                <div className="text-[11px] text-white/60">
+                                    Precio unitario: ${getSelectedProductUnitPriceUSDT().toFixed(2)}
+                                </div>
+                                <div className="text-xl font-bold text-accent">
+                                    ${(getSelectedProductUnitPriceUSDT() * productModalQuantity).toFixed(2)}
+                                </div>
+                            </div>
                         </div>
 
                         <button
@@ -1208,172 +1286,181 @@ const StoreFront = () => {
                             )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-white/60">Efectivo (USDT)</label>
-                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
-                                        <input
-                                            type="checkbox"
-                                            className="w-3 h-3"
-                                            checked={enableCashUsdt}
-                                            onChange={(e) => setEnableCashUsdt(e.target.checked)}
-                                        />
-                                        <span>Habilitar</span>
-                                    </label>
-                                </div>
-                                {enableCashUsdt && (
-                                    <div className="relative">
-                                        <Banknote className="absolute left-3 top-2.5 text-green-400" size={18} />
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                            value={payments.cash_usdt}
-                                            onChange={(e) => setPayments({ ...payments, cash_usdt: e.target.value })}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-white/60">Zelle / Transf. (USDT)</label>
-                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
-                                        <input
-                                            type="checkbox"
-                                            className="w-3 h-3"
-                                            checked={enableZelle}
-                                            onChange={(e) => setEnableZelle(e.target.checked)}
-                                        />
-                                        <span>Habilitar</span>
-                                    </label>
-                                </div>
-                                {enableZelle && (
-                                    <div className="relative">
-                                        <CreditCard className="absolute left-3 top-2.5 text-accent" size={18} />
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                            value={payments.zelle}
-                                            onChange={(e) => setPayments({ ...payments, zelle: e.target.value })}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-white/60">Bs en efectivo</label>
-                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
-                                        <input
-                                            type="checkbox"
-                                            className="w-3 h-3"
-                                            checked={enableBsCash}
-                                            onChange={(e) => setEnableBsCash(e.target.checked)}
-                                        />
-                                        <span>Habilitar</span>
-                                    </label>
-                                </div>
-                                {enableBsCash && (
-                                    <>
-                                        <div className="relative mb-2">
-                                            <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={payments.bs_cash}
-                                                onChange={(e) => setPayments({ ...payments, bs_cash: e.target.value })}
-                                            />
+                        <div className="space-y-3 mb-4">
+                            {paymentLines.map((line, index) => {
+                                const methodConfig =
+                                    paymentMethodOptions.find((opt) => opt.id === line.method) ||
+                                    paymentMethodOptions[0];
+
+                                if (!methodConfig) return null;
+
+                                const field = methodConfig.field;
+                                const amountValue = payments[field] ?? '';
+                                const isBs = field === 'bs_cash' || field === 'bs_transfer';
+                                const isUsdt = field === 'cash_usdt' || field === 'zelle';
+                                const isFires = field === 'fires';
+
+                                const availableMethods = paymentMethodOptions.filter((opt) => {
+                                    if (opt.id === line.method) return true;
+                                    return !paymentLines.some((l) => l.id !== line.id && l.method === opt.id);
+                                });
+
+                                return (
+                                    <div
+                                        key={line.id}
+                                        className="border border-white/10 rounded-lg p-3 space-y-2 bg-white/5/10"
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex-1">
+                                                <label className="block text-[11px] text-white/60 mb-1">
+                                                    Método de pago
+                                                </label>
+                                                <select
+                                                    value={line.method}
+                                                    onChange={(e) => {
+                                                        const newMethod = e.target.value;
+                                                        setPaymentLines((prev) =>
+                                                            prev.map((l) =>
+                                                                l.id === line.id ? { ...l, method: newMethod } : l
+                                                            )
+                                                        );
+                                                    }}
+                                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                >
+                                                    {availableMethods.map((opt) => (
+                                                        <option key={opt.id} value={opt.id}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {paymentLines.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPaymentLines((prev) =>
+                                                            prev.filter((l) => l.id !== line.id)
+                                                        );
+                                                    }}
+                                                    className="text-white/40 hover:text-white text-xs px-2 py-1 rounded-full border border-white/10"
+                                                >
+                                                    Quitar
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="block text-[11px] text-white/60">Comprobante de efectivo (foto, opcional)</label>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleCashProofChange}
-                                                    className="text-[11px] text-white/70"
-                                                />
-                                                {cashProofName && (
-                                                    <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
-                                                        {cashProofName}
+
+                                        <div>
+                                            <label className="block text-[11px] text-white/60 mb-1">
+                                                Monto {isUsdt ? 'en USDT' : isBs ? 'en Bs' : isFires ? 'en Fuegos' : ''}
+                                            </label>
+                                            <div className="relative">
+                                                {isBs && (
+                                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">
+                                                        Bs
                                                     </span>
                                                 )}
+                                                {isUsdt && (
+                                                    <span className="absolute left-3 top-2.5 text-white/60 text-xs">
+                                                        $
+                                                    </span>
+                                                )}
+                                                {isFires && (
+                                                    <Flame
+                                                        className="absolute left-3 top-2.5 text-fire-orange"
+                                                        size={16}
+                                                    />
+                                                )}
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className={`w-full bg-white/5 rounded-lg ${
+                                                        isBs || isUsdt || isFires ? 'pl-9' : 'pl-3'
+                                                    } pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent`}
+                                                    value={amountValue}
+                                                    onChange={(e) =>
+                                                        setPayments((prev) => ({
+                                                            ...prev,
+                                                            [field]: e.target.value
+                                                        }))
+                                                    }
+                                                />
                                             </div>
+
+                                            {field === 'bs_cash' && (
+                                                <div className="space-y-1 mt-2">
+                                                    <label className="block text-[11px] text-white/60">
+                                                        Comprobante de efectivo (foto, opcional)
+                                                    </label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleCashProofChange}
+                                                            className="text-[11px] text-white/70"
+                                                        />
+                                                        {cashProofName && (
+                                                            <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
+                                                                {cashProofName}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {field === 'bs_transfer' && (
+                                                <div className="mt-2 space-y-1">
+                                                    <label className="block text-[11px] text-white/60 mb-1">
+                                                        Referencia bancaria (opcional)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                        value={transferReference}
+                                                        onChange={(e) => setTransferReference(e.target.value)}
+                                                    />
+                                                    <div className="text-[11px] text-white/40 mt-1">
+                                                        Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {field === 'fires' && (
+                                                <div className="text-[11px] text-white/40 mt-1">
+                                                    1 USDT ≈ {rates.fires.toFixed(0)} 🔥
+                                                </div>
+                                            )}
+
+                                            {methodConfig.instructions && (
+                                                <div className="mt-2 text-[11px] text-white/60 whitespace-pre-wrap border border-dashed border-white/15 rounded-md px-3 py-2 bg-white/5">
+                                                    {methodConfig.instructions}
+                                                </div>
+                                            )}
                                         </div>
-                                    </>
-                                )}
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-white/60">Transferencia en Bs</label>
-                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
-                                        <input
-                                            type="checkbox"
-                                            className="w-3 h-3"
-                                            checked={enableBsTransfer}
-                                            onChange={(e) => setEnableBsTransfer(e.target.checked)}
-                                        />
-                                        <span>Habilitar</span>
-                                    </label>
-                                </div>
-                                {enableBsTransfer && (
-                                    <>
-                                        <div className="relative mb-2">
-                                            <span className="absolute left-3 top-2.5 text-white/60 text-xs">Bs</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={payments.bs_transfer}
-                                                onChange={(e) => setPayments({ ...payments, bs_transfer: e.target.value })}
-                                            />
-                                        </div>
-                                        <label className="block text-[11px] text-white/60 mb-1">Referencia bancaria (opcional)</label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
-                                            value={transferReference}
-                                            onChange={(e) => setTransferReference(e.target.value)}
-                                        />
-                                        <div className="text-[11px] text-white/40 mt-1">
-                                            Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                            <div className="md:col-span-2">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-white/60">Pago con Fuegos</label>
-                                    <label className="flex items-center gap-1 text-[10px] text-white/60">
-                                        <input
-                                            type="checkbox"
-                                            className="w-3 h-3"
-                                            checked={enableFires}
-                                            onChange={(e) => setEnableFires(e.target.checked)}
-                                        />
-                                        <span>Habilitar</span>
-                                    </label>
-                                </div>
-                                {enableFires && (
-                                    <>
-                                        <div className="relative">
-                                            <Flame className="absolute left-3 top-2.5 text-fire-orange" size={18} />
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="w-full bg-white/5 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                                                value={payments.fires}
-                                                onChange={(e) => setPayments({ ...payments, fires: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="text-[11px] text-white/40 mt-1">
-                                            1 USDT ≈ {rates.fires.toFixed(0)} 🔥
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                    </div>
+                                );
+                            })}
+
+                            {paymentLines.length < paymentMethodOptions.length && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const used = new Set(paymentLines.map((l) => l.method));
+                                        const nextMethod = paymentMethodOptions.find(
+                                            (opt) => !used.has(opt.id)
+                                        );
+                                        if (!nextMethod) return;
+                                        setPaymentLines((prev) => [
+                                            ...prev,
+                                            { id: nextPaymentLineId, method: nextMethod.id }
+                                        ]);
+                                        setNextPaymentLineId((id) => id + 1);
+                                    }}
+                                    className="w-full text-xs px-3 py-2 rounded-lg border border-dashed border-white/20 text-white/70 hover:border-white/40 hover:text-white flex items-center justify-center gap-2"
+                                >
+                                    <Plus size={14} />
+                                    Agregar otro método de pago
+                                </button>
+                            )}
                         </div>
 
                         <div className="bg-white/5 rounded-lg p-3 mb-4 text-xs space-y-1">
