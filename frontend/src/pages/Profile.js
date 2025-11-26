@@ -517,6 +517,154 @@ const Profile = () => {
         )}
       </motion.div>
 
+      {/* Mis Tiendas */}
+      {myStores.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4">Mis tiendas</h3>
+          {storeStaffLoading && (
+            <div className="text-xs text-text/60 mb-2">Cargando tiendas...</div>
+          )}
+          {storeStaffError && (
+            <div className="text-xs text-red-400 mb-2">Error al cargar tus tiendas</div>
+          )}
+          <div className="space-y-3">
+            {myStores.map((row) => {
+              const role = row.role;
+              const canOpenDashboard =
+                role === 'owner' || role === 'admin' || role === 'manager';
+              const canOpenPos =
+                role === 'owner' ||
+                role === 'admin' ||
+                role === 'manager' ||
+                role === 'seller';
+
+              return (
+                <div
+                  key={row.id}
+                  className="glass-panel p-3 flex flex-col gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    {row.logo_url ? (
+                      <img
+                        src={row.logo_url}
+                        alt={row.store_name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-glass flex items-center justify-center text-sm font-semibold">
+                        {(row.store_name || 'T')[0]}
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-semibold text-text">{row.store_name}</div>
+                      <div className="text-xs text-text/60">
+                        @{row.store_slug}  b7 {getStoreRoleLabel(row.role)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-xs mt-1">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShareStoreMenuId((current) =>
+                            current === row.id ? null : row.id
+                          )
+                        }
+                        className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover flex items-center gap-1"
+                      >
+                        <Share2 size={12} />
+                        Compartir
+                      </button>
+                      {shareStoreMenuId === row.id && (
+                        <div className="absolute left-0 mt-1 w-44 rounded-lg bg-black/90 border border-white/10 shadow-lg z-20 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => shareStore(row, 'whatsapp')}
+                            className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                          >
+                            WhatsApp
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => shareStore(row, 'telegram')}
+                            className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                          >
+                            Telegram
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => shareStore(row, 'copy')}
+                            className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                          >
+                            Copiar enlace
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => shareStore(row, 'qr')}
+                            className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                          >
+                            Descargar QR
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/store/${row.store_slug}`)}
+                      className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover"
+                    >
+                      Ver tienda
+                    </button>
+
+                    {canOpenDashboard && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/store/${row.store_slug}/dashboard`)}
+                        className="px-3 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30"
+                      >
+                        Panel de tienda
+                      </button>
+                    )}
+
+                    {canOpenDashboard && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/store/${row.store_slug}/dashboard?tab=settings`
+                          )
+                        }
+                        className="px-3 py-1 rounded-full bg-accent/10 text-accent hover:bg-accent/20"
+                      >
+                        Configuraci f3n
+                      </button>
+                    )}
+
+                    {canOpenPos && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/store/${row.store_slug}/pos`)}
+                        className="px-3 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30"
+                      >
+                        Ir al POS
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* Mis pedidos */}
       {user && (
         <motion.div 
@@ -1159,124 +1307,6 @@ const Profile = () => {
         </motion.div>
       )}
 
-      {/* Mis Tiendas */}
-      {myStores.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-          className="card-glass mb-6"
-        >
-          <h3 className="text-lg font-bold mb-4">Mis tiendas</h3>
-          {storeStaffLoading && (
-            <div className="text-xs text-text/60 mb-2">Cargando tiendas...</div>
-          )}
-          {storeStaffError && (
-            <div className="text-xs text-red-400 mb-2">Error al cargar tus tiendas</div>
-          )}
-          <div className="space-y-3">
-            {myStores.map((row) => (
-              <div
-                key={row.id}
-                className="glass-panel p-3 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  {row.logo_url ? (
-                    <img
-                      src={row.logo_url}
-                      alt={row.store_name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-glass flex items-center justify-center text-sm font-semibold">
-                      {(row.store_name || 'T')[0]}
-                    </div>
-                  )}
-                  <div>
-                    <div className="font-semibold text-text">{row.store_name}</div>
-                    <div className="text-xs text-text/60">
-                      @{row.store_slug} • {getStoreRoleLabel(row.role)}
-                    </div>
-                  </div>
-                </div>
-                <div className="relative flex flex-col items-end gap-2">
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShareStoreMenuId((current) =>
-                          current === row.id ? null : row.id
-                        )
-                      }
-                      className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover flex items-center gap-1"
-                    >
-                      <Share2 size={12} />
-                      Compartir
-                    </button>
-                    {shareStoreMenuId === row.id && (
-                      <div className="absolute right-0 mt-1 w-40 rounded-lg bg-black/90 border border-white/10 shadow-lg z-20 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => shareStore(row, 'whatsapp')}
-                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
-                        >
-                          WhatsApp
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => shareStore(row, 'telegram')}
-                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
-                        >
-                          Telegram
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => shareStore(row, 'copy')}
-                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
-                        >
-                          Copiar enlace
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => shareStore(row, 'qr')}
-                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
-                        >
-                          Descargar QR
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/store/${row.store_slug}`)}
-                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover"
-                  >
-                    Ver tienda
-                  </button>
-                  {row.role === 'owner' && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/store/${row.store_slug}/dashboard`)}
-                      className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30"
-                    >
-                      Panel de tienda
-                    </button>
-                  )}
-                  {(row.role === 'owner' || row.role === 'admin' || row.role === 'manager' || row.role === 'seller') && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/store/${row.store_slug}/pos`)}
-                      className="px-3 py-1 rounded-full text-xs bg-accent/20 text-accent hover:bg-accent/30"
-                    >
-                      Ir al POS
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
 
       {/* Achievements */}
       {stats?.achievements?.length > 0 && (

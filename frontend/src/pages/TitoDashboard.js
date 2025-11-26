@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 const TitoDashboard = () => {
   const { user } = useAuth();
 
+  const [inviteUrl, setInviteUrl] = useState('');
   const isTito = !!user?.roles?.includes('tito');
 
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
@@ -44,9 +45,14 @@ const TitoDashboard = () => {
   const handleGenerateLink = async () => {
     try {
       const res = await axios.post('/api/commissions/tito/me/link');
-      const { inviteUrl } = res.data;
-      if (navigator.clipboard && inviteUrl) {
-        await navigator.clipboard.writeText(inviteUrl);
+      const { inviteUrl: generatedInviteUrl } = res.data;
+
+      if (generatedInviteUrl) {
+        setInviteUrl(generatedInviteUrl);
+      }
+
+      if (navigator.clipboard && generatedInviteUrl) {
+        await navigator.clipboard.writeText(generatedInviteUrl);
         toast.success('Link de Tito copiado al portapapeles');
       } else {
         toast.success('Link generado', { duration: 2000 });
@@ -130,6 +136,27 @@ const TitoDashboard = () => {
           Generar / Copiar link
         </button>
       </div>
+
+      {inviteUrl && (
+        <div className="card-glass p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-text/60 mb-1">Link actual</p>
+            <p className="text-[11px] break-all text-text/80">{inviteUrl}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2 mt-3 md:mt-0">
+            <p className="text-xs text-text/60">QR para compartir tu link</p>
+            <div className="bg-background-dark/80 p-2 rounded-lg">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                  inviteUrl
+                )}`}
+                alt="QR link de Tito"
+                className="w-32 h-32 md:w-40 md:h-40"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card-glass p-4">
         <h3 className="text-sm font-semibold mb-2">Usuarios registrados</h3>

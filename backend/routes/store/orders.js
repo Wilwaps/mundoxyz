@@ -7,6 +7,26 @@ const { v4: uuidv4 } = require('uuid');
 const ubicacionService = require('../../services/ubicacion/ubicacionService');
 const { distributeCommissions } = require('../../services/referralService');
 
+async function userCanAccessStoreOrders(user, storeId) {
+    if (!user || !storeId) return false;
+
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+    const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
+
+    if (isGlobalAdmin) return true;
+
+    const staffResult = await query(
+        `SELECT role FROM store_staff WHERE user_id = $1 AND store_id = $2 AND is_active = TRUE LIMIT 1`,
+        [user.id, storeId]
+    );
+
+    if (staffResult.rows.length === 0) return false;
+
+    const staffRole = staffResult.rows[0].role;
+    const allowedRoles = ['owner', 'admin', 'manager', 'seller', 'marketing', 'mesonero', 'delivery'];
+    return allowedRoles.includes(staffRole);
+}
+
 // POST /api/store/order/create
 // Nota: usa optionalAuth para permitir pedidos del StoreFront sin sesión,
 // pero sigue exigiendo autenticación para POS / flujos internos.
@@ -532,6 +552,11 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
         const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+        const canAccess = await userCanAccessStoreOrders(req.user, storeId);
+        if (!canAccess) {
+            return res.status(403).json({ error: 'No autorizado para ver el historial de pedidos de esta tienda' });
+        }
+
         const result = await query(
             `SELECT 
                 o.id,
@@ -555,6 +580,7 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
            LEFT JOIN users u ON u.id = o.customer_id
            LEFT JOIN users su ON su.id = o.user_id
            WHERE o.store_id = $1
+             AND o.status NOT IN ('pending', 'confirmed', 'preparing', 'ready')
            ORDER BY o.created_at DESC
            LIMIT $2 OFFSET $3`,
             [storeId, limit, offset]
@@ -692,6 +718,11 @@ router.get('/:storeId/orders/active', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
 
+        const canAccess = await userCanAccessStoreOrders(req.user, storeId);
+        if (!canAccess) {
+            return res.status(403).json({ error: 'No autorizado para ver los pedidos activos de esta tienda' });
+        }
+
         const result = await query(
             `SELECT o.*, 
               json_agg(json_build_object(
@@ -721,6 +752,22 @@ router.post('/:orderId/status', verifyToken, async (req, res) => {
         const { orderId } = req.params;
         const { status } = req.body;
 
+        const existingOrderResult = await query(
+            `SELECT id, store_id, user_id, code FROM orders WHERE id = $1`,
+            [orderId]
+        );
+
+        if (existingOrderResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Orden no encontrada' });
+        }
+
+        const existingOrder = existingOrderResult.rows[0];
+
+        const canAccess = await userCanAccessStoreOrders(req.user, existingOrder.store_id);
+        if (!canAccess) {
+            return res.status(403).json({ error: 'No autorizado para actualizar pedidos de esta tienda' });
+        }
+
         const result = await query(
             `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
             [status, orderId]
@@ -729,9 +776,11 @@ router.post('/:orderId/status', verifyToken, async (req, res) => {
         const order = result.rows[0];
 
         // Notify Customer
-        if (req.io) {
+        if (req.io && order.user_id) {
             req.io.to(`user:${order.user_id}`).emit('store:order-update', {
-                orderId, status, code: order.code
+                orderId,
+                status,
+                code: order.code
             });
         }
 

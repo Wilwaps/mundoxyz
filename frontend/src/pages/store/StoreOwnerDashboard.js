@@ -137,6 +137,8 @@ const StoreOwnerDashboard = () => {
   const [locationMapsUrl, setLocationMapsUrl] = useState('');
   const [locationPreview, setLocationPreview] = useState(null);
   const [tablesCountInput, setTablesCountInput] = useState('0');
+  const [messagingEnabled, setMessagingEnabled] = useState(true);
+  const [messagingNotifyRoles, setMessagingNotifyRoles] = useState(['owner', 'admin', 'marketing']);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState({});
   const [settingsInitialized, setSettingsInitialized] = useState(false);
 
@@ -184,6 +186,19 @@ const StoreOwnerDashboard = () => {
         normalizedTables = 0;
       }
 
+      const rawMessaging =
+        rawSettings.messaging && typeof rawSettings.messaging === 'object'
+          ? rawSettings.messaging
+          : {};
+      const rawMessagingEnabled =
+        typeof rawMessaging.enabled === 'boolean' ? rawMessaging.enabled : true;
+      const rawNotifyRoles = Array.isArray(rawMessaging.notify_roles)
+        ? rawMessaging.notify_roles
+        : ['owner', 'admin', 'marketing'];
+      const normalizedNotifyRoles = rawNotifyRoles
+        .map((r) => (typeof r === 'string' ? r.trim() : ''))
+        .filter((r) => r.length > 0);
+
       setHeaderLayout(rawSettings.header_layout || 'normal');
       setLogoUrlInput(store.logo_url || '');
       setCoverUrlInput(store.cover_url || '');
@@ -192,6 +207,12 @@ const StoreOwnerDashboard = () => {
         rawLocation.maps_url || rawLocation.google_maps_url || ''
       );
       setTablesCountInput(String(normalizedTables));
+      setMessagingEnabled(rawMessagingEnabled);
+      setMessagingNotifyRoles(
+        normalizedNotifyRoles.length > 0
+          ? normalizedNotifyRoles
+          : ['owner', 'admin', 'marketing']
+      );
 
       const defaultPaymentMethods = {
         bs_transfer: {
@@ -1352,6 +1373,62 @@ const StoreOwnerDashboard = () => {
               </div>
 
               <div>
+                <p className="text-text/60 mb-1">Mensajería de tienda</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-[11px] text-text/80">
+                    <input
+                      type="checkbox"
+                      checked={messagingEnabled}
+                      onChange={(e) => setMessagingEnabled(e.target.checked)}
+                      className="rounded border-glass"
+                    />
+                    <span>Activar mensajería para esta tienda</span>
+                  </label>
+                  <div className="mt-1 space-y-1">
+                    <p className="text-[11px] text-text/60">
+                      ¿Quién debe ser notificado cuando un cliente escribe a la tienda?
+                    </p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { id: 'owner', label: 'Dueño' },
+                        { id: 'admin', label: 'Admin' },
+                        { id: 'manager', label: 'Manager' },
+                        { id: 'seller', label: 'Vendedor' },
+                        { id: 'marketing', label: 'Marketing' },
+                        { id: 'mesonero', label: 'Mesonero' },
+                        { id: 'delivery', label: 'Delivery' }
+                      ].map((opt) => {
+                        const checked = messagingNotifyRoles.includes(opt.id);
+                        return (
+                          <label
+                            key={opt.id}
+                            className="flex items-center gap-2 text-[11px] text-text/70"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                setMessagingNotifyRoles((prev) => {
+                                  if (isChecked) {
+                                    if (prev.includes(opt.id)) return prev;
+                                    return [...prev, opt.id];
+                                  }
+                                  return prev.filter((roleId) => roleId !== opt.id);
+                                });
+                              }}
+                              className="rounded border-glass"
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
                 <p className="text-text/60 mb-1">URL del logo (perfil)</p>
                 <div className="flex flex-col gap-2">
                   <input
@@ -1595,6 +1672,19 @@ const StoreOwnerDashboard = () => {
                   normalizedTables = 0;
                 }
                 settingsPatch.tables_count = normalizedTables;
+
+                const normalizedNotifyRoles = Array.isArray(messagingNotifyRoles)
+                  ? messagingNotifyRoles
+                      .map((r) => (typeof r === 'string' ? r.trim() : ''))
+                      .filter((r) => r.length > 0)
+                  : [];
+                settingsPatch.messaging = {
+                  enabled: messagingEnabled,
+                  notify_roles:
+                    normalizedNotifyRoles.length > 0
+                      ? normalizedNotifyRoles
+                      : ['owner', 'admin', 'marketing']
+                };
 
                 const locationPatch = {
                   address: locationAddress || null,
