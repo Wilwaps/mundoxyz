@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { BarChart3, ShoppingBag, Megaphone, ListChecks, ExternalLink, ArrowLeft, Settings } from 'lucide-react';
@@ -67,6 +67,7 @@ const processProductImageFile = async (file, maxSizeMB = MAX_PRODUCT_IMAGE_MB) =
 const StoreOwnerDashboard = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
   const [productSearch, setProductSearch] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
@@ -99,6 +100,16 @@ const StoreOwnerDashboard = () => {
   const store = storeData?.store;
   const categories = storeData?.categories || [];
   const products = storeData?.products || [];
+
+  // Sincronizar pestaña activa con query param ?tab= (overview, products, inventory, reports, marketing, settings)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    const allowedTabs = ['overview', 'products', 'inventory', 'reports', 'marketing', 'settings'];
+    if (tabParam && allowedTabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!store || settingsInitialized) return;
@@ -893,20 +904,35 @@ const StoreOwnerDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-glass/40">
-                      <td className="py-1 pr-3 text-text/80">{order.code}</td>
-                      <td className="py-1 pr-3 text-text/70">{order.status}</td>
-                      <td className="py-1 pr-3 text-text/70">{order.type}</td>
-                      <td className="py-1 pr-3 text-text/70">{order.table_number || '-'}</td>
-                      <td className="py-1 pr-3 text-right text-text/80">
-                        {Number(order.total_usdt || 0).toFixed(2)}
-                      </td>
-                      <td className="py-1 pr-3 text-text/60">
-                        {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
-                      </td>
-                    </tr>
-                  ))}
+                  {orders.map((order) => {
+                    const canOpenInvoice = order.invoice_number != null;
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className={`border-b border-glass/40 ${
+                          canOpenInvoice ? 'cursor-pointer hover:bg-glass' : ''
+                        }`}
+                        onClick={() => {
+                          if (!canOpenInvoice) return;
+                          navigate(
+                            `/store/${store.slug}/invoice/${order.invoice_number}?from=reports`
+                          );
+                        }}
+                      >
+                        <td className="py-1 pr-3 text-text/80">{order.code}</td>
+                        <td className="py-1 pr-3 text-text/70">{order.status}</td>
+                        <td className="py-1 pr-3 text-text/70">{order.type}</td>
+                        <td className="py-1 pr-3 text-text/70">{order.table_number || '-'}</td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {Number(order.total_usdt || 0).toFixed(2)}
+                        </td>
+                        <td className="py-1 pr-3 text-text/60">
+                          {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -931,6 +957,7 @@ const StoreOwnerDashboard = () => {
                     <th className="py-1 pr-3 text-left">Cliente</th>
                     <th className="py-1 pr-3 text-left">CI</th>
                     <th className="py-1 pr-3 text-left">Vendedor</th>
+                    <th className="py-1 pr-3 text-left">Estado</th>
                     <th className="py-1 pr-3 text-right">Total USDT</th>
                     <th className="py-1 pr-3 text-right">Total Bs</th>
                     <th className="py-1 pr-3 text-left">Fecha / hora</th>
@@ -962,7 +989,9 @@ const StoreOwnerDashboard = () => {
                         }`}
                         onClick={() => {
                           if (!canOpenInvoice) return;
-                          navigate(`/store/${store.slug}/invoice/${order.invoice_number}`);
+                          navigate(
+                            `/store/${store.slug}/invoice/${order.invoice_number}?from=reports`
+                          );
                         }}
                       >
                         <td className="py-1 pr-3 text-text/80">
@@ -975,6 +1004,12 @@ const StoreOwnerDashboard = () => {
                           {order.customer_ci || '-'}
                         </td>
                         <td className="py-1 pr-3 text-text/70">{sellerLabel}</td>
+                        <td className="py-1 pr-3 text-text/70">
+                          {order.status || '-'}
+                          {order.payment_status
+                            ? ` · ${order.payment_status}`
+                            : ''}
+                        </td>
                         <td className="py-1 pr-3 text-right text-text/80">
                           {totalUsdt.toFixed(2)}
                         </td>

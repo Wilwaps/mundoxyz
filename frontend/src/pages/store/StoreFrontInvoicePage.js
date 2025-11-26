@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { ArrowLeft, MapPin, FileText, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, MapPin, FileText, ShoppingBag, ListChecks, Share2 } from 'lucide-react';
 
 const StoreFrontInvoicePage = () => {
   const { slug, invoiceNumber } = useParams();
@@ -11,6 +11,7 @@ const StoreFrontInvoicePage = () => {
   const searchParams = new URLSearchParams(locationRouter.search);
   const fromParam = searchParams.get('from');
   const fromOrders = fromParam === 'orders';
+  const fromReports = fromParam === 'reports';
 
   const { data: storeData, isLoading: loadingStore, error: storeError } = useQuery({
     queryKey: ['store', slug],
@@ -57,6 +58,33 @@ const StoreFrontInvoicePage = () => {
     return String(numeric).padStart(7, '0');
   };
 
+  const handleOpenDeliveryMap = () => {
+    if (!deliveryMapsUrl) return;
+    window.open(deliveryMapsUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareDelivery = async () => {
+    if (!rawDeliveryAddress) return;
+
+    const text = `Dirección de entrega del pedido ${formatInvoiceNumber(invoiceNumber)} en ${
+      store?.name || 'MundoXYZ'
+    }:\n${rawDeliveryAddress}`;
+
+    try {
+      if (navigator.share && typeof navigator.share === 'function') {
+        await navigator.share({ text, url: deliveryMapsUrl || undefined });
+        return;
+      }
+
+      const shareUrl = deliveryMapsUrl || rawDeliveryAddress;
+      const waText = `${text}\n${shareUrl}`;
+      const url = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      // Silencioso: no queremos romper la factura por errores de share
+    }
+  };
+
   const handlePrint = () => {
     if (!order) return;
     const storeName = order.store_name || store?.name || 'Factura';
@@ -77,6 +105,8 @@ const StoreFrontInvoicePage = () => {
   const handleBack = () => {
     if (fromOrders) {
       navigate('/profile?tab=orders');
+    } else if (fromReports) {
+      navigate(`/store/${slug}/dashboard?tab=reports`);
     } else {
       navigate(`/store/${slug}`);
     }
@@ -86,9 +116,25 @@ const StoreFrontInvoicePage = () => {
     navigate('/profile?tab=orders');
   };
 
+  const handleGoToStoreReports = () => {
+    navigate(`/store/${slug}/dashboard?tab=reports`);
+  };
+
   const location = store?.location && typeof store.location === 'object' ? store.location : {};
   const mapsUrl = location.maps_url || location.google_maps_url || '';
   const locationAddress = location.address || '';
+
+  const deliveryInfo = order && order.delivery_info && typeof order.delivery_info === 'object'
+    ? order.delivery_info
+    : null;
+  const rawDeliveryAddress = typeof deliveryInfo?.address === 'string' ? deliveryInfo.address.trim() : '';
+
+  const isDeliveryUrl = rawDeliveryAddress && /^https?:\/\//i.test(rawDeliveryAddress);
+  const deliveryMapsUrl = rawDeliveryAddress
+    ? isDeliveryUrl
+      ? rawDeliveryAddress
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawDeliveryAddress)}`
+    : '';
 
   const handleOpenMap = () => {
     if (mapsUrl) {
@@ -141,7 +187,11 @@ const StoreFrontInvoicePage = () => {
             className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover"
           >
             <ArrowLeft size={14} />
-            {fromOrders ? 'Volver a mis pedidos' : 'Volver a la tienda'}
+            {fromOrders
+              ? 'Volver a mis pedidos'
+              : fromReports
+              ? 'Volver a pedidos / informes'
+              : 'Volver a la tienda'}
           </button>
 
           <div className="flex gap-2">
@@ -162,6 +212,14 @@ const StoreFrontInvoicePage = () => {
             >
               <ShoppingBag size={14} />
               Mis pedidos
+            </button>
+            <button
+              type="button"
+              onClick={handleGoToStoreReports}
+              className="hidden md:flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover"
+            >
+              <ListChecks size={14} />
+              Pedidos / informes
             </button>
             <button
               type="button"
@@ -230,6 +288,35 @@ const StoreFrontInvoicePage = () => {
                   )}
                 </div>
               </div>
+
+              {rawDeliveryAddress && (
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                  <div className="space-y-1">
+                    <p className="text-text/60">Dirección / link de entrega</p>
+                    <p className="text-text/80 break-all whitespace-pre-wrap">{rawDeliveryAddress}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-start md:justify-end">
+                    {deliveryMapsUrl && (
+                      <button
+                        type="button"
+                        onClick={handleOpenDeliveryMap}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover"
+                      >
+                        <MapPin size={12} />
+                        Abrir mapa
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleShareDelivery}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover"
+                    >
+                      <Share2 size={12} />
+                      Compartir
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <table className="min-w-full text-[11px] align-middle">

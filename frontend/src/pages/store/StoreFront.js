@@ -483,7 +483,23 @@ const StoreFront = () => {
                     alt="Cover"
                     className="w-full h-full object-cover"
                 />
-                <div className="absolute top-4 right-4 z-30">
+                <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+                    {(mapsUrl || locationAddress) && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (mapsUrl) {
+                                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                                } else if (locationAddress) {
+                                    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`;
+                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                }
+                            }}
+                            className="w-9 h-9 rounded-full bg-dark/70 hover:bg-dark/90 border border-white/20 flex items-center justify-center text-white/80 text-xs shadow-lg"
+                        >
+                            <span role="img" aria-label="Ubicación">📍</span>
+                        </button>
+                    )}
                     <div className="relative">
                         <button
                             type="button"
