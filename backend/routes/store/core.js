@@ -910,7 +910,8 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             price_fires,
             is_menu_item,
             has_modifiers,
-            accepts_fires
+            accepts_fires,
+            modifierGroups
         } = req.body || {};
 
         const normalizedAcceptsFires = accepts_fires === true;
@@ -965,8 +966,52 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 normalizedAcceptsFires
             ]
         );
+        const product = result.rows[0];
 
-        res.json(result.rows[0]);
+        // Persistir modificadores si vienen desde el dashboard
+        if (Array.isArray(modifierGroups) && modifierGroups.length > 0) {
+            for (const group of modifierGroups) {
+                if (!group || !group.groupName) continue;
+                const groupName = String(group.groupName).trim();
+                if (!groupName) continue;
+
+                const groupMaxSelRaw = group.maxSelection;
+                let groupMaxSel = parseInt(groupMaxSelRaw, 10);
+                if (!Number.isFinite(groupMaxSel) || groupMaxSel <= 0) {
+                    groupMaxSel = 1;
+                }
+
+                const options = Array.isArray(group.options) ? group.options : [];
+                for (const opt of options) {
+                    if (!opt || !opt.name) continue;
+                    const optName = String(opt.name).trim();
+                    if (!optName) continue;
+
+                    const rawAdj = opt.priceAdjustmentUsdt;
+                    const parsedAdj =
+                        rawAdj === '' || rawAdj === null || rawAdj === undefined
+                            ? 0
+                            : Number(String(rawAdj).replace(',', '.'));
+                    const priceAdj =
+                        Number.isFinite(parsedAdj) && parsedAdj >= 0 ? parsedAdj : 0;
+
+                    const optMaxSelRaw = opt.maxSelection;
+                    let optMaxSel = parseInt(optMaxSelRaw, 10);
+                    if (!Number.isFinite(optMaxSel) || optMaxSel <= 0) {
+                        optMaxSel = groupMaxSel;
+                    }
+
+                    await query(
+                        `INSERT INTO product_modifiers 
+                 (product_id, group_name, name, price_adjustment_usdt, max_selection)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                        [product.id, groupName, optName, priceAdj, optMaxSel]
+                    );
+                }
+            }
+        }
+
+        res.json(product);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -1024,7 +1069,8 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             is_menu_item,
             has_modifiers,
             accepts_fires,
-            stock
+            stock,
+            modifierGroups
         } = req.body || {};
 
         const fields = [];
@@ -1091,8 +1137,54 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
             values
         );
+        const updatedProduct = updateResult.rows[0];
 
-        res.json(updateResult.rows[0]);
+        // Si llegan nuevos grupos de modificadores, reemplazar configuración existente
+        if (Array.isArray(modifierGroups)) {
+            await query('DELETE FROM product_modifiers WHERE product_id = $1', [productId]);
+
+            for (const group of modifierGroups) {
+                if (!group || !group.groupName) continue;
+                const groupName = String(group.groupName).trim();
+                if (!groupName) continue;
+
+                const groupMaxSelRaw = group.maxSelection;
+                let groupMaxSel = parseInt(groupMaxSelRaw, 10);
+                if (!Number.isFinite(groupMaxSel) || groupMaxSel <= 0) {
+                    groupMaxSel = 1;
+                }
+
+                const options = Array.isArray(group.options) ? group.options : [];
+                for (const opt of options) {
+                    if (!opt || !opt.name) continue;
+                    const optName = String(opt.name).trim();
+                    if (!optName) continue;
+
+                    const rawAdj = opt.priceAdjustmentUsdt;
+                    const parsedAdj =
+                        rawAdj === '' || rawAdj === null || rawAdj === undefined
+                            ? 0
+                            : Number(String(rawAdj).replace(',', '.'));
+                    const priceAdj =
+                        Number.isFinite(parsedAdj) && parsedAdj >= 0 ? parsedAdj : 0;
+
+                    const optMaxSelRaw = opt.maxSelection;
+                    let optMaxSel = parseInt(optMaxSelRaw, 10);
+                    if (!Number.isFinite(optMaxSel) || optMaxSel <= 0) {
+                        optMaxSel = groupMaxSel;
+                    }
+
+                    await query(
+                        `INSERT INTO product_modifiers 
+                 (product_id, group_name, name, price_adjustment_usdt, max_selection)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                        [productId, groupName, optName, priceAdj, optMaxSel]
+                    );
+                }
+            }
+        }
+
+        res.json(updatedProduct);
     } catch (error) {
         logger.error('Error updating product:', error);
         res.status(400).json({ error: error.message });

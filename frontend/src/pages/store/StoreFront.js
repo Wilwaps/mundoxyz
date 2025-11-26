@@ -75,7 +75,19 @@ const StoreFront = () => {
         }
     });
 
-    const vesPerUsdt = fiatContext?.operationalRate?.rate;
+    let vesPerUsdt = null;
+    if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
+        const bcvParsed = parseFloat(String(fiatContext.bcvRate.rate));
+        if (Number.isFinite(bcvParsed) && bcvParsed > 0) {
+            vesPerUsdt = bcvParsed;
+        }
+    }
+    if (!vesPerUsdt && fiatContext?.operationalRate?.rate != null) {
+        const opParsed = parseFloat(String(fiatContext.operationalRate.rate));
+        if (Number.isFinite(opParsed) && opParsed > 0) {
+            vesPerUsdt = opParsed;
+        }
+    }
     const firesPerUsdt = fiatContext?.config?.fires_per_usdt;
 
     const bsRate = typeof vesPerUsdt === 'number' && isFinite(vesPerUsdt) && vesPerUsdt > 0 ? vesPerUsdt : 38.5;
@@ -725,6 +737,10 @@ const StoreFront = () => {
                         const quantityInCart = cartItem ? cartItem.quantity : 0;
                         const hasModifiers = Array.isArray(product.modifiers) && product.modifiers.length > 0;
 
+                        const basePriceRaw = parseFloat(product.price_usdt);
+                        const basePriceUsdt = Number.isFinite(basePriceRaw) && basePriceRaw >= 0 ? basePriceRaw : 0;
+                        const priceBs = basePriceUsdt * rates.bs;
+
                         return (
                             <motion.div
                                 key={product.id}
@@ -778,9 +794,19 @@ const StoreFront = () => {
                                     )}
                                 </div>
                                 <div className="p-4">
-                                    <div className="flex justify-between items-start mb-2">
+                                    <div className="flex justify-between items-start mb-2 gap-3">
                                         <h3 className="font-bold text-lg text-white">{product.name}</h3>
-                                        <span className="font-bold text-accent">${product.price_usdt}</span>
+                                        <div className="text-right leading-tight">
+                                            <div className="font-bold text-accent text-sm">
+                                                {priceBs.toLocaleString('es-VE', {
+                                                    style: 'currency',
+                                                    currency: 'VES'
+                                                })}
+                                            </div>
+                                            <div className="text-[11px] text-white/60">
+                                                ≈ ${basePriceUsdt.toFixed(2)} USDT
+                                            </div>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-white/60 line-clamp-2 mb-4">{product.description}</p>
                                 </div>
@@ -1088,12 +1114,26 @@ const StoreFront = () => {
                                 </button>
                             </div>
                             <div className="text-right">
-                                <div className="text-[11px] text-white/60">
-                                    Precio unitario: ${getSelectedProductUnitPriceUSDT().toFixed(2)}
-                                </div>
-                                <div className="text-xl font-bold text-accent">
-                                    ${(getSelectedProductUnitPriceUSDT() * productModalQuantity).toFixed(2)}
-                                </div>
+                                {(() => {
+                                    const unitUsdt = getSelectedProductUnitPriceUSDT();
+                                    const unitBs = unitUsdt * rates.bs;
+                                    const totalBs = unitBs * productModalQuantity;
+                                    const totalUsdt = unitUsdt * productModalQuantity;
+
+                                    return (
+                                        <>
+                                            <div className="text-sm font-bold text-accent">
+                                                {totalBs.toLocaleString('es-VE', {
+                                                    style: 'currency',
+                                                    currency: 'VES'
+                                                })}
+                                            </div>
+                                            <div className="text-[11px] text-white/60">
+                                                ≈ {totalUsdt.toFixed(2)} USDT ({unitUsdt.toFixed(2)} USDT c/u)
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 

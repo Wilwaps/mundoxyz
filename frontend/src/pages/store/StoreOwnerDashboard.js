@@ -284,7 +284,19 @@ const StoreOwnerDashboard = () => {
     }
   });
 
-  const vesPerUsdt = fiatContext?.operationalRate?.rate || null;
+  let vesPerUsdt = null;
+  if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
+    const bcvParsed = parseFloat(String(fiatContext.bcvRate.rate));
+    if (Number.isFinite(bcvParsed) && bcvParsed > 0) {
+      vesPerUsdt = bcvParsed;
+    }
+  }
+  if (!vesPerUsdt && fiatContext?.operationalRate?.rate != null) {
+    const opParsed = parseFloat(String(fiatContext.operationalRate.rate));
+    if (Number.isFinite(opParsed) && opParsed > 0) {
+      vesPerUsdt = opParsed;
+    }
+  }
   const firesPerUsdt = fiatContext?.config?.fires_per_usdt || null;
 
   const queryClient = useQueryClient();
@@ -427,7 +439,7 @@ const StoreOwnerDashboard = () => {
   } = useQuery({
     queryKey: ['store-active-orders', store?.id],
     queryFn: async () => {
-      const response = await axios.get(`/api/store/${store.id}/orders/active`);
+      const response = await axios.get(`/api/store/order/${store.id}/orders/active`);
       return response.data;
     },
     enabled: !!store?.id
@@ -586,6 +598,7 @@ const StoreOwnerDashboard = () => {
           onClose={() => setIsNewCategoryModalOpen(false)}
           onSave={async (data) => {
             await createCategoryMutation.mutateAsync(data);
+            setIsNewCategoryModalOpen(false);
           }}
           loading={createCategoryMutation.isLoading}
         />
@@ -1419,7 +1432,9 @@ const StoreOwnerDashboard = () => {
               disabled={updateStoreSettingsMutation.isLoading}
               className="px-4 py-2 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {updateStoreSettingsMutation.isLoading ? 'Guardando…' : 'Guardar configuración de tienda'}
+              {updateStoreSettingsMutation.isLoading
+                ? 'Guardando…'
+                : 'Guardar configuración de tienda'}
             </button>
           </div>
         </div>
@@ -1434,6 +1449,7 @@ const StoreOwnerDashboard = () => {
           vesPerUsdt={vesPerUsdt}
           firesPerUsdt={firesPerUsdt}
           onClose={() => setEditingProduct(null)}
+          onRequestNewCategory={() => setIsNewCategoryModalOpen(true)}
           onSave={async (data) => {
             if (editingMode === 'edit') {
               await updateProductMutation.mutateAsync({ productId: editingProduct.id, data });
@@ -1484,7 +1500,8 @@ const ProductEditModal = ({
   onSave,
   loading,
   vesPerUsdt,
-  firesPerUsdt
+  firesPerUsdt,
+  onRequestNewCategory
 }) => {
   const [sku, setSku] = useState(product?.sku ? String(product.sku) : '');
   const [name, setName] = useState(product?.name || '');
@@ -1533,6 +1550,7 @@ const ProductEditModal = ({
         id: `${Date.now()}_${prev.length}`,
         groupName: '',
         maxSelection: 1,
+        color: '#00E5FF',
         options: [
           {
             id: `${Date.now()}_${prev.length}_0`,
@@ -1620,6 +1638,11 @@ const ProductEditModal = ({
           maxSelection = 1;
         }
 
+        const color =
+          typeof group.color === 'string' && group.color.trim().length > 0
+            ? group.color.trim()
+            : null;
+
         const options = Array.isArray(group.options) ? group.options : [];
         const cleanedOptions = options
           .map((opt) => {
@@ -1647,6 +1670,7 @@ const ProductEditModal = ({
         return {
           groupName,
           maxSelection,
+          color,
           options: cleanedOptions
         };
       })
@@ -1742,7 +1766,18 @@ const ProductEditModal = ({
           </div>
 
           <div>
-            <div className="text-text/60 mb-1">Categoría</div>
+            <div className="flex items-center justify-between mb-1 text-text/60">
+              <span>Categoría</span>
+              {onRequestNewCategory && (
+                <button
+                  type="button"
+                  onClick={onRequestNewCategory}
+                  className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[10px]"
+                >
+                  Nueva
+                </button>
+              )}
+            </div>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -1923,6 +1958,17 @@ const ProductEditModal = ({
                           updateModifierGroup(group.id, { maxSelection: e.target.value })
                         }
                         className="input-glass w-full text-[11px] py-1"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <div className="text-[10px] text-text/60 mb-0.5">Color</div>
+                      <input
+                        type="color"
+                        value={group.color || '#00E5FF'}
+                        onChange={(e) =>
+                          updateModifierGroup(group.id, { color: e.target.value })
+                        }
+                        className="w-full h-7 rounded-md border border-white/10 bg-transparent p-0"
                       />
                     </div>
                     <button

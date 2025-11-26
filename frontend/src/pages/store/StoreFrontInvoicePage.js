@@ -32,7 +32,19 @@ const StoreFrontInvoicePage = () => {
     }
   });
 
-  const vesPerUsdt = fiatContext?.operationalRate?.rate;
+  let vesPerUsdt = null;
+  if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
+    const bcvParsed = parseFloat(String(fiatContext.bcvRate.rate));
+    if (Number.isFinite(bcvParsed) && bcvParsed > 0) {
+      vesPerUsdt = bcvParsed;
+    }
+  }
+  if (!vesPerUsdt && fiatContext?.operationalRate?.rate != null) {
+    const opParsed = parseFloat(String(fiatContext.operationalRate.rate));
+    if (Number.isFinite(opParsed) && opParsed > 0) {
+      vesPerUsdt = opParsed;
+    }
+  }
   const bsRate =
     typeof vesPerUsdt === 'number' && Number.isFinite(vesPerUsdt) && vesPerUsdt > 0
       ? vesPerUsdt
