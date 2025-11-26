@@ -128,6 +128,7 @@ const StoreOwnerDashboard = () => {
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
   const [headerLayout, setHeaderLayout] = useState('normal');
   const [logoUrlInput, setLogoUrlInput] = useState('');
@@ -466,6 +467,47 @@ const StoreOwnerDashboard = () => {
     }
   });
 
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ categoryId, data }) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.patch(
+        `/api/store/${store.id}/category/${categoryId}`,
+        data
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Categoría actualizada');
+      queryClient.invalidateQueries(['store-owner', slug]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al actualizar categoría';
+      toast.error(message);
+    }
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.delete(
+        `/api/store/${store.id}/category/${categoryId}`
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Categoría eliminada');
+      queryClient.invalidateQueries(['store-owner', slug]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al eliminar categoría';
+      toast.error(message);
+    }
+  });
+
   const updateStoreSettingsMutation = useMutation({
     mutationFn: async (payload) => {
       if (!store?.id) {
@@ -693,10 +735,10 @@ const StoreOwnerDashboard = () => {
             <div className="flex flex-wrap gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => setIsNewCategoryModalOpen(true)}
+                onClick={() => setIsCategoryManagerOpen(true)}
                 className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover whitespace-nowrap"
               >
-                Nueva categoría
+                Categorías
               </button>
               <button
                 type="button"
@@ -1603,6 +1645,24 @@ const StoreOwnerDashboard = () => {
           loading={createPurchaseMutation.isLoading}
         />
       )}
+      {isCategoryManagerOpen && (
+        <CategoryManagementModal
+          categories={categories}
+          onClose={() => setIsCategoryManagerOpen(false)}
+          onCreate={async (data) => {
+            await createCategoryMutation.mutateAsync(data);
+          }}
+          onUpdate={async ({ categoryId, data }) => {
+            await updateCategoryMutation.mutateAsync({ categoryId, data });
+          }}
+          onDelete={async (categoryId) => {
+            await deleteCategoryMutation.mutateAsync(categoryId);
+          }}
+          loadingCreate={createCategoryMutation.isLoading}
+          loadingUpdate={updateCategoryMutation.isLoading}
+          loadingDelete={deleteCategoryMutation.isLoading}
+        />
+      )}
     </div>
   );
 };
@@ -1816,7 +1876,7 @@ const ProductEditModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -2613,6 +2673,228 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+const CategoryManagementModal = ({
+  categories,
+  onClose,
+  onCreate,
+  onUpdate,
+  onDelete,
+  loadingCreate,
+  loadingUpdate,
+  loadingDelete
+}) => {
+  const [newName, setNewName] = useState('');
+  const [newSortOrder, setNewSortOrder] = useState('0');
+  const [editableCategories, setEditableCategories] = useState(() => {
+    const list = Array.isArray(categories) ? categories : [];
+    return list.map((cat) => ({
+      id: cat.id,
+      name: cat.name || '',
+      sortOrder:
+        cat.sort_order !== undefined && cat.sort_order !== null
+          ? String(cat.sort_order)
+          : '0'
+    }));
+  });
+
+  useEffect(() => {
+    const list = Array.isArray(categories) ? categories : [];
+    setEditableCategories(
+      list.map((cat) => ({
+        id: cat.id,
+        name: cat.name || '',
+        sortOrder:
+          cat.sort_order !== undefined && cat.sort_order !== null
+            ? String(cat.sort_order)
+            : '0'
+      }))
+    );
+  }, [categories]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      toast.error('El nombre de la categoría es obligatorio');
+      return;
+    }
+
+    let parsedSort = parseInt(newSortOrder, 10);
+    if (!Number.isFinite(parsedSort)) {
+      parsedSort = 0;
+    }
+
+    await onCreate({ name: trimmedName, sort_order: parsedSort });
+    setNewName('');
+    setNewSortOrder('0');
+  };
+
+  const handleUpdate = async (catId) => {
+    const current = editableCategories.find((c) => c.id === catId);
+    if (!current) return;
+
+    const trimmedName = (current.name || '').trim();
+    if (!trimmedName) {
+      toast.error('El nombre de la categoría es obligatorio');
+      return;
+    }
+
+    let parsedSort = parseInt(current.sortOrder, 10);
+    if (!Number.isFinite(parsedSort)) {
+      parsedSort = 0;
+    }
+
+    await onUpdate({
+      categoryId: catId,
+      data: { name: trimmedName, sort_order: parsedSort }
+    });
+  };
+
+  const handleDelete = async (catId) => {
+    const cat = editableCategories.find((c) => c.id === catId);
+    const name = cat?.name || '';
+
+    const confirmed = window.confirm(
+      `¿Eliminar la categoría "${name}"? Los productos asociados pasarán a "Sin categoría".`
+    );
+    if (!confirmed) return;
+
+    await onDelete(catId);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto card-glass p-6 space-y-4 text-xs"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-bold">Categorías</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+          >
+            Cerrar
+          </button>
+        </div>
+        <p className="text-[11px] text-text/60">
+          Administra las categorías de tu tienda. Si borras una categoría, los productos que la usan pasarán a
+          <span className="font-semibold"> Sin categoría</span>.
+        </p>
+
+        <div className="border border-glass rounded-lg p-3 space-y-2 bg-background-dark/40">
+          <p className="text-[11px] text-text/70 font-semibold mb-1">Crear nueva categoría</p>
+          <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+            <div className="md:col-span-2">
+              <div className="text-[11px] text-text/60 mb-0.5">Nombre</div>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="input-glass w-full text-[11px]"
+                placeholder="Ej: Entradas, Pastas, Bebidas"
+              />
+            </div>
+            <div>
+              <div className="text-[11px] text-text/60 mb-0.5">Orden</div>
+              <input
+                type="number"
+                value={newSortOrder}
+                onChange={(e) => setNewSortOrder(e.target.value)}
+                className="input-glass w-full text-[11px]"
+              />
+            </div>
+            <div className="md:col-span-3 flex justify-end">
+              <button
+                type="submit"
+                disabled={loadingCreate}
+                className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+              >
+                {loadingCreate ? 'Creando…' : 'Crear categoría'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-text/70 font-semibold">Categorías existentes</p>
+            <span className="text-[11px] text-text/50">{editableCategories.length} registradas</span>
+          </div>
+          {editableCategories.length === 0 ? (
+            <p className="text-[11px] text-text/60">Aún no tienes categorías configuradas.</p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {editableCategories.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="border border-glass rounded-lg p-2 flex flex-col md:flex-row md:items-center gap-2 bg-background-dark/40"
+                >
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                    <div className="md:col-span-2">
+                      <div className="text-[11px] text-text/60 mb-0.5">Nombre</div>
+                      <input
+                        type="text"
+                        value={cat.name}
+                        onChange={(e) =>
+                          setEditableCategories((prev) =>
+                            prev.map((c) =>
+                              c.id === cat.id ? { ...c, name: e.target.value } : c
+                            )
+                          )
+                        }
+                        className="input-glass w-full text-[11px] py-1"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-text/60 mb-0.5">Orden</div>
+                      <input
+                        type="number"
+                        value={cat.sortOrder}
+                        onChange={(e) =>
+                          setEditableCategories((prev) =>
+                            prev.map((c) =>
+                              c.id === cat.id ? { ...c, sortOrder: e.target.value } : c
+                            )
+                          )
+                        }
+                        className="input-glass w-full text-[11px] py-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdate(cat.id)}
+                      disabled={loadingUpdate}
+                      className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(cat.id)}
+                      disabled={loadingDelete}
+                      className="px-3 py-1 rounded-full bg-error/20 text-error hover:bg-error/30 text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

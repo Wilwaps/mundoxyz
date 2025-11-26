@@ -879,19 +879,145 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
 router.post('/:storeId/category', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
-        const { name, sort_order } = req.body;
+        const { name, sort_order } = req.body || {};
 
-        // Validate ownership/role (TODO: Implement granular permissions)
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const trimmedName = typeof name === 'string' ? name.trim() : '';
+        if (!trimmedName) {
+            return res.status(400).json({ error: 'El nombre de la categoría es obligatorio' });
+        }
+
+        let normalizedSortOrder = 0;
+        if (sort_order !== undefined && sort_order !== null && String(sort_order).trim() !== '') {
+            const parsed = parseInt(sort_order, 10);
+            if (Number.isFinite(parsed)) {
+                normalizedSortOrder = parsed;
+            }
+        }
 
         const result = await query(
             `INSERT INTO categories (store_id, name, sort_order)
        VALUES ($1, $2, $3)
        RETURNING *`,
-            [storeId, name, sort_order || 0]
+            [storeId, trimmedName, normalizedSortOrder]
         );
 
         res.json(result.rows[0]);
     } catch (error) {
+        logger.error('Error creating category:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// PATCH /api/store/:storeId/category/:categoryId - Update category fields
+router.patch('/:storeId/category/:categoryId', verifyToken, async (req, res) => {
+    try {
+        const { storeId, categoryId } = req.params;
+        const { name, sort_order, is_active } = req.body || {};
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        if (name !== undefined) {
+            const trimmedName = typeof name === 'string' ? name.trim() : '';
+            if (!trimmedName) {
+                return res.status(400).json({ error: 'El nombre de la categoría es obligatorio' });
+            }
+            fields.push(`name = $${idx++}`);
+            values.push(trimmedName);
+        }
+
+        if (sort_order !== undefined) {
+            let normalizedSortOrder = 0;
+            if (sort_order !== null && String(sort_order).trim() !== '') {
+                const parsed = parseInt(sort_order, 10);
+                if (Number.isFinite(parsed)) {
+                    normalizedSortOrder = parsed;
+                }
+            }
+            fields.push(`sort_order = $${idx++}`);
+            values.push(normalizedSortOrder);
+        }
+
+        if (is_active !== undefined) {
+            fields.push(`is_active = $${idx++}`);
+            values.push(!!is_active);
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay cambios para aplicar' });
+        }
+
+        values.push(storeId);
+        values.push(categoryId);
+
+        const result = await query(
+            `UPDATE categories
+       SET ${fields.join(', ')}
+       WHERE store_id = $${idx++} AND id = $${idx}
+       RETURNING *`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Categoría no encontrada' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error updating category:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// DELETE /api/store/:storeId/category/:categoryId - Delete category and detach products
+router.delete('/:storeId/category/:categoryId', verifyToken, async (req, res) => {
+    try {
+        const { storeId, categoryId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const deletedCategory = await transaction(async (client) => {
+            await client.query(
+                `UPDATE products
+         SET category_id = NULL
+         WHERE store_id = $1 AND category_id = $2`,
+                [storeId, categoryId]
+            );
+
+            const deleteResult = await client.query(
+                `DELETE FROM categories
+         WHERE store_id = $1 AND id = $2
+         RETURNING *`,
+                [storeId, categoryId]
+            );
+
+            if (deleteResult.rows.length === 0) {
+                throw new Error('CATEGORY_NOT_FOUND');
+            }
+
+            return deleteResult.rows[0];
+        });
+
+        res.json(deletedCategory);
+    } catch (error) {
+        if (error && error.message === 'CATEGORY_NOT_FOUND') {
+            return res.status(404).json({ error: 'Categoría no encontrada' });
+        }
+        logger.error('Error deleting category:', error);
         res.status(400).json({ error: error.message });
     }
 });

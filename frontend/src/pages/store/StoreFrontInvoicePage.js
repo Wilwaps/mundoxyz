@@ -4,6 +4,58 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ArrowLeft, MapPin, FileText, ShoppingBag, ListChecks, Share2 } from 'lucide-react';
 
+const COLOR_KEYWORDS = {
+  rojo: { color: '#ef4444', label: 'Rojo' },
+  azul: { color: '#3b82f6', label: 'Azul' },
+  verde: { color: '#22c55e', label: 'Verde' },
+  amarillo: { color: '#eab308', label: 'Amarillo' },
+  naranja: { color: '#f97316', label: 'Naranja' },
+  morado: { color: '#a855f7', label: 'Morado' },
+  rosa: { color: '#ec4899', label: 'Rosa' },
+  negro: { color: '#000000', label: 'Negro' },
+  blanco: { color: '#ffffff', label: 'Blanco' },
+  gris: { color: '#6b7280', label: 'Gris' },
+  dorado: { color: '#facc15', label: 'Dorado' },
+  plateado: { color: '#9ca3af', label: 'Plateado' }
+};
+
+const parseModifierColorFromName = (rawName) => {
+  if (!rawName || typeof rawName !== 'string') {
+    return { label: '', color: null };
+  }
+
+  const trimmed = rawName.trim();
+  if (!trimmed) {
+    return { label: '', color: null };
+  }
+
+  const parts = trimmed.split(/\s+/);
+  const last = parts[parts.length - 1];
+  let color = null;
+  let label = trimmed;
+
+  if (last && last.startsWith('#') && last.length > 1) {
+    const token = last.slice(1).toLowerCase();
+
+    if (/^[0-9a-f]{3}$|^[0-9a-f]{6}$/.test(token)) {
+      color = `#${token}`;
+    } else if (COLOR_KEYWORDS[token]) {
+      color = COLOR_KEYWORDS[token].color;
+    }
+
+    if (color) {
+      const base = parts.slice(0, -1).join(' ').trim();
+      if (base) {
+        label = base;
+      } else if (COLOR_KEYWORDS[token]) {
+        label = COLOR_KEYWORDS[token].label;
+      }
+    }
+  }
+
+  return { label, color };
+};
+
 const StoreFrontInvoicePage = () => {
   const { slug, invoiceNumber } = useParams();
   const navigate = useNavigate();
@@ -348,6 +400,53 @@ const StoreFrontInvoicePage = () => {
                       >
                         <td className="py-1 pr-3 text-text/80">
                           <div>{item.product_name || 'Producto'}</div>
+                          {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                            <div className="mt-0.5 text-[10px] text-text/70 space-y-0.5">
+                              {Object.entries(
+                                item.modifiers.reduce((groups, mod) => {
+                                  if (!mod) return groups;
+                                  const groupName = mod.group_name || 'Extras';
+                                  if (!groups[groupName]) groups[groupName] = [];
+                                  groups[groupName].push(mod);
+                                  return groups;
+                                }, {})
+                              ).map(([groupName, mods]) => (
+                                <div
+                                  key={groupName}
+                                  className="flex flex-wrap items-center gap-1"
+                                >
+                                  <span className="font-semibold mr-1">{groupName}:</span>
+                                  {mods.map((mod) => {
+                                    const { label, color } = parseModifierColorFromName(mod.name);
+                                    const extra = Number(mod.price_adjustment_usdt || 0);
+
+                                    return (
+                                      <span
+                                        key={mod.id}
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-glass text-[9px]"
+                                      >
+                                        {color && (
+                                          <span
+                                            className="w-3 h-3 rounded-full border border-white/30"
+                                            style={{ backgroundColor: color }}
+                                          />
+                                        )}
+                                        <span>
+                                          {label || mod.name}
+                                          {color && ` x${item.quantity}`}
+                                        </span>
+                                        {extra > 0 && (
+                                          <span className="opacity-70">
+                                            (+{extra.toFixed(2)})
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="py-1 pr-3 text-right text-text/80">{item.quantity}</td>
                         <td className="py-1 pr-3 text-right text-text/80">

@@ -61,6 +61,22 @@ const parseModifierColorFromName = (rawName) => {
     return { label, color };
 };
 
+const buildModifierSignature = (modifiers) => {
+    if (!Array.isArray(modifiers) || modifiers.length === 0) return 'none';
+
+    const parts = modifiers
+        .filter(Boolean)
+        .map((mod) => {
+            if (mod.id != null) return String(mod.id);
+            const group = mod.group_name || '';
+            const name = mod.name || '';
+            return `${group}:${name}`;
+        })
+        .sort();
+
+    return parts.join('|');
+};
+
 const StoreFront = () => {
     const { slug } = useParams(); // e.g., 'divorare04'
     const navigate = useNavigate();
@@ -216,27 +232,39 @@ const StoreFront = () => {
     };
 
     const addToCart = (product, quantity = 1, modifiers = []) => {
-        setCart(prev => {
-            const existing = prev.find(item => item.product.id === product.id);
-            if (existing) {
-                return prev.map(item => {
-                    if (item.product.id !== product.id) return item;
+        const normalizedModifiers = Array.isArray(modifiers)
+            ? modifiers.filter(Boolean)
+            : [];
+        const newSignature = buildModifierSignature(normalizedModifiers);
 
-                    const existingModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
-                    const newModifiers = Array.isArray(modifiers) ? modifiers : [];
+        setCart((prev) => {
+            const existingIndex = prev.findIndex((item) => {
+                if (!item || !item.product || item.product.id !== product.id) return false;
+                const existingMods = Array.isArray(item.modifiers) ? item.modifiers : [];
+                return buildModifierSignature(existingMods) === newSignature;
+            });
 
-                    // Si vienen modificadores nuevos, los reemplazamos; si no, mantenemos los existentes
-                    const finalModifiers = newModifiers.length > 0 ? newModifiers : existingModifiers;
-
+            if (existingIndex !== -1) {
+                return prev.map((item, idx) => {
+                    if (idx !== existingIndex) return item;
+                    const newQty = item.quantity + quantity;
                     return {
                         ...item,
-                        quantity: item.quantity + quantity,
-                        modifiers: finalModifiers
+                        quantity: newQty
                     };
                 });
             }
-            return [...prev, { product, quantity, modifiers }];
+
+            return [
+                ...prev,
+                {
+                    product,
+                    quantity,
+                    modifiers: normalizedModifiers
+                }
+            ];
         });
+
         toast.success('Agregado al carrito');
     };
 
@@ -244,14 +272,18 @@ const StoreFront = () => {
         setCart(prev => prev.filter(item => item.product.id !== productId));
     };
 
-    const updateQuantity = (productId, delta) => {
-        setCart(prev => prev.map(item => {
-            if (item.product.id === productId) {
+    const updateQuantity = (index, delta) => {
+        setCart((prev) => {
+            if (index == null || index < 0 || index >= prev.length) return prev;
+
+            const next = prev.map((item, idx) => {
+                if (idx !== index) return item;
                 const newQty = Math.max(0, item.quantity + delta);
                 return { ...item, quantity: newQty };
-            }
-            return item;
-        }).filter(item => item.quantity > 0));
+            });
+
+            return next.filter((item) => item.quantity > 0);
+        });
     };
 
     const getItemUnitPriceUSDT = (item) => {
@@ -785,8 +817,11 @@ const StoreFront = () => {
             <div className="container mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product) => {
-                        const cartItem = cart.find((item) => item.product.id === product.id);
-                        const quantityInCart = cartItem ? cartItem.quantity : 0;
+                        const productCartItems = cart.filter((item) => item.product.id === product.id);
+                        const quantityInCart = productCartItems.reduce(
+                            (sum, it) => sum + (it.quantity || 0),
+                            0
+                        );
                         const hasModifiers = Array.isArray(product.modifiers) && product.modifiers.length > 0;
 
                         const basePriceRaw = parseFloat(product.price_usdt);
@@ -826,7 +861,16 @@ const StoreFront = () => {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    updateQuantity(product.id, -1);
+                                                    let targetIndex = -1;
+                                                    for (let i = cart.length - 1; i >= 0; i -= 1) {
+                                                        if (cart[i].product.id === product.id) {
+                                                            targetIndex = i;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (targetIndex !== -1) {
+                                                        updateQuantity(targetIndex, -1);
+                                                    }
                                                 }}
                                                 className="w-8 h-8 flex items-center justify-center text-white/80 hover:bg-white/10"
                                             >
@@ -949,16 +993,67 @@ const StoreFront = () => {
                                                     </span>
                                                 </div>
                                             </div>
+                                            {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                                                <div className="mt-1 text-[11px] text-white/70 space-y-0.5">
+                                                    {Object.entries(
+                                                        item.modifiers.reduce((groups, mod) => {
+                                                            if (!mod) return groups;
+                                                            const groupName = mod.group_name || 'Extras';
+                                                            if (!groups[groupName]) groups[groupName] = [];
+                                                            groups[groupName].push(mod);
+                                                            return groups;
+                                                        }, {})
+                                                    ).map(([groupName, mods]) => (
+                                                        <div
+                                                            key={groupName}
+                                                            className="flex flex-wrap items-center gap-1"
+                                                        >
+                                                            <span className="font-semibold mr-1">{groupName}:</span>
+                                                            {mods.map((mod) => {
+                                                                const { label, color } = parseModifierColorFromName(
+                                                                    mod.name
+                                                                );
+                                                                const extra = Number(
+                                                                    mod.price_adjustment_usdt || 0
+                                                                );
+
+                                                                return (
+                                                                    <span
+                                                                        key={mod.id}
+                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 text-[10px]"
+                                                                    >
+                                                                        {color && (
+                                                                            <span
+                                                                                className="w-3 h-3 rounded-full border border-white/40"
+                                                                                style={{ backgroundColor: color }}
+                                                                            />
+                                                                        )}
+                                                                        <span>
+                                                                            {label || mod.name}
+                                                                            {color && ` x${item.quantity}`}
+                                                                        </span>
+                                                                        {extra > 0 && (
+                                                                            <span className="opacity-70">
+                                                                                (+${extra.toFixed(2)})
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-3 mt-2">
                                                 <button
-                                                    onClick={() => updateQuantity(item.product.id, -1)}
+                                                    onClick={() => updateQuantity(idx, -1)}
                                                     className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
                                                 >
                                                     <Minus size={14} />
                                                 </button>
                                                 <span className="text-sm">{item.quantity}</span>
                                                 <button
-                                                    onClick={() => updateQuantity(item.product.id, 1)}
+                                                    onClick={() => updateQuantity(idx, 1)}
                                                     className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
                                                 >
                                                     <Plus size={14} />
