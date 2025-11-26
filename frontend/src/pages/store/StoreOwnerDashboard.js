@@ -1695,6 +1695,9 @@ const ProductEditModal = ({
   const [stock, setStock] = useState(
     product?.stock != null ? String(product.stock) : '0'
   );
+  const [minStockAlert, setMinStockAlert] = useState(
+    product?.min_stock_alert != null ? String(product.min_stock_alert) : '0'
+  );
   const existingModifiers = Array.isArray(product?.modifiers) ? product.modifiers : [];
   const [modifierGroups, setModifierGroups] = useState([]);
 
@@ -1848,6 +1851,11 @@ const ProductEditModal = ({
     let normalizedStock = parseInt(stock, 10);
     if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
       normalizedStock = 0;
+    }
+
+    let normalizedMinStockAlert = parseInt(minStockAlert, 10);
+    if (!Number.isFinite(normalizedMinStockAlert) || normalizedMinStockAlert < 0) {
+      normalizedMinStockAlert = 0;
     }
 
     const cleanedModifierGroups = modifierGroups

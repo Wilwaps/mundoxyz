@@ -1037,6 +1037,7 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             is_menu_item,
             has_modifiers,
             accepts_fires,
+            min_stock_alert,
             modifierGroups
         } = req.body || {};
 
@@ -1047,6 +1048,14 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             const parsedStock = parseInt(req.body.stock, 10);
             if (Number.isFinite(parsedStock) && parsedStock >= 0) {
                 normalizedStock = parsedStock;
+            }
+        }
+
+        let normalizedMinStockAlert = 0;
+        if (min_stock_alert !== undefined && min_stock_alert !== null && String(min_stock_alert).trim() !== '') {
+            const parsedMin = parseInt(min_stock_alert, 10);
+            if (Number.isFinite(parsedMin) && parsedMin >= 0) {
+                normalizedMinStockAlert = parsedMin;
             }
         }
 
@@ -1074,8 +1083,8 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
         const result = await query(
             `INSERT INTO products 
        (store_id, category_id, sku, name, description, image_url, 
-        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
             [
                 storeId,
@@ -1089,7 +1098,8 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 normalizedStock,
                 is_menu_item,
                 has_modifiers,
-                normalizedAcceptsFires
+                normalizedAcceptsFires,
+                normalizedMinStockAlert
             ]
         );
         const product = result.rows[0];
@@ -1196,6 +1206,7 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             has_modifiers,
             accepts_fires,
             stock,
+            min_stock_alert,
             modifierGroups
         } = req.body || {};
 
@@ -1251,6 +1262,15 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             }
             fields.push(`stock = $${idx++}`);
             values.push(normalizedStock);
+        }
+
+        if (min_stock_alert !== undefined) {
+            let normalizedMinStockAlert = parseInt(min_stock_alert, 10);
+            if (!Number.isFinite(normalizedMinStockAlert) || normalizedMinStockAlert < 0) {
+                normalizedMinStockAlert = 0;
+            }
+            fields.push(`min_stock_alert = $${idx++}`);
+            values.push(normalizedMinStockAlert);
         }
 
         if (fields.length === 0) {
@@ -1347,8 +1367,8 @@ router.post('/product/:productId/duplicate', verifyToken, async (req, res) => {
             const insertProduct = await client.query(
                 `INSERT INTO products 
            (store_id, category_id, sku, name, description, image_url, 
-            price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING *`,
                 [
                     original.store_id,
@@ -1362,7 +1382,8 @@ router.post('/product/:productId/duplicate', verifyToken, async (req, res) => {
                     0,
                     original.is_menu_item,
                     original.has_modifiers,
-                    original.accepts_fires === true
+                    original.accepts_fires === true,
+                    original.min_stock_alert || 0
                 ]
             );
 

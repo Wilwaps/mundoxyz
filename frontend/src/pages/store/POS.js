@@ -423,6 +423,12 @@ const POS = () => {
                         {filteredProducts.map(product => {
                             const priceUsdt = Number(product.price_usdt || 0);
                             const priceBs = priceUsdt * rates.bs;
+
+                            const rawStock = product.stock;
+                            const stockNumber = typeof rawStock === 'number' ? rawStock : parseFloat(rawStock);
+                            const hasNumericStock = Number.isFinite(stockNumber);
+                            const isOutOfStock = hasNumericStock && stockNumber === 0;
+
                             return (
                                 <button
                                     key={product.id}
@@ -438,6 +444,11 @@ const POS = () => {
                                                 currency: 'VES'
                                             })}
                                         </span>
+                                        {hasNumericStock && (
+                                            <span className={`text-[10px] sm:text-xs ${isOutOfStock ? 'text-red-400' : 'text-white/60'}`}>
+                                                Stock: {stockNumber}
+                                            </span>
+                                        )}
                                     </div>
                                 </button>
                             );

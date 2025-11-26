@@ -828,6 +828,10 @@ const StoreFront = () => {
                         const basePriceUsdt = Number.isFinite(basePriceRaw) && basePriceRaw >= 0 ? basePriceRaw : 0;
                         const priceBs = basePriceUsdt * rates.bs;
 
+                        const rawStock = product.stock;
+                        const stockNumber = typeof rawStock === 'number' ? rawStock : parseFloat(rawStock);
+                        const hasNumericStock = Number.isFinite(stockNumber);
+
                         return (
                             <motion.div
                                 key={product.id}
@@ -904,7 +908,12 @@ const StoreFront = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-white/60 line-clamp-2 mb-4">{product.description}</p>
+                                    <p className="text-sm text-white/60 line-clamp-2 mb-2">{product.description}</p>
+                                    {hasNumericStock && (
+                                        <div className="text-xs text-white/70">
+                                            Stock disponible: {stockNumber}
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         );

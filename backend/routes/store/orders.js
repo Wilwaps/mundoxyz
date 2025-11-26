@@ -286,7 +286,7 @@ router.post('/create', optionalAuth, async (req, res) => {
             for (const adj of inventoryAdjustments) {
                 // Bloquear y validar stock del producto
                 const prodRes = await client.query(
-                    'SELECT stock FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
+                    'SELECT stock, min_stock_alert FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
                     [adj.product_id, store_id]
                 );
 
@@ -294,12 +294,17 @@ router.post('/create', optionalAuth, async (req, res) => {
                     throw new Error('Producto no encontrado para ajuste de inventario');
                 }
 
-                const currentStockRaw = prodRes.rows[0].stock;
+                const row = prodRes.rows[0];
+                const currentStockRaw = row.stock;
                 const currentStock = Number(currentStockRaw ?? 0);
+                const minStockRaw = row.min_stock_alert;
+                const minStock = Number(minStockRaw ?? 0);
 
                 if (Number.isFinite(currentStock) && currentStock < adj.totalQty) {
                     throw new Error('Stock insuficiente para uno de los productos');
                 }
+
+                const newStock = Math.max(0, currentStock - adj.totalQty);
 
                 await client.query(
                     `UPDATE products 
@@ -307,6 +312,21 @@ router.post('/create', optionalAuth, async (req, res) => {
              WHERE id = $2 AND store_id = $3`,
                     [adj.totalQty, adj.product_id, store_id]
                 );
+
+                // Registrar alertas de stock cuando se alcanza el umbral configurado o se agota
+                if (newStock === 0 && currentStock > 0) {
+                    await client.query(
+                        `INSERT INTO product_stock_alerts (store_id, product_id, event_type, stock)
+                 VALUES ($1, $2, 'out_of_stock', $3)`,
+                        [store_id, adj.product_id, newStock]
+                    );
+                } else if (minStock > 0 && newStock <= minStock && currentStock > minStock) {
+                    await client.query(
+                        `INSERT INTO product_stock_alerts (store_id, product_id, event_type, stock)
+                 VALUES ($1, $2, 'low_stock', $3)`,
+                        [store_id, adj.product_id, newStock]
+                    );
+                }
 
                 // Bloquear y ajustar stock por modificador solo si existe configuración en product_modifier_stock
                 if (Array.isArray(adj.modifierQty) && adj.modifierQty.length > 0) {
