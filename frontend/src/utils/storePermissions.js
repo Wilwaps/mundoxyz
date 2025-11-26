@@ -62,6 +62,13 @@ export const canViewStoreInvoices = (staffData) => {
   return allowedRoles.includes(staffData.role);
 };
 
+// Check if user can access kitchen display
+export const canAccessKitchenDisplay = (staffData) => {
+  if (!staffData) return false;
+  const allowedRoles = ['owner', 'admin', 'manager', 'mesonero', 'delivery'];
+  return allowedRoles.includes(staffData.role);
+};
+
 // Get store slug from store ID
 export const getStoreSlugFromId = async (storeId) => {
   if (!storeId) return null;

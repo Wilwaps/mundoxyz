@@ -3,12 +3,13 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStoreStaffRoles } from '../utils/storePermissions';
 import { getStoreIdFromSlugCached } from '../utils/storeHelpers';
+import { canAccessKitchenDisplay } from '../utils/storePermissions';
 
 const ProtectedStoreRoute = ({ 
   children, 
   storeId, 
   storeSlug,
-  requiredPermission = 'dashboard', // 'dashboard', 'pos', 'invoices'
+  requiredPermission = 'dashboard', // 'dashboard', 'pos', 'invoices', 'kitchen'
   fallbackPath = '/' 
 }) => {
   const location = useLocation();
@@ -59,6 +60,9 @@ const ProtectedStoreRoute = ({
       break;
     case 'invoices':
       hasPermission = ['owner', 'admin', 'manager', 'seller'].includes(staffData.role);
+      break;
+    case 'kitchen':
+      hasPermission = ['owner', 'admin', 'manager', 'mesonero', 'delivery'].includes(staffData.role);
       break;
     default:
       hasPermission = false;

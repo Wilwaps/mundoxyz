@@ -188,7 +188,11 @@ function App() {
                       <POS />
                     </ProtectedStoreRouteBySlug>
                   } />
-                  <Route path="store/:slug/kitchen" element={<KitchenDisplay />} />
+                  <Route path="store/:slug/kitchen" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="kitchen">
+                      <KitchenDisplay />
+                    </ProtectedStoreRouteBySlug>
+                  } />
                   <Route path="raffles" element={<RafflesLobby />} />
                   <Route path="raffles/my" element={<MyRaffles />} />
                   <Route path="raffles/:code" element={<RaffleRoom />} />

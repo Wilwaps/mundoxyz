@@ -23,6 +23,15 @@ const KitchenDisplay = () => {
         }
     });
 
+    // Check if restaurant mode is enabled
+    const storeSettingsRaw = storeData?.store?.settings || {};
+    const rawTablesCount = storeSettingsRaw.tables_count ?? storeSettingsRaw.tablesCount ?? 0;
+    let tablesCount = parseInt(rawTablesCount, 10);
+    if (!Number.isFinite(tablesCount) || tablesCount < 0) {
+        tablesCount = 0;
+    }
+    const isRestaurantMode = tablesCount > 0;
+
     // Fetch Active Orders
     const { data: orders = [] } = useQuery({
         queryKey: ['kds-orders', storeId],
@@ -79,6 +88,19 @@ const KitchenDisplay = () => {
     };
 
     if (!storeData) return <div className="p-10">Cargando KDS...</div>;
+
+    if (!isRestaurantMode) {
+        return (
+            <div className="min-h-screen bg-dark flex items-center justify-center">
+                <div className="text-center">
+                    <ChefHat className="text-6xl text-gray-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-gray-400 mb-2">KDS No Disponible</h2>
+                    <p className="text-gray-500">Esta tienda no está configurada en modo restaurante.</p>
+                    <p className="text-gray-500 text-sm mt-2">Configura mesas en el panel de administración para activar el KDS.</p>
+                </div>
+            </div>
+        );
+    }
 
     const pendingOrders = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
     const preparingOrders = orders.filter(o => o.status === 'preparing');
