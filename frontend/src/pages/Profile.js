@@ -61,6 +61,7 @@ const Profile = () => {
   const [creatingGiftLink, setCreatingGiftLink] = useState(false);
   const [generatedLink, setGeneratedLink] = useState(null);
   const [showReferralsModal, setShowReferralsModal] = useState(false);
+  const [shareStoreMenuId, setShareStoreMenuId] = useState(null);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -190,6 +191,24 @@ const Profile = () => {
 
   const myStores = Array.isArray(storeStaff) ? storeStaff : [];
 
+  // Fetch user store orders ("Mis pedidos")
+  const {
+    data: myOrdersData,
+    isLoading: myOrdersLoading,
+    error: myOrdersError
+  } = useQuery({
+    queryKey: ['my-store-orders', user?.id],
+    queryFn: async () => {
+      const response = await axios.get('/api/store/order/my', {
+        params: { limit: 20 }
+      });
+      return response.data;
+    },
+    enabled: !!user?.id
+  });
+
+  const myOrders = Array.isArray(myOrdersData?.orders) ? myOrdersData.orders : [];
+
   const {
     data: referralsInfo,
     isLoading: referralsLoading,
@@ -269,32 +288,53 @@ const Profile = () => {
     return role;
   };
 
-  const handleShareStore = async (row) => {
-    if (!row || !row.store_slug) return;
+  const shareStore = async (row, platform) => {
+    if (!row || !row.store_slug || typeof window === 'undefined') return;
 
     const url = `${window.location.origin}/store/${row.store_slug}`;
     const title = row.store_name || 'Mi tienda';
     const text = `Mira la tienda ${title} en MundoXYZ`;
 
     try {
-      if (navigator.share && typeof navigator.share === 'function') {
-        await navigator.share({ title, text, url });
-        return;
+      switch (platform) {
+        case 'whatsapp': {
+          const shareText = `${text} ${url}`;
+          const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+          window.open(waUrl, '_blank', 'noopener,noreferrer');
+          break;
+        }
+        case 'telegram': {
+          const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+          window.open(tgUrl, '_blank', 'noopener,noreferrer');
+          break;
+        }
+        case 'copy': {
+          try {
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+              await navigator.clipboard.writeText(url);
+              toast.success('Link de tienda copiado');
+            } else {
+              window.prompt('Copia este link de tu tienda:', url);
+            }
+          } catch (err) {
+            console.error('Error copiando link de tienda:', err);
+            window.prompt('Copia este link de tu tienda:', url);
+          }
+          break;
+        }
+        case 'qr': {
+          try {
+            await downloadQrForUrl(url, `tienda-${row.store_slug}-qr.png`);
+          } catch (err) {
+            console.error('Error generando QR de tienda:', err);
+          }
+          break;
+        }
+        default:
+          break;
       }
-
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        await navigator.clipboard.writeText(url);
-        toast.success('Link de tienda copiado');
-        return;
-      }
-
-      window.prompt('Copia este link de tu tienda:', url);
-    } catch (error) {
-      if (error && error.name === 'AbortError') {
-        return;
-      }
-      console.error('Error al compartir tienda:', error);
-      toast.error('No se pudo compartir la tienda');
+    } finally {
+      setShareStoreMenuId(null);
     }
   };
 
@@ -476,6 +516,81 @@ const Profile = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Mis pedidos */}
+      {user && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.16 }}
+          className="card-glass mb-6"
+        >
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Trophy size={20} className="text-accent" />
+            Mis pedidos
+          </h3>
+
+          {myOrdersLoading ? (
+            <div className="py-4 text-sm text-text/60">Cargando tus pedidos...</div>
+          ) : myOrdersError ? (
+            <div className="py-4 text-sm text-red-400">Error al cargar tus pedidos</div>
+          ) : myOrders.length === 0 ? (
+            <div className="py-4 text-sm text-text/60">
+              Aún no tienes pedidos registrados.
+            </div>
+          ) : (
+            <>
+              <div className="text-[11px] text-text/60 mb-2">
+                Mostrando tus últimos {Math.min(myOrders.length, 5)} pedidos.
+              </div>
+              <div className="space-y-2 text-xs">
+                {myOrders.slice(0, 5).map((order) => (
+                  <div
+                    key={order.id}
+                    className="glass-panel p-2 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-text truncate">
+                        {order.store_name || 'Tienda'}
+                      </div>
+                      <div className="text-[11px] text-text/60 flex flex-wrap gap-2">
+                        <span>Estado: {order.status}</span>
+                        <span>Pago: {order.payment_status}</span>
+                      </div>
+                      <div className="text-[11px] text-text/50">
+                        {new Date(order.created_at).toLocaleString('es-ES', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      <div className="text-sm font-semibold text-accent">
+                        {Number(order.total_usdt || 0).toFixed(2)} USDT
+                      </div>
+                      {order.store_slug && order.invoice_number != null && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/store/${order.store_slug}/invoice/${order.invoice_number}`
+                            )
+                          }
+                          className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+                        >
+                          Ver factura
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </motion.div>
+      )}
 
       {/* Generador de links de regalo - Solo Tote */}
       {Array.isArray(user?.roles) && user.roles.includes('tote') && (
@@ -960,13 +1075,17 @@ const Profile = () => {
       </motion.div>
 
       {/* Admin Rooms Manager - Solo para tote/admin */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <AdminRoomsManager />
-      </motion.div>
+      {Array.isArray(user?.roles) &&
+        (user.roles.includes('tote') || user.roles.includes('admin')) && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="card-glass mb-6"
+          >
+            <AdminRoomsManager />
+          </motion.div>
+        )}
 
       {Array.isArray(user?.roles) && user.roles.includes('tote') && (
         <motion.div 
@@ -1080,30 +1199,53 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleShareStore(row)}
-                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover flex items-center gap-1"
-                  >
-                    <Share2 size={12} />
-                    Compartir
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!row.store_slug || typeof window === 'undefined') return;
-                      const url = `${window.location.origin}/store/${row.store_slug}`;
-                      try {
-                        await downloadQrForUrl(url, `tienda-${row.store_slug}-qr.png`);
-                      } catch (e) {
-                        // Errores ya manejados en la utilidad
+                <div className="relative flex flex-col items-end gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShareStoreMenuId((current) =>
+                          current === row.id ? null : row.id
+                        )
                       }
-                    }}
-                    className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover"
-                  >
-                    QR
-                  </button>
+                      className="px-3 py-1 rounded-full text-xs bg-glass hover:bg-glass-hover flex items-center gap-1"
+                    >
+                      <Share2 size={12} />
+                      Compartir
+                    </button>
+                    {shareStoreMenuId === row.id && (
+                      <div className="absolute right-0 mt-1 w-40 rounded-lg bg-black/90 border border-white/10 shadow-lg z-20 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => shareStore(row, 'whatsapp')}
+                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                        >
+                          WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareStore(row, 'telegram')}
+                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                        >
+                          Telegram
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareStore(row, 'copy')}
+                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                        >
+                          Copiar enlace
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareStore(row, 'qr')}
+                          className="w-full text-left px-3 py-1.5 hover:bg-white/10"
+                        >
+                          Descargar QR
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => navigate(`/store/${row.store_slug}`)}

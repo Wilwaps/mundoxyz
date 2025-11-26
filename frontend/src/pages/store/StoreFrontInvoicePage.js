@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ArrowLeft, MapPin, FileText, ShoppingBag } from 'lucide-react';
@@ -7,6 +7,10 @@ import { ArrowLeft, MapPin, FileText, ShoppingBag } from 'lucide-react';
 const StoreFrontInvoicePage = () => {
   const { slug, invoiceNumber } = useParams();
   const navigate = useNavigate();
+  const locationRouter = useLocation();
+  const searchParams = new URLSearchParams(locationRouter.search);
+  const fromParam = searchParams.get('from');
+  const fromOrders = fromParam === 'orders';
 
   const { data: storeData, isLoading: loadingStore, error: storeError } = useQuery({
     queryKey: ['store', slug],
@@ -70,8 +74,12 @@ const StoreFrontInvoicePage = () => {
     }
   };
 
-  const handleBackToStore = () => {
-    navigate(`/store/${slug}`);
+  const handleBack = () => {
+    if (fromOrders) {
+      navigate('/profile?tab=orders');
+    } else {
+      navigate(`/store/${slug}`);
+    }
   };
 
   const handleGoToProfileOrders = () => {
@@ -129,11 +137,11 @@ const StoreFrontInvoicePage = () => {
         <div className="flex items-center justify-between mb-4">
           <button
             type="button"
-            onClick={handleBackToStore}
+            onClick={handleBack}
             className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover"
           >
             <ArrowLeft size={14} />
-            Volver a la tienda
+            {fromOrders ? 'Volver a mis pedidos' : 'Volver a la tienda'}
           </button>
 
           <div className="flex gap-2">

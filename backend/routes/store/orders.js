@@ -454,6 +454,47 @@ router.post('/create', optionalAuth, async (req, res) => {
     }
 });
 
+// GET /api/store/order/my
+// Lista de órdenes recientes asociadas al usuario (cliente POS o usuario que creó la orden)
+router.get('/my', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+        const result = await query(
+            `SELECT 
+                o.id,
+                o.store_id,
+                s.name AS store_name,
+                s.slug AS store_slug,
+                o.code,
+                o.invoice_number,
+                o.status,
+                o.payment_status,
+                o.type,
+                o.table_number,
+                o.total_usdt,
+                o.created_at
+           FROM orders o
+           JOIN stores s ON s.id = o.store_id
+           WHERE (o.user_id = $1 OR o.customer_id = $1)
+           ORDER BY o.created_at DESC
+           LIMIT $2 OFFSET $3`,
+            [userId, limit, offset]
+        );
+
+        res.json({
+            orders: result.rows,
+            limit,
+            offset
+        });
+    } catch (error) {
+        logger.error('Error fetching user orders:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // GET /api/store/order/:storeId/orders/history
 // Lista de órdenes recientes de una tienda (para historial / facturación)
 router.get('/:storeId/orders/history', verifyToken, async (req, res) => {

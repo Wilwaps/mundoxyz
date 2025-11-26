@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -1112,6 +1112,11 @@ const AdminRedemptions = () => {
 const AdminFiat = () => {
   const queryClient = useQueryClient();
   const [scrapingSource, setScrapingSource] = useState(null);
+  const [marginInput, setMarginInput] = useState('');
+  const [ttlInput, setTtlInput] = useState('');
+  const [firesPerUsdtInput, setFiresPerUsdtInput] = useState('');
+  const [enabledInput, setEnabledInput] = useState(false);
+  const [shadowInput, setShadowInput] = useState(true);
 
   const scrapeMutation = useMutation({
     mutationFn: async (source) => {
@@ -1204,6 +1209,72 @@ const AdminFiat = () => {
   const isDegradedCtx = fiatContext?.isDegraded ?? null;
   const usedFallbackCtx = fiatContext?.usedFallback ?? null;
 
+  useEffect(() => {
+    if (!configFiat) return;
+
+    try {
+      setMarginInput(
+        configFiat.margin_percent != null
+          ? String(parseFloat(configFiat.margin_percent))
+          : ''
+      );
+      setTtlInput(
+        configFiat.max_rate_age_minutes != null
+          ? String(configFiat.max_rate_age_minutes)
+          : ''
+      );
+      setFiresPerUsdtInput(
+        configFiat.fires_per_usdt != null
+          ? String(parseFloat(configFiat.fires_per_usdt))
+          : ''
+      );
+      setEnabledInput(!!configFiat.is_enabled);
+      setShadowInput(!!configFiat.shadow_mode_enabled);
+    } catch {
+      // noop: ante cualquier error mantenemos valores actuales
+    }
+  }, [configFiat]);
+
+  const configMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await axios.patch('/api/admin/fiat/config', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Configuración FIAT actualizada');
+      queryClient.invalidateQueries(['economy-fiat-context']);
+    },
+    onError: (error) => {
+      const msg = error?.response?.data?.error || 'Error al actualizar configuración FIAT';
+      toast.error(msg);
+    }
+  });
+
+  const handleSaveConfig = async () => {
+    try {
+      const payload = {
+        margin_percent:
+          marginInput !== '' && !Number.isNaN(Number(marginInput))
+            ? Number(marginInput)
+            : undefined,
+        max_rate_age_minutes:
+          ttlInput !== '' && !Number.isNaN(Number(ttlInput))
+            ? Number(ttlInput)
+            : undefined,
+        fires_per_usdt:
+          firesPerUsdtInput !== '' && !Number.isNaN(Number(firesPerUsdtInput))
+            ? Number(firesPerUsdtInput)
+            : undefined,
+        is_enabled: enabledInput,
+        shadow_mode_enabled: shadowInput
+      };
+
+      await configMutation.mutateAsync(payload);
+    } catch {
+      // errores ya gestionados en onError
+    }
+  };
+
   return (
     <div className="p-4 space-y-6">
       <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
@@ -1221,7 +1292,7 @@ const AdminFiat = () => {
           <Shield size={16} className="text-accent" />
           Estado del Plugin FIAT
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-text/70">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-text/70 mb-3">
           <div>
             <div className="text-text/50">Habilitado</div>
             <div className="font-semibold">
@@ -1259,6 +1330,92 @@ const AdminFiat = () => {
                 ? parseFloat(configFiat.margin_percent).toFixed(2)
                 : '—'}
             </div>
+          </div>
+          <div>
+            <div className="text-text/50">Peg fuegos/USDT</div>
+            <div className="font-semibold">
+              {configFiat?.fires_per_usdt != null
+                ? parseFloat(configFiat.fires_per_usdt).toFixed(0)
+                : pegFires}
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Scheduler BCV</div>
+            <div className="font-semibold text-[11px] md:text-xs">
+              Diario 16:30 (hora servidor)
+            </div>
+          </div>
+          <div>
+            <div className="text-text/50">Scheduler Binance</div>
+            <div className="font-semibold text-[11px] md:text-xs">
+              Cada 1 hora
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 pt-2 border-t border-glass text-[11px] space-y-2">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[120px]">
+              <div className="text-text/50 mb-1">Margen (%)</div>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={marginInput}
+                onChange={(e) => setMarginInput(e.target.value)}
+                className="input-glass w-full px-2 py-1 text-[11px]"
+              />
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <div className="text-text/50 mb-1">TTL tasas (min)</div>
+              <input
+                type="number"
+                min="1"
+                value={ttlInput}
+                onChange={(e) => setTtlInput(e.target.value)}
+                className="input-glass w-full px-2 py-1 text-[11px]"
+              />
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <div className="text-text/50 mb-1">Fuegos por 1 USDT</div>
+              <input
+                type="number"
+                min="1"
+                value={firesPerUsdtInput}
+                onChange={(e) => setFiresPerUsdtInput(e.target.value)}
+                className="input-glass w-full px-2 py-1 text-[11px]"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 mt-1">
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                className="w-3 h-3"
+                checked={enabledInput}
+                onChange={(e) => setEnabledInput(e.target.checked)}
+              />
+              <span>Plugin habilitado</span>
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                className="w-3 h-3"
+                checked={shadowInput}
+                onChange={(e) => setShadowInput(e.target.checked)}
+              />
+              <span>Shadow mode</span>
+            </label>
+            <button
+              type="button"
+              onClick={handleSaveConfig}
+              disabled={configMutation.isLoading}
+              className="ml-auto px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {configMutation.isLoading ? 'Guardando…' : 'Guardar configuración'}
+            </button>
           </div>
         </div>
       </div>

@@ -573,6 +573,164 @@ router.get('/fiat/operations', adminAuth, async (req, res) => {
   }
 });
 
+// FIAT: get operational config (margin, TTL, peg USDT/Fuegos, flags)
+router.get('/fiat/config', adminAuth, async (req, res) => {
+  try {
+    const config = await fiatRateService.getOperationalConfig();
+    res.json(config);
+  } catch (error) {
+    logger.error('Error fetching FIAT operational config:', error);
+    res.status(500).json({ error: 'Failed to fetch FIAT config' });
+  }
+});
+
+// FIAT: update operational config (margin, TTL, peg USDT/Fuegos, flags)
+router.patch('/fiat/config', adminAuth, async (req, res) => {
+  try {
+    const {
+      margin_percent,
+      max_rate_age_minutes,
+      fires_per_usdt,
+      is_enabled,
+      shadow_mode_enabled,
+      usdt_official_wallet,
+      usdt_network
+    } = req.body || {};
+
+    const existingRes = await query(
+      'SELECT * FROM fiat_operational_config ORDER BY id DESC LIMIT 1'
+    );
+
+    let row;
+
+    if (existingRes.rows.length === 0) {
+      // Insertar nueva configuración
+      let margin = margin_percent != null ? Number(margin_percent) : 5.0;
+      let ttl =
+        max_rate_age_minutes != null ? parseInt(max_rate_age_minutes, 10) : 30;
+      let fires = fires_per_usdt != null ? Number(fires_per_usdt) : 300;
+
+      if (!Number.isFinite(margin) || margin < 0 || margin > 100) {
+        return res
+          .status(400)
+          .json({ error: 'margin_percent inválido (debe estar entre 0 y 100)' });
+      }
+      if (!Number.isFinite(ttl) || ttl <= 0) {
+        return res
+          .status(400)
+          .json({ error: 'max_rate_age_minutes debe ser un entero > 0' });
+      }
+      if (!Number.isFinite(fires) || fires <= 0) {
+        return res
+          .status(400)
+          .json({ error: 'fires_per_usdt debe ser un número > 0' });
+      }
+
+      const enabled =
+        typeof is_enabled === 'boolean' ? is_enabled : false;
+      const shadow =
+        typeof shadow_mode_enabled === 'boolean' ? shadow_mode_enabled : true;
+      const wallet = usdt_official_wallet || null;
+      const network = usdt_network || 'TRON';
+
+      const insertRes = await query(
+        `INSERT INTO fiat_operational_config
+          (margin_percent, max_rate_age_minutes, is_enabled, shadow_mode_enabled, fires_per_usdt, usdt_official_wallet, usdt_network, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         RETURNING *`,
+        [margin, ttl, enabled, shadow, fires, wallet, network]
+      );
+
+      row = insertRes.rows[0];
+    } else {
+      // Actualizar configuración existente
+      const current = existingRes.rows[0];
+
+      let margin =
+        current.margin_percent != null
+          ? parseFloat(current.margin_percent)
+          : 5.0;
+      if (margin_percent != null) {
+        margin = Number(margin_percent);
+      }
+
+      let ttl = current.max_rate_age_minutes || 30;
+      if (max_rate_age_minutes != null) {
+        ttl = parseInt(max_rate_age_minutes, 10);
+      }
+
+      let fires =
+        current.fires_per_usdt != null
+          ? parseFloat(current.fires_per_usdt)
+          : 300;
+      if (fires_per_usdt != null) {
+        fires = Number(fires_per_usdt);
+      }
+
+      if (!Number.isFinite(margin) || margin < 0 || margin > 100) {
+        return res
+          .status(400)
+          .json({ error: 'margin_percent inválido (debe estar entre 0 y 100)' });
+      }
+      if (!Number.isFinite(ttl) || ttl <= 0) {
+        return res
+          .status(400)
+          .json({ error: 'max_rate_age_minutes debe ser un entero > 0' });
+      }
+      if (!Number.isFinite(fires) || fires <= 0) {
+        return res
+          .status(400)
+          .json({ error: 'fires_per_usdt debe ser un número > 0' });
+      }
+
+      const enabled =
+        typeof is_enabled === 'boolean' ? is_enabled : current.is_enabled;
+      const shadow =
+        typeof shadow_mode_enabled === 'boolean'
+          ? shadow_mode_enabled
+          : current.shadow_mode_enabled;
+      const wallet =
+        usdt_official_wallet !== undefined
+          ? usdt_official_wallet
+          : current.usdt_official_wallet;
+      const network =
+        usdt_network !== undefined ? usdt_network : current.usdt_network;
+
+      const updateRes = await query(
+        `UPDATE fiat_operational_config
+           SET margin_percent = $1,
+               max_rate_age_minutes = $2,
+               is_enabled = $3,
+               shadow_mode_enabled = $4,
+               fires_per_usdt = $5,
+               usdt_official_wallet = $6,
+               usdt_network = $7,
+               updated_at = NOW()
+         WHERE id = $8
+         RETURNING *`,
+        [margin, ttl, enabled, shadow, fires, wallet, network, current.id]
+      );
+
+      row = updateRes.rows[0];
+    }
+
+    logger.info('FIAT operational config updated/inserted', {
+      id: row.id,
+      margin_percent: row.margin_percent,
+      max_rate_age_minutes: row.max_rate_age_minutes,
+      fires_per_usdt: row.fires_per_usdt,
+      is_enabled: row.is_enabled,
+      shadow_mode_enabled: row.shadow_mode_enabled
+    });
+
+    const config = await fiatRateService.getOperationalConfig();
+    res.json({ success: true, config });
+  } catch (error) {
+    logger.error('Error updating FIAT operational config:', error);
+    res.status(500).json({ error: 'Failed to update FIAT config' });
+  }
+});
+
 async function scrapeBcvRate(pair) {
   const url = process.env.FIAT_BCV_URL || 'https://www.bcv.org.ve';
 

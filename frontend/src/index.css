@@ -238,11 +238,44 @@
   cursor: not-allowed;
 }
 
-/* Estilos de impresión para facturas generadas desde el POS */
+/* Estilos de impresión para facturas (POS / StoreFront) */
 @media print {
+  /* Quitar márgenes por defecto del navegador */
+  @page {
+    margin: 5mm;
+  }
+
   body.print-invoice {
     background: #ffffff !important;
     color: #000000 !important;
+  }
+
+  /* Ocultar layout global (navbar, sidebar, footer) y dejar solo el contenido */
+  body.print-invoice header,
+  body.print-invoice footer,
+  body.print-invoice nav,
+  body.print-invoice .app-header,
+  body.print-invoice .app-footer,
+  body.print-invoice .sidebar,
+  body.print-invoice .bottom-nav {
+    display: none !important;
+  }
+
+  /* Forzar que el contenedor principal de la factura sea estrecho y sin fondos */
+  body.print-invoice .min-h-screen {
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.print-invoice .max-w-3xl,
+  body.print-invoice .max-w-4xl,
+  body.print-invoice .max-w-5xl {
+    max-width: 80mm !important; /* ancho tipo ticket / factura pequeña */
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
   }
 
   body.print-invoice * {
@@ -251,13 +284,15 @@
     box-shadow: none !important;
   }
 
-  body.print-invoice .bg-dark,
-  body.print-invoice .bg-dark-lighter,
-  body.print-invoice .bg-card,
-  body.print-invoice .bg-glass,
-  body.print-invoice .bg-black,
-  body.print-invoice .bg-black\/70,
-  body.print-invoice .bg-black\/80 {
-    background-color: #ffffff !important;
+  body.print-invoice .card-glass,
+  body.print-invoice .glass-panel {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.print-invoice button,
+  body.print-invoice a {
+    display: none !important;
   }
 }
