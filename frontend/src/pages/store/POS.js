@@ -15,11 +15,15 @@ const POS = () => {
     // Payment State
     const initialPayments = {
         cash_usdt: 0,
-        zelle: 0,
+        usdt_tron: 0,
         bs: 0,
+        bs_cash: 0,
         fires: 0
     };
     const [payments, setPayments] = useState(initialPayments);
+    const [usdtTronHash, setUsdtTronHash] = useState('');
+    const [cashProofBase64, setCashProofBase64] = useState('');
+    const [cashProofName, setCashProofName] = useState('');
 
     // Cliente POS (simple CRM local)
     const [customerName, setCustomerName] = useState('');
@@ -101,6 +105,9 @@ const POS = () => {
             setCart([]);
             setPaymentModalOpen(false);
             setPayments(initialPayments);
+            setUsdtTronHash('');
+            setCashProofBase64('');
+            setCashProofName('');
 
             // Guardar cliente en recientes (solo si tiene algún dato)
             setRecentCustomers((prev) => {
@@ -191,14 +198,15 @@ const POS = () => {
     }, 0);
 
     const cashUsdt = parseAmount(payments.cash_usdt);
-    const zelleUsdt = parseAmount(payments.zelle);
+    const usdtTronUsdt = parseAmount(payments.usdt_tron);
     const bsAmount = parseAmount(payments.bs);
+    const bsCashAmount = parseAmount(payments.bs_cash);
     const firesAmount = parseAmount(payments.fires);
 
     const totalPaidUSDT =
         cashUsdt +
-        zelleUsdt +
-        (bsAmount / rates.bs) +
+        usdtTronUsdt +
+        ((bsAmount + bsCashAmount) / rates.bs) +
         (firesAmount / rates.fires);
 
     // Lo que falta por pagar (en USDT) – nunca negativo
@@ -243,6 +251,26 @@ const POS = () => {
         }
     }, [draftsStorageKey]);
 
+    const handleCashProofChange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) {
+            setCashProofBase64('');
+            setCashProofName('');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result;
+            if (typeof result === 'string') {
+                const base64 = result.includes(',') ? result.split(',')[1] : result;
+                setCashProofBase64(base64 || '');
+                setCashProofName(file.name || '');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleCheckout = () => {
         if (!isPaid) return toast.error('Falta completar el pago');
 
@@ -265,7 +293,11 @@ const POS = () => {
             type: 'dine_in', // Default
             payment_method: {
                 ...payments,
-                source: 'pos'
+                source: 'pos',
+                meta: {
+                    usdt_tron_hash: usdtTronHash.trim() || null,
+                    proof_cash_bill_image_base64: cashProofBase64 || null
+                }
             },
             currency_snapshot: rates,
             table_number: effectiveTable,
@@ -287,6 +319,9 @@ const POS = () => {
         // Reinicia la venta actual sin tocar clientes recientes ni historial
         setCart([]);
         setPayments(initialPayments);
+        setUsdtTronHash('');
+        setCashProofBase64('');
+        setCashProofName('');
         setCustomerName('');
         setCustomerPhone('');
         setCustomerSearch('');
@@ -776,16 +811,26 @@ const POS = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Zelle / Transf.</label>
+                                    <label className="block text-sm text-white/60 mb-1">USDT Tron</label>
                                     <div className="relative">
                                         <CreditCard className="absolute left-3 top-3 text-blue-500" size={20} />
                                         <input
                                             type="number"
                                             className="w-full bg-white/5 rounded-lg pl-10 p-3"
-                                            value={payments.zelle}
-                                            onChange={e => setPayments({ ...payments, zelle: e.target.value })}
+                                            value={payments.usdt_tron}
+                                            onChange={e => setPayments({ ...payments, usdt_tron: e.target.value })}
                                         />
                                     </div>
+                                </div>
+                                <div className="mt-2">
+                                    <label className="block text-xs text-white/60 mb-1">Hash TRON (opcional)</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs"
+                                        value={usdtTronHash}
+                                        onChange={e => setUsdtTronHash(e.target.value)}
+                                        placeholder="TXID..."
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-white/60 mb-1">Bolívares (Tasa: {rates.bs})</label>
@@ -799,6 +844,37 @@ const POS = () => {
                                         />
                                         <div className="absolute right-3 top-3 text-xs text-white/40">
                                             = ${(bsAmount / rates.bs).toFixed(2)}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <label className="block text-sm text-white/60 mb-1">Bs en efectivo</label>
+                                    <div className="relative">
+                                        <Banknote className="absolute left-3 top-3 text-green-500" size={20} />
+                                        <input
+                                            type="number"
+                                            className="w-full bg-white/5 rounded-lg pl-10 p-3"
+                                            value={payments.bs_cash}
+                                            onChange={e => setPayments({ ...payments, bs_cash: e.target.value })}
+                                        />
+                                        <div className="absolute right-3 top-3 text-xs text-white/40">
+                                            = ${(bsCashAmount / rates.bs).toFixed(2)}
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs text-white/60 mb-1">Comprobante (foto, opcional)</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleCashProofChange}
+                                                className="text-xs text-white/70"
+                                            />
+                                            {cashProofName && (
+                                                <span className="text-xs text-emerald-400 truncate max-w-[120px]">
+                                                    {cashProofName}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

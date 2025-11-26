@@ -223,8 +223,8 @@ const StoreOwnerDashboard = () => {
           label: 'Bs en efectivo',
           instructions: ''
         },
-        zelle: {
-          label: 'Zelle / Transf. (USDT)',
+        usdt_tron: {
+          label: 'USDT Tron',
           instructions: ''
         },
         cash_usdt: {
@@ -1095,10 +1095,15 @@ const StoreOwnerDashboard = () => {
 
       {activeTab === 'reports' && (
         <div className="space-y-4">
-          <div className="card-glass p-4 overflow-x-auto">
+          <div className="card-glass p-4 overflow-x-auto border border-emerald-500/20">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Pedidos activos</h2>
-              <span className="text-[11px] text-text/60">Vista rápida de lo que está en curso en tu tienda.</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <h2 className="text-sm font-semibold text-emerald-400">Pedidos activos</h2>
+              </div>
+              <span className="text-[11px] text-text/60">
+                {orders.length} en proceso
+              </span>
             </div>
             {loadingOrders ? (
               <p className="text-xs text-text/60">Cargando pedidos...</p>
@@ -1189,11 +1194,22 @@ const StoreOwnerDashboard = () => {
             )}
           </div>
 
-          <div className="card-glass p-4 overflow-x-auto">
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-px bg-glass flex-1"></div>
+              <div className="text-xs text-text/50 font-medium uppercase tracking-wide">Historial</div>
+              <div className="h-px bg-glass flex-1"></div>
+            </div>
+          </div>
+
+          <div className="card-glass p-4 overflow-x-auto border border-blue-500/20">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Historial de ventas (recientes)</h2>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <h2 className="text-sm font-semibold text-blue-400">Historial de ventas</h2>
+              </div>
               <span className="text-[11px] text-text/60">
-                Últimas {ordersHistory.length} facturas registradas en esta tienda.
+                Últimas {ordersHistory.length} facturas
               </span>
             </div>
             {loadingOrdersHistory ? (
@@ -1589,10 +1605,9 @@ const StoreOwnerDashboard = () => {
                   placeholder: 'Instrucciones para pagar en efectivo en Bs (caja, mostrador, etc.)'
                 },
                 {
-                  key: 'zelle',
-                  title: 'Zelle / Transf. (USDT)',
-                  placeholder:
-                    'Correo o datos de cuenta Zelle / transferencia en USDT que verá el cliente'
+                  key: 'usdt_tron',
+                  title: 'USDT Tron',
+                  placeholder: 'Correo o datos de cuenta USDT Tron que verá el cliente'
                 },
                 {
                   key: 'cash_usdt',

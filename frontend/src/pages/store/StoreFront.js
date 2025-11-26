@@ -92,7 +92,7 @@ const StoreFront = () => {
 
     const initialPayments = {
         cash_usdt: 0,
-        zelle: 0,
+        usdt_tron: 0,
         bs_cash: 0,
         bs_transfer: 0,
         fires: 0
@@ -112,11 +112,12 @@ const StoreFront = () => {
     const [cashProofBase64, setCashProofBase64] = useState('');
     const [cashProofName, setCashProofName] = useState('');
     const [transferReference, setTransferReference] = useState('');
+    const [usdtTronHash, setUsdtTronHash] = useState('');
 
     const basePaymentMethodOptions = [
         { id: 'bs_transfer', defaultLabel: 'Pago móvil / Transferencia en Bs', field: 'bs_transfer' },
         { id: 'bs_cash', defaultLabel: 'Bs en efectivo', field: 'bs_cash' },
-        { id: 'zelle', defaultLabel: 'Zelle / Transf. (USDT)', field: 'zelle' },
+        { id: 'usdt_tron', defaultLabel: 'USDT Tron', field: 'usdt_tron' },
         { id: 'cash_usdt', defaultLabel: 'Efectivo (USDT)', field: 'cash_usdt' },
         { id: 'fires', defaultLabel: 'Pago con Fuegos', field: 'fires' }
     ];
@@ -352,11 +353,12 @@ const StoreFront = () => {
     const rawBsCash = parseAmount(payments.bs_cash);
     const rawBsTransfer = parseAmount(payments.bs_transfer);
     const rawFiresAmount = parseAmount(payments.fires);
+    const rawUsdtTron = parseAmount(payments.usdt_tron);
 
     const enabledMethods = new Set(paymentLines.map((l) => l.method));
 
     const cashUsdt = enabledMethods.has('cash_usdt') ? rawCashUsdt : 0;
-    const zelleUsdt = enabledMethods.has('zelle') ? rawZelleUsdt : 0;
+    const usdtTron = enabledMethods.has('usdt_tron') ? rawUsdtTron : 0;
     const bsCashAmount = enabledMethods.has('bs_cash') ? rawBsCash : 0;
     const bsTransferAmount = enabledMethods.has('bs_transfer') ? rawBsTransfer : 0;
     const bsAmount = bsCashAmount + bsTransferAmount;
@@ -364,7 +366,7 @@ const StoreFront = () => {
 
     const totalPaidUSDT =
         cashUsdt +
-        zelleUsdt +
+        usdtTron +
         (bsAmount / rates.bs) +
         (firesAmount / rates.fires);
 
@@ -404,6 +406,7 @@ const StoreFront = () => {
             setCashProofBase64('');
             setCashProofName('');
             setTransferReference('');
+            setUsdtTronHash('');
             setGuestInfoConfirmed(false);
         },
         onError: (error) => {
@@ -467,7 +470,8 @@ const StoreFront = () => {
 
         const paymentMeta = {
             proof_cash_bill_image_base64: cashProofBase64 || null,
-            transfer_reference: transferReference.trim() || null
+            transfer_reference: transferReference.trim() || null,
+            usdt_tron_hash: usdtTronHash.trim() || null
         };
 
         const deliveryInfo = guestInfo || deliveryLocation
@@ -488,7 +492,7 @@ const StoreFront = () => {
             payment_method: {
                 source: 'storefront',
                 cash_usdt: cashUsdt,
-                zelle: zelleUsdt,
+                usdt_tron: usdtTron,
                 bs: bsAmount,
                 bs_cash: bsCashAmount,
                 bs_transfer: bsTransferAmount,
@@ -1555,7 +1559,7 @@ const StoreFront = () => {
                                 const field = methodConfig.field;
                                 const amountValue = payments[field] ?? '';
                                 const isBs = field === 'bs_cash' || field === 'bs_transfer';
-                                const isUsdt = field === 'cash_usdt' || field === 'zelle';
+                                const isUsdt = field === 'cash_usdt' || field === 'usdt_tron';
                                 const isFires = field === 'fires';
 
                                 const availableMethods = paymentMethodOptions.filter((opt) => {
@@ -1679,6 +1683,21 @@ const StoreFront = () => {
                                                     <div className="text-[11px] text-white/40 mt-1">
                                                         Tasa referencial: 1 USDT ≈ {rates.bs.toFixed(2)} Bs
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {field === 'usdt_tron' && (
+                                                <div className="mt-2 space-y-1">
+                                                    <label className="block text-[11px] text-white/60 mb-1">
+                                                        Hash de transacción TRON (opcional)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                        value={usdtTronHash}
+                                                        onChange={(e) => setUsdtTronHash(e.target.value)}
+                                                        placeholder="TXID..."
+                                                    />
                                                 </div>
                                             )}
 

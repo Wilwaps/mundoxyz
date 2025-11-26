@@ -37,6 +37,8 @@ import StoreFrontInvoicePage from './pages/store/StoreFrontInvoicePage';
 import POS from './pages/store/POS';
 import KitchenDisplay from './pages/store/KitchenDisplay';
 import StoreOwnerDashboard from './pages/store/StoreOwnerDashboard';
+import ProtectedStoreRoute from './components/ProtectedStoreRoute';
+import ProtectedStoreRouteBySlug from './components/ProtectedStoreRouteBySlug';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -171,9 +173,21 @@ function App() {
                   <Route path="caida/lobby" element={<CaidaLobby />} />
                   <Route path="caida/room/:code" element={<CaidaRoom />} />
                   <Route path="store/:slug" element={<StoreFront />} />
-                  <Route path="store/:slug/invoice/:invoiceNumber" element={<StoreFrontInvoicePage />} />
-                  <Route path="store/:slug/dashboard" element={<StoreOwnerDashboard />} />
-                  <Route path="store/:slug/pos" element={<POS />} />
+                  <Route path="store/:slug/invoice/:invoiceNumber" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="invoices">
+                      <StoreFrontInvoicePage />
+                    </ProtectedStoreRouteBySlug>
+                  } />
+                  <Route path="store/:slug/dashboard" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="dashboard">
+                      <StoreOwnerDashboard />
+                    </ProtectedStoreRouteBySlug>
+                  } />
+                  <Route path="store/:slug/pos" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="pos">
+                      <POS />
+                    </ProtectedStoreRouteBySlug>
+                  } />
                   <Route path="store/:slug/kitchen" element={<KitchenDisplay />} />
                   <Route path="raffles" element={<RafflesLobby />} />
                   <Route path="raffles/my" element={<MyRaffles />} />

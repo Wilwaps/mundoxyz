@@ -180,10 +180,10 @@ router.post('/create', optionalAuth, async (req, res) => {
             }
         };
 
-        // POS: cash_usdt, zelle, bs, fires
-        // StoreFront: cash_usdt, zelle, bs, bs_cash, bs_transfer, fires
+        // POS: cash_usdt, usdt_tron, bs, bs_cash, fires
+        // StoreFront: cash_usdt, usdt_tron, bs, bs_cash, bs_transfer, fires
         addAmount('usdt', pm.cash_usdt);
-        addAmount('usdt', pm.zelle);
+        addAmount('usdt', pm.usdt_tron);
         addAmount('ves', pm.bs);
         addAmount('ves', pm.bs_cash);
         addAmount('ves', pm.bs_transfer);
