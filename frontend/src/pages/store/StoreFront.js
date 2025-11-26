@@ -9,6 +9,58 @@ import toast from 'react-hot-toast';
 import { downloadQrForUrl } from '../../utils/qr';
 import './StoreFront.css'; // Custom styles
 
+const COLOR_KEYWORDS = {
+    rojo: { color: '#ef4444', label: 'Rojo' },
+    azul: { color: '#3b82f6', label: 'Azul' },
+    verde: { color: '#22c55e', label: 'Verde' },
+    amarillo: { color: '#eab308', label: 'Amarillo' },
+    naranja: { color: '#f97316', label: 'Naranja' },
+    morado: { color: '#a855f7', label: 'Morado' },
+    rosa: { color: '#ec4899', label: 'Rosa' },
+    negro: { color: '#000000', label: 'Negro' },
+    blanco: { color: '#ffffff', label: 'Blanco' },
+    gris: { color: '#6b7280', label: 'Gris' },
+    dorado: { color: '#facc15', label: 'Dorado' },
+    plateado: { color: '#9ca3af', label: 'Plateado' }
+};
+
+const parseModifierColorFromName = (rawName) => {
+    if (!rawName || typeof rawName !== 'string') {
+        return { label: '', color: null };
+    }
+
+    const trimmed = rawName.trim();
+    if (!trimmed) {
+        return { label: '', color: null };
+    }
+
+    const parts = trimmed.split(/\s+/);
+    const last = parts[parts.length - 1];
+    let color = null;
+    let label = trimmed;
+
+    if (last && last.startsWith('#') && last.length > 1) {
+        const token = last.slice(1).toLowerCase();
+
+        if (/^[0-9a-f]{3}$|^[0-9a-f]{6}$/.test(token)) {
+            color = `#${token}`;
+        } else if (COLOR_KEYWORDS[token]) {
+            color = COLOR_KEYWORDS[token].color;
+        }
+
+        if (color) {
+            const base = parts.slice(0, -1).join(' ').trim();
+            if (base) {
+                label = base;
+            } else if (COLOR_KEYWORDS[token]) {
+                label = COLOR_KEYWORDS[token].label;
+            }
+        }
+    }
+
+    return { label, color };
+};
+
 const StoreFront = () => {
     const { slug } = useParams(); // e.g., 'divorare04'
     const navigate = useNavigate();
@@ -1038,7 +1090,7 @@ const StoreFront = () => {
                                                 {options.map((mod) => {
                                                     const id = mod.id;
                                                     const isSelected = selectedIds.includes(id);
-                                                    const label = mod.name;
+                                                    const { label, color } = parseModifierColorFromName(mod.name);
                                                     const extraPrice = Number(mod.price_adjustment_usdt || 0);
 
                                                     return (
@@ -1081,10 +1133,18 @@ const StoreFront = () => {
                                                                     : 'bg-white/5 text-white/80 border-white/10 hover:bg-white/10'
                                                             }`}
                                                         >
-                                                            <span>{label}</span>
-                                                            {extraPrice > 0 && (
-                                                                <span className="ml-1 text-[10px] opacity-80">(+${extraPrice})</span>
-                                                            )}
+                                                            <div className="flex items-center gap-1">
+                                                                {color && (
+                                                                    <span
+                                                                        className="w-3 h-3 rounded-full border border-white/40"
+                                                                        style={{ backgroundColor: color }}
+                                                                    />
+                                                                )}
+                                                                <span>{label}</span>
+                                                                {extraPrice > 0 && (
+                                                                    <span className="ml-1 text-[10px] opacity-80">(+${extraPrice})</span>
+                                                                )}
+                                                            </div>
                                                         </button>
                                                     );
                                                 })}

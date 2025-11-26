@@ -64,6 +64,58 @@ const processProductImageFile = async (file, maxSizeMB = MAX_PRODUCT_IMAGE_MB) =
   }
 };
 
+const COLOR_KEYWORDS = {
+  rojo: { color: '#ef4444', label: 'Rojo' },
+  azul: { color: '#3b82f6', label: 'Azul' },
+  verde: { color: '#22c55e', label: 'Verde' },
+  amarillo: { color: '#eab308', label: 'Amarillo' },
+  naranja: { color: '#f97316', label: 'Naranja' },
+  morado: { color: '#a855f7', label: 'Morado' },
+  rosa: { color: '#ec4899', label: 'Rosa' },
+  negro: { color: '#000000', label: 'Negro' },
+  blanco: { color: '#ffffff', label: 'Blanco' },
+  gris: { color: '#6b7280', label: 'Gris' },
+  dorado: { color: '#facc15', label: 'Dorado' },
+  plateado: { color: '#9ca3af', label: 'Plateado' }
+};
+
+const parseModifierColorFromName = (rawName) => {
+  if (!rawName || typeof rawName !== 'string') {
+    return { label: '', color: null };
+  }
+
+  const trimmed = rawName.trim();
+  if (!trimmed) {
+    return { label: '', color: null };
+  }
+
+  const parts = trimmed.split(/\s+/);
+  const last = parts[parts.length - 1];
+  let color = null;
+  let label = trimmed;
+
+  if (last && last.startsWith('#') && last.length > 1) {
+    const token = last.slice(1).toLowerCase();
+
+    if (/^[0-9a-f]{3}$|^[0-9a-f]{6}$/.test(token)) {
+      color = `#${token}`;
+    } else if (COLOR_KEYWORDS[token]) {
+      color = COLOR_KEYWORDS[token].color;
+    }
+
+    if (color) {
+      const base = parts.slice(0, -1).join(' ').trim();
+      if (base) {
+        label = base;
+      } else if (COLOR_KEYWORDS[token]) {
+        label = COLOR_KEYWORDS[token].label;
+      }
+    }
+  }
+
+  return { label, color };
+};
+
 const StoreOwnerDashboard = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -429,6 +481,31 @@ const StoreOwnerDashboard = () => {
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al actualizar configuracin de tienda';
+      toast.error(message);
+    }
+  });
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }) => {
+      const response = await axios.post(`/api/store/order/${orderId}/status`, { status });
+      return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      const status = variables?.status;
+      if (status === 'cancelled') {
+        toast.success('Pedido rechazado');
+      } else if (status === 'confirmed') {
+        toast.success('Pedido aceptado');
+      } else {
+        toast.success('Estado de pedido actualizado');
+      }
+      if (store?.id) {
+        queryClient.invalidateQueries(['store-active-orders', store.id]);
+        queryClient.invalidateQueries(['store-orders-history', store.id]);
+      }
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al actualizar estado del pedido';
       toast.error(message);
     }
   });
@@ -965,11 +1042,13 @@ const StoreOwnerDashboard = () => {
                     <th className="py-1 pr-3 text-left">Mesa / Ref</th>
                     <th className="py-1 pr-3 text-right">Total USDT</th>
                     <th className="py-1 pr-3 text-left">Creado</th>
+                    <th className="py-1 pl-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => {
                     const canOpenInvoice = order.invoice_number != null;
+                    const isPending = order.status === 'pending';
 
                     return (
                       <tr
@@ -993,6 +1072,42 @@ const StoreOwnerDashboard = () => {
                         </td>
                         <td className="py-1 pr-3 text-text/60">
                           {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="py-1 pl-3 text-right">
+                          {isPending ? (
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateOrderStatusMutation.mutate({
+                                    orderId: order.id,
+                                    status: 'confirmed'
+                                  });
+                                }}
+                                className="px-2 py-0.5 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-[10px] font-semibold text-dark disabled:opacity-50"
+                                disabled={updateOrderStatusMutation.isLoading}
+                              >
+                                Aceptar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateOrderStatusMutation.mutate({
+                                    orderId: order.id,
+                                    status: 'cancelled'
+                                  });
+                                }}
+                                className="px-2 py-0.5 rounded-full bg-red-500/90 hover:bg-red-400 text-[10px] font-semibold text-dark disabled:opacity-50"
+                                disabled={updateOrderStatusMutation.isLoading}
+                              >
+                                Rechazar
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-text/50">-</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1981,38 +2096,50 @@ const ProductEditModal = ({
                   </div>
 
                   <div className="space-y-1">
-                    {group.options.map((opt) => (
-                      <div key={opt.id} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={opt.name}
-                          onChange={(e) =>
-                            updateModifierOption(group.id, opt.id, { name: e.target.value })
-                          }
-                          className="flex-1 input-glass text-[11px] py-1"
-                          placeholder="Nombre del elemento (Ej: Carta, Oficio)"
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={opt.priceAdjustmentUsdt}
-                          onChange={(e) =>
-                            updateModifierOption(group.id, opt.id, {
-                              priceAdjustmentUsdt: e.target.value
-                            })
-                          }
-                          className="w-24 input-glass text-[11px] py-1"
-                          placeholder="+ USDT"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeModifierOption(group.id, opt.id)}
-                          className="px-2 py-1 rounded-full bg-glass text-text/70 hover:bg-glass-hover text-[10px]"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                    {group.options.map((opt) => {
+                      const { color } = parseModifierColorFromName(opt.name);
+
+                      return (
+                        <div key={opt.id} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={opt.name}
+                            onChange={(e) =>
+                              updateModifierOption(group.id, opt.id, { name: e.target.value })
+                            }
+                            className="flex-1 input-glass text-[11px] py-1"
+                            placeholder="Nombre del elemento (Ej: Rojo #rojo, Carta, Oficio)"
+                          />
+                          <div className="flex items-center gap-1">
+                            {color && (
+                              <div
+                                className="w-4 h-4 rounded-full border border-white/40"
+                                style={{ backgroundColor: color }}
+                              />
+                            )}
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={opt.priceAdjustmentUsdt}
+                              onChange={(e) =>
+                                updateModifierOption(group.id, opt.id, {
+                                  priceAdjustmentUsdt: e.target.value
+                                })
+                              }
+                              className="w-24 input-glass text-[11px] py-1"
+                              placeholder="+ USDT"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeModifierOption(group.id, opt.id)}
+                            className="px-2 py-1 rounded-full bg-glass text-text/70 hover:bg-glass-hover text-[10px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
                       onClick={() => addModifierOption(group.id)}
