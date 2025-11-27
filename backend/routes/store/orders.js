@@ -73,6 +73,7 @@ router.post('/create', optionalAuth, async (req, res) => {
 
         // 1. Calculate Totals & preparar datos para inventario
         let subtotal_usdt = 0;
+        let fires_eligible_subtotal_usdt = 0;
         const orderItemsData = [];
 
         // Agrupar cantidades por producto y por modificador para control de stock
@@ -110,6 +111,11 @@ router.post('/create', optionalAuth, async (req, res) => {
             const quantityNumber = Number(item.quantity) || 0;
 
             subtotal_usdt += itemPrice * quantityNumber;
+
+            // Acumular subtotal elegible para pago con Fuegos (solo productos que lo permiten)
+            if (product.accepts_fires === true) {
+                fires_eligible_subtotal_usdt += itemPrice * quantityNumber;
+            }
 
             orderItemsData.push({
                 product_id: product.id,
@@ -219,6 +225,34 @@ router.post('/create', optionalAuth, async (req, res) => {
                     allowed: allowedCurrencies
                 }
             });
+        }
+
+        // Validar que el monto en Fuegos no exceda lo permitido por los productos que aceptan Fuegos
+        const firesRateRaw = currency_snapshot && currency_snapshot.fires;
+        const firesRate = Number(firesRateRaw);
+        const firesAmountRaw = pm.fires != null ? Number(pm.fires) : 0;
+        const firesAmount = Number.isFinite(firesAmountRaw) && firesAmountRaw > 0 ? firesAmountRaw : 0;
+
+        if (firesAmount > 0) {
+            if (!Number.isFinite(firesRate) || firesRate <= 0) {
+                return res.status(400).json({ error: 'No hay tasa de Fuegos configurada para esta tienda' });
+            }
+
+            const maxFiresTokens = Math.floor(fires_eligible_subtotal_usdt * firesRate);
+
+            if (maxFiresTokens <= 0) {
+                return res.status(400).json({ error: 'Ningún producto de este pedido permite pago con Fuegos' });
+            }
+
+            if (firesAmount > maxFiresTokens) {
+                return res.status(400).json({
+                    error: 'El monto en Fuegos excede el máximo permitido para este pedido',
+                    details: {
+                        max_fires: maxFiresTokens,
+                        fires_attempted: firesAmount
+                    }
+                });
+            }
         }
 
         const tax_usdt = subtotal_usdt * (settings.tax_rate || 0);

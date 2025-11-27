@@ -12,13 +12,13 @@ const POS = () => {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
-    // Payment State
+    // Payment State (strings vacíos para evitar ceros iniciales en los inputs)
     const initialPayments = {
-        cash_usdt: 0,
-        usdt_tron: 0,
-        bs: 0,
-        bs_cash: 0,
-        fires: 0
+        cash_usdt: '',
+        usdt_tron: '',
+        bs: '',
+        bs_cash: '',
+        fires: ''
     };
     const [payments, setPayments] = useState(initialPayments);
     const [usdtTronHash, setUsdtTronHash] = useState('');
@@ -197,11 +197,27 @@ const POS = () => {
         return sum + price * qty;
     }, 0);
 
+    // Subtotal elegible para pago con Fuegos (solo productos que aceptan Fuegos)
+    const firesEligibleUSDT = cart.reduce((sum, item) => {
+        if (!item.accepts_fires) return sum;
+        const price = parseAmount(item.price_usdt);
+        const qty = parseAmount(item.quantity || 0);
+        return sum + price * qty;
+    }, 0);
+
+    const firesRateForCart = Number(rates.fires);
+    const maxFiresTokens =
+        Number.isFinite(firesRateForCart) && firesRateForCart > 0
+            ? Math.floor(firesEligibleUSDT * firesRateForCart)
+            : 0;
+    const canUseFires = maxFiresTokens > 0;
+
     const cashUsdt = parseAmount(payments.cash_usdt);
     const usdtTronUsdt = parseAmount(payments.usdt_tron);
     const bsAmount = parseAmount(payments.bs);
     const bsCashAmount = parseAmount(payments.bs_cash);
-    const firesAmount = parseAmount(payments.fires);
+    const rawFiresAmount = parseAmount(payments.fires);
+    const firesAmount = canUseFires ? Math.min(rawFiresAmount, maxFiresTokens) : 0;
 
     const totalPaidUSDT =
         cashUsdt +
@@ -884,12 +900,24 @@ const POS = () => {
                                         <Flame className="absolute left-3 top-3 text-orange-500" size={20} />
                                         <input
                                             type="number"
-                                            className="w-full bg-white/5 rounded-lg pl-10 p-3"
+                                            min={0}
+                                            max={maxFiresTokens || undefined}
+                                            disabled={!canUseFires}
+                                            className="w-full bg-white/5 rounded-lg pl-10 p-3 disabled:opacity-40 disabled:cursor-not-allowed"
                                             value={payments.fires}
-                                            onChange={e => setPayments({ ...payments, fires: e.target.value })}
+                                            onChange={e => {
+                                                const raw = e.target.value;
+                                                const n = parseAmount(raw);
+                                                if (!canUseFires || maxFiresTokens <= 0) {
+                                                    setPayments({ ...payments, fires: 0 });
+                                                    return;
+                                                }
+                                                const clamped = Math.max(0, Math.min(n, maxFiresTokens));
+                                                setPayments({ ...payments, fires: String(clamped) });
+                                            }}
                                         />
                                         <div className="absolute right-3 top-3 text-xs text-white/40">
-                                            = ${(firesAmount / rates.fires).toFixed(2)}
+                                            = {(firesAmount / rates.fires).toFixed(2)}
                                         </div>
                                     </div>
                                 </div>

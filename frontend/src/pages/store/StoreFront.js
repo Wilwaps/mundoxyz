@@ -90,12 +90,13 @@ const StoreFront = () => {
     const [productModalModifiers, setProductModalModifiers] = useState({});
     const [deliveryLocation, setDeliveryLocation] = useState('');
 
+    // Pagos iniciales como strings vacíos para que no aparezca un '0' pegado al escribir
     const initialPayments = {
-        cash_usdt: 0,
-        usdt_tron: 0,
-        bs_cash: 0,
-        bs_transfer: 0,
-        fires: 0
+        cash_usdt: '',
+        usdt_tron: '',
+        bs_cash: '',
+        bs_transfer: '',
+        fires: ''
     };
     const [payments, setPayments] = useState(initialPayments);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -348,6 +349,19 @@ const StoreFront = () => {
 
     const cartTotalUSDT = cart.reduce((sum, item) => sum + getItemUnitPriceUSDT(item) * item.quantity, 0);
 
+    // Subtotal elegible para pago con Fuegos (solo productos que aceptan Fuegos)
+    const firesEligibleUSDT = cart.reduce((sum, item) => {
+        if (!item.product?.accepts_fires) return sum;
+        return sum + getItemUnitPriceUSDT(item) * item.quantity;
+    }, 0);
+
+    const firesRateForCart = Number(rates.fires);
+    const maxFiresTokens =
+        Number.isFinite(firesRateForCart) && firesRateForCart > 0
+            ? Math.floor(firesEligibleUSDT * firesRateForCart)
+            : 0;
+    const canUseFires = maxFiresTokens > 0;
+
     const rawCashUsdt = parseAmount(payments.cash_usdt);
     const rawZelleUsdt = parseAmount(payments.zelle);
     const rawBsCash = parseAmount(payments.bs_cash);
@@ -362,13 +376,15 @@ const StoreFront = () => {
     const bsCashAmount = enabledMethods.has('bs_cash') ? rawBsCash : 0;
     const bsTransferAmount = enabledMethods.has('bs_transfer') ? rawBsTransfer : 0;
     const bsAmount = bsCashAmount + bsTransferAmount;
-    const firesAmount = enabledMethods.has('fires') ? rawFiresAmount : 0;
+    const firesAmountTokens = enabledMethods.has('fires') && canUseFires
+        ? Math.min(rawFiresAmount, maxFiresTokens)
+        : 0;
 
     const totalPaidUSDT =
         cashUsdt +
         usdtTron +
         (bsAmount / rates.bs) +
-        (firesAmount / rates.fires);
+        (firesAmountTokens / rates.fires);
 
     const remainingUSDT = Math.max(0, cartTotalUSDT - totalPaidUSDT);
     const changeUSDT = Math.max(0, totalPaidUSDT - cartTotalUSDT);
@@ -496,7 +512,7 @@ const StoreFront = () => {
                 bs: bsAmount,
                 bs_cash: bsCashAmount,
                 bs_transfer: bsTransferAmount,
-                fires: firesAmount,
+                fires: firesAmountTokens,
                 meta: paymentMeta
             },
             currency_snapshot: rates,
@@ -1635,16 +1651,35 @@ const StoreFront = () => {
                                                 <input
                                                     type="number"
                                                     min="0"
+                                                    max={isFires ? (maxFiresTokens || undefined) : undefined}
+                                                    disabled={isFires && !canUseFires}
                                                     className={`w-full bg-white/5 rounded-lg ${
                                                         isBs || isUsdt || isFires ? 'pl-9' : 'pl-3'
-                                                    } pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent`}
+                                                    } pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed`}
                                                     value={amountValue}
-                                                    onChange={(e) =>
-                                                        setPayments((prev) => ({
-                                                            ...prev,
-                                                            [field]: e.target.value
-                                                        }))
-                                                    }
+                                                    onChange={(e) => {
+                                                        const raw = e.target.value;
+                                                        if (isFires) {
+                                                            const n = parseAmount(raw);
+                                                            if (!canUseFires || maxFiresTokens <= 0) {
+                                                                setPayments((prev) => ({
+                                                                    ...prev,
+                                                                    [field]: 0
+                                                                }));
+                                                                return;
+                                                            }
+                                                            const clamped = Math.max(0, Math.min(n, maxFiresTokens));
+                                                            setPayments((prev) => ({
+                                                                ...prev,
+                                                                [field]: String(clamped)
+                                                            }));
+                                                        } else {
+                                                            setPayments((prev) => ({
+                                                                ...prev,
+                                                                [field]: raw
+                                                            }));
+                                                        }
+                                                    }}
                                                 />
                                             </div>
 
