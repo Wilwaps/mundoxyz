@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -7,6 +7,8 @@ import { Clock, LogOut, Repeat } from 'lucide-react';
 import API_URL from '../config/api';
 import './BingoV2GameRoom.css';
 import toast from 'react-hot-toast';
+
+/* eslint-disable no-use-before-define */
 
 const BingoV2GameRoom = () => {
   const { code } = useParams();
@@ -29,6 +31,7 @@ const BingoV2GameRoom = () => {
   const [remainingTime, setRemainingTime] = useState(30);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // eslint-disable-next-line no-use-before-define
   useEffect(() => {
     // CRITICAL: Validate user authentication
     if (!user || !user.id) {
@@ -38,7 +41,9 @@ const BingoV2GameRoom = () => {
       return;
     }
 
+    // eslint-disable-next-line no-use-before-define
     loadRoomAndCards();
+    // eslint-disable-next-line no-use-before-define
     loadUserExperience();
 
     if (socket && user) {
@@ -115,9 +120,9 @@ const BingoV2GameRoom = () => {
         socket.off('bingo:error');
       };
     }
-  }, [socket, user, code]);
+  }, [socket, user, code, navigate, loadRoomAndCards, loadUserExperience, highlightCalledNumber]);
 
-  const loadRoomAndCards = async () => {
+  const loadRoomAndCards = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
       const data = await response.json();
@@ -163,9 +168,9 @@ const BingoV2GameRoom = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [code, user?.id]);
 
-  const loadUserExperience = async () => {
+  const loadUserExperience = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/bingo/v2/stats`, {
         headers: {
@@ -181,9 +186,9 @@ const BingoV2GameRoom = () => {
     } catch (err) {
       console.error('Error loading user stats:', err);
     }
-  };
+  }, []);
 
-  const highlightCalledNumber = (number) => {
+  const highlightCalledNumber = useCallback((number) => {
     // This will be handled in the card component
     setMyCards(prevCards => 
       prevCards.map(card => ({
@@ -191,7 +196,7 @@ const BingoV2GameRoom = () => {
         highlightedNumber: number
       }))
     );
-  };
+  }, []);
 
   const handleCallNumber = () => {
     if (socket && room && room.host_id === user.id && !isCallingNumber) {

@@ -9,22 +9,17 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Trophy,
-  Users,
-  Clock,
-  TrendingUp,
   Package,
   Ticket,
   Settings,
   AlertCircle
 } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext';
 import RaffleCard from '../components/RaffleCard';
 import CreateRaffleModal from '../components/CreateRaffleModal';
 import { useRaffleList, useUserRaffles } from '../hooks/useRaffleData';
 
 const MyRaffles: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'created' | 'participating'>('participating');
   const [showCreateModal, setShowCreateModal] = useState(false);
   

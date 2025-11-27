@@ -10,6 +10,8 @@ const Roles = () => {
   const { user, hasRole } = useAuth();
   const [activeTab, setActiveTab] = useState('user');
 
+  const username = user?.username || 'Usuario';
+
   // Fetch my roles with details
   const { data: myRoles } = useQuery({
     queryKey: ['my-roles'],
@@ -68,7 +70,9 @@ const Roles = () => {
 
   return (
     <div className="p-4">
-      <h1 className="text-3xl font-bold text-center mb-8 text-gradient-violet">Roles</h1>
+      <h1 className="text-3xl font-bold text-center mb-8 text-gradient-violet">
+        Roles de {username}
+      </h1>
 
       <div className="flex gap-2 mb-6 overflow-x-auto">
         {tabs.map((tab) => (

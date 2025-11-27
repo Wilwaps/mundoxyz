@@ -4,9 +4,14 @@ import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Users, Zap } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const Games = () => {
   const navigate = useNavigate();
+
+  const { user, isAdmin } = useAuth();
+  const canSeeExperimentalGames = !!user && isAdmin();
 
   // Fetch available games
   const { data: games, isLoading } = useQuery({
@@ -101,6 +106,37 @@ const Games = () => {
     }
   };
 
+  const handleShareGame = async (gameId) => {
+    let path = '';
+
+    if (gameId === 'pool') {
+      path = '/pool/lobby';
+    } else if (gameId === 'caida') {
+      path = '/caida/lobby';
+    } else {
+      return;
+    }
+
+    try {
+      const url = `${window.location.origin}${path}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: 'MundoXYZ',
+          text: 'Únete a esta sala de juego en MundoXYZ',
+          url
+        });
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copiado al portapapeles');
+      } else {
+        window.prompt('Copia este link de la sala:', url);
+      }
+    } catch (error) {
+      // El usuario puede cancelar el share; no es un error crítico
+    }
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold text-center mb-8 text-gradient-accent">Juegos</h1>
@@ -112,40 +148,63 @@ const Games = () => {
             <div className="spinner"></div>
           </div>
         ) : (
-          games?.map((game) => (
-            <motion.div
-              key={game.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.02 }}
-              className="card-glass flex flex-col items-center text-center cursor-pointer"
-              onClick={() => handleGameClick(game.id)}
-            >
-              <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
-                {gameIcons[game.id]}
-              </div>
-              
-              <h2 className="text-2xl font-bold text-violet mb-2">{game.name}</h2>
-              <p className="text-text/60 mb-4">{game.description}</p>
-              
-              <div className="flex items-center gap-4 mb-4 text-sm">
-                <div className="flex items-center gap-1 text-text/60">
-                  <Users size={16} />
-                  <span>{game.min_players}-{game.max_players}</span>
+          games?.map((game) => {
+            const isExperimentalGame = game.id === 'pool' || game.id === 'caida';
+
+            // Ocultar Pool y Caída para usuarios que no sean admin/tote
+            if (isExperimentalGame && !canSeeExperimentalGames) {
+              return null;
+            }
+
+            return (
+              <motion.div
+                key={game.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }}
+                className="card-glass flex flex-col items-center text-center cursor-pointer"
+                onClick={() => handleGameClick(game.id)}
+              >
+                <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
+                  {gameIcons[game.id]}
                 </div>
-                {game.active_rooms > 0 && (
-                  <div className="flex items-center gap-1 text-success">
-                    <Zap size={16} />
-                    <span>{game.active_rooms} activas</span>
+                
+                <h2 className="text-2xl font-bold text-violet mb-2">{game.name}</h2>
+                <p className="text-text/60 mb-4">{game.description}</p>
+                
+                <div className="flex items-center gap-4 mb-4 text-sm">
+                  <div className="flex items-center gap-1 text-text/60">
+                    <Users size={16} />
+                    <span>{game.min_players}-{game.max_players}</span>
                   </div>
-                )}
-              </div>
-              
-              <button className="w-full max-w-xs btn-primary">
-                Jugar Ahora
-              </button>
-            </motion.div>
-          ))
+                  {game.active_rooms > 0 && (
+                    <div className="flex items-center gap-1 text-success">
+                      <Zap size={16} />
+                      <span>{game.active_rooms} activas</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full max-w-xs flex gap-2 justify-center">
+                  <button className="flex-1 btn-primary">
+                    Jugar Ahora
+                  </button>
+                  {isExperimentalGame && canSeeExperimentalGames && (
+                    <button
+                      type="button"
+                      className="btn-secondary px-3"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareGame(game.id);
+                      }}
+                    >
+                      Compartir
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })
         )}
       </div>
 

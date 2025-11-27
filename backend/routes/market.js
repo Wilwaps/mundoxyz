@@ -7,6 +7,49 @@ const config = require('../config/config');
 const telegramService = require('../services/telegramService');
 const { calculateAndLogCommission } = require('../services/commissionService');
 
+async function getStoreMarketConfig() {
+  const defaults = {
+    is_enabled: false,
+    plans: {
+      starter: { price_usd: 29 },
+      professional: { price_usd: 79 },
+      enterprise: { price_usd: 199 }
+    }
+  };
+
+  try {
+    const result = await query(
+      'SELECT is_enabled, plans FROM store_market_config WHERE id = 1 LIMIT 1'
+    );
+
+    if (result.rows.length === 0) {
+      return defaults;
+    }
+
+    const row = result.rows[0];
+    const rawPlans = row.plans && typeof row.plans === 'object' ? row.plans : {};
+
+    const normalizedPlans = {};
+    const keys = ['starter', 'professional', 'enterprise'];
+    for (const key of keys) {
+      const plan = rawPlans[key] && typeof rawPlans[key] === 'object' ? rawPlans[key] : {};
+      const rawPrice = Number(plan.price_usd);
+      const price = Number.isFinite(rawPrice) && rawPrice >= 0
+        ? rawPrice
+        : defaults.plans[key].price_usd;
+      normalizedPlans[key] = { price_usd: price };
+    }
+
+    return {
+      is_enabled: !!row.is_enabled,
+      plans: normalizedPlans
+    };
+  } catch (error) {
+    logger.error('Error loading store_market_config:', error);
+    return defaults;
+  }
+}
+
 // Request to redeem fires for fiat (mínimo 100, con comisión 5%)
 router.post('/redeem-100-fire', verifyToken, requireWalletAccess, async (req, res) => {
   try {
@@ -600,6 +643,66 @@ router.get('/stats', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching market stats:', error);
     res.status(500).json({ error: 'Failed to fetch market statistics' });
+  }
+});
+
+// Store marketplace configuration (plans & toggle). This controls whether
+// selling stores is active on the Market and the base USD prices per plan.
+
+// GET /api/market/store-plans (public)
+router.get('/store-plans', async (req, res) => {
+  try {
+    const config = await getStoreMarketConfig();
+    res.json(config);
+  } catch (error) {
+    logger.error('Error fetching store market plans:', error);
+    res.status(500).json({ error: 'Failed to fetch store plans' });
+  }
+});
+
+// PATCH /api/market/store-plans (admin only)
+router.patch('/store-plans', adminAuth, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const enabledFlag = !!body.is_enabled;
+
+    const defaults = {
+      starter: { price_usd: 29 },
+      professional: { price_usd: 79 },
+      enterprise: { price_usd: 199 }
+    };
+
+    const incomingPlans = body.plans && typeof body.plans === 'object' ? body.plans : {};
+    const normalizedPlans = {};
+    const keys = ['starter', 'professional', 'enterprise'];
+
+    for (const key of keys) {
+      const plan = incomingPlans[key] && typeof incomingPlans[key] === 'object'
+        ? incomingPlans[key]
+        : {};
+      const rawPrice = Number(plan.price_usd);
+      let price = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : defaults[key].price_usd;
+      if (price > 9999) price = 9999; // small sanity cap
+      normalizedPlans[key] = { price_usd: price };
+    }
+
+    await query(
+      `INSERT INTO store_market_config (id, is_enabled, plans, updated_at)
+       VALUES (1, $1, $2::jsonb, NOW())
+       ON CONFLICT (id) DO UPDATE
+       SET is_enabled = EXCLUDED.is_enabled,
+           plans = EXCLUDED.plans,
+           updated_at = EXCLUDED.updated_at`,
+      [enabledFlag, JSON.stringify(normalizedPlans)]
+    );
+
+    res.json({
+      is_enabled: enabledFlag,
+      plans: normalizedPlans
+    });
+  } catch (error) {
+    logger.error('Error updating store market plans:', error);
+    res.status(400).json({ error: error.message || 'Failed to update store plans' });
   }
 });
 

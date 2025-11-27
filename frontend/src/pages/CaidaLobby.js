@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Users, Coins, Flame, Lock, Globe, X, AlertCircle, ArrowRight, Info } from 'lucide-react';
+import { Plus, Users, Coins, Flame, Lock, Globe, X, Info, Share2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import InsufficientFiresModal from '../components/InsufficientFiresModal';
 
 const CaidaLobby = () => {
     const navigate = useNavigate();
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, isAdmin } = useAuth();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createForm, setCreateForm] = useState({
         mode: 'coins',
@@ -19,40 +19,25 @@ const CaidaLobby = () => {
     });
     const [modeFilter, setModeFilter] = useState('all');
     const [joinCode, setJoinCode] = useState('');
-    const [showHelpModal, setShowHelpModal] = useState(false);
+    const [, setShowHelpModal] = useState(false);
     const [showInsufficientFiresModal, setShowInsufficientFiresModal] = useState(false);
     const [missingFires, setMissingFires] = useState(0);
 
+    const canShareLobby = !!user && isAdmin();
+
     // Fetch active room (reconnection)
-    const { data: activeRoomData } = useQuery({
+    useQuery({
         queryKey: ['caida-active-room'],
-        queryFn: async () => {
-            if (!user) return { activeRoom: null };
-            try {
-                // Assuming generic active room check or specific endpoint
-                return { activeRoom: null };
-            } catch (error) {
-                return { activeRoom: null };
-            }
-        },
+        queryFn: async () => ({ activeRoom: null }),
         enabled: !!user,
         refetchInterval: 10000
     });
 
     // Fetch public rooms
+    // Temporary: Mock response or implement GET /api/caida/rooms/public
     const { data: rooms, isLoading } = useQuery({
         queryKey: ['caida-rooms', modeFilter],
-        queryFn: async () => {
-            // Temporary: Mock response or implement GET /api/caida/rooms/public
-            const params = modeFilter !== 'all' ? `?mode=${modeFilter}` : '';
-            try {
-                // Note: I haven't implemented this route yet in backend/routes/caida.js
-                // I should add it, but for now let's assume it returns empty or errors gracefully
-                return [];
-            } catch (e) {
-                return [];
-            }
-        },
+        queryFn: async () => [],
         refetchInterval: 5000
     });
 
@@ -146,6 +131,27 @@ const CaidaLobby = () => {
         joinRoomMutation.mutate(code);
     };
 
+    const handleShareLobby = async () => {
+        try {
+            const url = window.location.href;
+
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'MundoXYZ - Lobby de Caída',
+                    text: 'Únete a mi lobby de Caída en MundoXYZ',
+                    url
+                });
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(url);
+                toast.success('Link del lobby copiado al portapapeles');
+            } else {
+                window.prompt('Copia este link del lobby:', url);
+            }
+        } catch (error) {
+            // El usuario puede cancelar compartir; no es un error crítico
+        }
+    };
+
     return (
         <div className="p-4">
             <div className="mb-6">
@@ -155,7 +161,7 @@ const CaidaLobby = () => {
                 <p className="text-center text-text/60">
                     Juego de cartas tradicional • Estrategia y Memoria • Apuestas
                 </p>
-                <div className="mt-3 flex justify-center">
+                <div className="mt-3 flex justify-center gap-2">
                     <button
                         type="button"
                         onClick={() => setShowHelpModal(true)}
@@ -164,6 +170,16 @@ const CaidaLobby = () => {
                         <Info size={14} className="text-accent" />
                         <span>Reglas y Ayuda</span>
                     </button>
+                    {canShareLobby && (
+                        <button
+                            type="button"
+                            onClick={handleShareLobby}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/20 hover:bg-accent/30 text-xs text-accent transition-colors"
+                        >
+                            <Share2 size={14} />
+                            <span>Compartir Lobby</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

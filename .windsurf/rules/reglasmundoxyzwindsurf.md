@@ -2,6 +2,13 @@
 trigger: always_on
 ---
 
+QUIERO QUE SIEMPRE ME MUESTRES TABLAS DE ESTADO
+TODOs Actuales
+ID	Tarea	Estado	Prioridad
+
+
+https://github.com/apple/ml-fastvlm
+
 MANTENER ACTUALIZADO SCHEMA MAESTRO ANTE LA CREACION, MODIFICACION, DE TABLAS EN LA BASE DE DATOS
 ANALIZA LA DOCUMENTACION DE CHROME DEVTOOLS PARA SACARLE TODO EL PROVECHO
 https://github.com/ChromeDevTools/chrome-devtools-mcp/

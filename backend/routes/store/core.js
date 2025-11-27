@@ -470,8 +470,8 @@ router.patch('/:storeId/settings', verifyToken, async (req, res) => {
             const baseSet = ['coins', 'fires', 'usdt', 'ves'];
             let normalized = Array.isArray(allowed_currencies)
                 ? allowed_currencies
-                      .map((c) => (c != null ? String(c).toLowerCase() : ''))
-                      .filter((c) => baseSet.includes(c))
+                    .map((c) => (c != null ? String(c).toLowerCase() : ''))
+                    .filter((c) => baseSet.includes(c))
                 : null;
             if (!normalized || normalized.length === 0) {
                 normalized = baseSet;
@@ -747,6 +747,18 @@ router.post('/create', verifyToken, async (req, res) => {
         let commission = Number.isFinite(rawCommission) && rawCommission >= 0 ? rawCommission : 0;
         if (commission > 100) commission = 100;
 
+        // Normalizar currency_config (JSONB)
+        // El frontend envía un string ("coins", "coins_fires", etc.), pero la DB espera JSON.
+        // Lo envolvemos en un objeto para que sea válido.
+        let normalizedCurrencyConfig = {};
+        if (typeof currency_config === 'string') {
+            normalizedCurrencyConfig = { mode: currency_config };
+        } else if (typeof currency_config === 'object' && currency_config !== null) {
+            normalizedCurrencyConfig = currency_config;
+        } else {
+            normalizedCurrencyConfig = { mode: 'coins' }; // Default
+        }
+
         // Normalizar tipo de tienda
         const allowedTypes = ['papeleria', 'restaurante', 'joyeria', 'otro'];
         let normalizedType = typeof store_type === 'string' ? store_type.toLowerCase() : 'papeleria';
@@ -758,8 +770,8 @@ router.post('/create', verifyToken, async (req, res) => {
         const baseCurrencies = ['coins', 'fires', 'usdt', 'ves'];
         let normalizedAllowed = Array.isArray(allowed_currencies)
             ? allowed_currencies
-                  .map((c) => (c != null ? String(c).toLowerCase() : ''))
-                  .filter((c) => baseCurrencies.includes(c))
+                .map((c) => (c != null ? String(c).toLowerCase() : ''))
+                .filter((c) => baseCurrencies.includes(c))
             : null;
         if (!normalizedAllowed || normalizedAllowed.length === 0) {
             normalizedAllowed = baseCurrencies;
@@ -768,19 +780,18 @@ router.post('/create', verifyToken, async (req, res) => {
         // Normalizar nivel
         let lvl = parseInt(level, 10);
         if (!Number.isFinite(lvl)) lvl = 3;
-        if (lvl < 1) lvl = 1;
         if (lvl > 3) lvl = 3;
 
         const result = await query(
             `INSERT INTO stores (name, slug, description, owner_id, currency_config, commission_percentage, store_type, allowed_currencies, level)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
+       RETURNING id, name, slug`,
             [
                 name,
                 slug,
                 description,
                 ownerId,
-                currency_config,
+                JSON.stringify(normalizedCurrencyConfig),
                 commission,
                 normalizedType,
                 JSON.stringify(normalizedAllowed),

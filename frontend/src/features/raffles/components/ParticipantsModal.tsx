@@ -4,8 +4,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Users, Check, XCircle, Eye, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { X, Users, Check, XCircle, Eye, Loader2, AlertCircle } from 'lucide-react';
 import { useParticipants } from '../hooks/useParticipants';
 import { useApproveRequest } from '../hooks/useApproveRequest';
 import { useRejectRequest } from '../hooks/useRejectRequest';

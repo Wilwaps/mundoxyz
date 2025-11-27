@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Send, Download, ShoppingBag, Gift, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, RefreshCw, Coins, Flame } from 'lucide-react';
 import axios from 'axios';
-import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,7 +12,7 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
   const pageSize = 25;
 
   // Usar React Query para manejar transacciones con refetch automático
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading: loading } = useQuery({
     queryKey: ['wallet-transactions', user?.id, activeTab, page],
     queryFn: async () => {
       if (!user?.id) return { transactions: [], total: 0 };
@@ -96,10 +95,6 @@ const WalletHistoryModal = ({ isOpen, onClose, onOpenSend, onOpenBuy, onOpenRece
       experience_purchase: 'Compra de Experiencia'
     };
     return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const getTransactionColor = (amount) => {
-    return parseFloat(amount) >= 0 ? 'text-green-400' : 'text-red-400';
   };
 
   // Determinar si una transacción es un débito (debe mostrar signo negativo)

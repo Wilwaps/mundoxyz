@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Mail, MessageCircle, Save, Check, AlertCircle, ExternalLink } from 'lucide-react';
+import { X, User, MessageCircle, Save, Check, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -89,7 +89,7 @@ const MyDataModal = ({ isOpen, onClose, forceSecuritySetup = false, onSecuritySe
     return () => {
       cancelled = true;
     };
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, user, refreshUser]);
 
   // Cuando se fuerza configuración de seguridad, abrir pestaña Seguridad en modo edición
   useEffect(() => {

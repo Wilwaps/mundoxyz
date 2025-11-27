@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
@@ -14,7 +14,6 @@ import {
   TrendingUp,
   LogOut,
   Lock,
-  Key,
   Share2,
   Users
 } from 'lucide-react';
@@ -32,7 +31,6 @@ import RaffleCard from '../features/raffles/components/RaffleCard';
 import { downloadQrForUrl } from '../utils/qr';
 
 const Profile = () => {
-  const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
@@ -92,7 +90,7 @@ const Profile = () => {
     }
   }, [location.search]);
 
-  const fetchGiftLinks = async () => {
+  const fetchGiftLinks = React.useCallback(async () => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
     try {
       setGiftLinksLoading(true);
@@ -106,7 +104,7 @@ const Profile = () => {
     } finally {
       setGiftLinksLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
@@ -126,12 +124,12 @@ const Profile = () => {
       }
     };
     loadSettings();
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
     fetchGiftLinks();
-  }, [user?.id]);
+  }, [user, fetchGiftLinks]);
 
   // Sync walletAddress when user changes
   React.useEffect(() => {
@@ -153,7 +151,7 @@ const Profile = () => {
   });
 
   // Fetch wallet address
-  const { data: walletData } = useQuery({
+  useQuery({
     queryKey: ['user-wallet', user?.id],
     queryFn: async () => {
       const response = await axios.get(`/api/profile/${user.id}`);
@@ -344,14 +342,6 @@ const Profile = () => {
     }
   };
 
-  const handleRefreshBalance = async () => {
-    await refreshUser();
-    // Invalidar todas las queries para forzar actualización
-    queryClient.invalidateQueries(['user-stats', user?.id]);
-    queryClient.invalidateQueries(['user-wallet', user?.id]);
-    queryClient.invalidateQueries(['user-games', user?.id]);
-    toast.success('Balance actualizado');
-  };
 
   const handleCreateGiftLink = async () => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;

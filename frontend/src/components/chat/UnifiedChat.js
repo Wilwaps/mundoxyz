@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import GlobalChatTab from './GlobalChatTab';
 import AnonymousChatTab from './AnonymousChatTab';
@@ -17,7 +16,6 @@ const UnifiedChat = () => {
   const [hasOpenedInRoom, setHasOpenedInRoom] = useState(false);
   
   const { socket } = useSocket();
-  const { user } = useAuth();
   const location = useLocation();
 
   // Detectar si usuario está en una sala

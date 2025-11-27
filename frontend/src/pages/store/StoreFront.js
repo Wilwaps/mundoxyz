@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Banknote, Flame, Share2 } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Flame, Share2, MapPin } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { downloadQrForUrl } from '../../utils/qr';
@@ -175,21 +175,6 @@ const StoreFront = () => {
         return Number.isFinite(n) && n >= 0 ? n : 0;
     };
 
-    const fileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                if (typeof reader.result === 'string') {
-                    resolve(reader.result);
-                } else {
-                    reject(new Error('No se pudo leer el archivo'));
-                }
-            };
-            reader.onerror = () => reject(reader.error || new Error('Error leyendo archivo'));
-            reader.readAsDataURL(file);
-        });
-    };
-
     const buildDefaultModifiersForProduct = (product) => {
         const modsArray = Array.isArray(product?.modifiers) ? product.modifiers : [];
         if (!modsArray.length) return {};
@@ -268,10 +253,6 @@ const StoreFront = () => {
         });
 
         toast.success('Agregado al carrito');
-    };
-
-    const removeFromCart = (productId) => {
-        setCart(prev => prev.filter(item => item.product.id !== productId));
     };
 
     const updateQuantity = (index, delta) => {
@@ -363,7 +344,6 @@ const StoreFront = () => {
     const canUseFires = maxFiresTokens > 0;
 
     const rawCashUsdt = parseAmount(payments.cash_usdt);
-    const rawZelleUsdt = parseAmount(payments.zelle);
     const rawBsCash = parseAmount(payments.bs_cash);
     const rawBsTransfer = parseAmount(payments.bs_transfer);
     const rawFiresAmount = parseAmount(payments.fires);
@@ -449,6 +429,51 @@ const StoreFront = () => {
             }
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleUseCurrentLocation = () => {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            toast.error('Tu navegador no permite obtener la ubicación automáticamente');
+            return;
+        }
+
+        const loadingId = toast.loading('Obteniendo tu ubicación...');
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                toast.dismiss(loadingId);
+                const { latitude, longitude } = position.coords;
+                if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                    toast.error('No se pudo interpretar tu ubicación');
+                    return;
+                }
+
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+                setDeliveryLocation(mapsUrl);
+
+                try {
+                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                } catch {
+                }
+            },
+            (error) => {
+                toast.dismiss(loadingId);
+                if (error.code === 1) {
+                    toast.error('Debes permitir el acceso a tu ubicación para usar esta opción');
+                } else if (error.code === 2) {
+                    toast.error('No se pudo determinar tu ubicación. Intenta nuevamente');
+                } else if (error.code === 3) {
+                    toast.error('La búsqueda de ubicación tardó demasiado. Intenta de nuevo');
+                } else {
+                    toast.error('Ocurrió un error al obtener tu ubicación');
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 60000
+            }
+        );
     };
 
     const handleCheckout = async () => {
@@ -838,11 +863,10 @@ const StoreFront = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product) => {
                         const productCartItems = cart.filter((item) => item.product.id === product.id);
-                        const quantityInCart = productCartItems.reduce(
+                        const totalQuantity = productCartItems.reduce(
                             (sum, it) => sum + (it.quantity || 0),
                             0
                         );
-                        const hasModifiers = Array.isArray(product.modifiers) && product.modifiers.length > 0;
 
                         const basePriceRaw = parseFloat(product.price_usdt);
                         const basePriceUsdt = Number.isFinite(basePriceRaw) && basePriceRaw >= 0 ? basePriceRaw : 0;
@@ -870,7 +894,7 @@ const StoreFront = () => {
                                         alt={product.name}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     />
-                                    {quantityInCart === 0 ? (
+                                    {totalQuantity === 0 ? (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -900,7 +924,7 @@ const StoreFront = () => {
                                             >
                                                 <Minus size={16} />
                                             </button>
-                                            <span className="px-3 text-sm font-semibold text-white">{quantityInCart}</span>
+                                            <span className="px-3 text-sm font-semibold text-white">{totalQuantity}</span>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -948,15 +972,15 @@ const StoreFront = () => {
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
                         exit={{ y: 100 }}
-                        className="fixed bottom-6 inset-x-0 px-4 z-40 pointer-events-none"
+                        className="fixed bottom-24 md:bottom-6 inset-x-0 px-4 z-40 pointer-events-none"
                     >
                         <div className="container mx-auto max-w-lg pointer-events-auto">
                             <button
                                 onClick={() => setShowCart(true)}
-                                className="w-full bg-accent text-dark p-4 rounded-xl shadow-2xl flex justify-between items-center font-bold"
+                                className="w-2/3 md:w-full mx-auto bg-accent text-dark py-3 px-4 rounded-xl shadow-2xl flex justify-between items-center font-semibold text-sm md:text-base"
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-dark/20 w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    <div className="bg-dark/20 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">
                                         {cart.length}
                                     </div>
                                     <span>Ver pedido</span>
@@ -1099,25 +1123,35 @@ const StoreFront = () => {
                                         <span>Subtotal</span>
                                         <span>${cartTotalUSDT.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-white/60">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const value = window.prompt(
-                                                    'Ingresa tu ubicación o dirección para el delivery',
-                                                    deliveryLocation || ''
-                                                );
-                                                if (value !== null) {
-                                                    setDeliveryLocation(value.trim());
-                                                }
-                                            }}
-                                            className="text-xs text-accent underline-offset-2 hover:underline"
-                                        >
-                                            {deliveryLocation
-                                                ? 'Editar ubicación de delivery'
-                                                : 'Agregar ubicación de delivery'}
-                                        </button>
-                                        <span>$0.00</span>
+                                    <div className="flex justify-between items-start text-white/60 gap-3">
+                                        <div className="flex flex-col items-start gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const value = window.prompt(
+                                                        'Ingresa tu ubicación o dirección para el delivery',
+                                                        deliveryLocation || ''
+                                                    );
+                                                    if (value !== null) {
+                                                        setDeliveryLocation(value.trim());
+                                                    }
+                                                }}
+                                                className="text-xs text-accent underline-offset-2 hover:underline"
+                                            >
+                                                {deliveryLocation
+                                                    ? 'Editar ubicación de delivery'
+                                                    : 'Agregar ubicación de delivery'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleUseCurrentLocation}
+                                                className="inline-flex items-center gap-1 text-[11px] text-accent/90 underline-offset-2 hover:underline"
+                                            >
+                                                <MapPin size={12} />
+                                                Usar mi ubicación
+                                            </button>
+                                        </div>
+                                        <span className="mt-1">$0.00</span>
                                     </div>
                                     {deliveryLocation && (
                                         <div className="text-[11px] text-white/50 mt-1 line-clamp-2">
@@ -1427,6 +1461,14 @@ const StoreFront = () => {
                                                 value={deliveryLocation}
                                                 onChange={(e) => setDeliveryLocation(e.target.value)}
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={handleUseCurrentLocation}
+                                                className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px]"
+                                            >
+                                                <MapPin size={12} />
+                                                Usar mi ubicación actual
+                                            </button>
                                         </div>
                                     )}
                                 </div>

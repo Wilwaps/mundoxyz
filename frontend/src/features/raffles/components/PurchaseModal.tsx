@@ -8,19 +8,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   ShoppingCart,
-  CreditCard,
   AlertCircle,
-  CheckCircle,
   Loader,
   Info,
-  DollarSign,
-  FileText,
   Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePurchaseNumber, useReleaseNumber } from '../hooks/useRaffleData';
-import { RaffleMode, PaymentMethod } from '../types';
+import { PaymentMethod } from '../types';
 import { processImage } from '../utils/imageHelpers';
 
 interface PurchaseModalProps {

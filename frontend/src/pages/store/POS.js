@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, Trash2, CreditCard, Banknote, Flame, CheckCircle, RefreshCw, User, UserPlus } from 'lucide-react';
+import { Search, CreditCard, Banknote, Flame, RefreshCw, User, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const POS = () => {
@@ -29,7 +29,7 @@ const POS = () => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
-    const [recentCustomers, setRecentCustomers] = useState([]);
+    const [, setRecentCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false);
     const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
@@ -65,14 +65,28 @@ const POS = () => {
         }
     });
 
-    const vesPerUsdt = fiatContext?.operationalRate?.rate;
+    // Preferir siempre la tasa oficial del BCV para USD/VES en el POS
+    let vesPerUsdt = null;
+    if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
+        const bcvParsed = parseFloat(String(fiatContext.bcvRate.rate));
+        if (Number.isFinite(bcvParsed) && bcvParsed > 0) {
+            vesPerUsdt = bcvParsed;
+        }
+    }
+    if (!vesPerUsdt && fiatContext?.operationalRate?.rate != null) {
+        const opParsed = parseFloat(String(fiatContext.operationalRate.rate));
+        if (Number.isFinite(opParsed) && opParsed > 0) {
+            vesPerUsdt = opParsed;
+        }
+    }
+
     const firesPerUsdt = fiatContext?.config?.fires_per_usdt;
 
     const bsRate = typeof vesPerUsdt === 'number' && isFinite(vesPerUsdt) && vesPerUsdt > 0 ? vesPerUsdt : 38.5;
     const firesRate = typeof firesPerUsdt === 'number' && isFinite(firesPerUsdt) && firesPerUsdt > 0 ? firesPerUsdt : 10;
 
     const rates = {
-        bs: bsRate, // 1 USDT = bsRate Bs
+        bs: bsRate, // 1 USDT = bsRate Bs (BCV prioritario)
         fires: firesRate // 1 USDT = firesRate Fires
     };
 
@@ -245,7 +259,6 @@ const POS = () => {
     const totalFires = totalUSDT * rates.fires;
     const remainingBs = remainingUSDT * rates.bs;
     const changeBs = changeUSDT * rates.bs;
-    const remainingFires = remainingUSDT * rates.fires;
     const changeFires = changeUSDT * rates.fires;
 
     // --- Helpers y efectos para manejo de mesas (store_table_tabs) ---
@@ -1688,7 +1701,7 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
 
 const QuoteModal = ({ products, rates, onClose }) => {
     const [search, setSearch] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [categoryFilter] = useState('all');
     const [quoteItems, setQuoteItems] = useState([]);
 
     const filtered = products.filter((p) => {

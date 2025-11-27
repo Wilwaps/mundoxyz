@@ -8,12 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   Trophy,
-  Tag,
   Globe,
   Lock,
   Building2,
-  Calendar,
-  FileText,
   Image,
   AlertCircle,
   Check,
@@ -27,7 +24,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateRaffle, useRaffleSettings } from '../hooks/useRaffleData';
 import { CreateRaffleForm, RaffleMode, RaffleVisibility, DrawMode } from '../types';
-import { RAFFLE_LIMITS, VALIDATION_RULES, UI_TEXTS } from '../constants';
+import { RAFFLE_LIMITS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 import { processImage } from '../utils/imageHelpers';
 import InsufficientFiresModal from '../../../components/InsufficientFiresModal';

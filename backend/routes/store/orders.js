@@ -6,6 +6,7 @@ const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const ubicacionService = require('../../services/ubicacion/ubicacionService');
 const { distributeCommissions } = require('../../services/referralService');
+const { isStoreRentalActive } = require('../../helpers/storeHelpers');
 
 async function userCanAccessStoreOrders(user, storeId) {
     if (!user || !storeId) return false;
@@ -603,6 +604,11 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
         const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+        const rentalActive = await isStoreRentalActive(storeId);
+        if (!rentalActive) {
+            return res.status(403).json({ error: 'Store Rental Expired' });
+        }
+
         const canAccess = await userCanAccessStoreOrders(req.user, storeId);
         if (!canAccess) {
             return res.status(403).json({ error: 'No autorizado para ver el historial de pedidos de esta tienda' });
@@ -768,6 +774,11 @@ router.get('/:storeId/invoice/:invoiceNumber', optionalAuth, async (req, res) =>
 router.get('/:storeId/orders/active', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
+
+        const rentalActive = await isStoreRentalActive(storeId);
+        if (!rentalActive) {
+            return res.status(403).json({ error: 'Store Rental Expired' });
+        }
 
         const canAccess = await userCanAccessStoreOrders(req.user, storeId);
         if (!canAccess) {

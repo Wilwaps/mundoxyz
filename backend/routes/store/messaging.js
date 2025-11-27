@@ -445,4 +445,40 @@ router.post('/:storeId/internal-channels', verifyToken, async (req, res) => {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')</json>
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'general';
+
+    // Verificar si ya existe un canal interno con esta key
+    const existing = await query(
+      `SELECT * FROM store_conversations
+       WHERE store_id = $1 AND type = 'internal' AND channel_key = $2
+       LIMIT 1`,
+      [storeId, channelKey]
+    );
+
+    let channelRow;
+    if (existing.rows.length > 0) {
+      channelRow = existing.rows[0];
+    } else {
+      const insert = await query(
+        `INSERT INTO store_conversations
+           (store_id, type, channel_key, label, status, priority, created_by, metadata)
+         VALUES ($1, 'internal', $2, $3, 'open', 'normal', $4, '{}'::jsonb)
+         RETURNING *`,
+        [storeId, channelKey, label, req.user.id]
+      );
+      channelRow = insert.rows[0];
+    }
+
+    return res.json({ channel: channelRow });
+  } catch (error) {
+    logger.error('[StoreMessaging] Error creating internal channel', {
+      error: error.message,
+      storeId,
+      label
+    });
+    return res.status(500).json({ error: 'Error al crear hilo interno' });
+  }
+});
+
+module.exports = router;

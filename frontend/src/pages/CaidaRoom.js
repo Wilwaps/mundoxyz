@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +11,6 @@ import './CaidaRoom.css'; // We'll add some specific room styles here
 
 const CaidaRoom = () => {
     const { code } = useParams();
-    const navigate = useNavigate();
     const { user } = useAuth();
     const { socket } = useSocket();
     const [gameState, setGameState] = useState(null);

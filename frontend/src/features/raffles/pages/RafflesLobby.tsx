@@ -3,14 +3,13 @@
  * Página principal con lista de rifas públicas
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
   Filter,
-  TrendingUp,
   Users,
   Trophy,
   Grid3x3,
@@ -24,7 +23,7 @@ import RaffleCard from '../components/RaffleCard';
 import CreateRaffleModal from '../components/CreateRaffleModal';
 import { useRaffleList, useRaffleFilters } from '../hooks/useRaffleData';
 import { RaffleStatus, RaffleMode, RaffleVisibility } from '../types';
-import { FILTER_OPTIONS, PAGINATION } from '../constants';
+import { FILTER_OPTIONS } from '../constants';
 
 const RafflesLobby: React.FC = () => {
   const navigate = useNavigate();

@@ -5,9 +5,8 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Clock, User, Lock } from 'lucide-react';
+import { Check, Clock, User, Lock } from 'lucide-react';
 import { RaffleNumber } from '../types';
-import { NUMBER_STATE_COLORS } from '../constants';
 
 interface NumberGridProps {
   totalNumbers: number;
@@ -187,7 +186,6 @@ const NumberGrid: React.FC<NumberGridProps> = ({
           {numberIndices.map(idx => {
             const number = numbersMap.get(idx);
             const state = getNumberState(idx);
-            const isUser = isUserNumber(idx);
             
             return (
               <motion.div

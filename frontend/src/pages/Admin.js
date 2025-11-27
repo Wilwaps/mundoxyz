@@ -5,7 +5,6 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { 
-  Settings, 
   Users, 
   TrendingUp, 
   Gift, 
@@ -18,7 +17,8 @@ import {
   XCircle,
   Clock,
   Repeat,
-  Send
+  Send,
+  Megaphone
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
@@ -2078,6 +2078,11 @@ const StoreSettingsModal = ({ store, onClose }) => {
 const AdminStores = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
+  const [storePlansEnabled, setStorePlansEnabled] = useState(false);
+  const [storePlanStarterPrice, setStorePlanStarterPrice] = useState('29');
+  const [storePlanProfessionalPrice, setStorePlanProfessionalPrice] = useState('79');
+  const [storePlanEnterprisePrice, setStorePlanEnterprisePrice] = useState('199');
+  const [storePlansInitialized, setStorePlansInitialized] = useState(false);
 
   const { data: storesData, isLoading, error } = useQuery({
     queryKey: ['stores-list'],
@@ -2087,7 +2092,90 @@ const AdminStores = () => {
     }
   });
 
+  const { data: storePlans, isLoading: loadingStorePlans } = useQuery({
+    queryKey: ['store-plans'],
+    queryFn: async () => {
+      const response = await axios.get('/api/market/store-plans');
+      return response.data;
+    }
+  });
+
+  useEffect(() => {
+    if (!storePlansInitialized && storePlans) {
+      setStorePlansEnabled(!!storePlans.is_enabled);
+      const plans = storePlans.plans || {};
+      const starter = plans.starter || {};
+      const professional = plans.professional || {};
+      const enterprise = plans.enterprise || {};
+      setStorePlanStarterPrice(
+        starter.price_usd != null ? String(starter.price_usd) : '29'
+      );
+      setStorePlanProfessionalPrice(
+        professional.price_usd != null ? String(professional.price_usd) : '79'
+      );
+      setStorePlanEnterprisePrice(
+        enterprise.price_usd != null ? String(enterprise.price_usd) : '199'
+      );
+      setStorePlansInitialized(true);
+    }
+  }, [storePlansInitialized, storePlans]);
+
+  const updateStorePlansMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await axios.patch('/api/market/store-plans', payload);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Configuración de venta de tiendas actualizada');
+      if (data && data.plans) {
+        setStorePlansEnabled(!!data.is_enabled);
+        const plans = data.plans || {};
+        const starter = plans.starter || {};
+        const professional = plans.professional || {};
+        const enterprise = plans.enterprise || {};
+        setStorePlanStarterPrice(
+          starter.price_usd != null ? String(starter.price_usd) : storePlanStarterPrice
+        );
+        setStorePlanProfessionalPrice(
+          professional.price_usd != null
+            ? String(professional.price_usd)
+            : storePlanProfessionalPrice
+        );
+        setStorePlanEnterprisePrice(
+          enterprise.price_usd != null
+            ? String(enterprise.price_usd)
+            : storePlanEnterprisePrice
+        );
+      }
+    },
+    onError: (err) => {
+      const message = err?.response?.data?.error || 'Error al actualizar venta de tiendas';
+      toast.error(message);
+    }
+  });
+
   const stores = Array.isArray(storesData) ? storesData : [];
+
+  const handleSaveStorePlans = () => {
+    const starter = Number(storePlanStarterPrice);
+    const professional = Number(storePlanProfessionalPrice);
+    const enterprise = Number(storePlanEnterprisePrice);
+    const payload = {
+      is_enabled: storePlansEnabled,
+      plans: {
+        starter: { price_usd: Number.isFinite(starter) && starter >= 0 ? starter : 29 },
+        professional: {
+          price_usd:
+            Number.isFinite(professional) && professional >= 0 ? professional : 79
+        },
+        enterprise: {
+          price_usd:
+            Number.isFinite(enterprise) && enterprise >= 0 ? enterprise : 199
+        }
+      }
+    };
+    updateStorePlansMutation.mutate(payload);
+  };
 
   return (
     <div className="p-4">
@@ -2103,6 +2191,97 @@ const AdminStores = () => {
         >
           Crear tienda
         </button>
+      </div>
+
+      <div className="card-glass mb-4 p-4 text-xs">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div>
+            <div className="text-sm font-semibold text-text/90">
+              Venta de tiendas en el Market
+            </div>
+            <div className="text-[11px] text-text/60">
+              Controla si se muestran los planes Starter / Professional / Enterprise en el
+              Market y sus precios base en USD.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-text/60">
+              {storePlansEnabled ? 'Activada' : 'Desactivada'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setStorePlansEnabled((prev) => !prev)}
+              disabled={loadingStorePlans || updateStorePlansMutation.isLoading}
+              className={`w-12 h-6 rounded-full flex items-center px-1 text-[10px] transition-colors ${
+                storePlansEnabled ? 'bg-accent justify-end' : 'bg-glass justify-start'
+              } ${
+                loadingStorePlans || updateStorePlansMutation.isLoading
+                  ? 'opacity-60 cursor-not-allowed'
+                  : ''
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-background-dark" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+          <div className="glass-panel p-3 space-y-1">
+            <div className="text-[11px] text-text/60">Starter</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-text/60">Precio USD</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={storePlanStarterPrice}
+                onChange={(e) => setStorePlanStarterPrice(e.target.value)}
+                className="input-glass w-20 text-xs"
+              />
+            </div>
+          </div>
+          <div className="glass-panel p-3 space-y-1">
+            <div className="text-[11px] text-text/60">Professional</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-text/60">Precio USD</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={storePlanProfessionalPrice}
+                onChange={(e) => setStorePlanProfessionalPrice(e.target.value)}
+                className="input-glass w-20 text-xs"
+              />
+            </div>
+          </div>
+          <div className="glass-panel p-3 space-y-1">
+            <div className="text-[11px] text-text/60">Enterprise</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-text/60">Precio USD</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={storePlanEnterprisePrice}
+                onChange={(e) => setStorePlanEnterprisePrice(e.target.value)}
+                className="input-glass w-20 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-3">
+          <button
+            type="button"
+            onClick={handleSaveStorePlans}
+            disabled={updateStorePlansMutation.isLoading}
+            className="px-4 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {updateStorePlansMutation.isLoading
+              ? 'Guardando…'
+              : 'Guardar configuración de venta de tiendas'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -2267,6 +2446,15 @@ const Admin = () => {
             <DollarSign size={18} />
             FIAT
           </NavLink>
+          <a
+            href="/marketing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap text-text/60 hover:text-text"
+          >
+            <Megaphone size={18} />
+            Marketing
+          </a>
           {isTote() && (
             <NavLink
               to="/admin/referrals"

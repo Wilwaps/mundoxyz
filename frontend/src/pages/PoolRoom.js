@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { ChevronLeft, Users, Clock, Info, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import toast from 'react-hot-toast';
@@ -14,7 +13,6 @@ const PoolRoom = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { socket } = useSocket();
-    const queryClient = useQueryClient();
 
     const [room, setRoom] = useState(null);
     const [gameState, setGameState] = useState(null);
@@ -94,7 +92,6 @@ const PoolRoom = () => {
 
     const isHost = room.host_id === user?.id;
     const isOpponent = room.player_opponent_id === user?.id;
-    const isSpectator = !isHost && !isOpponent;
 
     return (
         <div className="min-h-screen bg-black/90 flex flex-col">
@@ -121,10 +118,12 @@ const PoolRoom = () => {
                     <div className="flex items-center gap-2 justify-end">
                         <span className={room.current_turn === room.host_id ? 'text-accent font-bold' : 'text-white/60'}>
                             {room.host_username}
+                            {isHost && ' (Tú)'}
                         </span>
                         <div className="w-2 h-2 rounded-full bg-white/20"></div>
                         <span className={room.current_turn === room.player_opponent_id ? 'text-accent font-bold' : 'text-white/60'}>
                             {room.opponent_username || 'Esperando...'}
+                            {isOpponent && ' (Tú)'}
                         </span>
                     </div>
                     <div className="text-xs text-white/40 mt-1">

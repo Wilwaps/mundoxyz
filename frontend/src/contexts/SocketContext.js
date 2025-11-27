@@ -19,11 +19,6 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-        setConnected(false);
-      }
       return;
     }
 
@@ -78,9 +73,11 @@ export const SocketProvider = ({ children }) => {
     // Set socket
     setSocket(newSocket);
 
-    // Cleanup on unmount
+    // Cleanup on unmount or when user changes
     return () => {
       newSocket.disconnect();
+      setConnected(false);
+      setSocket(null);
     };
   }, [user]);
 

@@ -60,6 +60,8 @@ const Lobby = () => {
       case 'bingo':
         setShowBingoModal(true);
         break;
+      default:
+        break;
     }
   };
 
@@ -135,6 +137,8 @@ const Lobby = () => {
         break;
       case 'raffle':
         url = `/raffles/${room.code}`;
+        break;
+      default:
         break;
     }
     if (url) navigate(url);

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Gift, Plus, Play, Pause, TrendingUp, Users, Coins, Flame, Calendar, Settings, ChevronDown, X } from 'lucide-react';
+import { Gift, Plus, Play, Pause, TrendingUp, Users, Coins, Flame, Calendar, Settings, X } from 'lucide-react';
 
 const WelcomeEventsManager = () => {
   const [activeTab, setActiveTab] = useState('events');

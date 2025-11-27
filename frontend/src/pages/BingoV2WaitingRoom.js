@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -6,6 +6,8 @@ import { Plus, Minus, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import API_URL from '../config/api';
 import './BingoV2WaitingRoom.css';
+
+/* eslint-disable no-use-before-define */
 
 const BingoV2WaitingRoom = () => {
   const { code } = useParams();
@@ -25,6 +27,7 @@ const BingoV2WaitingRoom = () => {
   const [pendingCards, setPendingCards] = useState(1);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  // eslint-disable-next-line no-use-before-define
   useEffect(() => {
     loadRoomDetails();
     
@@ -104,15 +107,16 @@ const BingoV2WaitingRoom = () => {
         socket.off('bingo:error');
       };
     }
-  }, [socket, user, code, navigate]);
+  }, [socket, user, code, navigate, loadRoomDetails, checkCanCloseRoom]);
 
+  // eslint-disable-next-line no-use-before-define
   useEffect(() => {
     if (room && user && room.host_id === user.id) {
       checkCanCloseRoom();
     }
-  }, [room, user, code]);
+  }, [room, user, code, checkCanCloseRoom]);
 
-  const loadRoomDetails = async () => {
+  const loadRoomDetails = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
       const data = await response.json();
@@ -146,7 +150,7 @@ const BingoV2WaitingRoom = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [code, navigate, user]);
 
   const handleBuyCards = async () => {
     try {
@@ -292,7 +296,7 @@ const BingoV2WaitingRoom = () => {
     navigate('/bingo');
   };
 
-  const checkCanCloseRoom = async () => {
+  const checkCanCloseRoom = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/can-close`, {
@@ -308,7 +312,7 @@ const BingoV2WaitingRoom = () => {
     } catch (err) {
       console.error('Error checking if can close room:', err);
     }
-  };
+  }, [code]);
 
   const handleCloseRoom = async () => {
     if (!window.confirm('¿Estás seguro de que quieres cerrar la sala? Se reembolsará a todos los jugadores.')) {

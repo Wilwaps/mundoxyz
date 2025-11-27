@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -141,6 +141,8 @@ const StoreOwnerDashboard = () => {
   const [messagingNotifyRoles, setMessagingNotifyRoles] = useState(['owner', 'admin', 'marketing']);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState({});
   const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const [marketingPlan, setMarketingPlan] = useState(null);
+  const [marketingPlanDraft, setMarketingPlanDraft] = useState('');
 
   const {
     data: storeData,
@@ -213,6 +215,19 @@ const StoreOwnerDashboard = () => {
           ? normalizedNotifyRoles
           : ['owner', 'admin', 'marketing']
       );
+      const marketingRaw = rawSettings.marketing_plan ?? rawSettings.marketingPlan ?? null;
+      setMarketingPlan(marketingRaw);
+      if (typeof marketingRaw === 'string') {
+        setMarketingPlanDraft(marketingRaw);
+      } else if (marketingRaw != null) {
+        try {
+          setMarketingPlanDraft(JSON.stringify(marketingRaw, null, 2));
+        } catch (e) {
+          setMarketingPlanDraft(String(marketingRaw));
+        }
+      } else {
+        setMarketingPlanDraft('');
+      }
 
       const defaultPaymentMethods = {
         bs_transfer: {
@@ -321,6 +336,22 @@ const StoreOwnerDashboard = () => {
       if (!store?.id) return [];
       const response = await axios.get(`/api/store/${store.id}/suppliers`);
       return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const {
+    data: marketingConversationsData,
+    isLoading: loadingMarketingConversations,
+    error: marketingConversationsError
+  } = useQuery({
+    queryKey: ['store-marketing-conversations', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/messaging/${store.id}/conversations`, {
+        params: { type: 'customer', status: 'open' }
+      });
+      return response.data?.conversations || [];
     },
     enabled: !!store?.id
   });
@@ -619,6 +650,9 @@ const StoreOwnerDashboard = () => {
 
   const orders = Array.isArray(activeOrders) ? activeOrders : [];
   const ordersHistory = Array.isArray(ordersHistoryData) ? ordersHistoryData : [];
+  const marketingConversations = Array.isArray(marketingConversationsData)
+    ? marketingConversationsData
+    : [];
 
   const currencyConfigLabel = (() => {
     const cfg = store?.currency_config;
@@ -1304,16 +1338,126 @@ const StoreOwnerDashboard = () => {
       )}
 
       {activeTab === 'marketing' && (
-        <div className="card-glass p-4 space-y-2 text-xs">
-          <h2 className="text-sm font-semibold mb-1">Marketing & comunidad</h2>
-          <p className="text-text/70">
-            Aquí podrás ver y configurar campañas, combos especiales, códigos promocionales y acciones de comunidad
-            conectadas con el ecosistema de Mundo XYZ.
-          </p>
-          <p className="text-text/60">
-            En esta primera versión, usa el POS y la vista de pedidos para entender qué se vende mejor y planificar
-            tus próximas promociones.
-          </p>
+        <div className="space-y-4">
+          <div className="card-glass p-4 space-y-3 text-xs">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold mb-1">Marketing & comunidad</h2>
+              <p className="text-text/70">
+                Aquí podrás ver y configurar campañas, combos especiales, códigos promocionales y acciones de
+                comunidad conectadas con el ecosistema de Mundo XYZ.
+              </p>
+            </div>
+            {marketingPlan ? (
+              typeof marketingPlan === 'string' ? (
+                <p className="text-text/70 whitespace-pre-line">{marketingPlan}</p>
+              ) : (
+                <pre className="text-[11px] text-text/70 bg-black/20 rounded-md p-2 overflow-x-auto">
+                  {JSON.stringify(marketingPlan, null, 2)}
+                </pre>
+              )
+            ) : (
+              <p className="text-text/60">
+                Aún no hay un plan de marketing guardado. Puedes usar el editor de abajo para definir uno.
+              </p>
+            )}
+            <div className="space-y-2">
+              <p className="text-[11px] text-text/60">
+                Editor de plan de marketing (solo visible para el equipo de la tienda).
+              </p>
+              <textarea
+                value={marketingPlanDraft}
+                onChange={(e) => setMarketingPlanDraft(e.target.value)}
+                className="input-glass w-full h-32 resize-none"
+                placeholder="Ej: Objetivos de la campaña, calendario de lanzamientos, mensajes clave..."
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const trimmed = marketingPlanDraft != null ? marketingPlanDraft.trim() : '';
+                    const settingsPatch = {
+                      marketing_plan: trimmed !== '' ? marketingPlanDraft : null
+                    };
+                    await updateStoreSettingsMutation.mutateAsync({
+                      settings_patch: settingsPatch
+                    });
+                    setMarketingPlan(settingsPatch.marketing_plan);
+                  }}
+                  disabled={updateStoreSettingsMutation.isLoading}
+                  className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {updateStoreSettingsMutation.isLoading
+                    ? 'Guardando…'
+                    : 'Guardar plan de marketing'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-glass p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-text/90">Tickets y mensajes de clientes</h3>
+                <p className="text-[11px] text-text/60">
+                  Conversaciones abiertas que pueden contener reclamos, sugerencias o ideas útiles para Marketing.
+                </p>
+              </div>
+              <span className="text-[11px] text-text/60">
+                {marketingConversations.length} abierto(s)
+              </span>
+            </div>
+
+            {loadingMarketingConversations ? (
+              <p className="text-[11px] text-text/60">Cargando tickets...</p>
+            ) : marketingConversationsError ? (
+              <p className="text-[11px] text-red-400">No se pudieron cargar los tickets de esta tienda.</p>
+            ) : marketingConversations.length === 0 ? (
+              <p className="text-[11px] text-text/60">
+                No hay tickets abiertos en este momento. Cuando los clientes escriban a tu tienda, sus mensajes
+                aparecerán aquí.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-[11px] align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass">
+                      <th className="py-1 pr-3 text-left">Asunto</th>
+                      <th className="py-1 pr-3 text-left">Cliente</th>
+                      <th className="py-1 pr-3 text-left">CI</th>
+                      <th className="py-1 pr-3 text-left">Último mensaje</th>
+                      <th className="py-1 pr-3 text-left">Estado</th>
+                      <th className="py-1 pr-3 text-right">Última actividad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marketingConversations.map((conv) => {
+                      const lastAt = conv.last_message_at || conv.created_at;
+                      const formattedDate = lastAt
+                        ? new Date(lastAt).toLocaleString()
+                        : '-';
+                      const statusLabel = conv.status || 'open';
+                      const priorityLabel = conv.priority || 'normal';
+
+                      return (
+                        <tr key={conv.id} className="border-b border-glass/40">
+                          <td className="py-1 pr-3 text-text/80">{conv.label}</td>
+                          <td className="py-1 pr-3 text-text/80">{conv.customer_name || 'Cliente'}</td>
+                          <td className="py-1 pr-3 text-text/70">{conv.customer_ci || '-'}</td>
+                          <td className="py-1 pr-3 text-text/70 max-w-xs truncate">
+                            {conv.last_message_preview || '(sin preview)'}
+                          </td>
+                          <td className="py-1 pr-3 text-text/70">
+                            {statusLabel} · {priorityLabel}
+                          </td>
+                          <td className="py-1 pr-3 text-right text-text/60">{formattedDate}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1832,10 +1976,13 @@ const ProductEditModal = ({
   const [stock, setStock] = useState(
     product?.stock != null ? String(product.stock) : '0'
   );
-  const [minStockAlert, setMinStockAlert] = useState(
+  const [minStockAlert] = useState(
     product?.min_stock_alert != null ? String(product.min_stock_alert) : '0'
   );
-  const existingModifiers = Array.isArray(product?.modifiers) ? product.modifiers : [];
+  const existingModifiers = useMemo(
+    () => (Array.isArray(product?.modifiers) ? product.modifiers : []),
+    [product?.modifiers]
+  );
   const [modifierGroups, setModifierGroups] = useState([]);
 
   useEffect(() => {

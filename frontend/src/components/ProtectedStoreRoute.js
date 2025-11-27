@@ -2,8 +2,6 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStoreStaffRoles } from '../utils/storePermissions';
-import { getStoreIdFromSlugCached } from '../utils/storeHelpers';
-import { canAccessKitchenDisplay } from '../utils/storePermissions';
 
 const ProtectedStoreRoute = ({ 
   children, 

@@ -13,8 +13,7 @@ import {
   Shield,
   Clock,
   Settings,
-  Trophy,
-  Sparkles
+  Trophy
 } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
@@ -24,7 +23,6 @@ const Layout = () => {
   const { user, isAdmin, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showBalanceTooltip, setShowBalanceTooltip] = useState(false);
   const [showExperienceModal, setShowExperienceModal] = useState(false);
   const [showBuyExperienceModal, setShowBuyExperienceModal] = useState(false);
   const [showWalletHistoryModal, setShowWalletHistoryModal] = useState(false);

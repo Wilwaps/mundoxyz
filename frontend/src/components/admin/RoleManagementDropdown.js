@@ -28,7 +28,7 @@ const RoleManagementDropdown = ({ user, onRolesUpdated }) => {
     if (isTote && isOpen && availableRoles.length === 0) {
       loadAvailableRoles();
     }
-  }, [isTote, isOpen]);
+  }, [isTote, isOpen, availableRoles.length]);
 
   // Sincronizar roles cuando cambie el usuario
   useEffect(() => {

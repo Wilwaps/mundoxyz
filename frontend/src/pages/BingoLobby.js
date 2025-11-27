@@ -50,19 +50,6 @@ const BingoLobby = () => {
     enabled: !!user,
     refetchInterval: 10000
   });
-
-  // Handler para limpiar sala problemática
-  const handleClearRoom = async () => {
-    try {
-      await axios.post('/api/bingo/clear-my-room');
-      toast.success('Sala limpiada exitosamente');
-      queryClient.invalidateQueries(['bingo-rooms']);
-    } catch (error) {
-      console.error('Error limpiando sala:', error);
-      toast.error('Error al limpiar sala');
-    }
-  };
-
   // Efecto para notificar salas activas
   useEffect(() => {
     if (activeRooms.length > 0) {

@@ -40,6 +40,9 @@ const caidaRoutes = require('./routes/caida');
 const storeCoreRoutes = require('./routes/store/core');
 const storeOrderRoutes = require('./routes/store/orders');
 const storeInventoryRoutes = require('./routes/store/inventory');
+const storeMessagingRoutes = require('./routes/store/messaging');
+const storeCashRoutes = require('./routes/store/cash');
+const storeReportsRoutes = require('./routes/store/reports');
 const storeStaffRoutes = require('./routes/admin/store-staff');
 const referralRoutes = require('./routes/referrals');
 
@@ -254,6 +257,12 @@ if (process.env.NODE_ENV === 'production' || fs.existsSync(buildPath)) {
   logger.info(`Serving static files from: ${buildPath}`);
 }
 
+const marketingPath = path.join(__dirname, '../marketing');
+if (fs.existsSync(marketingPath)) {
+  app.use('/marketing', express.static(marketingPath));
+  logger.info(`Serving marketing command center from: ${marketingPath}`);
+}
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -282,6 +291,9 @@ app.use('/api/caida', (req, res, next) => {
 app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeCoreRoutes);
 app.use('/api/store/order', (req, res, next) => { req.io = io; next(); }, storeOrderRoutes);
 app.use('/api/store/inventory', (req, res, next) => { req.io = io; next(); }, storeInventoryRoutes);
+app.use('/api/store/messaging', (req, res, next) => { req.io = io; next(); }, storeMessagingRoutes);
+app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeCashRoutes);
+app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeReportsRoutes);
 app.use('/api/admin/store-staff', storeStaffRoutes);
 
 app.use('/api/bingo/v2', (req, res, next) => {

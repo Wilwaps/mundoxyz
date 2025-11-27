@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Matter from 'matter-js';
 
 const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
@@ -180,7 +180,7 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
         updateAim(getPointerPos(event));
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = useCallback(() => {
         if (!aimingRef.current || !cueBallRef.current || isShotInProgressRef.current) return;
         aimingRef.current = false;
         if (cueState.power <= 0.05) return; // tiro muy débil, ignorar
@@ -218,7 +218,7 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
         setTimeout(() => {
             isShotInProgressRef.current = false;
         }, 2000);
-    };
+    }, [cueState.power, cueState.angle, room, user, socket]);
 
     // Global event listeners for release
     useEffect(() => {
@@ -228,7 +228,7 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
             window.removeEventListener('mouseup', handlePointerUp);
             window.removeEventListener('touchend', handlePointerUp);
         };
-    }, [cueState.power, cueState.angle]); // Re-bind to capture latest state
+    }, [handlePointerUp]); // Re-bind to capture latest state
 
     return (
         <div className="relative flex justify-center items-center">

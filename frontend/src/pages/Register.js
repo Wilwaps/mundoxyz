@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Sparkles, UserPlus, Mail, Lock, User, MessageCircle, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, MessageCircle, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MathCaptcha from '../components/MathCaptcha';
 

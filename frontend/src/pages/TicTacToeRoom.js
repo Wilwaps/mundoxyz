@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
-  X, Circle, Trophy, Clock, Users, Coins, Flame, 
+  X, Circle, Trophy, Clock, Users, 
   ChevronLeft, RefreshCw, AlertCircle, Zap, Info
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -265,7 +265,7 @@ const TicTacToeRoom = () => {
     if (room?.status === 'playing') {
       setTimeLeft(15);
     }
-  }, [room?.current_turn]);
+  }, [room?.current_turn, room?.status]);
   
   // Join socket room
   useEffect(() => {

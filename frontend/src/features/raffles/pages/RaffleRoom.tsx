@@ -15,13 +15,8 @@ import {
   Share2,
   Settings,
   ShoppingCart,
-  AlertCircle,
-  CheckCircle,
   XCircle,
-  Zap,
-  TrendingUp,
   Info,
-  DollarSign,
   Sparkles,
   Trash2,
   Hand,
@@ -30,12 +25,12 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSocket } from '../../../contexts/SocketContext';
-import { useRaffle, useReserveNumber, usePurchaseNumber, useCancelRaffle, useUpdateRaffle } from '../hooks/useRaffleData';
+import { useRaffle, useReserveNumber, useCancelRaffle, useUpdateRaffle } from '../hooks/useRaffleData';
 import NumberGrid from '../components/NumberGrid';
 import PurchaseModal from '../components/PurchaseModal';
 import ParticipantsModal from '../components/ParticipantsModal';
 import { RaffleStatus, RaffleMode, NumberState, DrawMode } from '../types';
-import { formatDate, formatCurrency } from '../../../utils/format';
+import { formatDate } from '../../../utils/format';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 
 const GUEST_SELECTION_KEY = 'raffle_guest_selection';
@@ -98,6 +93,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   
   // Query de la sala
   const raffleData = useRaffle(code || '');
+  const { forceRefresh } = raffleData;
   const raffle = raffleData.raffle;
   const numbers = raffleData.numbers;
   const winner = raffleData.winner;
@@ -118,7 +114,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [raffle?.drawMode, raffle?.scheduledDrawAt]);
+  }, [raffle]);
   
   // Debounced refetch para evitar múltiples actualizaciones simultáneas
   const debouncedRefetch = useCallback(() => {
@@ -127,9 +123,9 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     }
     
     refreshTimerRef.current = setTimeout(() => {
-      raffleData.forceRefresh();
+      forceRefresh();
     }, 300); // 300ms debounce
-  }, [raffleData.forceRefresh]);
+  }, [forceRefresh]);
   
   // Cleanup del timer al desmontar
   useEffect(() => {
@@ -160,7 +156,6 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
 
   // Mutations
   const reserveNumbers = useReserveNumber();
-  const purchaseNumbers = usePurchaseNumber();
   const cancelRaffle = useCancelRaffle();
   const updateRaffle = useUpdateRaffle();
 
@@ -274,37 +269,6 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     }
   };
   
-  // Conectar a socket room
-  useEffect(() => {
-    if (socket && code) {
-      socket.emit('raffle:join_room', { code });
-      
-      // Listeners de eventos
-      socket.on('raffle:number_reserved', handleNumberReserved);
-      socket.on('raffle:number_released', handleNumberReleased);
-      socket.on('raffle:number_purchased', handleNumberPurchased);
-      socket.on('raffle:status_changed', handleStatusChanged);
-      socket.on('raffle:winner_drawn', handleWinnerDrawn);
-      socket.on('raffle:cancelled', handleRaffleCancelled);
-      socket.on('raffle:all_sold', handleAllSold);
-      socket.on('raffle:drawing_scheduled', handleDrawingScheduled);
-      socket.on('raffle:draw_cancelled', handleDrawCancelled);
-      
-      return () => {
-        socket.emit('raffle:leave_room', { code });
-        socket.off('raffle:number_reserved');
-        socket.off('raffle:number_released');
-        socket.off('raffle:number_purchased');
-        socket.off('raffle:status_changed');
-        socket.off('raffle:winner_drawn');
-        socket.off('raffle:cancelled');
-        socket.off('raffle:all_sold');
-        socket.off('raffle:drawing_scheduled');
-        socket.off('raffle:draw_cancelled');
-      };
-    }
-  }, [socket, code]);
-  
   // Manejadores de eventos socket - optimizados para no refrescar en eventos propios
   const handleNumberReserved = useCallback((data: any) => {
     console.log('Number reserved:', data);
@@ -386,6 +350,49 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
     toast.error(data.message || 'No se pudo realizar el sorteo programado');
     raffleData.forceRefresh();
   }, [raffle?.code, raffleData]);
+  
+  // Conectar a socket room
+  useEffect(() => {
+    if (socket && code) {
+      socket.emit('raffle:join_room', { code });
+      
+      // Listeners de eventos
+      socket.on('raffle:number_reserved', handleNumberReserved);
+      socket.on('raffle:number_released', handleNumberReleased);
+      socket.on('raffle:number_purchased', handleNumberPurchased);
+      socket.on('raffle:status_changed', handleStatusChanged);
+      socket.on('raffle:winner_drawn', handleWinnerDrawn);
+      socket.on('raffle:cancelled', handleRaffleCancelled);
+      socket.on('raffle:all_sold', handleAllSold);
+      socket.on('raffle:drawing_scheduled', handleDrawingScheduled);
+      socket.on('raffle:draw_cancelled', handleDrawCancelled);
+      
+      return () => {
+        socket.emit('raffle:leave_room', { code });
+        socket.off('raffle:number_reserved', handleNumberReserved);
+        socket.off('raffle:number_released', handleNumberReleased);
+        socket.off('raffle:number_purchased', handleNumberPurchased);
+        socket.off('raffle:status_changed', handleStatusChanged);
+        socket.off('raffle:winner_drawn', handleWinnerDrawn);
+        socket.off('raffle:cancelled', handleRaffleCancelled);
+        socket.off('raffle:all_sold', handleAllSold);
+        socket.off('raffle:drawing_scheduled', handleDrawingScheduled);
+        socket.off('raffle:draw_cancelled', handleDrawCancelled);
+      };
+    }
+  }, [
+    socket,
+    code,
+    handleNumberReserved,
+    handleNumberReleased,
+    handleNumberPurchased,
+    handleStatusChanged,
+    handleWinnerDrawn,
+    handleRaffleCancelled,
+    handleAllSold,
+    handleDrawingScheduled,
+    handleDrawCancelled
+  ]);
   
   const handleGuestAuthClose = () => {
     setShowGuestAuthModal(false);
@@ -749,7 +756,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
       accountNumber: info.accountNumber || '',
       phone: info.phone || ''
     });
-  }, [raffle?.id, raffle?.mode, (raffle as any)?.prizeMeta]);
+  }, [raffle]);
 
   const handleSaveBankingInfo = async () => {
     if (!code || !raffle || raffle.mode !== RaffleMode.PRIZE) return;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Copy, Check, ExternalLink } from 'lucide-react';
 import axios from 'axios';
@@ -17,25 +17,10 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
   const [checking, setChecking] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Generate bot link
-  const generateBotLink = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.post(`/api/profile/${user.id}/link-telegram`);
-      setBotToken(response.data.linkToken);
-      setBotUrl(response.data.telegramUrl);
-      
-      // Start polling to check if linked
-      startPolling();
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Error al generar enlace');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Polling to check if user linked via bot
-  const startPolling = () => {
+  const startPolling = useCallback(() => {
+    if (!user?.id) return;
+
     setChecking(true);
     const interval = setInterval(async () => {
       try {
@@ -60,7 +45,26 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
       clearInterval(interval);
       setChecking(false);
     }, 300000);
-  };
+  }, [refreshUser, user?.id, queryClient, onClose]);
+
+  // Generate bot link
+  const generateBotLink = useCallback(async () => {
+    if (!user?.id) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`/api/profile/${user.id}/link-telegram`);
+      setBotToken(response.data.linkToken);
+      setBotUrl(response.data.telegramUrl);
+      
+      // Start polling to check if linked
+      startPolling();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Error al generar enlace');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, startPolling]);
 
   // Link manually
   const handleManualLink = async () => {
@@ -107,7 +111,7 @@ const TelegramLinkModal = ({ isOpen, onClose }) => {
     if (isOpen && method === 'bot' && !botUrl) {
       generateBotLink();
     }
-  }, [isOpen, method]);
+  }, [isOpen, method, botUrl, generateBotLink]);
 
   return (
     <AnimatePresence>

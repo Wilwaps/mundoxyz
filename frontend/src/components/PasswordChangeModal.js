@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
 import axios from 'axios';
@@ -21,14 +21,7 @@ const PasswordChangeModal = ({ isOpen, onClose, onFirstPasswordSet }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Check if user has password when modal opens
-  useEffect(() => {
-    if (isOpen && user) {
-      checkIfHasPassword();
-    }
-  }, [isOpen, user]);
-
-  const checkIfHasPassword = async () => {
+  const checkIfHasPassword = useCallback(async () => {
     try {
       // Intentar verificar con password vacío para detectar si tiene password
       await axios.post(`/api/profile/${user.id}/check-password`, { password: 'dummy-check' });
@@ -48,7 +41,14 @@ const PasswordChangeModal = ({ isOpen, onClose, onFirstPasswordSet }) => {
         setHasPassword(true);
       }
     }
-  };
+  }, [user]);
+
+  // Check if user has password when modal opens
+  useEffect(() => {
+    if (isOpen && user) {
+      checkIfHasPassword();
+    }
+  }, [isOpen, user, checkIfHasPassword]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

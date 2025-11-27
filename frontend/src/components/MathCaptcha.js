@@ -41,23 +41,27 @@ const MathCaptcha = ({ onValidate }) => {
     generateCaptcha();
   }, []);
 
-  // Calcular respuesta correcta
-  const getCorrectAnswer = () => {
-    switch (operator) {
-      case '+': return num1 + num2;
-      case '-': return num1 - num2;
-      case '*': return num1 * num2;
-      default: return 0;
-    }
-  };
-
   // Validar respuesta
   useEffect(() => {
-    const correctAnswer = getCorrectAnswer();
+    let correctAnswer;
+    switch (operator) {
+      case '+':
+        correctAnswer = num1 + num2;
+        break;
+      case '-':
+        correctAnswer = num1 - num2;
+        break;
+      case '*':
+        correctAnswer = num1 * num2;
+        break;
+      default:
+        correctAnswer = 0;
+    }
+
     const valid = parseInt(userAnswer) === correctAnswer;
     setIsValid(valid);
     onValidate(valid);
-  }, [userAnswer, num1, num2, operator]);
+  }, [userAnswer, num1, num2, operator, onValidate]);
 
   return (
     <div className="space-y-3">

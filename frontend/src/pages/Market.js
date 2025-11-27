@@ -43,6 +43,15 @@ const Market = () => {
     }
   });
 
+  // Fetch store marketplace plans (venta de tiendas)
+  const { data: storePlans } = useQuery({
+    queryKey: ['store-plans'],
+    queryFn: async () => {
+      const response = await axios.get('/api/market/store-plans');
+      return response.data;
+    }
+  });
+
   // Fetch public stores list for Market
   const { data: stores } = useQuery({
     queryKey: ['public-stores'],
@@ -64,6 +73,9 @@ const Market = () => {
     payoutMethod === 'bs' && amountNumber > 0 && operationalRate
       ? (amountNumber / firesPerUsdt) * operationalRate
       : null;
+
+  const storePlansEnabled = !!storePlans?.is_enabled;
+  const storePlansData = storePlans?.plans || {};
 
   // Redeem mutation
   const redeemMutation = useMutation({
@@ -249,6 +261,116 @@ const Market = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Store marketplace: venta de tiendas */}
+      {storePlans && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="card-glass mt-6 bg-gradient-to-br from-indigo-600/30 via-fuchsia-500/20 to-cyan-400/20 border border-white/10"
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Tu Propia Tienda Digital</h2>
+              <p className="text-xs text-white/80">
+                Activa una tienda profesional dentro de MundoXYZ con todo el ecosistema de juegos y economía dual.
+              </p>
+            </div>
+            <div className="text-[11px] text-white/80">
+              {storePlansEnabled ? 'Venta de tiendas: ACTIVADA' : 'Venta de tiendas: Próximamente'}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {['starter', 'professional', 'enterprise'].map((key) => {
+              const plan = storePlansData[key] || {};
+              const price = Number(plan.price_usd || 0);
+              const label =
+                key === 'starter'
+                  ? 'Starter'
+                  : key === 'professional'
+                  ? 'Professional'
+                  : 'Enterprise';
+              const features =
+                key === 'starter'
+                  ? [
+                      'Hasta 100 productos',
+                      'Motor SEO básico',
+                      'Integración básica con Telegram',
+                      '1 tienda activa'
+                    ]
+                  : key === 'professional'
+                  ? [
+                      'Hasta 500 productos',
+                      'SEO avanzado con IA',
+                      'Integración Telegram Pro',
+                      '3 tiendas activas',
+                      'Dual economy (Coins + Fires)'
+                    ]
+                  : [
+                      'Productos ilimitados',
+                      'SEO enterprise con IA',
+                      'Tiendas ilimitadas',
+                      'Gamificación avanzada',
+                      'API y white-label'
+                    ];
+
+              const approxFires =
+                firesPerUsdt && price > 0 ? Math.round(price * firesPerUsdt) : null;
+
+              return (
+                <div
+                  key={key}
+                  className="relative glass-panel bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col"
+                >
+                  {key === 'professional' && (
+                    <div className="absolute -top-3 right-4 px-3 py-1 rounded-full text-[11px] bg-amber-400 text-black font-semibold shadow-lg">
+                      POPULAR 🔥
+                    </div>
+                  )}
+                  <div className="mb-2">
+                    <h3 className="text-base font-bold text-white">{label}</h3>
+                    <div className="text-2xl font-extrabold text-white mt-1">
+                      ${price.toFixed(0)}{' '}
+                      <span className="text-xs font-normal text-white/70">/ tienda</span>
+                    </div>
+                    {approxFires && (
+                      <div className="text-[11px] text-white/70 mt-1">
+                        ≈ {approxFires.toLocaleString('es-VE')} 🔥
+                      </div>
+                    )}
+                  </div>
+                  <ul className="mt-2 mb-3 space-y-1 text-[11px] text-white/80 flex-1">
+                    {features.map((feat) => (
+                      <li key={feat} className="flex items-center gap-1">
+                        <span className="text-amber-300">✨</span>
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toast(
+                        'La compra de tiendas se gestiona con el equipo MundoXYZ. Muy pronto activaremos este flujo directo desde el Market.'
+                      )
+                    }
+                    disabled={!storePlansEnabled}
+                    className={`w-full mt-auto py-2 rounded-full text-xs font-semibold transition ${
+                      storePlansEnabled
+                        ? 'bg-white text-indigo-700 hover:bg-amber-100'
+                        : 'bg-white/10 text-white/60 cursor-not-allowed'
+                    }`}
+                  >
+                    {storePlansEnabled ? 'Quiero esta tienda' : 'Próximamente'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {stores && stores.length > 0 && (
         <motion.div 

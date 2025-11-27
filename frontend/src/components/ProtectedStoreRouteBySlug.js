@@ -1,7 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import ProtectedStoreRoute from './ProtectedStoreRoute';
-import { getStoreIdFromSlugCached } from '../utils/storeHelpers';
 
 const ProtectedStoreRouteBySlug = ({ 
   children, 

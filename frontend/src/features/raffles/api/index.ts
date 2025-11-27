@@ -14,7 +14,6 @@ import {
   BuyNumberForm,
   PurchaseResponse,
   RaffleNumber,
-  PurchaseRequest,
   RaffleStats,
   RaffleSettings
 } from '../types';

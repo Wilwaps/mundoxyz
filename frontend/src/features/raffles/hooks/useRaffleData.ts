@@ -12,8 +12,7 @@ import * as api from '../api';
 import {
   RaffleFilters,
   CreateRaffleForm,
-  BuyNumberForm,
-  Raffle
+  BuyNumberForm
 } from '../types';
 import {
   RAFFLE_QUERY_KEYS,
@@ -45,8 +44,6 @@ export const useRaffleSettings = () => {
  * Hook para obtener detalle de rifa
  */
 export const useRaffleDetail = (code: string, enabled = true) => {
-  const queryClient = useQueryClient();
-  
   return useQuery({
     queryKey: RAFFLE_QUERY_KEYS.detail(code),
     queryFn: () => api.getRaffleDetail(code),
@@ -553,8 +550,7 @@ export const useRaffleFilters = (initialFilters?: RaffleFilters) => {
     applyFilters
   };
 };
-
-export default {
+const raffleDataHooks = {
   useRaffleList,
   useRaffleDetail,
   useRaffleNumbers,
@@ -569,3 +565,5 @@ export default {
   useRaffle,
   useRaffleFilters
 };
+
+export default raffleDataHooks;

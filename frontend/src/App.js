@@ -37,7 +37,6 @@ import StoreFrontInvoicePage from './pages/store/StoreFrontInvoicePage';
 import POS from './pages/store/POS';
 import KitchenDisplay from './pages/store/KitchenDisplay';
 import StoreOwnerDashboard from './pages/store/StoreOwnerDashboard';
-import ProtectedStoreRoute from './components/ProtectedStoreRoute';
 import ProtectedStoreRouteBySlug from './components/ProtectedStoreRouteBySlug';
 
 // Create a client
