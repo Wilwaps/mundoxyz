@@ -769,7 +769,7 @@ const StoreFront = () => {
                                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    className="absolute right-0 mt-2 w-48 max-w-[calc(100vw-3rem)] bg-black/80 backdrop-blur-md rounded-lg shadow-xl border border-white/10 z-50"
+                                    className="absolute right-0 top-full mt-2 w-48 max-w-[calc(100vw-3rem)] bg-black/80 backdrop-blur-md rounded-lg shadow-xl border border-white/10 z-50"
                                 >
                                     <button
                                         onClick={() => shareStore('whatsapp')}

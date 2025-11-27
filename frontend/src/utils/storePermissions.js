@@ -11,11 +11,19 @@ export const useStoreStaffRoles = (storeIdOrSlug) => {
       
       // Try to get store info first to determine if it's a slug or ID
       let storeId = storeIdOrSlug;
+      const token = typeof window !== 'undefined' && window.localStorage
+        ? window.localStorage.getItem('token')
+        : null;
+      const authHeaders = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
       
       // If it looks like a slug (contains letters), try to get the ID
       if (!storeIdOrSlug.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
         try {
-          const response = await fetch(`/api/store/by-slug/${storeIdOrSlug}`);
+          const response = await fetch(`/api/store/by-slug/${storeIdOrSlug}` , {
+            headers: authHeaders
+          });
           if (response.ok) {
             const data = await response.json();
             storeId = data.id;
@@ -27,7 +35,9 @@ export const useStoreStaffRoles = (storeIdOrSlug) => {
         }
       }
       
-      const response = await fetch(`/api/store/${storeId}/staff/me`);
+      const response = await fetch(`/api/store/${storeId}/staff/me`, {
+        headers: authHeaders
+      });
       if (!response.ok) {
         if (response.status === 404 || response.status === 403) {
           return null; // Not staff or store doesn't exist

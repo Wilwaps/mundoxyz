@@ -30,7 +30,28 @@ router.get('/:storeId/staff/me', verifyToken, async (req, res) => {
         );
 
         if (staffResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Not a staff member of this store' });
+            // Fallback: si el usuario es el dueño de la tienda, tratarlo como 'owner'
+            const ownerResult = await query(
+                `SELECT id, slug, name, owner_id FROM stores WHERE id = $1 LIMIT 1`,
+                [storeId]
+            );
+
+            if (ownerResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Not a staff member of this store' });
+            }
+
+            const store = ownerResult.rows[0];
+
+            if (String(store.owner_id) !== String(userId)) {
+                return res.status(404).json({ error: 'Not a staff member of this store' });
+            }
+
+            return res.json({
+                role: 'owner',
+                is_active: true,
+                store_name: store.name,
+                store_slug: store.slug
+            });
         }
 
         const staffData = staffResult.rows[0];

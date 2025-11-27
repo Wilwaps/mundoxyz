@@ -1705,8 +1705,11 @@ const QuoteModal = ({ products, rates, onClose }) => {
     const [quoteItems, setQuoteItems] = useState([]);
 
     const filtered = products.filter((p) => {
-        const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-        const matchesCategory = categoryFilter === 'all' || p.category_id === categoryFilter;
+        const term = search.trim().toLowerCase();
+        const haystack = `${p.name || ''} ${p.description || ''} ${p.sku || ''}`.toLowerCase();
+        const matchesSearch = term === '' || haystack.includes(term);
+        const matchesCategory =
+            categoryFilter === 'all' || String(p.category_id) === String(categoryFilter);
         return matchesSearch && matchesCategory;
     });
 

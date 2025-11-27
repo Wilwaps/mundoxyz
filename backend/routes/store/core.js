@@ -162,6 +162,31 @@ router.get('/public/:slug', async (req, res) => {
     }
 });
 
+// GET /api/store/by-slug/:slug
+// Resolver id y datos básicos de tienda a partir del slug
+router.get('/by-slug/:slug', async (req, res) => {
+    try {
+        const { slug } = req.params;
+
+        const result = await query(
+            `SELECT id, slug, name
+           FROM stores
+           WHERE slug = $1 AND (is_active IS NULL OR is_active = TRUE)
+           LIMIT 1`,
+            [slug]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Store not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error fetching store by slug:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // GET /api/store/public-list
 // Lista pública de tiendas para el Mercado (clientes)
 router.get('/public-list', verifyToken, async (req, res) => {
