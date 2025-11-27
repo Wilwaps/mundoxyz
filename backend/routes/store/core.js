@@ -1457,7 +1457,7 @@ router.get('/:storeId/staff/me', verifyToken, async (req, res) => {
         // 1) Admin global: siempre puede ver el panel de cualquier tienda
         if (isGlobalAdmin) {
             const storeResult = await query(
-                `SELECT id, name, slug FROM stores WHERE id = $1 AND is_active = TRUE LIMIT 1`,
+                `SELECT id, name, slug FROM stores WHERE id = $1 LIMIT 1`,
                 [storeId]
             );
 
@@ -1504,7 +1504,7 @@ router.get('/:storeId/staff/me', verifyToken, async (req, res) => {
 
         // 3) Fallback: si el usuario es el dueño (owner_id), tratarlo como role "owner" aunque no exista en store_staff
         const ownerResult = await query(
-            `SELECT id, name, slug, owner_id FROM stores WHERE id = $1 AND is_active = TRUE LIMIT 1`,
+            `SELECT id, name, slug, owner_id FROM stores WHERE id = $1 LIMIT 1`,
             [storeId]
         );
 
@@ -1537,7 +1537,7 @@ router.get('/:storeId/info', async (req, res) => {
         const { storeId } = req.params;
 
         const storeResult = await query(
-            `SELECT id, slug, name FROM stores WHERE id = $1 AND is_active = TRUE LIMIT 1`,
+            `SELECT id, slug, name FROM stores WHERE id = $1 LIMIT 1`,
             [storeId]
         );
 
@@ -1559,13 +1559,13 @@ router.get('/:storeId/info', async (req, res) => {
     }
 });
 
-// Get store ID by slug
+// Get store ID by slug (para lógica interna de panel/POS/KDS, no para público)
 router.get('/by-slug/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
 
         const storeResult = await query(
-            `SELECT id, name FROM stores WHERE slug = $1 AND is_active = TRUE LIMIT 1`,
+            `SELECT id, name FROM stores WHERE slug = $1 LIMIT 1`,
             [slug]
         );
 
