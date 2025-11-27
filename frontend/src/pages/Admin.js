@@ -25,6 +25,7 @@ import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
 import AdminReferrals from '../components/admin/AdminReferrals';
+import AdminMarketing from '../components/admin/AdminMarketing';
 
 // Stats Component
 const AdminStats = () => {
@@ -2446,15 +2447,17 @@ const Admin = () => {
             <DollarSign size={18} />
             FIAT
           </NavLink>
-          <a
-            href="/marketing"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap text-text/60 hover:text-text"
+          <NavLink
+            to="/admin/marketing"
+            className={({ isActive }) => 
+              `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+              }`
+            }
           >
             <Megaphone size={18} />
             Marketing
-          </a>
+          </NavLink>
           {isTote() && (
             <NavLink
               to="/admin/referrals"
@@ -2480,6 +2483,7 @@ const Admin = () => {
         <Route path="fire-requests" element={<AdminFireRequests />} />
         <Route path="redemptions" element={<AdminRedemptions />} />
         <Route path="fiat" element={<AdminFiat />} />
+        <Route path="marketing" element={<AdminMarketing />} />
         <Route path="referrals" element={<AdminReferrals />} />
       </Routes>
     </div>
