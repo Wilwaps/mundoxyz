@@ -42,6 +42,45 @@ async function userCanManageStoreProducts(user, storeId) {
     return false;
 }
 
+// Permisos para manejar mesas del POS (incluye mesoneros, vendedores, delivery)
+async function userCanManageStoreTables(user, storeId) {
+    if (!user || !storeId) return false;
+
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+    const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
+
+    if (isGlobalAdmin) return true;
+
+    // Intentar resolver rol desde store_staff activo
+    const staffResult = await query(
+        `SELECT role FROM store_staff WHERE user_id = $1 AND store_id = $2 AND is_active = TRUE LIMIT 1`,
+        [user.id, storeId]
+    );
+
+    if (staffResult.rows.length > 0) {
+        const staffRole = staffResult.rows[0].role;
+        const allowedRoles = ['owner', 'admin', 'manager', 'seller', 'mesonero', 'delivery'];
+        if (allowedRoles.includes(staffRole)) {
+            return true;
+        }
+    }
+
+    // Fallback: si es el dueño de la tienda, también puede usar POS/mesas
+    const ownerResult = await query(
+        `SELECT owner_id FROM stores WHERE id = $1 LIMIT 1`,
+        [storeId]
+    );
+
+    if (ownerResult.rows.length > 0) {
+        const ownerId = ownerResult.rows[0].owner_id;
+        if (String(ownerId) === String(user.id)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // --- PUBLIC ENDPOINTS ---
 
 router.get('/list', verifyToken, async (req, res) => {
@@ -542,6 +581,138 @@ router.get('/:storeId/customers/search', verifyToken, async (req, res) => {
         res.json(mapped);
     } catch (error) {
         logger.error('Error searching POS customers:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// --- POS TABLE TABS (Restaurant mode) ---
+
+// GET /api/store/:storeId/tables - listar totales por mesa
+router.get('/:storeId/tables', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreTables(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar mesas de esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT table_label, total_usdt, version
+           FROM store_table_tabs
+           WHERE store_id = $1
+           ORDER BY table_label ASC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching store table tabs:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/:storeId/tables/:tableLabel - obtener detalle de una mesa
+router.get('/:storeId/tables/:tableLabel', verifyToken, async (req, res) => {
+    try {
+        const { storeId, tableLabel } = req.params;
+
+        const canManage = await userCanManageStoreTables(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar mesas de esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT table_label, cart_items, total_usdt, version
+           FROM store_table_tabs
+           WHERE store_id = $1 AND table_label = $2
+           LIMIT 1`,
+            [storeId, tableLabel]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Mesa no encontrada' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error fetching store table tab:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// PUT /api/store/:storeId/tables/:tableLabel - guardar/actualizar cuenta de mesa
+router.put('/:storeId/tables/:tableLabel', verifyToken, async (req, res) => {
+    try {
+        const { storeId, tableLabel } = req.params;
+
+        const canManage = await userCanManageStoreTables(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar mesas de esta tienda' });
+        }
+
+        const { cart_items, total_usdt, previous_version } = req.body || {};
+
+        const items = Array.isArray(cart_items) ? cart_items : [];
+        const totalRaw = Number(total_usdt);
+        const total = Number.isFinite(totalRaw) && totalRaw >= 0 ? totalRaw : 0;
+
+        const result = await transaction(async (client) => {
+            const existingRes = await client.query(
+                `SELECT id, version
+             FROM store_table_tabs
+             WHERE store_id = $1 AND table_label = $2
+             FOR UPDATE`,
+                [storeId, tableLabel]
+            );
+
+            if (existingRes.rows.length > 0) {
+                const existing = existingRes.rows[0];
+                const currentVersion = Number(existing.version) || 1;
+
+                if (previous_version != null && Number(previous_version) !== currentVersion) {
+                    return { conflict: true, currentVersion };
+                }
+
+                const newVersion = currentVersion + 1;
+
+                const updateRes = await client.query(
+                    `UPDATE store_table_tabs
+                 SET cart_items = $1,
+                     total_usdt = $2,
+                     version = $3,
+                     locked_by = NULL,
+                     locked_at = NULL,
+                     updated_at = NOW()
+                 WHERE id = $4
+                 RETURNING table_label, cart_items, total_usdt, version`,
+                    [JSON.stringify(items), total, newVersion, existing.id]
+                );
+
+                return { row: updateRes.rows[0] };
+            }
+
+            const insertRes = await client.query(
+                `INSERT INTO store_table_tabs
+             (id, store_id, table_label, cart_items, total_usdt, version, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 1, NOW(), NOW())
+             RETURNING table_label, cart_items, total_usdt, version`,
+                [uuidv4(), storeId, tableLabel, JSON.stringify(items), total]
+            );
+
+            return { row: insertRes.rows[0] };
+        });
+
+        if (result.conflict) {
+            return res.status(409).json({
+                error: 'La mesa fue actualizada desde otro dispositivo. Recarga antes de guardar.',
+                current_version: result.currentVersion
+            });
+        }
+
+        res.json(result.row);
+    } catch (error) {
+        logger.error('Error saving store table tab:', error);
         res.status(400).json({ error: error.message });
     }
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
@@ -40,7 +40,10 @@ const POS = () => {
     const [draftInvoices, setDraftInvoices] = useState([]);
     const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
 
-    const [currentTable, setCurrentTable] = useState(null);
+    const [currentTable, setCurrentTable] = useState(null); // Mesa actualmente cargada en el carrito (si aplica)
+    const [tableTabs, setTableTabs] = useState({}); // { 'Mesa 1': { total_usdt, version, cart?: [...] } }
+    const [activeTableVersion, setActiveTableVersion] = useState(null); // Versión de la mesa actualmente cargada
+    const [activeTableCartSnapshot, setActiveTableCartSnapshot] = useState(null); // Snapshot del carrito guardado para detectar cambios
 
     const draftsStorageKey = slug ? `pos_drafts_${slug}` : 'pos_drafts_default';
 
@@ -77,6 +80,7 @@ const POS = () => {
         storeData?.store && typeof storeData.store.settings === 'object'
             ? storeData.store.settings
             : {};
+    const storeId = storeData?.store?.id;
     const rawTablesCount =
         storeSettingsRaw.tables_count ?? storeSettingsRaw.tablesCount ?? 0;
     let tablesCount = parseInt(rawTablesCount, 10);
@@ -100,6 +104,11 @@ const POS = () => {
         },
         onSuccess: (response) => {
             const createdOrder = response?.data?.order || response?.data;
+
+            // Si estamos en modo restaurante, limpiar también la cuenta de la mesa en backend
+            if (isRestaurantMode && currentTable) {
+                void saveTableTab(currentTable, { clearAfterSave: true });
+            }
 
             toast.success('Orden creada exitosamente');
             setCart([]);
@@ -238,6 +247,246 @@ const POS = () => {
     const changeBs = changeUSDT * rates.bs;
     const remainingFires = remainingUSDT * rates.fires;
     const changeFires = changeUSDT * rates.fires;
+
+    // --- Helpers y efectos para manejo de mesas (store_table_tabs) ---
+
+    // Inicializar mesa por defecto en modo restaurante
+    useEffect(() => {
+        if (!isRestaurantMode || tablesCount <= 0) return;
+        if (!currentTable) {
+            setCurrentTable('Mesa 1');
+        }
+    }, [isRestaurantMode, tablesCount, currentTable]);
+
+    // Cargar totales de mesas desde backend
+    useEffect(() => {
+        if (!storeId || !isRestaurantMode) return;
+
+        let cancelled = false;
+
+        const fetchTables = async () => {
+            try {
+                const response = await axios.get(`/api/store/${storeId}/tables`);
+                if (cancelled) return;
+                const rows = Array.isArray(response.data) ? response.data : [];
+                const map = {};
+                for (const row of rows) {
+                    const label = row.table_label || '';
+                    if (!label) continue;
+                    const total = Number(row.total_usdt);
+                    map[label] = {
+                        total_usdt: Number.isFinite(total) ? total : 0,
+                        version: row.version != null ? Number(row.version) : 1
+                    };
+                }
+                setTableTabs(map);
+            } catch (error) {
+                // No hacer ruido fuerte; el POS sigue funcionando aunque falle esta carga
+                console.error('Error fetching store tables', error);
+            }
+        };
+
+        fetchTables();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [storeId, isRestaurantMode]);
+
+    const buildTableCartSnapshot = (items) => {
+        return items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            price_usdt: item.price_usdt,
+            accepts_fires: item.accepts_fires,
+            quantity: item.quantity
+        }));
+    };
+
+    const computeCartTotalUSDT = (items) => {
+        return items.reduce((sum, item) => {
+            const price = parseAmount(item.price_usdt);
+            const qty = parseAmount(item.quantity || 0);
+            return sum + price * qty;
+        }, 0);
+    };
+
+    const hasActiveTableUnsavedChanges = () => {
+        if (!isRestaurantMode || !currentTable) return false;
+        const current = JSON.stringify(buildTableCartSnapshot(cart));
+        if (activeTableCartSnapshot == null) {
+            // Nunca se ha guardado/cargado esta mesa: cualquier carrito distinto de vacío es un cambio
+            return current !== JSON.stringify([]);
+        }
+        return current !== activeTableCartSnapshot;
+    };
+
+    const saveTableTab = async (label, { clearAfterSave = false } = {}) => {
+        if (!storeId || !isRestaurantMode || !label) return { ok: false };
+
+        const baseItems = clearAfterSave ? [] : buildTableCartSnapshot(cart);
+        const total = computeCartTotalUSDT(baseItems);
+
+        try {
+            const response = await axios.put(
+                `/api/store/${storeId}/tables/${encodeURIComponent(label)}`,
+                {
+                    cart_items: baseItems,
+                    total_usdt: total,
+                    previous_version: activeTableVersion
+                }
+            );
+
+            const row = response.data || {};
+            const newVersion = row.version != null ? Number(row.version) : (activeTableVersion || 1);
+
+            setTableTabs((prev) => ({
+                ...prev,
+                [label]: {
+                    total_usdt: Number(row.total_usdt) || 0,
+                    version: newVersion
+                }
+            }));
+
+            setActiveTableVersion(newVersion);
+            setActiveTableCartSnapshot(JSON.stringify(baseItems));
+
+            if (clearAfterSave) {
+                setCart([]);
+            }
+
+            return { ok: true };
+        } catch (error) {
+            if (error?.response?.status === 409) {
+                toast.error('La mesa fue actualizada desde otro dispositivo. Recarga antes de guardar.');
+            } else {
+                toast.error('Error al guardar la mesa');
+            }
+            console.error('Error saving table tab', error);
+            return { ok: false, error };
+        }
+    };
+
+    const loadTableTab = async (label) => {
+        if (!storeId || !isRestaurantMode || !label) return;
+
+        try {
+            const response = await axios.get(
+                `/api/store/${storeId}/tables/${encodeURIComponent(label)}`
+            );
+            const row = response.data || {};
+            const items = Array.isArray(row.cart_items) ? row.cart_items : [];
+
+            setCart(items);
+            setCurrentTable(label);
+
+            const version = row.version != null ? Number(row.version) : 1;
+            setActiveTableVersion(version);
+            setActiveTableCartSnapshot(JSON.stringify(buildTableCartSnapshot(items)));
+
+            setTableTabs((prev) => ({
+                ...prev,
+                [label]: {
+                    total_usdt: Number(row.total_usdt) || 0,
+                    version
+                }
+            }));
+        } catch (error) {
+            if (error?.response?.status === 404) {
+                // Mesa sin datos previos: considerarla vacía
+                const empty = [];
+                setCart(empty);
+                setCurrentTable(label);
+                const version = 1;
+                setActiveTableVersion(version);
+                setActiveTableCartSnapshot(JSON.stringify(empty));
+                setTableTabs((prev) => ({
+                    ...prev,
+                    [label]: {
+                        total_usdt: 0,
+                        version
+                    }
+                }));
+                return;
+            }
+            toast.error('Error al cargar la mesa');
+            console.error('Error loading table tab', error);
+        }
+    };
+
+    const lastTableClickRef = useRef({ label: null, time: 0 });
+
+    const handleTableSingleClick = async (label) => {
+        if (!isRestaurantMode || !label) return;
+
+        if (!currentTable || currentTable === label) {
+            // Si no hay mesa activa o es la misma, solo cargar estado desde backend
+            await loadTableTab(label);
+            return;
+        }
+
+        if (hasActiveTableUnsavedChanges()) {
+            const shouldSave = window.confirm(
+                'La mesa actual tiene cambios no guardados. Aceptar = guardar y cambiar, Cancelar = descartar y cambiar de mesa.'
+            );
+
+            if (shouldSave) {
+                const result = await saveTableTab(currentTable);
+                if (!result.ok) {
+                    return; // No cambiar si no se pudo guardar
+                }
+            }
+        }
+
+        await loadTableTab(label);
+    };
+
+    const handleTableDoubleClick = async (label) => {
+        if (!isRestaurantMode || !label) return;
+        if (currentTable !== label) {
+            // Si doble clic en otra mesa, simplemente cargarla
+            await loadTableTab(label);
+            return;
+        }
+
+        const hasCart = cart.length > 0;
+        const message = hasCart
+            ? '¿Guardar y limpiar esta mesa para una nueva cuenta?'
+            : '¿Limpiar esta mesa para una nueva cuenta?';
+
+        const confirmClear = window.confirm(message);
+        if (!confirmClear) return;
+
+        const result = await saveTableTab(label, { clearAfterSave: true });
+        if (result.ok) {
+            const version = (tableTabs[label]?.version || activeTableVersion || 1);
+            setActiveTableVersion(version);
+            setActiveTableCartSnapshot(JSON.stringify([]));
+            setTableTabs((prev) => ({
+                ...prev,
+                [label]: {
+                    total_usdt: 0,
+                    version
+                }
+            }));
+        }
+    };
+
+    const handleTableButtonClick = (label) => {
+        if (!isRestaurantMode || !label) return;
+
+        const now = Date.now();
+        const last = lastTableClickRef.current;
+
+        if (last.label === label && now - last.time < 400) {
+            // Doble clic
+            lastTableClickRef.current = { label: null, time: 0 };
+            void handleTableDoubleClick(label);
+        } else {
+            lastTableClickRef.current = { label, time: now };
+            void handleTableSingleClick(label);
+        }
+    };
 
     useEffect(() => {
         try {
@@ -424,8 +673,6 @@ const POS = () => {
         setIsDraftsModalOpen(false);
     };
 
-    const storeId = storeData?.store?.id;
-
     // Remote search of customers por CI / nombre / correo / teléfono / email
     const {
         data: customerSearchResults = [],
@@ -487,39 +734,6 @@ const POS = () => {
                         ))}
                     </div>
                 </div>
-
-                {isRestaurantMode && (
-                    <div className="px-3 py-2 md:px-4 border-b border-white/10 bg-black/10">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-[11px] uppercase tracking-wide text-white/50">
-                                Mesas
-                            </span>
-                            <span className="text-[11px] text-white/70">
-                                {effectiveTable}
-                            </span>
-                        </div>
-                        <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                            {Array.from({ length: tablesCount }, (_, index) => {
-                                const label = `Mesa ${index + 1}`;
-                                const isActive = effectiveTable === label;
-                                return (
-                                    <button
-                                        key={label}
-                                        type="button"
-                                        onClick={() => setCurrentTable(label)}
-                                        className={`px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap border ${
-                                            isActive
-                                                ? 'bg-accent text-dark border-accent'
-                                                : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
-                                        }`}
-                                    >
-                                        {index + 1}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
 
                 {/* Grid */}
                 <div className="flex-1 overflow-y-auto px-3 py-3 md:p-4">
@@ -738,6 +952,48 @@ const POS = () => {
                 </div>
 
                 <div className="p-4 bg-white/5 border-t border-white/10">
+                    {isRestaurantMode && (
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] uppercase tracking-wide text-white/50">
+                                    Mesas
+                                </span>
+                                <span className="text-[11px] text-white/70">
+                                    {effectiveTable}
+                                </span>
+                            </div>
+                            <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                                {Array.from({ length: tablesCount }, (_, index) => {
+                                    const label = `Mesa ${index + 1}`;
+                                    const isActive = effectiveTable === label;
+                                    const tab = tableTabs[label];
+                                    const totalTabUsdt = tab ? Number(tab.total_usdt) || 0 : 0;
+                                    const totalTabBs = totalTabUsdt * rates.bs;
+                                    return (
+                                        <button
+                                            key={label}
+                                            type="button"
+                                            onClick={() => handleTableButtonClick(label)}
+                                            className={`px-2.5 py-1.5 rounded-full text-[10px] whitespace-nowrap border flex flex-col items-center justify-center min-w-[52px] ${
+                                                isActive
+                                                    ? 'bg-accent text-dark border-accent'
+                                                    : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <span className="font-semibold">{index + 1}</span>
+                                            <span className="text-[9px] leading-tight text-white/80">
+                                                {totalTabBs.toLocaleString('es-VE', {
+                                                    style: 'currency',
+                                                    currency: 'VES'
+                                                })}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="mb-4">
                         <div className="text-xs text-white/60">Total a cobrar</div>
                         <div className="text-2xl font-bold text-accent">
