@@ -818,6 +818,30 @@ const StoreOwnerDashboard = () => {
               >
                 Nueva factura de compra
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!store) return;
+                  setEditingMode('create');
+                  setEditingProduct({
+                    id: 'new',
+                    name: '',
+                    description: '',
+                    category_id: '',
+                    sku: '',
+                    price_usdt: '',
+                    price_fires: '',
+                    is_menu_item: true,
+                    has_modifiers: false,
+                    accepts_fires: false,
+                    image_url: '',
+                    stock: 0
+                  });
+                }}
+                className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 whitespace-nowrap"
+              >
+                + Nuevo producto
+              </button>
             </div>
           </div>
 
