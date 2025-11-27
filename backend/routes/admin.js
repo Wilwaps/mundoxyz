@@ -1265,4 +1265,107 @@ router.get('/role-changes', verifyToken, requireTote, async (req, res) => {
   }
 });
 
+// ============================================
+// CHANGELOG DEL SISTEMA (SOLO TOTE)
+// ============================================
+
+// Listar entradas de changelog (admin/tote)
+router.get('/changelog', verifyToken, requireTote, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, title, category, version, content_html, author_user_id, is_published, created_at, updated_at
+       FROM system_changelog_entries
+       ORDER BY created_at DESC
+       LIMIT 300`
+    );
+
+    res.json({
+      success: true,
+      entries: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching system changelog:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener changelog'
+    });
+  }
+});
+
+// Crear nueva entrada de changelog (admin/tote)
+router.post('/changelog', verifyToken, requireTote, async (req, res) => {
+  try {
+    const { title, category, version, content_html, is_published } = req.body || {};
+
+    const safeTitle = (title || '').trim();
+    const safeContent = (content_html || '').trim();
+
+    if (!safeTitle || !safeContent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Título y contenido son requeridos'
+      });
+    }
+
+    const cat = (category || '').trim() || null;
+    const ver = (version || '').trim() || null;
+    const published = is_published !== undefined ? !!is_published : true;
+
+    const result = await query(
+      `INSERT INTO system_changelog_entries
+        (title, category, version, content_html, author_user_id, is_published, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       RETURNING id, title, category, version, content_html, author_user_id, is_published, created_at, updated_at`,
+      [safeTitle, cat, ver, safeContent, req.user.id, published]
+    );
+
+    res.json({
+      success: true,
+      entry: result.rows[0]
+    });
+  } catch (error) {
+    logger.error('Error creating system changelog entry:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al crear entrada de changelog'
+    });
+  }
+});
+
+// ============================================
+// SOLICITUDES "QUIERO UNA TIENDA" (SOLO TOTE)
+// ============================================
+
+router.get('/store-interest-requests', verifyToken, requireTote, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT 
+         sir.id,
+         sir.email,
+         sir.store_concept,
+         sir.interested_services,
+         sir.heard_from,
+         sir.heard_from_other,
+         sir.user_id,
+         sir.created_at,
+         u.username AS user_username
+       FROM store_interest_requests sir
+       LEFT JOIN users u ON u.id = sir.user_id
+       ORDER BY sir.created_at DESC
+       LIMIT 500`
+    );
+
+    res.json({
+      success: true,
+      requests: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching store interest requests:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener solicitudes de tiendas'
+    });
+  }
+});
+
 module.exports = router;

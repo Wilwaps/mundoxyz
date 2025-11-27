@@ -328,6 +328,37 @@ CREATE INDEX IF NOT EXISTS idx_fiat_operations_user
 CREATE INDEX IF NOT EXISTS idx_fiat_operations_wallet_tx
   ON fiat_operations (wallet_transaction_id);
 
+-- 29. SYSTEM_CHANGELOG_ENTRIES
+CREATE TABLE IF NOT EXISTS system_changelog_entries (
+  id BIGSERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  category VARCHAR(32),
+  version VARCHAR(32),
+  content_html TEXT NOT NULL,
+  author_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  is_published BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_changelog_created
+  ON system_changelog_entries(created_at DESC);
+
+-- 30. STORE_INTEREST_REQUESTS
+CREATE TABLE IF NOT EXISTS store_interest_requests (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  store_concept TEXT,
+  interested_services TEXT,
+  heard_from VARCHAR(32) NOT NULL,
+  heard_from_other TEXT,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_store_interest_created
+  ON store_interest_requests(created_at DESC);
+
 -- FUNCIONES
 CREATE OR REPLACE FUNCTION generate_room_code() RETURNS VARCHAR(6) AS $$
 DECLARE

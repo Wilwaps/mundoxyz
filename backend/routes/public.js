@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
+const { optionalAuth } = require('../middleware/auth');
 
 /**
  * GET /api/public/stats
@@ -180,6 +181,92 @@ router.get('/stats', async (req, res) => {
       timestamp: new Date().toISOString(),
       note: 'Datos por defecto - error en servidor'
     });
+  }
+});
+
+/**
+ * GET /api/public/changelog
+ * Lista pública de entradas de changelog del sistema
+ */
+router.get('/changelog', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, title, category, version, content_html, author_user_id, is_published, created_at, updated_at
+       FROM system_changelog_entries
+       WHERE is_published IS TRUE
+       ORDER BY created_at DESC
+       LIMIT 200`
+    );
+
+    res.json({
+      success: true,
+      entries: result.rows
+    });
+  } catch (error) {
+    console.error('Error obteniendo changelog público:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener changelog' });
+  }
+});
+
+/**
+ * POST /api/public/store-interest
+ * Registro público de interés en tiendas ("QUIERO UNA TIENDA!!")
+ * Usa optionalAuth para adjuntar user_id cuando exista sesión
+ */
+router.post('/store-interest', optionalAuth, async (req, res) => {
+  try {
+    const {
+      email,
+      store_concept,
+      interested_services,
+      heard_from,
+      heard_from_other
+    } = req.body || {};
+
+    const normalizedEmail = (email || '').trim();
+    const source = (heard_from || '').trim().toLowerCase();
+
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Correo inválido' });
+    }
+
+    const allowedSources = [
+      'instagram',
+      'facebook',
+      'amigo',
+      'volante',
+      'youtube',
+      'telegram',
+      'otro'
+    ];
+
+    if (!allowedSources.includes(source)) {
+      return res.status(400).json({ success: false, error: 'Origen inválido' });
+    }
+
+    let otherText = null;
+    if (source === 'otro') {
+      otherText = (heard_from_other || '').trim();
+      if (!otherText || otherText.length < 3) {
+        return res.status(400).json({ success: false, error: 'Debes especificar cómo escuchaste de MundoXYZ' });
+      }
+    }
+
+    const conceptText = (store_concept || '').trim() || null;
+    const servicesText = (interested_services || '').trim() || null;
+    const userId = req.user?.id || null;
+
+    await query(
+      `INSERT INTO store_interest_requests
+       (email, store_concept, interested_services, heard_from, heard_from_other, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [normalizedEmail, conceptText, servicesText, source, otherText, userId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error registrando interés en tienda:', error);
+    res.status(500).json({ success: false, error: 'Error al registrar interés en tienda' });
   }
 });
 

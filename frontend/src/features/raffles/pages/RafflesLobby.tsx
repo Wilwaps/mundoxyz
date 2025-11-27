@@ -16,7 +16,10 @@ import {
   List,
   RefreshCw,
   Sparkles,
-  Info
+  Info,
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import RaffleCard from '../components/RaffleCard';
@@ -24,6 +27,43 @@ import CreateRaffleModal from '../components/CreateRaffleModal';
 import { useRaffleList, useRaffleFilters } from '../hooks/useRaffleData';
 import { RaffleStatus, RaffleMode, RaffleVisibility } from '../types';
 import { FILTER_OPTIONS } from '../constants';
+
+type CalendarEventType = 'start' | 'draw';
+
+interface CalendarEvent {
+  id: string;
+  raffleId: number;
+  code: string;
+  name: string;
+  type: CalendarEventType;
+  date: Date;
+  status?: string;
+  mode?: string;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function getStartOfWeek(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = (day + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  return d;
+}
+
+function getStartOfMonth(date: Date) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 const RafflesLobby: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +73,9 @@ const RafflesLobby: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMode, setCalendarMode] = useState<'month' | 'week'>('month');
+  const [calendarReferenceDate, setCalendarReferenceDate] = useState<Date>(() => new Date());
   
   // Hook de filtros
   const { filters, updateFilter, clearFilters, applyFilters } = useRaffleFilters({
@@ -88,6 +131,162 @@ const RafflesLobby: React.FC = () => {
       totalPotCoins
     };
   }, [data]);
+  const calendarEvents = useMemo<CalendarEvent[]>(() => {
+    const raffles = data?.raffles || [];
+    const events: CalendarEvent[] = [];
+    raffles.forEach((raffle: any) => {
+      const base = {
+        raffleId: raffle.id,
+        code: raffle.code,
+        name: raffle.name,
+        status: raffle.status,
+        mode: raffle.mode
+      };
+      if (raffle.startsAt) {
+        const d = new Date(raffle.startsAt);
+        if (!Number.isNaN(d.getTime())) {
+          events.push({
+            id: `start-${raffle.id}`,
+            type: 'start',
+            date: d,
+            ...base
+          });
+        }
+      }
+      if (raffle.scheduledDrawAt) {
+        const d = new Date(raffle.scheduledDrawAt);
+        if (!Number.isNaN(d.getTime())) {
+          events.push({
+            id: `draw-${raffle.id}`,
+            type: 'draw',
+            date: d,
+            ...base
+          });
+        }
+      }
+    });
+    return events;
+  }, [data]);
+
+  const monthDays = useMemo(
+    () => {
+      const startOfMonth = getStartOfMonth(calendarReferenceDate);
+      const calendarStart = getStartOfWeek(startOfMonth);
+      const days: {
+        date: Date;
+        key: string;
+        isCurrentMonth: boolean;
+        isToday: boolean;
+        events: CalendarEvent[];
+      }[] = [];
+      const today = new Date();
+
+      for (let i = 0; i < 42; i += 1) {
+        const date = new Date(calendarStart);
+        date.setDate(calendarStart.getDate() + i);
+        const key = date.toISOString().slice(0, 10);
+        const dayEvents = calendarEvents.filter((ev) => isSameDay(ev.date, date));
+        days.push({
+          date,
+          key,
+          isCurrentMonth:
+            date.getMonth() === startOfMonth.getMonth() &&
+            date.getFullYear() === startOfMonth.getFullYear(),
+          isToday: isSameDay(date, today),
+          events: dayEvents
+        });
+      }
+
+      return days;
+    },
+    [calendarReferenceDate, calendarEvents]
+  );
+
+  const weekDays = useMemo(
+    () => {
+      const startOfWeek = getStartOfWeek(calendarReferenceDate);
+      const days: {
+        date: Date;
+        key: string;
+        isToday: boolean;
+        events: CalendarEvent[];
+      }[] = [];
+      const today = new Date();
+
+      for (let i = 0; i < 7; i += 1) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const key = date.toISOString().slice(0, 10);
+        const dayEvents = calendarEvents.filter((ev) => isSameDay(ev.date, date));
+        days.push({
+          date,
+          key,
+          isToday: isSameDay(date, today),
+          events: dayEvents
+        });
+      }
+
+      return days;
+    },
+    [calendarReferenceDate, calendarEvents]
+  );
+
+  const calendarTitle = useMemo(
+    () => {
+      if (calendarMode === 'month') {
+        const label = calendarReferenceDate.toLocaleDateString('es-VE', {
+          month: 'long',
+          year: 'numeric'
+        });
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      }
+
+      const start = getStartOfWeek(calendarReferenceDate);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+
+      const startLabel = start.toLocaleDateString('es-VE', {
+        day: '2-digit',
+        month: 'short'
+      });
+      const endLabel = end.toLocaleDateString('es-VE', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      return `Semana del ${startLabel} al ${endLabel}`;
+    },
+    [calendarReferenceDate, calendarMode]
+  );
+
+  const handlePrevPeriod = useCallback(() => {
+    setCalendarReferenceDate((current) => {
+      const next = new Date(current);
+      if (calendarMode === 'month') {
+        next.setMonth(next.getMonth() - 1);
+      } else {
+        next.setDate(next.getDate() - 7);
+      }
+      return next;
+    });
+  }, [calendarMode]);
+
+  const handleNextPeriod = useCallback(() => {
+    setCalendarReferenceDate((current) => {
+      const next = new Date(current);
+      if (calendarMode === 'month') {
+        next.setMonth(next.getMonth() + 1);
+      } else {
+        next.setDate(next.getDate() + 7);
+      }
+      return next;
+    });
+  }, [calendarMode]);
+
+  const handleToday = useCallback(() => {
+    setCalendarReferenceDate(new Date());
+  }, []);
   
   return (
     <motion.div
@@ -209,10 +408,10 @@ const RafflesLobby: React.FC = () => {
                 className={`px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                   showFilters ? 'bg-accent text-dark' : 'bg-glass/50 text-text hover:bg-glass'
                 }`}
-              >
-                <Filter size={18} />
-                Filtros
-              </motion.button>
+                >
+                  <Filter size={18} />
+                  Filtros
+                </motion.button>
               
               <div className="flex bg-glass/50 rounded-lg p-1">
                 <button
@@ -234,6 +433,19 @@ const RafflesLobby: React.FC = () => {
                   <List size={18} />
                 </button>
               </div>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowCalendar((prev) => !prev)}
+                className={`px-3 sm:px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  showCalendar ? 'bg-accent text-dark' : 'bg-glass/50 text-text hover:bg-glass'
+                }`}
+              >
+                <Calendar size={18} />
+                <span className="hidden sm:inline">Calendario</span>
+                <span className="sm:hidden">Cal</span>
+              </motion.button>
               
               <motion.button
                 type="button"
@@ -444,6 +656,202 @@ const RafflesLobby: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        {showCalendar && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8 bg-glass rounded-2xl p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-accent" />
+                <div>
+                  <h2 className="text-sm sm:text-base font-semibold text-text">
+                    Calendario de campañas y rifas
+                  </h2>
+                  <p className="text-[11px] text-text/60">
+                    Basado en fechas de inicio y sorteos programados
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex bg-glass/60 rounded-lg p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMode('month')}
+                    className={`px-2.5 py-1 rounded-md ${
+                      calendarMode === 'month'
+                        ? 'bg-accent text-dark'
+                        : 'text-text/70 hover:text-text'
+                    }`}
+                  >
+                    Mes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMode('week')}
+                    className={`px-2.5 py-1 rounded-md ${
+                      calendarMode === 'week'
+                        ? 'bg-accent text-dark'
+                        : 'text-text/70 hover:text-text'
+                    }`}
+                  >
+                    Semana
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handlePrevPeriod}
+                    className="p-1.5 rounded-lg bg-glass/60 text-text/80 hover:bg-glass"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextPeriod}
+                    className="p-1.5 rounded-lg bg-glass/60 text-text/80 hover:bg-glass"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToday}
+                    className="ml-1 px-2.5 py-1 rounded-lg bg-glass/60 text-[11px] text-text/80 hover:bg-glass"
+                  >
+                    Hoy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="text-xs text-text/70 mb-2">
+                {calendarTitle}
+              </div>
+              {calendarEvents.length === 0 ? (
+                <div className="text-xs text-text/60 bg-glass/60 rounded-lg p-3">
+                  No hay fechas de inicio ni sorteos programados para las rifas actuales.
+                </div>
+              ) : calendarMode === 'month' ? (
+                <>
+                  <div className="grid grid-cols-7 gap-1 text-[11px] text-text/60 mb-1">
+                    {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((label) => (
+                      <div
+                        key={label}
+                        className="text-center uppercase tracking-wide"
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-xs">
+                    {monthDays.map((day) => (
+                      <div
+                        key={day.key}
+                        className={`min-h-[72px] rounded-lg border border-white/5 bg-glass/40 p-1.5 flex flex-col ${
+                          day.isCurrentMonth ? '' : 'opacity-40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] text-text/80">
+                            {day.date.getDate()}
+                          </span>
+                          {day.isToday && (
+                            <span className="text-[9px] px-1 rounded-full bg-accent/20 text-accent">
+                              Hoy
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-0.5">
+                          {day.events.slice(0, 3).map((event) => (
+                            <button
+                              key={event.id}
+                              type="button"
+                              onClick={() => navigate(`/raffles/${event.code}`)}
+                              className="w-full text-left text-[10px] px-1 py-0.5 rounded bg-accent/15 text-text/90 hover:bg-accent/25"
+                            >
+                              <span className="font-semibold">
+                                {event.type === 'start' ? 'Inicio' : 'Sorteo'}:
+                              </span>{' '}
+                              <span className="truncate inline-block max-w-[90%] align-middle">
+                                {event.name}
+                              </span>
+                            </button>
+                          ))}
+                          {day.events.length > 3 && (
+                            <div className="text-[10px] text-text/50">
+                              +{day.events.length - 3} más
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {weekDays.map((day) => (
+                    <div
+                      key={day.key}
+                      className="rounded-lg border border-white/5 bg-glass/40 p-2"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium text-text/80">
+                            {day.date.toLocaleDateString('es-VE', {
+                              weekday: 'short',
+                              day: '2-digit',
+                              month: 'short'
+                            })}
+                          </span>
+                          {day.isToday && (
+                            <span className="text-[9px] px-1 rounded-full bg-accent/20 text-accent">
+                              Hoy
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-text/60">
+                          {day.events.length} evento{day.events.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      {day.events.length === 0 ? (
+                        <div className="text-[10px] text-text/50">
+                          Sin eventos este día.
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {day.events.map((event) => (
+                            <button
+                              key={event.id}
+                              type="button"
+                              onClick={() => navigate(`/raffles/${event.code}`)}
+                              className="w-full text-left px-1.5 py-0.5 rounded bg-accent/15 text-text/90 hover:bg-accent/25"
+                            >
+                              <span className="font-semibold">
+                                {event.type === 'start' ? 'Inicio' : 'Sorteo'}
+                              </span>{' '}
+                              <span>
+                                {event.date.toLocaleTimeString('es-VE', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>{' '}
+                              ·{' '}
+                              <span className="truncate inline-block max-w-[55%] align-middle">
+                                {event.name}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
         
         {/* Modal de ayuda - Lobby de Rifas */}
         <AnimatePresence>

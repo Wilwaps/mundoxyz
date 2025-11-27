@@ -60,7 +60,7 @@ const ProtectedStoreRoute = ({
   
   switch (requiredPermission) {
     case 'dashboard':
-      hasPermission = ['owner', 'admin', 'manager'].includes(staffData.role);
+      hasPermission = ['owner', 'admin', 'manager', 'marketing'].includes(staffData.role);
       break;
     case 'pos':
       hasPermission = ['owner', 'admin', 'manager', 'seller'].includes(staffData.role);

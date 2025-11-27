@@ -5,16 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import MessageInbox from './MessageInbox';
 import UnifiedChat from './chat/UnifiedChat';
-import {
-  User,
-  DoorOpen,
-  Gamepad2,
-  Store,
-  Shield,
-  Clock,
-  Settings,
-  Trophy
-} from 'lucide-react';
+import { User, DoorOpen, Gamepad2, Trophy, Store, Settings } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
 import WalletHistoryModal from './WalletHistoryModal';
@@ -74,9 +65,7 @@ const Layout = () => {
     { path: '/lobby', icon: DoorOpen, label: 'Lobby' },
     { path: '/games', icon: Gamepad2, label: 'Juegos' },
     { path: '/raffles', icon: Trophy, label: 'Rifas' },
-    { path: '/market', icon: Store, label: 'Mercado' },
-    { path: '/roles', icon: Shield, label: 'Rol' },
-    { path: '/upcoming', icon: Clock, label: 'Próximo' }
+    { path: '/market', icon: Store, label: 'Mercado' }
   ];
 
   // Añadir panel Admin para admins o para usuarios tote

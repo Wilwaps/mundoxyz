@@ -28,6 +28,7 @@ import Landing from './pages/Landing';
 import GiftLinkClaimPage from './pages/GiftLinkClaimPage';
 import TitoDashboard from './pages/TitoDashboard';
 import TitoLanding from './pages/TitoLanding';
+import Changelog from './pages/Changelog';
 import PoolLobby from './pages/PoolLobby';
 import PoolRoom from './pages/PoolRoom';
 import CaidaLobby from './pages/CaidaLobby';
@@ -141,6 +142,9 @@ function App() {
 
                 {/* Landing Pública de Rifas (sin login) */}
                 <Route path="/raffles/public/:code" element={<RafflePublicLanding />} />
+
+                {/* Changelog público */}
+                <Route path="/changelog" element={<Changelog />} />
 
                 <Route path="/gift-link/:token" element={<GiftLinkClaimPage />} />
 

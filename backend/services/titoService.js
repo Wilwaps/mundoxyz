@@ -22,7 +22,9 @@ async function resolveTitoOwnerIdByToken(client, rawToken) {
   try {
     const res = await executor.query(
       `SELECT tito_user_id FROM tito_tokens
-       WHERE token = $1 AND status = 'active'
+       WHERE token = $1
+         AND status = 'active'
+         AND (expires_at IS NULL OR expires_at > NOW())
        LIMIT 1`,
       [token]
     );

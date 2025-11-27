@@ -168,26 +168,33 @@ router.post('/tito/me/link', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes rol Tito' });
     }
 
-    // Buscar token activo existente
+    // Buscar token activo existente (no expirado)
     const existing = await query(
-      `SELECT token
+      `SELECT token, expires_at
        FROM tito_tokens
-       WHERE tito_user_id = $1 AND status = 'active'
+       WHERE tito_user_id = $1
+         AND status = 'active'
+         AND (expires_at IS NULL OR expires_at > NOW())
        ORDER BY created_at ASC
        LIMIT 1`,
       [userId]
     );
 
     let token;
+    let expiresAt = null;
+
     if (existing.rows.length > 0) {
       token = existing.rows[0].token;
+      expiresAt = existing.rows[0].expires_at || null;
     } else {
       token = crypto.randomBytes(12).toString('hex');
-      await query(
-        `INSERT INTO tito_tokens (tito_user_id, token, status, metadata)
-         VALUES ($1, $2, 'active', $3)`,
-        [userId, token, JSON.stringify({ created_from: 'tito_panel' })]
+      const insertRes = await query(
+        `INSERT INTO tito_tokens (tito_user_id, token, status, metadata, expires_at)
+         VALUES ($1, $2, 'active', $3, NOW() + INTERVAL '24 hours')
+         RETURNING expires_at`,
+        [userId, token, JSON.stringify({ created_from: 'tito_panel', ttl_hours: 24 })]
       );
+      expiresAt = insertRes.rows[0]?.expires_at || null;
     }
 
     const frontendBase = config.server.frontendUrl || '';
@@ -197,7 +204,8 @@ router.post('/tito/me/link', verifyToken, async (req, res) => {
 
     res.json({
       token,
-      inviteUrl
+      inviteUrl,
+      expiresAt
     });
   } catch (error) {
     logger.error('[Commissions] Error generating Tito link', error);
