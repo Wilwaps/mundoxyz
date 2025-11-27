@@ -171,7 +171,7 @@ router.get('/by-slug/:slug', async (req, res) => {
         const result = await query(
             `SELECT id, slug, name
            FROM stores
-           WHERE slug = $1 AND (is_active IS NULL OR is_active = TRUE)
+           WHERE slug = $1
            LIMIT 1`,
             [slug]
         );
