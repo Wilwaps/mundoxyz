@@ -12,17 +12,34 @@ async function userCanManageStoreProducts(user, storeId) {
     const roles = Array.isArray(user.roles) ? user.roles : [];
     const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
 
+    // Los admins globales siempre pueden gestionar cualquier tienda
     if (isGlobalAdmin) return true;
 
+    // 1) Intentar resolver permisos desde store_staff activo
     const staffResult = await query(
         `SELECT role FROM store_staff WHERE user_id = $1 AND store_id = $2 AND is_active = TRUE LIMIT 1`,
         [user.id, storeId]
     );
 
-    if (staffResult.rows.length === 0) return false;
+    if (staffResult.rows.length > 0) {
+        const staffRole = staffResult.rows[0].role;
+        return ['owner', 'admin', 'manager'].includes(staffRole);
+    }
 
-    const staffRole = staffResult.rows[0].role;
-    return ['owner', 'admin', 'manager'].includes(staffRole);
+    // 2) Fallback: si el usuario es el dueño (owner_id) de la tienda, darle acceso completo
+    const ownerResult = await query(
+        `SELECT owner_id FROM stores WHERE id = $1 LIMIT 1`,
+        [storeId]
+    );
+
+    if (ownerResult.rows.length > 0) {
+        const ownerId = ownerResult.rows[0].owner_id;
+        if (String(ownerId) === String(user.id)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // --- PUBLIC ENDPOINTS ---
@@ -1434,7 +1451,31 @@ router.get('/:storeId/staff/me', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Store ID and user ID required' });
         }
 
-        // Check if user is staff for this store
+        const roles = Array.isArray(req.user.roles) ? req.user.roles : [];
+        const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
+
+        // 1) Admin global: siempre puede ver el panel de cualquier tienda
+        if (isGlobalAdmin) {
+            const storeResult = await query(
+                `SELECT id, name, slug FROM stores WHERE id = $1 AND is_active = TRUE LIMIT 1`,
+                [storeId]
+            );
+
+            if (storeResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Store not found' });
+            }
+
+            const store = storeResult.rows[0];
+
+            return res.json({
+                role: 'admin',
+                is_active: true,
+                store_name: store.name,
+                store_slug: store.slug
+            });
+        }
+
+        // 2) Intentar resolver rol desde store_staff activo
         const staffResult = await query(
             `SELECT 
                 ss.role,
@@ -1450,17 +1491,38 @@ router.get('/:storeId/staff/me', verifyToken, async (req, res) => {
             [storeId, userId]
         );
 
-        if (staffResult.rows.length === 0) {
+        if (staffResult.rows.length > 0) {
+            const staffData = staffResult.rows[0];
+
+            return res.json({
+                role: staffData.role,
+                is_active: staffData.is_active,
+                store_name: staffData.store_name,
+                store_slug: staffData.store_slug
+            });
+        }
+
+        // 3) Fallback: si el usuario es el dueño (owner_id), tratarlo como role "owner" aunque no exista en store_staff
+        const ownerResult = await query(
+            `SELECT id, name, slug, owner_id FROM stores WHERE id = $1 AND is_active = TRUE LIMIT 1`,
+            [storeId]
+        );
+
+        if (ownerResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Store not found' });
+        }
+
+        const store = ownerResult.rows[0];
+
+        if (String(store.owner_id) !== String(userId)) {
             return res.status(404).json({ error: 'Not a staff member of this store' });
         }
 
-        const staffData = staffResult.rows[0];
-
-        res.json({
-            role: staffData.role,
-            is_active: staffData.is_active,
-            store_name: staffData.store_name,
-            store_slug: staffData.store_slug
+        return res.json({
+            role: 'owner',
+            is_active: true,
+            store_name: store.name,
+            store_slug: store.slug
         });
 
     } catch (error) {

@@ -14,6 +14,10 @@ const ProtectedStoreRoute = ({
 }) => {
   const location = useLocation();
   const { user } = useAuth();
+
+  const isGlobalAdmin = Array.isArray(user?.roles) && (
+    user.roles.includes('tote') || user.roles.includes('admin')
+  );
   
   // If storeSlug is provided, get the store ID
   const actualStoreId = React.useMemo(() => {
@@ -23,15 +27,6 @@ const ProtectedStoreRoute = ({
   
   const { data: staffData, isLoading, error } = useStoreStaffRoles(actualStoreId);
 
-  // Show loading spinner while checking permissions
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
-
   // If user is not logged in, redirect to login
   if (!user) {
     return (
@@ -39,6 +34,20 @@ const ProtectedStoreRoute = ({
         to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} 
         replace 
       />
+    );
+  }
+
+  // Admin global: acceso completo a rutas de tienda sin depender de store_staff
+  if (isGlobalAdmin) {
+    return children;
+  }
+
+  // Show loading spinner while checking permissions
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="spinner"></div>
+      </div>
     );
   }
 

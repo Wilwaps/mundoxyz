@@ -13,18 +13,35 @@ async function userCanAccessStoreOrders(user, storeId) {
     const roles = Array.isArray(user.roles) ? user.roles : [];
     const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
 
+    // Admins globales siempre pueden ver/gestionar pedidos de cualquier tienda
     if (isGlobalAdmin) return true;
 
+    // 1) Intentar resolver permisos desde store_staff activo
     const staffResult = await query(
         `SELECT role FROM store_staff WHERE user_id = $1 AND store_id = $2 AND is_active = TRUE LIMIT 1`,
         [user.id, storeId]
     );
 
-    if (staffResult.rows.length === 0) return false;
+    if (staffResult.rows.length > 0) {
+        const staffRole = staffResult.rows[0].role;
+        const allowedRoles = ['owner', 'admin', 'manager', 'seller', 'marketing', 'mesonero', 'delivery'];
+        return allowedRoles.includes(staffRole);
+    }
 
-    const staffRole = staffResult.rows[0].role;
-    const allowedRoles = ['owner', 'admin', 'manager', 'seller', 'marketing', 'mesonero', 'delivery'];
-    return allowedRoles.includes(staffRole);
+    // 2) Fallback: si el usuario es el dueño (owner_id) de la tienda, permitir acceso completo
+    const ownerResult = await query(
+        `SELECT owner_id FROM stores WHERE id = $1 LIMIT 1`,
+        [storeId]
+    );
+
+    if (ownerResult.rows.length > 0) {
+        const ownerId = ownerResult.rows[0].owner_id;
+        if (String(ownerId) === String(user.id)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // POST /api/store/order/create
