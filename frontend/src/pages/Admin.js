@@ -30,7 +30,6 @@ import {
   TrendingUp,
   Award
 } from 'lucide-react';
-import HTMLEditor from '../components/admin/HTMLEditor';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
@@ -1970,18 +1969,81 @@ const AdminChangelog = () => {
                 </button>
               </div>
             </div>
-            
+
             {showPreview ? (
-              <div className="html-preview">
-                <div dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-text/60">El contenido aparecerá aquí...</p>' }} />
+              <div className="html-preview custom-scrollbar">
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      contentHtml && contentHtml.trim().length > 0
+                        ? contentHtml
+                        : '<p class="text-text/60">El contenido aparecerá aquí...</p>'
+                  }}
+                />
               </div>
             ) : (
-              <HTMLEditor
-                value={contentHtml}
-                onChange={setContentHtml}
-                placeholder="Escribe el contenido del changelog con formato HTML..."
-                height="250px"
-              />
+              <>
+                <div className="flex flex-wrap gap-1 mb-2 text-[10px] text-text/70">
+                  <span className="mr-2 text-text/50">Atajos rápidos:</span>
+                  <button
+                    type="button"
+                    onClick={() => setContentHtml((prev) => `${prev}\n<h3>Título de sección</h3>\n`)}
+                    className="px-2 py-1 rounded bg-glass hover:bg-glass-hover"
+                  >
+                    &lt;h3&gt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContentHtml(
+                        (prev) =>
+                          `${prev}\n<ul>\n  <li>Primer punto</li>\n  <li>Segundo punto</li>\n</ul>\n`
+                      )
+                    }
+                    className="px-2 py-1 rounded bg-glass hover:bg-glass-hover"
+                  >
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContentHtml((prev) => `${prev}<strong>Texto en negrita</strong>`)
+                    }
+                    className="px-2 py-1 rounded bg-glass hover:bg-glass-hover"
+                  >
+                    &lt;strong&gt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContentHtml(
+                        (prev) => `${prev}<a href=\"https://mundoxyz.com\">Enlace</a>`
+                      )
+                    }
+                    className="px-2 py-1 rounded bg-glass hover:bg-glass-hover"
+                  >
+                    Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContentHtml(
+                        (prev) => `${prev}\n<code>const x = 123;</code>\n`
+                      )
+                    }
+                    className="px-2 py-1 rounded bg-glass hover:bg-glass-hover"
+                  >
+                    &lt;code&gt;
+                  </button>
+                </div>
+
+                <textarea
+                  value={contentHtml}
+                  onChange={(e) => setContentHtml(e.target.value)}
+                  className="input-glass w-full h-48 resize-y font-mono text-[11px] custom-scrollbar"
+                  placeholder="Escribe el contenido del changelog en HTML (p, h3, ul/li, strong, a, etc.)"
+                />
+              </>
             )}
           </div>
           

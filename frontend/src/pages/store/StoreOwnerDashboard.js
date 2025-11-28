@@ -3137,9 +3137,27 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const [notes, setNotes] = useState('');
   const [invoiceImage, setInvoiceImage] = useState('');
   const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   const [items, setItems] = useState([
     { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
   ]);
+
+  // Auto-fill supplier data when selected
+  useEffect(() => {
+    if (supplierId && suppliers) {
+      const selectedSupplier = suppliers.find(s => s.id === supplierId);
+      if (selectedSupplier) {
+        setContactPhone(selectedSupplier.phone || '');
+        setContactEmail(selectedSupplier.email || '');
+        setSupplierAddress(selectedSupplier.address || '');
+      }
+    } else {
+      // Clear fields when no supplier is selected
+      setContactPhone('');
+      setContactEmail('');
+      setSupplierAddress('');
+    }
+  }, [supplierId, suppliers]);
 
   const updateItem = (index, changes) => {
     setItems((prev) =>
@@ -3238,18 +3256,27 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="text-text/60 mb-1">Proveedor</div>
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="input-glass w-full"
-              >
-                <option value="">Sin proveedor</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                  className="input-glass w-full"
+                >
+                  <option value="">Sin proveedor</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowNewSupplierModal(true)}
+                  className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] whitespace-nowrap"
+                >
+                  + Nuevo
+                </button>
+              </div>
             </div>
             <div>
               <div className="text-text/60 mb-1">Nº de factura</div>
@@ -3576,6 +3603,36 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
         </form>
         </div>
       </div>
+      
+      {/* New Supplier Modal */}
+      {showNewSupplierModal && (
+        <NewSupplierModal
+          onClose={() => setShowNewSupplierModal(false)}
+          onSave={async (data) => {
+            // This will be handled by the parent component's mutation
+            // We need to pass the create function from parent
+            const response = await fetch(`/api/store/${window.location.pathname.split('/')[2]}/suppliers`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+              toast.success('Proveedor creado correctamente');
+              setShowNewSupplierModal(false);
+              // Refresh suppliers list
+              window.location.reload();
+            } else {
+              const error = await response.json();
+              toast.error(error.error || 'Error al crear proveedor');
+            }
+          }}
+          loading={false}
+        />
+      )}
     </>
   );
 };
