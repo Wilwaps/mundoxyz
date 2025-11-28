@@ -3148,9 +3148,13 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
     const fetchExchangeRate = async () => {
       try {
         const response = await axios.get('/api/economy/fiat-context');
-        const bcvRate = response.data?.bcvRate?.rate;
-        if (bcvRate) {
-          setExchangeRate(bcvRate);
+        const rawRate = response.data?.bcvRate?.rate;
+        const parsedRate =
+          typeof rawRate === 'number' ? rawRate : parseFloat(rawRate);
+        if (Number.isFinite(parsedRate) && parsedRate > 0) {
+          setExchangeRate(parsedRate);
+        } else {
+          setExchangeRate(null);
         }
       } catch (error) {
         console.error('Error fetching exchange rate:', error);
