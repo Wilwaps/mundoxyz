@@ -3209,12 +3209,30 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl card-glass p-6 space-y-4"
-      >
-        <h3 className="text-lg font-bold">Nueva factura de compra</h3>
+    <>
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+      `}</style>
+      
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-2xl max-h-[90vh] card-glass p-6 space-y-4 overflow-y-auto custom-scrollbar"
+        >
+          <h3 className="text-lg font-bold">Nueva factura de compra</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -3556,8 +3574,9 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
             </button>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
