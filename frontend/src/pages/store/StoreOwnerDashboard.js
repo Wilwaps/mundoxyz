@@ -1184,6 +1184,7 @@ const StoreOwnerDashboard = () => {
                   {orders.map((order) => {
                     const canOpenInvoice = order.invoice_number != null;
                     const isPending = order.status === 'pending';
+                    const isConfirmed = order.status === 'confirmed';
 
                     return (
                       <tr
@@ -1240,6 +1241,21 @@ const StoreOwnerDashboard = () => {
                                 Rechazar
                               </button>
                             </div>
+                          ) : isConfirmed ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateOrderStatusMutation.mutate({
+                                  orderId: order.id,
+                                  status: 'completed'
+                                });
+                              }}
+                              className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[10px] font-semibold text-text disabled:opacity-50"
+                              disabled={updateOrderStatusMutation.isLoading}
+                            >
+                              Marcar como entregado
+                            </button>
                           ) : (
                             <span className="text-[10px] text-text/50">-</span>
                           )}
@@ -2711,6 +2727,8 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [notes, setNotes] = useState('');
+  const [invoiceImage, setInvoiceImage] = useState('');
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [items, setItems] = useState([
     { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
   ]);
@@ -2775,7 +2793,8 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
       supplier_address_snapshot: supplierAddress.trim() || null,
       contact_info: Object.keys(contactInfo).length ? contactInfo : null,
       notes: notes.trim() || null,
-      items: preparedItems
+      items: preparedItems,
+      invoice_image_url: invoiceImage || null
     };
 
     await onSave(payload);
@@ -2877,6 +2896,99 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
               >
                 Agregar ítem
               </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-text/60 text-[11px]">Foto de la factura (opcional)</div>
+              <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
+                <label className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+
+                      const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                      if (result.error) {
+                        toast.error(result.error);
+                      } else if (result.base64) {
+                        setInvoiceImage(result.base64);
+                        toast.success('Imagen de factura cargada');
+                      }
+                    }}
+                  />
+                  <span>Subir foto de factura</span>
+                </label>
+
+                {invoiceImage && (
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <div className="w-16 h-16 rounded-md overflow-hidden border border-glass bg-black/40">
+                      <img src={invoiceImage} alt="Factura" className="w-full h-full object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isOcrLoading}
+                      onClick={async () => {
+                        try {
+                          setIsOcrLoading(true);
+                          const storeId = products[0]?.store_id || null;
+                          if (!storeId) {
+                            toast.error('No se pudo determinar la tienda para leer la factura');
+                            setIsOcrLoading(false);
+                            return;
+                          }
+
+                          const response = await axios.post(`/api/store/${storeId}/inventory/purchases/ocr-preview`, {
+                            invoice_image_url: invoiceImage
+                          });
+
+                          const data = response.data || {};
+
+                          if (data.invoice_number != null) {
+                            setInvoiceNumber(String(data.invoice_number));
+                          }
+                          if (data.invoice_date != null) {
+                            setInvoiceDate(String(data.invoice_date));
+                          }
+                          if (data.notes != null && typeof data.notes === 'string') {
+                            setNotes((prev) => (prev ? `${prev}\n${data.notes}` : data.notes));
+                          }
+
+                          if (Array.isArray(data.items) && data.items.length > 0) {
+                            setItems((prev) => {
+                              // Si no hay ítems válidos aún, reemplazar, si no, concatenar
+                              const hasExistingValid = prev.some((it) => it.productId || it.ingredientId);
+                              const mapped = data.items.map((line) => ({
+                                kind: line.kind === 'ingredient' ? 'ingredient' : 'product',
+                                productId: '',
+                                ingredientId: '',
+                                modifierId: '',
+                                quantity: line.quantity != null ? String(line.quantity) : '',
+                                unitCost: line.unit_cost_usdt != null ? String(line.unit_cost_usdt) : '',
+                                description: line.description || ''
+                              }));
+
+                              return hasExistingValid ? [...prev, ...mapped] : mapped;
+                            });
+                          }
+
+                          toast.success('ron-ia analizó la factura (preview stub)');
+                        } catch (error) {
+                          const message = error?.response?.data?.error || 'No se pudo leer la factura';
+                          toast.error(message);
+                        } finally {
+                          setIsOcrLoading(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isOcrLoading ? 'Leyendo factura…' : 'Leer factura con ron-ia'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2 max-h-64 overflow-y-auto">

@@ -873,7 +873,9 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
             supplier_address_snapshot,
             contact_info,
             notes,
-            items
+            items,
+            invoice_image_url,
+            invoice_ocr_data
         } = req.body || {};
 
         if (!Array.isArray(items) || items.length === 0) {
@@ -938,11 +940,16 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
                 ? contact_info
                 : null;
 
+            const normalizedOcrData = invoice_ocr_data && typeof invoice_ocr_data === 'object'
+                ? invoice_ocr_data
+                : null;
+
             const invoiceResult = await client.query(
                 `INSERT INTO purchase_invoices
          (store_id, supplier_id, invoice_number, invoice_date,
-          supplier_address_snapshot, contact_info, notes, total_cost_usdt, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          supplier_address_snapshot, contact_info, notes, total_cost_usdt, created_by,
+          invoice_image_url, invoice_ocr_data, invoice_ocr_status, invoice_ocr_error)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
                 [
                     storeId,
@@ -953,7 +960,11 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
                     contactInfoJson ? JSON.stringify(contactInfoJson) : null,
                     notes || null,
                     totalCostUsdt,
-                    userId
+                    userId,
+                    invoice_image_url || null,
+                    normalizedOcrData ? JSON.stringify(normalizedOcrData) : null,
+                    normalizedOcrData ? 'success' : 'pending',
+                    null
                 ]
             );
 
@@ -1022,6 +1033,37 @@ router.post('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         logger.error('Error creating purchase invoice:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// POST /api/store/:storeId/inventory/purchases/ocr-preview - Stub para lectura de factura con ron-ia
+router.post('/:storeId/inventory/purchases/ocr-preview', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const { invoice_image_url } = req.body || {};
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        if (!invoice_image_url || typeof invoice_image_url !== 'string') {
+            return res.status(400).json({ error: 'Imagen de factura requerida para lectura' });
+        }
+
+        // Stub inicial: estructura base para que el frontend pueda autocompletar.
+        // Más adelante se integrará el motor real de ron-ia / OCR.
+        res.json({
+            supplier_name: null,
+            invoice_number: null,
+            invoice_date: null,
+            contact_info: null,
+            totals: null,
+            items: []
+        });
+    } catch (error) {
+        logger.error('Error en OCR preview de factura de compra:', error);
         res.status(400).json({ error: error.message });
     }
 });
