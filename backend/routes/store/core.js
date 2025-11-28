@@ -6,8 +6,33 @@ const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 
+async function normalizeStoreId(rawStoreId) {
+    if (!rawStoreId) return null;
+
+    const str = String(rawStoreId).trim();
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+    if (uuidRegex.test(str)) {
+        return str;
+    }
+
+    const result = await query(
+        `SELECT id FROM stores WHERE slug = $1 LIMIT 1`,
+        [str]
+    );
+
+    if (result.rows.length === 0) {
+        return null;
+    }
+
+    return result.rows[0].id;
+}
+
 async function userCanManageStoreProducts(user, storeId) {
     if (!user || !storeId) return false;
+
+    const normalizedStoreId = await normalizeStoreId(storeId);
+    if (!normalizedStoreId) return false;
 
     const roles = Array.isArray(user.roles) ? user.roles : [];
     const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
@@ -18,7 +43,7 @@ async function userCanManageStoreProducts(user, storeId) {
     // 1) Intentar resolver permisos desde store_staff activo
     const staffResult = await query(
         `SELECT role FROM store_staff WHERE user_id = $1 AND store_id = $2 AND is_active = TRUE LIMIT 1`,
-        [user.id, storeId]
+        [user.id, normalizedStoreId]
     );
 
     if (staffResult.rows.length > 0) {
@@ -29,7 +54,7 @@ async function userCanManageStoreProducts(user, storeId) {
     // 2) Fallback: si el usuario es el dueño (owner_id) de la tienda, darle acceso completo
     const ownerResult = await query(
         `SELECT owner_id FROM stores WHERE id = $1 LIMIT 1`,
-        [storeId]
+        [normalizedStoreId]
     );
 
     if (ownerResult.rows.length > 0) {
@@ -1073,14 +1098,19 @@ router.get('/:storeId/suppliers', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
 
-        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        const normalizedStoreId = await normalizeStoreId(storeId);
+        if (!normalizedStoreId) {
+            return res.status(404).json({ error: 'Tienda no encontrada' });
+        }
+
+        const canManage = await userCanManageStoreProducts(req.user, normalizedStoreId);
         if (!canManage) {
             return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
         }
 
         const result = await query(
             `SELECT * FROM suppliers WHERE store_id = $1 ORDER BY name ASC`,
-            [storeId]
+            [normalizedStoreId]
         );
 
         res.json(result.rows);
@@ -1095,7 +1125,12 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
     try {
         const { storeId } = req.params;
 
-        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        const normalizedStoreId = await normalizeStoreId(storeId);
+        if (!normalizedStoreId) {
+            return res.status(404).json({ error: 'Tienda no encontrada' });
+        }
+
+        const canManage = await userCanManageStoreProducts(req.user, normalizedStoreId);
         if (!canManage) {
             return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
         }
@@ -1124,7 +1159,7 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
             [
-                storeId,
+                normalizedStoreId,
                 name.trim(),
                 contact_name || null,
                 phone || null,
