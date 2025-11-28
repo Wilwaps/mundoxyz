@@ -146,6 +146,16 @@ const StoreOwnerDashboard = () => {
   const [reportInterval, setReportInterval] = useState('day');
   const [reportTypeFilter, setReportTypeFilter] = useState('all');
 
+  // Estado para filtros de pedidos activos
+  const [orderColumnsFilter, setOrderColumnsFilter] = useState({
+    actions: true,
+    total: true,
+    reference: true,
+    type: true,
+    created: true,
+    status: false
+  });
+
   const {
     data: storeData,
     isLoading,
@@ -722,7 +732,7 @@ const StoreOwnerDashboard = () => {
     return <div className="p-6 text-sm">No se pudo cargar la información de la tienda.</div>;
   }
 
-  const orders = Array.isArray(activeOrders) ? activeOrders : [];
+  const orders = Array.isArray(activeOrders) ? activeOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
   const ordersHistory = Array.isArray(ordersHistoryData) ? ordersHistoryData : [];
   const marketingConversations = Array.isArray(marketingConversationsData)
     ? marketingConversationsData
@@ -1457,119 +1467,212 @@ const StoreOwnerDashboard = () => {
             </div>
           </div>
 
-          <div className="card-glass p-4 overflow-x-auto border border-emerald-500/20">
-            <div className="flex items-center justify-between mb-3">
+          <div className="card-glass p-4 border border-emerald-500/20">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                 <h2 className="text-sm font-semibold text-emerald-400">Pedidos activos</h2>
-              <p className="text-xs text-text/60">Aún no hay pedidos activos en este momento.</p>
               </div>
-              <span className="text-[11px] text-text/60">
-                {orders.length} en proceso
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-text/60">
+                  {orders.length} en proceso
+                </span>
+                {/* Botón de filtro de columnas */}
+                <div className="relative group">
+                  <button className="px-2 py-1 text-[10px] bg-glass hover:bg-glass-hover rounded text-text/80 transition-colors">
+                    Columnas
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 bg-dark border border-glass rounded-lg shadow-lg p-2 min-w-[150px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    {Object.entries(orderColumnsFilter).map(([key, value]) => (
+                      <label key={key} className="flex items-center gap-2 text-[10px] text-text/80 hover:text-text cursor-pointer py-1">
+                        <input
+                          type="checkbox"
+                          checked={value}
+                          onChange={(e) => setOrderColumnsFilter(prev => ({
+                            ...prev,
+                            [key]: e.target.checked
+                          }))}
+                          className="w-3 h-3 rounded border-glass bg-dark text-accent focus:ring-accent/50"
+                        />
+                        {key === 'actions' ? 'Acciones' : 
+                         key === 'total' ? 'Total' : 
+                         key === 'reference' ? 'Referencia' : 
+                         key === 'type' ? 'Tipo' : 
+                         key === 'created' ? 'Creado' : 
+                         key === 'status' ? 'Estado' : key}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
+            
             {loadingOrders ? (
               <p className="text-xs text-text/60">Cargando pedidos...</p>
             ) : orders.length === 0 ? (
               <p className="text-xs text-text/60">No hay pedidos activos en este momento.</p>
             ) : (
-              <table className="min-w-full text-xs align-middle">
-                <thead>
-                  <tr className="text-text/60 border-b border-glass">
-                    <th className="py-1 pr-3 text-left">Código</th>
-                    <th className="py-1 pr-3 text-left">Estado</th>
-                    <th className="py-1 pr-3 text-left">Tipo</th>
-                    <th className="py-1 pr-3 text-left">Mesa / Ref</th>
-                    <th className="py-1 pr-3 text-right">Total USDT</th>
-                    <th className="py-1 pr-3 text-left">Creado</th>
-                    <th className="py-1 pl-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => {
-                    const canOpenInvoice = order.invoice_number != null;
-                    const isPending = order.status === 'pending';
-                    const isConfirmed = order.status === 'confirmed';
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass">
+                      {orderColumnsFilter.actions && <th className="py-2 pr-3 text-left">Acciones</th>}
+                      {orderColumnsFilter.total && <th className="py-2 pr-3 text-left">Total USD/VES - Ref</th>}
+                      {orderColumnsFilter.type && <th className="py-2 pr-3 text-left">Tipo</th>}
+                      {orderColumnsFilter.status && <th className="py-2 pr-3 text-left">Estado</th>}
+                      {orderColumnsFilter.created && <th className="py-2 pr-3 text-left">Creado</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => {
+                      const canOpenInvoice = order.invoice_number != null;
+                      const isPending = order.status === 'pending';
+                      const isConfirmed = order.status === 'confirmed';
+                      const hasDeliveryAddress = order.delivery_address || order.customer_address;
 
-                    return (
-                      <tr
-                        key={order.id}
-                        className={`border-b border-glass/40 ${
-                          canOpenInvoice ? 'cursor-pointer hover:bg-glass' : ''
-                        }`}
-                        onClick={() => {
-                          if (!canOpenInvoice) return;
-                          navigate(
-                            `/store/${store.slug}/invoice/${order.invoice_number}?from=reports`
-                          );
-                        }}
-                      >
-                        <td className="py-1 pr-3 text-text/80">{order.code}</td>
-                        <td className="py-1 pr-3 text-text/70">{order.status}</td>
-                        <td className="py-1 pr-3 text-text/70">{order.type}</td>
-                        <td className="py-1 pr-3 text-text/70">{order.table_number || '-'}</td>
-                        <td className="py-1 pr-3 text-right text-text/80">
-                          {Number(order.total_usdt || 0).toFixed(2)}
-                        </td>
-                        <td className="py-1 pr-3 text-text/60">
-                          {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
-                        </td>
-                        <td className="py-1 pl-3 text-right">
-                          {isPending ? (
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateOrderStatusMutation.mutate({
-                                    orderId: order.id,
-                                    status: 'confirmed'
-                                  });
-                                }}
-                                className="px-2 py-0.5 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-[10px] font-semibold text-dark disabled:opacity-50"
-                                disabled={updateOrderStatusMutation.isLoading}
-                              >
-                                Aceptar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateOrderStatusMutation.mutate({
-                                    orderId: order.id,
-                                    status: 'cancelled'
-                                  });
-                                }}
-                                className="px-2 py-0.5 rounded-full bg-red-500/90 hover:bg-red-400 text-[10px] font-semibold text-dark disabled:opacity-50"
-                                disabled={updateOrderStatusMutation.isLoading}
-                              >
-                                Rechazar
-                              </button>
-                            </div>
-                          ) : isConfirmed ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateOrderStatusMutation.mutate({
-                                  orderId: order.id,
-                                  status: 'completed'
-                                });
-                              }}
-                              className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[10px] font-semibold text-text disabled:opacity-50"
-                              disabled={updateOrderStatusMutation.isLoading}
-                            >
-                              Marcar como entregado
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-text/50">-</span>
+                      return (
+                        <tr
+                          key={order.id}
+                          className={`border-b border-glass/40 ${
+                            canOpenInvoice ? 'cursor-pointer hover:bg-glass' : ''
+                          }`}
+                          onClick={() => {
+                            if (!canOpenInvoice) return;
+                            navigate(
+                              `/store/${store.slug}/invoice/${order.invoice_number}?from=reports`
+                            );
+                          }}
+                        >
+                          {orderColumnsFilter.actions && (
+                            <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}>
+                              {isPending ? (
+                                <div className="flex gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateOrderStatusMutation.mutate({
+                                        orderId: order.id,
+                                        status: 'confirmed'
+                                      });
+                                    }}
+                                    className="px-2 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-[10px] font-semibold text-dark disabled:opacity-50 transition-colors"
+                                    disabled={updateOrderStatusMutation.isLoading}
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateOrderStatusMutation.mutate({
+                                        orderId: order.id,
+                                        status: 'cancelled'
+                                      });
+                                    }}
+                                    className="px-2 py-1 rounded-full bg-red-500/90 hover:bg-red-400 text-[10px] font-semibold text-dark disabled:opacity-50 transition-colors"
+                                    disabled={updateOrderStatusMutation.isLoading}
+                                  >
+                                    ✗
+                                  </button>
+                                </div>
+                              ) : isConfirmed ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateOrderStatusMutation.mutate({
+                                      orderId: order.id,
+                                      status: 'completed'
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[10px] font-semibold text-text disabled:opacity-50 transition-colors"
+                                  disabled={updateOrderStatusMutation.isLoading}
+                                >
+                                  Entregado
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-text/50">-</span>
+                              )}
+                            </td>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          
+                          {orderColumnsFilter.total && (
+                            <td className="py-2 pr-3">
+                              <div className="space-y-1">
+                                <div className="text-text/80 font-medium">
+                                  ${Number(order.total_usdt || 0).toFixed(2)}
+                                  {order.total_bsv && (
+                                    <span className="text-text/60 ml-2">
+                                      Bs {Number(order.total_bsv).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-text/60">
+                                  Ref: {order.payment_reference || order.invoice_number || order.code || 'N/A'}
+                                </div>
+                              </div>
+                            </td>
+                          )}
+                          
+                          {orderColumnsFilter.type && (
+                            <td className="py-2 pr-3">
+                              <div className="space-y-1">
+                                <div className="text-text/70 capitalize">
+                                  {order.type || 'local'}
+                                </div>
+                                {hasDeliveryAddress && (
+                                  <a
+                                    href={`https://maps.google.com/?q=${encodeURIComponent(hasDeliveryAddress)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-accent hover:text-accent/80 flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                    </svg>
+                                    Ver dirección
+                                  </a>
+                                )}
+                                {order.table_number && (
+                                  <div className="text-[10px] text-text/60">
+                                    Mesa: {order.table_number}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                          
+                          {orderColumnsFilter.status && (
+                            <td className="py-2 pr-3">
+                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                                order.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                order.status === 'confirmed' ? 'bg-blue-500/20 text-blue-400' :
+                                order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                                order.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
+                                'bg-glass text-text/60'
+                              }`}>
+                                {order.status || 'desconocido'}
+                              </span>
+                            </td>
+                          )}
+                          
+                          {orderColumnsFilter.created && (
+                            <td className="py-2 pr-3 text-text/60">
+                              {order.created_at ? 
+                                new Date(order.created_at).toLocaleString('es-VE', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : '-'
+                              }
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
