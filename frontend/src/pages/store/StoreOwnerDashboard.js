@@ -2366,6 +2366,12 @@ const StoreOwnerDashboard = () => {
           suppliers={suppliers}
           products={products}
           ingredients={ingredients}
+          categories={categories}
+          storeId={store?.id}
+          onCreateProduct={async (data) => {
+            const created = await createProductMutation.mutateAsync(data);
+            return created;
+          }}
           onClose={() => setIsNewInvoiceModalOpen(false)}
           onSave={async (data) => {
             await createPurchaseMutation.mutateAsync(data);
@@ -3127,7 +3133,17 @@ const NewSupplierModal = ({ onClose, onSave, loading }) => {
   );
 };
 
-const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, loading }) => {
+const NewPurchaseModal = ({
+  suppliers,
+  products,
+  ingredients,
+  categories,
+  storeId,
+  onCreateProduct,
+  onClose,
+  onSave,
+  loading
+}) => {
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
@@ -3139,9 +3155,50 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(null);
+  const [createdProducts, setCreatedProducts] = useState([]);
+  const [createdIngredients, setCreatedIngredients] = useState([]);
   const [items, setItems] = useState([
-    { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', unitCostVES: '', unit: '', taxRate: '0', description: '' }
+    {
+      kind: 'product',
+      productId: '',
+      ingredientId: '',
+      modifierId: '',
+      quantity: '',
+      unitCost: '',
+      unitCostVES: '',
+      unit: '',
+      taxRate: '0',
+      description: '',
+      searchTerm: '',
+      sku: ''
+    }
   ]);
+
+  const extendedProducts = useMemo(
+    () => [
+      ...(Array.isArray(products) ? products : []),
+      ...createdProducts
+    ],
+    [products, createdProducts]
+  );
+
+  const extendedIngredients = useMemo(
+    () => [
+      ...(Array.isArray(ingredients) ? ingredients : []),
+      ...createdIngredients
+    ],
+    [ingredients, createdIngredients]
+  );
+
+  const getDefaultCategoryId = () => {
+    if (Array.isArray(categories) && categories.length > 0) {
+      return categories[0].id;
+    }
+    return null;
+  };
+
+  const generateNumericSku = () =>
+    String(Math.floor(100000000 + Math.random() * 900000000));
 
   // Fetch BCV exchange rate
   useEffect(() => {
@@ -3207,7 +3264,20 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', unitCostVES: '', unit: '', taxRate: '0', description: '' }
+      {
+        kind: 'product',
+        productId: '',
+        ingredientId: '',
+        modifierId: '',
+        quantity: '',
+        unitCost: '',
+        unitCostVES: '',
+        unit: '',
+        taxRate: '0',
+        description: '',
+        searchTerm: '',
+        sku: ''
+      }
     ]);
   };
 
@@ -3233,11 +3303,13 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
       // Get item name
       let itemName = 'Item sin nombre';
       if (item.kind === 'product') {
-        const product = products.find(p => p.id === item.productId);
-        itemName = product?.name || 'Producto no encontrado';
+        const product = extendedProducts.find(p => p.id === item.productId);
+        itemName = product?.name || item.searchTerm || 'Producto no encontrado';
       } else if (item.kind === 'ingredient') {
-        const ingredient = ingredients.find(i => i.id === item.ingredientId);
-        itemName = ingredient?.name || 'Ingrediente no encontrado';
+        const ingredient = extendedIngredients.find(i => i.id === item.ingredientId);
+        itemName = ingredient?.name || item.searchTerm || 'Ingrediente no encontrado';
+      } else if (item.searchTerm) {
+        itemName = item.searchTerm;
       }
       
       return {
@@ -3259,6 +3331,129 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const summaryItems = calculateSummary();
   const grandTotalUSD = summaryItems.reduce((sum, item) => sum + item.totalUSD, 0);
   const grandTotalVES = summaryItems.reduce((sum, item) => sum + item.totalVES, 0);
+
+  const handleCreateProductFromItem = async (index) => {
+    try {
+      if (!onCreateProduct) {
+        toast.error('No se puede crear producto desde aquí');
+        return;
+      }
+
+      const item = items[index];
+      const name = (item.searchTerm || '').trim();
+      if (!name) {
+        toast.error('Escribe un nombre para el producto');
+        return;
+      }
+
+      const defaultCategoryId = getDefaultCategoryId();
+      if (!defaultCategoryId) {
+        toast.error('Configura al menos una categoría antes de crear productos');
+        return;
+      }
+
+      const sku = (item.sku || '').trim() || generateNumericSku();
+      const unitCostNumber = parseFloat(item.unitCost || '0');
+      const priceUsdt =
+        Number.isFinite(unitCostNumber) && unitCostNumber >= 0 ? unitCostNumber : 0;
+
+      const payload = {
+        sku,
+        name,
+        description: (item.description || '').trim(),
+        category_id: defaultCategoryId,
+        price_usdt: priceUsdt,
+        price_fires: '',
+        is_menu_item: true,
+        has_modifiers: false,
+        accepts_fires: false,
+        stock: 0,
+        min_stock_alert: 0
+      };
+
+      const newProduct = await onCreateProduct(payload);
+      if (newProduct && newProduct.id) {
+        setCreatedProducts((prev) => [...prev, newProduct]);
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === index
+              ? {
+                  ...it,
+                  kind: 'product',
+                  productId: newProduct.id,
+                  ingredientId: '',
+                  searchTerm: newProduct.name || name,
+                  sku: newProduct.sku || sku
+                }
+              : it
+          )
+        );
+        toast.success('Producto creado desde la factura');
+      }
+    } catch (error) {
+      console.error('Error creating product from invoice:', error);
+      const message = error?.response?.data?.error || 'Error al crear producto';
+      toast.error(message);
+    }
+  };
+
+  const handleCreateIngredientFromItem = async (index) => {
+    try {
+      if (!storeId) {
+        toast.error('No se pudo determinar la tienda para crear ingrediente');
+        return;
+      }
+
+      const item = items[index];
+      const name = (item.searchTerm || '').trim();
+      if (!name) {
+        toast.error('Escribe un nombre para el ingrediente');
+        return;
+      }
+
+      const unitValue = item.unit || 'unit';
+      const unitCostNumber = parseFloat(item.unitCost || '0');
+      const costPerUnitUsdt =
+        Number.isFinite(unitCostNumber) && unitCostNumber >= 0 ? unitCostNumber : 0;
+
+      const payload = {
+        name,
+        unit: unitValue,
+        cost_per_unit_usdt: costPerUnitUsdt,
+        current_stock: 0,
+        min_stock_alert: 0
+      };
+
+      const response = await axios.post(
+        `/api/store/inventory/${storeId}/ingredient`,
+        payload
+      );
+
+      const newIngredient = response.data;
+      if (newIngredient && newIngredient.id) {
+        setCreatedIngredients((prev) => [...prev, newIngredient]);
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === index
+              ? {
+                  ...it,
+                  kind: 'ingredient',
+                  ingredientId: newIngredient.id,
+                  productId: '',
+                  searchTerm: newIngredient.name || name,
+                  unit: newIngredient.unit || unitValue
+                }
+              : it
+          )
+        );
+        toast.success('Ingrediente creado desde la factura');
+      }
+    } catch (error) {
+      console.error('Error creating ingredient from invoice:', error);
+      const message = error?.response?.data?.error || 'Error al crear ingrediente';
+      toast.error(message);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -3554,35 +3749,99 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                       </select>
                     </div>
                     <div className="md:col-span-2">
+                      <div className="text-[11px] text-text/60 mb-0.5">Nombre / buscador</div>
+                      <input
+                        type="text"
+                        value={item.searchTerm}
+                        onChange={(e) => updateItem(index, { searchTerm: e.target.value })}
+                        className="input-glass w-full text-[11px]"
+                        placeholder={
+                          item.kind === 'product'
+                            ? 'Nombre o SKU de producto'
+                            : 'Nombre de ingrediente'
+                        }
+                      />
+                    </div>
+                    <div className="md:col-span-2">
                       <div className="text-[11px] text-text/60 mb-0.5">
                         {item.kind === 'product' ? 'Producto' : 'Ingrediente'}
                       </div>
-                      <select
-                        value={item.kind === 'product' ? item.productId : item.ingredientId}
-                        onChange={(e) => {
-                          if (item.kind === 'product') {
-                            updateItem(index, { productId: e.target.value, ingredientId: '', modifierId: '' });
-                          } else {
-                            updateItem(index, { ingredientId: e.target.value, productId: '' });
-                          }
-                        }}
-                        className="input-glass w-full text-[11px]"
-                      >
-                        <option value="">
-                          Selecciona {item.kind === 'product' ? 'producto' : 'ingrediente'}
-                        </option>
-                        {item.kind === 'product'
-                          ? products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} {p.sku ? `(#${p.sku})` : ''}
-                              </option>
-                            ))
-                          : ingredients.map((ing) => (
-                              <option key={ing.id} value={ing.id}>
-                                {ing.name} ({ing.unit})
-                              </option>
-                            ))}
-                      </select>
+                      {item.kind === 'product'
+                        ? (() => {
+                            const search = (item.searchTerm || '').toLowerCase();
+                            const list = extendedProducts.filter((p) => {
+                              const haystack = `${p.name || ''} ${p.sku || ''}`.toLowerCase();
+                              return !search || haystack.includes(search);
+                            });
+                            return (
+                              <>
+                                <select
+                                  value={item.productId}
+                                  onChange={(e) => {
+                                    updateItem(index, {
+                                      productId: e.target.value,
+                                      ingredientId: '',
+                                      modifierId: ''
+                                    });
+                                  }}
+                                  className="input-glass w-full text-[11px] mb-1"
+                                >
+                                  <option value="">Selecciona producto</option>
+                                  {list.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} {p.sku ? `(#${p.sku})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                                {item.searchTerm && list.length === 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCreateProductFromItem(index)}
+                                    className="px-2 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[10px]"
+                                  >
+                                    Crear producto "{item.searchTerm}"
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()
+                        : (() => {
+                            const search = (item.searchTerm || '').toLowerCase();
+                            const list = extendedIngredients.filter((ing) => {
+                              const haystack = `${ing.name || ''}`.toLowerCase();
+                              return !search || haystack.includes(search);
+                            });
+                            return (
+                              <>
+                                <select
+                                  value={item.ingredientId}
+                                  onChange={(e) => {
+                                    updateItem(index, {
+                                      ingredientId: e.target.value,
+                                      productId: ''
+                                    });
+                                  }}
+                                  className="input-glass w-full text-[11px] mb-1"
+                                >
+                                  <option value="">Selecciona ingrediente</option>
+                                  {list.map((ing) => (
+                                    <option key={ing.id} value={ing.id}>
+                                      {ing.name} ({ing.unit})
+                                    </option>
+                                  ))}
+                                </select>
+                                {item.searchTerm && list.length === 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCreateIngredientFromItem(index)}
+                                    className="px-2 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[10px]"
+                                  >
+                                    Crear ingrediente "{item.searchTerm}"
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
                     </div>
                     {item.kind === 'product' && (() => {
                       const product = products.find((p) => String(p.id) === String(item.productId));
@@ -3691,7 +3950,29 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                         className="input-glass w-full text-[11px]"
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5 text-[11px] text-text/60">
+                        <span>SKU (solo números)</span>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, { sku: generateNumericSku() })}
+                          className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[9px]"
+                        >
+                          Auto
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={item.sku}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          updateItem(index, { sku: value });
+                        }}
+                        className="input-glass w-full text-[11px]"
+                        placeholder="SKU numérico"
+                      />
+                    </div>
+                    <div className="md:col-span-1 md:col-start-1 md:col-end-4">
                       <div className="text-[11px] text-text/60 mb-0.5">Descripción (opcional)</div>
                       <input
                         type="text"
@@ -3700,7 +3981,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                         className="input-glass w-full text-[11px]"
                       />
                     </div>
-                    <div className="flex justify-end mt-1">
+                    <div className="flex justify-end mt-1 md:col-span-3">
                       {items.length > 1 && (
                         <button
                           type="button"
