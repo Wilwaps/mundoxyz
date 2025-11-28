@@ -3138,9 +3138,27 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
   const [invoiceImage, setInvoiceImage] = useState('');
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(null);
   const [items, setItems] = useState([
-    { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
+    { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', unitCostVES: '', unit: '', taxRate: '0', description: '' }
   ]);
+
+  // Fetch BCV exchange rate
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await axios.get('/api/economy/fiat-context');
+        const bcvRate = response.data?.bcvRate?.rate;
+        if (bcvRate) {
+          setExchangeRate(bcvRate);
+        }
+      } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+      }
+    };
+    
+    fetchExchangeRate();
+  }, []);
 
   // Auto-fill supplier data when selected
   useEffect(() => {
@@ -3159,22 +3177,84 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
     }
   }, [supplierId, suppliers]);
 
+  // Auto-convert prices
   const updateItem = (index, changes) => {
-    setItems((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, ...changes } : item))
-    );
+    setItems((prev) => {
+      const newItems = prev.map((item, idx) => (idx === index ? { ...item, ...changes } : item));
+      const updatedItem = newItems[index];
+      
+      // Auto-convert between USD and VES
+      if (changes.unitCost !== undefined && exchangeRate) {
+        const usdValue = parseFloat(changes.unitCost) || 0;
+        if (!isNaN(usdValue) && usdValue >= 0) {
+          updatedItem.unitCostVES = (usdValue * exchangeRate).toFixed(2);
+        }
+      } else if (changes.unitCostVES !== undefined && exchangeRate) {
+        const vesValue = parseFloat(changes.unitCostVES) || 0;
+        if (!isNaN(vesValue) && vesValue >= 0) {
+          updatedItem.unitCost = (vesValue / exchangeRate).toFixed(4);
+        }
+      }
+      
+      return newItems;
+    });
   };
 
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', description: '' }
+      { kind: 'product', productId: '', ingredientId: '', modifierId: '', quantity: '', unitCost: '', unitCostVES: '', unit: '', taxRate: '0', description: '' }
     ]);
   };
 
   const removeItem = (index) => {
     setItems((prev) => prev.filter((_, idx) => idx !== index));
   };
+
+  // Calculate summary totals
+  const calculateSummary = () => {
+    return items.map(item => {
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitCostUSD = parseFloat(item.unitCost) || 0;
+      const unitCostVES = parseFloat(item.unitCostVES) || 0;
+      const taxRate = parseFloat(item.taxRate) || 0;
+      
+      const subtotalUSD = quantity * unitCostUSD;
+      const subtotalVES = quantity * unitCostVES;
+      const taxUSD = subtotalUSD * (taxRate / 100);
+      const taxVES = subtotalVES * (taxRate / 100);
+      const totalUSD = subtotalUSD + taxUSD;
+      const totalVES = subtotalVES + taxVES;
+      
+      // Get item name
+      let itemName = 'Item sin nombre';
+      if (item.kind === 'product') {
+        const product = products.find(p => p.id === item.productId);
+        itemName = product?.name || 'Producto no encontrado';
+      } else if (item.kind === 'ingredient') {
+        const ingredient = ingredients.find(i => i.id === item.ingredientId);
+        itemName = ingredient?.name || 'Ingrediente no encontrado';
+      }
+      
+      return {
+        name: itemName,
+        quantity: quantity,
+        unit: item.unit || 'unit',
+        unitCostUSD: unitCostUSD,
+        unitCostVES: unitCostVES,
+        subtotalUSD: subtotalUSD,
+        subtotalVES: subtotalVES,
+        taxUSD: taxUSD,
+        taxVES: taxVES,
+        totalUSD: totalUSD,
+        totalVES: totalVES
+      };
+    });
+  };
+
+  const summaryItems = calculateSummary();
+  const grandTotalUSD = summaryItems.reduce((sum, item) => sum + item.totalUSD, 0);
+  const grandTotalVES = summaryItems.reduce((sum, item) => sum + item.totalVES, 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -3534,6 +3614,68 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                         </div>
                       );
                     })()}
+                    <div className="md:col-span-2">
+                      <div className="text-[11px] text-text/60 mb-0.5">Costo unitario</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={item.unitCost}
+                            onChange={(e) => updateItem(index, { unitCost: e.target.value })}
+                            className="input-glass w-full text-[11px]"
+                            placeholder="USD"
+                          />
+                          {exchangeRate && (
+                            <div className="text-[9px] text-text/50 mt-1">
+                              $1.00 USD = {exchangeRate.toFixed(2)} VES (BCV)
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitCostVES}
+                            onChange={(e) => updateItem(index, { unitCostVES: e.target.value })}
+                            className="input-glass w-full text-[11px]"
+                            placeholder="VES"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-text/60 mb-0.5">Unidad</div>
+                      <select
+                        value={item.unit}
+                        onChange={(e) => updateItem(index, { unit: e.target.value })}
+                        className="input-glass w-full text-[11px]"
+                      >
+                        <option value="">Seleccionar unidad</option>
+                        <option value="kg">Kilogramos (kg)</option>
+                        <option value="g">Gramos (g)</option>
+                        <option value="L">Litros (L)</option>
+                        <option value="ml">Mililitros (ml)</option>
+                        <option value="unit">Unidad (unit)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-text/60 mb-0.5">Impuesto (%)</div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={item.taxRate}
+                        onChange={(e) => updateItem(index, { taxRate: e.target.value })}
+                        className="input-glass w-full text-[11px]"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <div className="text-[11px] text-text/60 mb-0.5">Cantidad</div>
                       <input
@@ -3545,20 +3687,7 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
                         className="input-glass w-full text-[11px]"
                       />
                     </div>
-                    <div>
-                      <div className="text-[11px] text-text/60 mb-0.5">Costo unitario (USDT)</div>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        value={item.unitCost}
-                        onChange={(e) => updateItem(index, { unitCost: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-center">
-                    <div>
+                    <div className="md:col-span-2">
                       <div className="text-[11px] text-text/60 mb-0.5">Descripción (opcional)</div>
                       <input
                         type="text"
@@ -3583,6 +3712,61 @@ const NewPurchaseModal = ({ suppliers, products, ingredients, onClose, onSave, l
               ))}
             </div>
           </div>
+
+          {/* Summary Table */}
+          {summaryItems.some(item => item.quantity > 0) && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-text/80">Resumen de la factura</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-[11px]">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass">
+                      <th className="py-1 pr-2 text-left">Producto</th>
+                      <th className="py-1 pr-2 text-center">Cantidad</th>
+                      <th className="py-1 pr-2 text-center">Costo USD</th>
+                      <th className="py-1 pr-2 text-center">Costo VES</th>
+                      <th className="py-1 pr-2 text-center">Subtotal USD</th>
+                      <th className="py-1 pr-2 text-center">Subtotal VES</th>
+                      <th className="py-1 pr-2 text-center">Impuesto USD</th>
+                      <th className="py-1 pr-2 text-center">Impuesto VES</th>
+                      <th className="py-1 pr-2 text-center">Total USD</th>
+                      <th className="py-1 pr-2 text-center">Total VES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryItems.map((item, index) => (
+                      <tr key={index} className="border-b border-glass/40">
+                        <td className="py-1 pr-2">
+                          <div>
+                            <div className="text-text/80">{item.name}</div>
+                            <div className="text-text/50 text-[9px]">{item.unit}</div>
+                          </div>
+                        </td>
+                        <td className="py-1 pr-2 text-center">{item.quantity}</td>
+                        <td className="py-1 pr-2 text-center">${item.unitCostUSD.toFixed(4)}</td>
+                        <td className="py-1 pr-2 text-center">{item.unitCostVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">${item.subtotalUSD.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">{item.subtotalVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">${item.taxUSD.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">{item.taxVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold">${item.totalUSD.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold">{item.totalVES.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr className="font-semibold text-accent">
+                      <td colSpan="4" className="py-2 pr-2 text-right">TOTAL:</td>
+                      <td className="py-2 pr-2 text-center">${grandTotalUSD.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{grandTotalVES.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">${summaryItems.reduce((sum, item) => sum + item.taxUSD, 0).toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{summaryItems.reduce((sum, item) => sum + item.taxVES, 0).toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">${grandTotalUSD.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{grandTotalVES.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
