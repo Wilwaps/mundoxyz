@@ -1,26 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { Routes, Route, Link, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Users, 
-  TrendingUp, 
+  ShoppingBag, 
+  Home, 
+  Fire, 
   Gift, 
+  Coins, 
+  Megaphone, 
+  BarChart3, 
+  ArrowLeft, 
+  Settings,
+  ListChecks,
+  ExternalLink,
+  Flame,
   DollarSign,
   Activity,
-  Shield,
-  Award,
-  Flame,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Repeat,
   Send,
-  Megaphone
+  Clock,
+  XCircle,
+  CheckCircle,
+  Repeat,
+  Shield,
+  TrendingUp,
+  Award
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import HTMLEditor from '../components/admin/HTMLEditor';
 import WelcomeEventsManager from '../components/admin/WelcomeEventsManager';
 import DirectGiftsSender from '../components/admin/DirectGiftsSender';
 import RoleManagementDropdown from '../components/admin/RoleManagementDropdown';
@@ -1723,6 +1733,7 @@ const AdminChangelog = () => {
   const [version, setVersion] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [isPublished, setIsPublished] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-changelog'],
@@ -1775,19 +1786,117 @@ const AdminChangelog = () => {
 
   return (
     <div className="p-4 space-y-6">
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .html-preview h1, .html-preview h2, .html-preview h3,
+        .html-preview h4, .html-preview h5, .html-preview h6 {
+          color: #f3f4f6;
+          font-weight: bold;
+          margin: 0.5em 0;
+        }
+        .html-preview h1 { font-size: 1.5em; }
+        .html-preview h2 { font-size: 1.25em; }
+        .html-preview h3 { font-size: 1.1em; }
+        
+        .html-preview p {
+          margin: 0.5em 0;
+          line-height: 1.5;
+        }
+        
+        .html-preview ul, .html-preview ol {
+          margin: 0.5em 0;
+          padding-left: 1.5em;
+        }
+        
+        .html-preview li {
+          margin: 0.25em 0;
+        }
+        
+        .html-preview blockquote {
+          border-left: 3px solid #38bdf8;
+          padding-left: 1em;
+          margin: 1em 0;
+          color: #9ca3af;
+          font-style: italic;
+        }
+        
+        .html-preview a {
+          color: #38bdf8;
+          text-decoration: underline;
+        }
+        
+        .html-preview strong {
+          color: #f3f4f6;
+          font-weight: bold;
+        }
+        
+        .html-preview em {
+          color: #d1d5db;
+          font-style: italic;
+        }
+        
+        .html-preview code {
+          background: rgba(255, 255, 255, 0.1);
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          font-family: monospace;
+          color: #38bdf8;
+          font-size: 0.85em;
+        }
+        
+        .html-preview pre {
+          background: rgba(0, 0, 0, 0.3);
+          padding: 0.75em;
+          border-radius: 0.5rem;
+          margin: 1em 0;
+          overflow-x: auto;
+          font-size: 0.85em;
+        }
+        
+        .html-preview pre code {
+          background: none;
+          padding: 0;
+        }
+        
+        .html-preview img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 0.5rem;
+          margin: 0.5em 0;
+        }
+      `}</style>
+      
       <h2 className="text-2xl font-bold flex items-center gap-2">
         <Megaphone size={20} className="text-accent" />
         Changelog del sistema
       </h2>
 
-      <div className="card-glass p-4 text-xs space-y-3">
+      <div className="card-glass p-4 text-xs space-y-4">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold text-text/80">Nueva entrada</h3>
+          <h3 className="text-sm font-semibold text-text/80 flex items-center gap-2">
+            <Megaphone size={16} className="text-accent" />
+            Nueva entrada de changelog
+          </h3>
           {createEntryMutation.isLoading && (
             <span className="text-[11px] text-text/60">Guardando…</span>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <div className="text-[11px] text-text/60 mb-1">Título</div>
             <input
@@ -1798,16 +1907,25 @@ const AdminChangelog = () => {
               placeholder="Ej: Mejoras en el panel de tiendas"
             />
           </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <div className="text-[11px] text-text/60 mb-1">Categoría</div>
-              <input
-                type="text"
+              <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="input-glass w-full"
-                placeholder="core, tiendas, juegos…"
-              />
+              >
+                <option value="">Seleccionar...</option>
+                <option value="core">Core</option>
+                <option value="tiendas">Tiendas</option>
+                <option value="juegos">Juegos</option>
+                <option value="economía">Economía</option>
+                <option value="ui">UI/UX</option>
+                <option value="seguridad">Seguridad</option>
+                <option value="móvil">Móvil</option>
+                <option value="api">API</option>
+              </select>
             </div>
             <div>
               <div className="text-[11px] text-text/60 mb-1">Versión</div>
@@ -1831,22 +1949,52 @@ const AdminChangelog = () => {
               </label>
             </div>
           </div>
+          
           <div>
-            <div className="text-[11px] text-text/60 mb-1">Contenido (HTML permitido)</div>
-            <textarea
-              value={contentHtml}
-              onChange={(e) => setContentHtml(e.target.value)}
-              className="input-glass w-full h-32 resize-none font-mono text-[11px]"
-              placeholder="Ej: &lt;ul&gt;...&lt;/ul&gt;"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] text-text/60">Contenido HTML</div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="px-2 py-1 text-[10px] bg-glass hover:bg-glass-hover rounded text-text/80 transition-colors"
+                >
+                  {showPreview ? 'Editar' : 'Vista previa'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContentHtml('')}
+                  className="px-2 py-1 text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            
+            {showPreview ? (
+              <div className="html-preview">
+                <div dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-text/60">El contenido aparecerá aquí...</p>' }} />
+              </div>
+            ) : (
+              <HTMLEditor
+                value={contentHtml}
+                onChange={setContentHtml}
+                placeholder="Escribe el contenido del changelog con formato HTML..."
+                height="250px"
+              />
+            )}
           </div>
-          <div className="flex justify-end">
+          
+          <div className="flex justify-between items-center pt-2">
+            <div className="text-[10px] text-text/50">
+              {contentHtml.length} caracteres
+            </div>
             <button
               type="submit"
-              disabled={createEntryMutation.isLoading}
-              className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={createEntryMutation.isLoading || !title.trim() || !contentHtml.trim()}
+              className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Guardar entrada
+              {createEntryMutation.isLoading ? 'Guardando...' : 'Guardar entrada'}
             </button>
           </div>
         </form>
@@ -1867,24 +2015,37 @@ const AdminChangelog = () => {
         ) : (
           <div className="space-y-3 max-h-[420px] overflow-y-auto">
             {entries.map((entry) => (
-              <div key={entry.id} className="glass-panel p-3 space-y-1">
+              <div key={entry.id} className="glass-panel p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold text-sm text-text">{entry.title}</div>
-                    <div className="text-[11px] text-text/60 flex flex-wrap gap-2 mt-0.5">
-                      {entry.category && <span>Categoría: {entry.category}</span>}
-                      {entry.version && <span>Versión: {entry.version}</span>}
-                      <span>
-                        Estado:{' '}
-                        <span className={entry.is_published ? 'text-success' : 'text-warning'}>
-                          {entry.is_published ? 'Publicado' : 'Borrador'}
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm text-text flex items-center gap-2">
+                      {entry.title}
+                      {entry.is_published ? (
+                        <span className="px-2 py-0.5 bg-success/20 text-success text-[10px] rounded-full">
+                          Publicado
                         </span>
-                      </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-warning/20 text-warning text-[10px] rounded-full">
+                          Borrador
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-text/60 flex flex-wrap gap-3 mt-1">
+                      {entry.category && (
+                        <span className="px-2 py-0.5 bg-glass rounded text-[10px]">
+                          {entry.category}
+                        </span>
+                      )}
+                      {entry.version && (
+                        <span className="px-2 py-0.5 bg-accent/20 text-accent rounded text-[10px] font-mono">
+                          v{entry.version}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right text-[11px] text-text/50">
+                  <div className="text-right text-[11px] text-text/50 whitespace-nowrap">
                     {entry.created_at &&
-                      new Date(entry.created_at).toLocaleString('es-ES', {
+                      new Date(entry.created_at).toLocaleString('es-VE', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
@@ -1893,10 +2054,12 @@ const AdminChangelog = () => {
                       })}
                   </div>
                 </div>
-                <div
-                  className="mt-1 text-[11px] text-text/70 whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ __html: entry.content_html || '' }}
-                />
+                
+                <div className="border-t border-glass/30 pt-2">
+                  <div className="text-[11px] text-text/70 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                    <div dangerouslySetInnerHTML={{ __html: entry.content_html || '' }} />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
