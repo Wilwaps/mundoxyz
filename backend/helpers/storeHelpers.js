@@ -9,7 +9,7 @@ async function isStoreRentalActive(storeId) {
   if (!storeId) return false;
 
   const result = await query(
-    `SELECT rent_expires_at, is_blocked FROM stores WHERE id = $1 LIMIT 1`,
+    `SELECT * FROM stores WHERE id = $1 LIMIT 1`,
     [storeId]
   );
 
