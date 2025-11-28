@@ -143,6 +143,8 @@ const StoreOwnerDashboard = () => {
   const [settingsInitialized, setSettingsInitialized] = useState(false);
   const [marketingPlan, setMarketingPlan] = useState(null);
   const [marketingPlanDraft, setMarketingPlanDraft] = useState('');
+  const [reportInterval, setReportInterval] = useState('day');
+  const [reportTypeFilter, setReportTypeFilter] = useState('all');
 
   const {
     data: storeData,
@@ -415,6 +417,78 @@ const StoreOwnerDashboard = () => {
 
   const queryClient = useQueryClient();
 
+  const normalizedReportType = useMemo(
+    () => (reportTypeFilter === 'all' ? null : reportTypeFilter),
+    [reportTypeFilter]
+  );
+
+  const { data: salesKpiData, isLoading: loadingSalesKpi } = useQuery({
+    queryKey: ['store-reports-kpi', store?.id, normalizedReportType],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const params = {};
+      if (normalizedReportType) {
+        params.type = normalizedReportType;
+      }
+      const response = await axios.get(`/api/store/${store.id}/reports/kpi`, { params });
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const { data: salesOverviewData, isLoading: loadingSalesOverview } = useQuery({
+    queryKey: ['store-reports-overview', store?.id, reportInterval, normalizedReportType],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const params = {
+        interval: reportInterval || 'day'
+      };
+      if (normalizedReportType) {
+        params.type = normalizedReportType;
+      }
+      const response = await axios.get(
+        `/api/store/${store.id}/reports/sales/overview`,
+        { params }
+      );
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const { data: salesBySellerData, isLoading: loadingSalesBySeller } = useQuery({
+    queryKey: ['store-reports-by-seller', store?.id, normalizedReportType],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const params = {};
+      if (normalizedReportType) {
+        params.type = normalizedReportType;
+      }
+      const response = await axios.get(
+        `/api/store/${store.id}/reports/sales/by-seller`,
+        { params }
+      );
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const { data: salesByProductData, isLoading: loadingSalesByProduct } = useQuery({
+    queryKey: ['store-reports-by-product', store?.id, normalizedReportType],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const params = {};
+      if (normalizedReportType) {
+        params.type = normalizedReportType;
+      }
+      const response = await axios.get(
+        `/api/store/${store.id}/reports/sales/by-product`,
+        { params }
+      );
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
   const { data: storeMetrics } = useQuery({
     queryKey: ['store-metrics', store?.id],
     queryFn: async () => {
@@ -653,6 +727,19 @@ const StoreOwnerDashboard = () => {
   const marketingConversations = Array.isArray(marketingConversationsData)
     ? marketingConversationsData
     : [];
+  const salesKpi = salesKpiData || null;
+  const salesOverview = salesOverviewData || null;
+  const salesBySeller = Array.isArray(salesBySellerData?.sellers)
+    ? salesBySellerData.sellers
+    : [];
+  const salesByProduct = Array.isArray(salesByProductData?.products)
+    ? salesByProductData.products
+    : [];
+  const salesOverviewSeries = Array.isArray(salesOverview?.series)
+    ? salesOverview.series
+    : [];
+  const anyReportsLoading =
+    loadingSalesKpi || loadingSalesOverview || loadingSalesBySeller || loadingSalesByProduct;
 
   const currencyConfigLabel = (() => {
     const cfg = store?.currency_config;
@@ -1153,11 +1240,229 @@ const StoreOwnerDashboard = () => {
 
       {activeTab === 'reports' && (
         <div className="space-y-4">
+          <div className="card-glass p-4 space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text/90">Panel de informes de ventas</h2>
+                <p className="text-[11px] text-text/60">
+                  Ventas completadas agrupadas por periodo, tipo de pedido, vendedor y producto.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <select
+                  value={reportInterval}
+                  onChange={(e) => setReportInterval(e.target.value)}
+                  className="input-glass px-2 py-1 text-[11px]"
+                >
+                  <option value="day">Diario (por día)</option>
+                  <option value="week">Semanal</option>
+                  <option value="quincena">Quincenal</option>
+                  <option value="month">Mensual</option>
+                </select>
+                <select
+                  value={reportTypeFilter}
+                  onChange={(e) => setReportTypeFilter(e.target.value)}
+                  className="input-glass px-2 py-1 text-[11px]"
+                >
+                  <option value="all">Todos los tipos</option>
+                  <option value="dine_in">En salón</option>
+                  <option value="pickup">Para llevar</option>
+                  <option value="delivery">Delivery</option>
+                </select>
+              </div>
+            </div>
+
+            {anyReportsLoading && (
+              <p className="text-[11px] text-text/60">Cargando informes de ventas...</p>
+            )}
+
+            {salesKpi ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="card-glass p-3 bg-black/20">
+                  <p className="text-[11px] text-text/60 mb-1">Ventas completadas (USDT)</p>
+                  <p className="text-xl font-bold text-emerald-400">
+                    {Number(salesKpi.totals?.total_sales_usdt || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="card-glass p-3 bg-black/20">
+                  <p className="text-[11px] text-text/60 mb-1">Tickets completados / cancelados</p>
+                  <p className="text-xl font-bold text-text/90">
+                    {Number(salesKpi.totals?.order_count_completed || 0)}{' '}
+                    <span className="text-[11px] text-text/60">
+                      {' '}
+                      · {Number(salesKpi.totals?.order_count_cancelled || 0)} cancelados
+                    </span>
+                  </p>
+                </div>
+                <div className="card-glass p-3 bg-black/20">
+                  <p className="text-[11px] text-text/60 mb-1">Ticket promedio / tasa de cierre</p>
+                  <p className="text-xl font-bold text-text/90">
+                    {Number(salesKpi.totals?.avg_ticket_usdt || 0).toFixed(2)} USDT
+                  </p>
+                  <p className="text-[11px] text-text/60">
+                    {Math.round(
+                      (Number(salesKpi.totals?.completion_rate || 0) || 0) * 100
+                    )}
+                    % completados
+                  </p>
+                  <p className="text-[11px] text-text/60">
+                    Comisión: {Number(salesKpi.totals?.commission_usdt || 0).toFixed(2)} USDT
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-text/60">
+                No hay ventas completadas en el rango seleccionado.
+              </p>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-text/80">Resumen por periodo</h3>
+                  <span className="text-[11px] text-text/60">
+                    {salesOverviewSeries.length} fila(s)
+                  </span>
+                </div>
+                {salesOverviewSeries.length === 0 ? (
+                  <p className="text-[11px] text-text/60">
+                    No hay ventas registradas para este rango e intervalo.
+                  </p>
+                ) : (
+                  <table className="min-w-full text-[11px] align-middle">
+                    <thead>
+                      <tr className="text-text/60 border-b border-glass">
+                        <th className="py-1 pr-3 text-left">Periodo</th>
+                        <th className="py-1 pr-3 text-right">Tickets</th>
+                        <th className="py-1 pr-3 text-right">Total USDT</th>
+                        <th className="py-1 pr-3 text-right">Comisión USDT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesOverviewSeries.map((row, idx) => {
+                        const label = row.bucket
+                          ? new Date(row.bucket).toLocaleDateString()
+                          : `#${idx + 1}`;
+                        return (
+                          <tr key={idx} className="border-b border-glass/40">
+                            <td className="py-1 pr-3 text-text/80">{label}</td>
+                            <td className="py-1 pr-3 text-right text-text/80">
+                              {Number(row.order_count || 0)}
+                            </td>
+                            <td className="py-1 pr-3 text-right text-text/80">
+                              {Number(row.total_usdt || 0).toFixed(2)}
+                            </td>
+                            <td className="py-1 pr-3 text-right text-text/80">
+                              {Number(row.commission_usdt || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-text/80">Top productos</h3>
+                  <span className="text-[11px] text-text/60">
+                    {salesByProduct.length} producto(s)
+                  </span>
+                </div>
+                {salesByProduct.length === 0 ? (
+                  <p className="text-[11px] text-text/60">
+                    No hay productos con ventas registradas en este rango.
+                  </p>
+                ) : (
+                  <table className="min-w-full text-[11px] align-middle">
+                    <thead>
+                      <tr className="text-text/60 border-b border-glass">
+                        <th className="py-1 pr-3 text-left">Producto</th>
+                        <th className="py-1 pr-3 text-right">Unidades</th>
+                        <th className="py-1 pr-3 text-right">Ventas USDT</th>
+                        <th className="py-1 pr-3 text-right">Margen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesByProduct.slice(0, 20).map((p) => (
+                        <tr
+                          key={p.product_id || p.product_name}
+                          className="border-b border-glass/40"
+                        >
+                          <td className="py-1 pr-3 text-text/80">
+                            {p.product_name || p.product_sku || '-'}
+                          </td>
+                          <td className="py-1 pr-3 text-right text-text/80">
+                            {Number(p.units_sold || 0)}
+                          </td>
+                          <td className="py-1 pr-3 text-right text-text/80">
+                            {Number(p.gross_usdt || 0).toFixed(2)}
+                          </td>
+                          <td className="py-1 pr-3 text-right text-text/80">
+                            {Math.round((Number(p.profit_margin || 0) || 0) * 100)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-text/80">Top vendedores</h3>
+                <span className="text-[11px] text-text/60">
+                  {salesBySeller.length} vendedor(es)
+                </span>
+              </div>
+              {salesBySeller.length === 0 ? (
+                <p className="text-[11px] text-text/60">
+                  No hay vendedores con ventas registradas en este rango.
+                </p>
+              ) : (
+                <table className="min-w-full text-[11px] align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass">
+                      <th className="py-1 pr-3 text-left">Vendedor</th>
+                      <th className="py-1 pr-3 text-right">Tickets</th>
+                      <th className="py-1 pr-3 text-right">Ventas USDT</th>
+                      <th className="py-1 pr-3 text-right">Comisión USDT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesBySeller.slice(0, 20).map((s) => (
+                      <tr
+                        key={s.seller_id || s.seller_username || 'unknown'}
+                        className="border-b border-glass/40"
+                      >
+                        <td className="py-1 pr-3 text-text/80">
+                          {s.seller_display_name || s.seller_username || '-'}
+                        </td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {Number(s.order_count || 0)}
+                        </td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {Number(s.total_usdt || 0).toFixed(2)}
+                        </td>
+                        <td className="py-1 pr-3 text-right text-text/80">
+                          {Number(s.commission_usdt || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
           <div className="card-glass p-4 overflow-x-auto border border-emerald-500/20">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                 <h2 className="text-sm font-semibold text-emerald-400">Pedidos activos</h2>
+              <p className="text-xs text-text/60">Aún no hay pedidos activos en este momento.</p>
               </div>
               <span className="text-[11px] text-text/60">
                 {orders.length} en proceso
