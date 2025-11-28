@@ -1635,6 +1635,277 @@ const AdminFiat = () => {
   );
 };
 
+const AdminStoreLeads = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-store-leads'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/store-interest-requests');
+      return response.data;
+    }
+  });
+
+  const requests = Array.isArray(data?.requests) ? data.requests : [];
+
+  return (
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <Users size={20} className="text-accent" />
+        Leads de Tiendas
+      </h2>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        </div>
+      ) : error ? (
+        <div className="card-glass p-4 text-sm text-error">
+          Error al cargar leads de tiendas.
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="card-glass py-10 text-center text-sm text-text/60">
+          Aún no hay solicitudes de tiendas.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {requests.map((req) => (
+            <div key={req.id} className="card-glass p-4 text-xs flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-sm text-text">{req.email}</div>
+                  {req.user_username && (
+                    <div className="text-[11px] text-text/60">Usuario: @{req.user_username}</div>
+                  )}
+                  <div className="mt-1 text-[11px] text-text/60">
+                    Origen:{' '}
+                    <span className="font-mono">{req.heard_from}</span>
+                    {req.heard_from === 'otro' && req.heard_from_other && (
+                      <span className="ml-1">· {req.heard_from_other}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right text-[11px] text-text/50">
+                  {req.created_at &&
+                    new Date(req.created_at).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                </div>
+              </div>
+
+              {req.store_concept && (
+                <div className="text-[11px] text-text/70">
+                  <span className="font-semibold">Concepto:</span>{' '}
+                  {req.store_concept}
+                </div>
+              )}
+
+              {req.interested_services && (
+                <div className="text-[11px] text-text/70">
+                  <span className="font-semibold">Servicios de interés:</span>{' '}
+                  {req.interested_services}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminChangelog = () => {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [version, setVersion] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
+  const [isPublished, setIsPublished] = useState(true);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-changelog'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/changelog');
+      return response.data;
+    }
+  });
+
+  const entries = Array.isArray(data?.entries) ? data.entries : [];
+
+  const createEntryMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await axios.post('/api/admin/changelog', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Entrada de changelog creada');
+      setTitle('');
+      setCategory('');
+      setVersion('');
+      setContentHtml('');
+      setIsPublished(true);
+      queryClient.invalidateQueries(['admin-changelog']);
+    },
+    onError: (err) => {
+      const message = err?.response?.data?.error || 'Error al crear entrada de changelog';
+      toast.error(message);
+    }
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = contentHtml.trim();
+    if (!trimmedTitle || !trimmedContent) {
+      toast.error('Título y contenido son requeridos');
+      return;
+    }
+
+    await createEntryMutation.mutateAsync({
+      title: trimmedTitle,
+      category: category.trim() || null,
+      version: version.trim() || null,
+      content_html: trimmedContent,
+      is_published: isPublished
+    });
+  };
+
+  return (
+    <div className="p-4 space-y-6">
+      <h2 className="text-2xl font-bold flex items-center gap-2">
+        <Megaphone size={20} className="text-accent" />
+        Changelog del sistema
+      </h2>
+
+      <div className="card-glass p-4 text-xs space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-semibold text-text/80">Nueva entrada</h3>
+          {createEntryMutation.isLoading && (
+            <span className="text-[11px] text-text/60">Guardando…</span>
+          )}
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <div className="text-[11px] text-text/60 mb-1">Título</div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="input-glass w-full"
+              placeholder="Ej: Mejoras en el panel de tiendas"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <div className="text-[11px] text-text/60 mb-1">Categoría</div>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="input-glass w-full"
+                placeholder="core, tiendas, juegos…"
+              />
+            </div>
+            <div>
+              <div className="text-[11px] text-text/60 mb-1">Versión</div>
+              <input
+                type="text"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                className="input-glass w-full"
+                placeholder="Ej: 1.3.8"
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-4 md:mt-0">
+              <input
+                id="changelog-published"
+                type="checkbox"
+                checked={isPublished}
+                onChange={(e) => setIsPublished(e.target.checked)}
+              />
+              <label htmlFor="changelog-published" className="text-[11px] text-text/70">
+                Publicado
+              </label>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] text-text/60 mb-1">Contenido (HTML permitido)</div>
+            <textarea
+              value={contentHtml}
+              onChange={(e) => setContentHtml(e.target.value)}
+              className="input-glass w-full h-32 resize-none font-mono text-[11px]"
+              placeholder="Ej: &lt;ul&gt;...&lt;/ul&gt;"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={createEntryMutation.isLoading}
+              className="px-4 py-2 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Guardar entrada
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="card-glass p-4 text-xs">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text/80">Historial de changelog</h3>
+          {isLoading && (
+            <span className="text-[11px] text-text/60">Cargando...</span>
+          )}
+        </div>
+
+        {error ? (
+          <div className="text-sm text-error">Error al cargar changelog.</div>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-text/60">Aún no hay entradas de changelog.</p>
+        ) : (
+          <div className="space-y-3 max-h-[420px] overflow-y-auto">
+            {entries.map((entry) => (
+              <div key={entry.id} className="glass-panel p-3 space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-sm text-text">{entry.title}</div>
+                    <div className="text-[11px] text-text/60 flex flex-wrap gap-2 mt-0.5">
+                      {entry.category && <span>Categoría: {entry.category}</span>}
+                      {entry.version && <span>Versión: {entry.version}</span>}
+                      <span>
+                        Estado:{' '}
+                        <span className={entry.is_published ? 'text-success' : 'text-warning'}>
+                          {entry.is_published ? 'Publicado' : 'Borrador'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] text-text/50">
+                    {entry.created_at &&
+                      new Date(entry.created_at).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                  </div>
+                </div>
+                <div
+                  className="mt-1 text-[11px] text-text/70 whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ __html: entry.content_html || '' }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CreateStoreModal = ({ onClose, onCreated }) => {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -2459,17 +2730,41 @@ const Admin = () => {
             Marketing
           </NavLink>
           {isTote() && (
-            <NavLink
-              to="/admin/referrals"
-              className={({ isActive }) => 
-                `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                  isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
-                }`
-              }
-            >
-              <Users size={18} />
-              Referidos
-            </NavLink>
+            <>
+              <NavLink
+                to="/admin/referrals"
+                className={({ isActive }) => 
+                  `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                    isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+                  }`
+                }
+              >
+                <Users size={18} />
+                Referidos
+              </NavLink>
+              <NavLink
+                to="/admin/store-leads"
+                className={({ isActive }) => 
+                  `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                    isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+                  }`
+                }
+              >
+                <Users size={18} />
+                Leads Tiendas
+              </NavLink>
+              <NavLink
+                to="/admin/changelog"
+                className={({ isActive }) => 
+                  `flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
+                    isActive ? 'bg-violet/20 text-violet' : 'text-text/60 hover:text-text'
+                  }`
+                }
+              >
+                <Megaphone size={18} />
+                Changelog
+              </NavLink>
+            </>
           )}
         </div>
       </nav>
@@ -2485,6 +2780,8 @@ const Admin = () => {
         <Route path="fiat" element={<AdminFiat />} />
         <Route path="marketing" element={<AdminMarketing />} />
         <Route path="referrals" element={<AdminReferrals />} />
+        <Route path="store-leads" element={<AdminStoreLeads />} />
+        <Route path="changelog" element={<AdminChangelog />} />
       </Routes>
     </div>
   );

@@ -310,133 +310,6 @@ const Market = () => {
                     {redeem.processor_notes && (
                       <p className="text-xs text-text/40 mt-1">{redeem.processor_notes}</p>
                     )}
-
-      {/* Store Interest Modal */}
-      {showStoreInterestModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="card-glass w-full max-w-lg max-h-[90vh] flex flex-col"
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h3 className="text-xl font-bold">¡QUIERO UNA TIENDA!!</h3>
-                <p className="text-xs text-text/60 mt-1 whitespace-pre-line">
-                  En días estaremos listos!!{"\n"}
-                  Diviértete mientras tanto
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowStoreInterestModal(false)}
-                className="text-text/60 hover:text-text text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitStoreInterest} className="flex flex-col flex-1 min-h-0 text-sm">
-              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-                <div>
-                  <label className="block text-[11px] text-text/60 mb-1">Correo de contacto *</label>
-                  <input
-                    type="email"
-                    value={storeInterest.email}
-                    onChange={(e) => setStoreInterest({ ...storeInterest, email: e.target.value })}
-                    className="input-glass w-full text-sm"
-                    placeholder="tu@correo.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-text/60 mb-1">
-                    ¿De qué es la tienda o servicio que ofrece? *
-                  </label>
-                  <textarea
-                    value={storeInterest.store_concept}
-                    onChange={(e) => setStoreInterest({ ...storeInterest, store_concept: e.target.value })}
-                    className="input-glass w-full text-sm min-h-[70px] resize-y"
-                    placeholder="Cuéntanos brevemente sobre tu tienda o servicio"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-text/60 mb-1">
-                    ¿Qué servicios te interesan de MundoXYZ?
-                  </label>
-                  <textarea
-                    value={storeInterest.interested_services}
-                    onChange={(e) => setStoreInterest({ ...storeInterest, interested_services: e.target.value })}
-                    className="input-glass w-full text-sm min-h-[60px] resize-y"
-                    placeholder="Ej. rifas para clientes, integración con juegos, puntos de fidelidad..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-text/60 mb-1">
-                    ¿Cómo escuchó de MundoXYZ?
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    {['instagram','facebook','amigo','volante','youtube','telegram','otro'].map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setStoreInterest({ ...storeInterest, heard_from: value })}
-                        className={`px-2 py-1 rounded-full border text-left transition-colors ${
-                          storeInterest.heard_from === value
-                            ? 'bg-accent/20 border-accent text-accent'
-                            : 'bg-transparent border-white/10 text-text/70 hover:bg-glass'
-                        }`}
-                      >
-                        {value === 'amigo' && 'Amigo'}
-                        {value === 'volante' && 'Volante'}
-                        {value === 'youtube' && 'YouTube'}
-                        {value === 'telegram' && 'Telegram'}
-                        {value === 'instagram' && 'Instagram'}
-                        {value === 'facebook' && 'Facebook'}
-                        {value === 'otro' && 'Otro (especifique)'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {storeInterest.heard_from === 'otro' && (
-                  <div>
-                    <label className="block text-[11px] text-text/60 mb-1">
-                      Si marcaste "Otro", especifica aquí
-                    </label>
-                    <input
-                      type="text"
-                      value={storeInterest.heard_from_other}
-                      onChange={(e) => setStoreInterest({ ...storeInterest, heard_from_other: e.target.value })}
-                      className="input-glass w-full text-sm"
-                      placeholder="¿Dónde nos viste?"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setShowStoreInterestModal(false)}
-                  className="px-3 py-1.5 rounded-lg bg-glass hover:bg-glass-hover text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={storeInterestMutation.isLoading}
-                  className="px-4 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {storeInterestMutation.isLoading ? 'Enviando…' : 'Enviar'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
                   </div>
                   {redeem.transaction_id && (
                     <span className="text-xs text-success">
@@ -609,6 +482,133 @@ const Market = () => {
             ))}
           </div>
         </motion.div>
+      )}
+
+      {/* Store Interest Modal */}
+      {showStoreInterestModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="card-glass w-full max-w-lg max-h-[90vh] flex flex-col"
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-xl font-bold">¡QUIERO UNA TIENDA!!</h3>
+                <p className="text-xs text-text/60 mt-1 whitespace-pre-line">
+                  En días estaremos listos!!{"\n"}
+                  Diviértete mientras tanto
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStoreInterestModal(false)}
+                className="text-text/60 hover:text-text text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitStoreInterest} className="flex flex-col flex-1 min-h-0 text-sm">
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                <div>
+                  <label className="block text-[11px] text-text/60 mb-1">Correo de contacto *</label>
+                  <input
+                    type="email"
+                    value={storeInterest.email}
+                    onChange={(e) => setStoreInterest({ ...storeInterest, email: e.target.value })}
+                    className="input-glass w-full text-sm"
+                    placeholder="tu@correo.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-text/60 mb-1">
+                    ¿De qué es la tienda o servicio que ofrece? *
+                  </label>
+                  <textarea
+                    value={storeInterest.store_concept}
+                    onChange={(e) => setStoreInterest({ ...storeInterest, store_concept: e.target.value })}
+                    className="input-glass w-full text-sm min-h-[70px] resize-y"
+                    placeholder="Cuéntanos brevemente sobre tu tienda o servicio"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-text/60 mb-1">
+                    ¿Qué servicios te interesan de MundoXYZ?
+                  </label>
+                  <textarea
+                    value={storeInterest.interested_services}
+                    onChange={(e) => setStoreInterest({ ...storeInterest, interested_services: e.target.value })}
+                    className="input-glass w-full text-sm min-h-[60px] resize-y"
+                    placeholder="Ej. rifas para clientes, integración con juegos, puntos de fidelidad..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-text/60 mb-1">
+                    ¿Cómo escuchó de MundoXYZ?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    {['instagram','facebook','amigo','volante','youtube','telegram','otro'].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setStoreInterest({ ...storeInterest, heard_from: value })}
+                        className={`px-2 py-1 rounded-full border text-left transition-colors ${
+                          storeInterest.heard_from === value
+                            ? 'bg-accent/20 border-accent text-accent'
+                            : 'bg-transparent border-white/10 text-text/70 hover:bg-glass'
+                        }`}
+                      >
+                        {value === 'amigo' && 'Amigo'}
+                        {value === 'volante' && 'Volante'}
+                        {value === 'youtube' && 'YouTube'}
+                        {value === 'telegram' && 'Telegram'}
+                        {value === 'instagram' && 'Instagram'}
+                        {value === 'facebook' && 'Facebook'}
+                        {value === 'otro' && 'Otro (especifique)'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {storeInterest.heard_from === 'otro' && (
+                  <div>
+                    <label className="block text-[11px] text-text/60 mb-1">
+                      Si marcaste "Otro", especifica aquí
+                    </label>
+                    <input
+                      type="text"
+                      value={storeInterest.heard_from_other}
+                      onChange={(e) => setStoreInterest({ ...storeInterest, heard_from_other: e.target.value })}
+                      className="input-glass w-full text-sm"
+                      placeholder="¿Dónde nos viste?"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 mt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowStoreInterestModal(false)}
+                  className="px-3 py-1.5 rounded-lg bg-glass hover:bg-glass-hover text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={storeInterestMutation.isLoading}
+                  className="px-4 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {storeInterestMutation.isLoading ? 'Enviando…' : 'Enviar'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
       )}
 
       {/* Redeem Modal */}

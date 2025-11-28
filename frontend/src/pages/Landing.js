@@ -745,6 +745,7 @@ const Landing = () => {
                 <MessageCircle size={18} />
                 Telegram Bot
               </a>
+              <button onClick={() => navigate('/changelog')}>Changelog</button>
               <button onClick={() => navigate('/login')}>Iniciar Sesión</button>
               <button onClick={() => navigate('/register')}>Registrarse</button>
             </div>
