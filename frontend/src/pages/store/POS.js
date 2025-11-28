@@ -4,6 +4,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { Search, CreditCard, Banknote, Flame, RefreshCw, User, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const POS = () => {
     const { slug } = useParams(); // 'divorare04'
@@ -1703,6 +1705,7 @@ const QuoteModal = ({ products, rates, onClose }) => {
     const [search, setSearch] = useState('');
     const [categoryFilter] = useState('all');
     const [quoteItems, setQuoteItems] = useState([]);
+    const containerRef = useRef(null);
 
     const filtered = products.filter((p) => {
         const term = search.trim().toLowerCase();
@@ -1755,13 +1758,47 @@ const QuoteModal = ({ products, rates, onClose }) => {
 
     const totalQuoteBs = totalQuoteUSDT * rates.bs;
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        if (!containerRef.current) return;
+
+        try {
+            const element = containerRef.current;
+            const canvas = await html2canvas(element, {
+                backgroundColor: '#020617',
+                scale: 2
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const renderWidth = imgWidth * ratio;
+            const renderHeight = imgHeight * ratio;
+            const x = (pdfWidth - renderWidth) / 2;
+            const y = 10;
+
+            pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
+
+            const totalBsNumberRaw = Number.isFinite(totalQuoteBs) ? Math.round(totalQuoteBs * 100) : 0;
+            const totalBsNumber = Math.max(totalBsNumberRaw, 0);
+            const fileSuffix = String(totalBsNumber);
+
+            pdf.save(`cotizacion${fileSuffix}.pdf`);
+        } catch (error) {
+            console.error('Error generando PDF de cotización', error);
+            toast.error('No se pudo generar el PDF de la cotización');
+        }
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-4xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col max-h-[90vh]">
+            <div
+                ref={containerRef}
+                className="w-full max-w-4xl bg-dark border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col max-h-[90vh]"
+            >
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-lg md:text-xl font-bold">Cotización rápida</h2>
