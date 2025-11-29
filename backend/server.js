@@ -64,7 +64,13 @@ const io = new Server(server, {
         'https://web.telegram.org',
         'https://telegram.org',
         /^https:\/\/.*\.telegram\.org$/,
-        /^https?:\/\/.*\.up\.railway\.app$/
+        /^https?:\/\/.*\.up\.railway\.app$/,
+        // Capacitor APK support
+        'capacitor://localhost',
+        'http://localhost',
+        'https://localhost',
+        /^capacitor:\/\/*/,
+        /^https?:\/\/localhost.*/
       ];
 
       const isAllowed = allowedOrigins.some(allowed => {
@@ -178,6 +184,11 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
 
+    // In development, allow all origins to simplify local testing
+    if (config.server.env === 'development') {
+      return callback(null, true);
+    }
+
     const allowedOrigins = [
       config.server.frontendUrl,
       'http://localhost:3000',
@@ -185,7 +196,13 @@ app.use(cors({
       'https://web.telegram.org',
       'https://telegram.org',
       /^https:\/\/.*\.telegram\.org$/,
-      /^https?:\/\/.*\.up\.railway\.app$/
+      /^https?:\/\/.*\.up\.railway\.app$/,
+      // Capacitor APK support
+      'capacitor://localhost',
+      'http://localhost',
+      'https://localhost',
+      /^capacitor:\/\/*/,
+      /^https?:\/\/localhost.*/
     ];
 
     const isAllowed = allowedOrigins.some(allowed => {
