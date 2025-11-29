@@ -20,11 +20,20 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
     const [showTutorial, setShowTutorial] = useState(true);
 
     // Mesa vertical pensada para móvil / Telegram
-    const TABLE_WIDTH = 380;
-    const TABLE_HEIGHT = 720;
+    const TABLE_WIDTH = 400;
+    const TABLE_HEIGHT = 700;
     const BALL_RADIUS = 10;
     const MAX_DRAG_DISTANCE = 140;
     const FORCE_SCALE = 0.02; // Increased force for better impact
+    const POCKET_RADIUS = 16;
+    const POCKETS = [
+        { x: 24, y: 24 },
+        { x: TABLE_WIDTH / 2, y: 18 },
+        { x: TABLE_WIDTH - 24, y: 24 },
+        { x: 24, y: TABLE_HEIGHT - 24 },
+        { x: TABLE_WIDTH / 2, y: TABLE_HEIGHT - 18 },
+        { x: TABLE_WIDTH - 24, y: TABLE_HEIGHT - 24 }
+    ];
 
     useEffect(() => {
         if (!sceneRef.current) return;
@@ -51,10 +60,10 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
         // Bandas (cushions)
         const wallOptions = { isStatic: true, render: { fillStyle: '#14532d' }, restitution: 0.9 };
         const walls = [
-            Bodies.rectangle(TABLE_WIDTH / 2, 18, TABLE_WIDTH - 80, 24, wallOptions),
-            Bodies.rectangle(TABLE_WIDTH / 2, TABLE_HEIGHT - 18, TABLE_WIDTH - 80, 24, wallOptions),
-            Bodies.rectangle(18, TABLE_HEIGHT / 2, 24, TABLE_HEIGHT - 80, wallOptions),
-            Bodies.rectangle(TABLE_WIDTH - 18, TABLE_HEIGHT / 2, 24, TABLE_HEIGHT - 80, wallOptions)
+            Bodies.rectangle(TABLE_WIDTH / 2, 10, TABLE_WIDTH - 40, 20, wallOptions),
+            Bodies.rectangle(TABLE_WIDTH / 2, TABLE_HEIGHT - 10, TABLE_WIDTH - 40, 20, wallOptions),
+            Bodies.rectangle(10, TABLE_HEIGHT / 2, 20, TABLE_HEIGHT - 40, wallOptions),
+            Bodies.rectangle(TABLE_WIDTH - 10, TABLE_HEIGHT / 2, 20, TABLE_HEIGHT - 40, wallOptions)
         ];
         World.add(engine.world, walls);
 
@@ -180,6 +189,56 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
         updateAim(getPointerPos(event));
     };
 
+    const checkPottedBalls = () => {
+        if (!engineRef.current) return;
+        const world = engineRef.current.world;
+        if (!world || !ballsRef.current) return;
+
+        const remainingBalls = [];
+        const removedBalls = [];
+
+        ballsRef.current.forEach((ball) => {
+            if (ball.label === 'cueBall') {
+                remainingBalls.push(ball);
+                return;
+            }
+
+            const { x, y } = ball.position;
+            const isInPocket = POCKETS.some((pocket) => {
+                const dx = x - pocket.x;
+                const dy = y - pocket.y;
+                return Math.sqrt(dx * dx + dy * dy) < POCKET_RADIUS;
+            });
+
+            if (isInPocket) {
+                Matter.World.remove(world, ball);
+                removedBalls.push(ball);
+            } else {
+                remainingBalls.push(ball);
+            }
+        });
+
+        if (removedBalls.length > 0) {
+            ballsRef.current = remainingBalls;
+        }
+    };
+
+    const checkTurnEnd = () => {
+        const balls = ballsRef.current || [];
+        const moving = balls.filter((ball) => {
+            const v = ball.velocity || { x: 0, y: 0 };
+            return Math.abs(v.x) > 0.1 || Math.abs(v.y) > 0.1;
+        });
+
+        if (moving.length === 0) {
+            checkPottedBalls();
+            isShotInProgressRef.current = false;
+            return;
+        }
+
+        setTimeout(checkTurnEnd, 200);
+    };
+
     const handlePointerUp = useCallback(() => {
         if (!aimingRef.current || !cueBallRef.current || isShotInProgressRef.current) return;
         aimingRef.current = false;
@@ -216,8 +275,8 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
 
         // Cuando las bolas se detengan, podremos emitir turn-end (MVP futuro)
         setTimeout(() => {
-            isShotInProgressRef.current = false;
-        }, 2000);
+            checkTurnEnd();
+        }, 300);
     }, [cueState.power, cueState.angle, room, user, socket]);
 
     // Global event listeners for release
@@ -249,19 +308,12 @@ const PoolGame = ({ room, user, socket, gameState, isMyTurn }) => {
                     viewBox={`0 0 ${TABLE_WIDTH} ${TABLE_HEIGHT}`}
                     className="w-full h-full"
                 >
-                    {[
-                        { x: 24, y: 24 },
-                        { x: TABLE_WIDTH / 2, y: 18 },
-                        { x: TABLE_WIDTH - 24, y: 24 },
-                        { x: 24, y: TABLE_HEIGHT - 24 },
-                        { x: TABLE_WIDTH / 2, y: TABLE_HEIGHT - 18 },
-                        { x: TABLE_WIDTH - 24, y: TABLE_HEIGHT - 24 },
-                    ].map((pocket, index) => (
+                    {POCKETS.map((pocket, index) => (
                         <circle
                             key={index}
                             cx={pocket.x}
                             cy={pocket.y}
-                            r={14}
+                            r={POCKET_RADIUS}
                             fill="#020617"
                             stroke="#000000"
                             strokeWidth="4"

@@ -27,6 +27,60 @@ const BingoV2WaitingRoom = () => {
   const [pendingCards, setPendingCards] = useState(1);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  const loadRoomDetails = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setRoom(data.room);
+        
+        // Redirect to game if already started
+        if (data.room.status === 'in_progress') {
+          navigate(`/bingo/v2/play/${code}`);
+          return;
+        }
+        
+        // Check if current user is ready and has cards
+        const currentPlayer = data.room.players?.find(p => p.user_id === user?.id);
+        if (currentPlayer) {
+          setIsReady(currentPlayer.is_ready);
+          const myCards = currentPlayer.cards_purchased || 0;
+          setCurrentCards(myCards);
+          if (myCards === 0) {
+            setPendingCards(1); // Default para compra inicial
+          } else {
+            setPendingCards(myCards); // Mantener cantidad actual
+          }
+        }
+      } else {
+        setError(data.error || 'Error loading room');
+      }
+    } catch (err) {
+      setError('Error loading room details');
+    } finally {
+      setLoading(false);
+    }
+  }, [code, navigate, user]);
+
+  const checkCanCloseRoom = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/can-close`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCanCloseRoom(data.allowed);
+      }
+    } catch (err) {
+      console.error('Error checking if can close room:', err);
+    }
+  }, [code]);
+
   // eslint-disable-next-line no-use-before-define
   useEffect(() => {
     loadRoomDetails();
@@ -115,42 +169,6 @@ const BingoV2WaitingRoom = () => {
       checkCanCloseRoom();
     }
   }, [room, user, code, checkCanCloseRoom]);
-
-  const loadRoomDetails = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setRoom(data.room);
-        
-        // Redirect to game if already started
-        if (data.room.status === 'in_progress') {
-          navigate(`/bingo/v2/play/${code}`);
-          return;
-        }
-        
-        // Check if current user is ready and has cards
-        const currentPlayer = data.room.players?.find(p => p.user_id === user?.id);
-        if (currentPlayer) {
-          setIsReady(currentPlayer.is_ready);
-          const myCards = currentPlayer.cards_purchased || 0;
-          setCurrentCards(myCards);
-          if (myCards === 0) {
-            setPendingCards(1); // Default para compra inicial
-          } else {
-            setPendingCards(myCards); // Mantener cantidad actual
-          }
-        }
-      } else {
-        setError(data.error || 'Error loading room');
-      }
-    } catch (err) {
-      setError('Error loading room details');
-    } finally {
-      setLoading(false);
-    }
-  }, [code, navigate, user]);
 
   const handleBuyCards = async () => {
     try {
@@ -295,24 +313,6 @@ const BingoV2WaitingRoom = () => {
     }
     navigate('/bingo');
   };
-
-  const checkCanCloseRoom = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}/can-close`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCanCloseRoom(data.allowed);
-      }
-    } catch (err) {
-      console.error('Error checking if can close room:', err);
-    }
-  }, [code]);
 
   const handleCloseRoom = async () => {
     if (!window.confirm('¿Estás seguro de que quieres cerrar la sala? Se reembolsará a todos los jugadores.')) {

@@ -23,9 +23,11 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Create socket connection
-    // HARDCODED para Railway - detectar producción por hostname
+    // HARDCODED para Railway - detectar producción por hostname o Capacitor
     const isProduction = window.location.hostname === 'mundoxyz-production.up.railway.app' ||
-                        window.location.hostname.includes('railway.app');
+                        window.location.hostname.includes('railway.app') ||
+                        window.location.protocol === 'capacitor:' ||  // APK con Capacitor
+                        window.location.origin.startsWith('capacitor://');
     
     // Determine the socket URL
     let socketUrl;
@@ -52,7 +54,14 @@ export const SocketProvider = ({ children }) => {
       reconnectionDelay: 3000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 10,
-      timeout: 20000
+      timeout: 20000,
+      // Capacitor specific options
+      forceNew: true,
+      upgrade: false,
+      rememberUpgrade: false,
+      // Additional options for mobile
+      autoConnect: true,
+      forceJSONP: false
     });
 
     // Connection events

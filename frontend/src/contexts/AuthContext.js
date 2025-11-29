@@ -13,10 +13,12 @@ export const useAuth = () => {
 };
 
 // Configure axios defaults
-// HARDCODED para Railway - detectar producción por hostname
+// HARDCODED para Railway - detectar producción por hostname o Capacitor
 const isProduction = typeof window !== 'undefined' &&
   (window.location.hostname === 'mundoxyz-production.up.railway.app' ||
-    window.location.hostname.includes('railway.app'));
+    window.location.hostname.includes('railway.app') ||
+    window.location.protocol === 'capacitor:' ||  // APK con Capacitor
+    window.location.origin.startsWith('capacitor://'));
 
 const apiUrl = isProduction
   ? 'https://mundoxyz-production.up.railway.app'

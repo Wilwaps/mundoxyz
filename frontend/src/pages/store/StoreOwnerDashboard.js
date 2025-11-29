@@ -130,6 +130,10 @@ const StoreOwnerDashboard = () => {
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
+  const [isProductionRecipeModalOpen, setIsProductionRecipeModalOpen] = useState(false);
+  const [editingProductionRecipe, setEditingProductionRecipe] = useState(null);
+  const [selectedRecipeForBatch, setSelectedRecipeForBatch] = useState(null);
+
   const [headerLayout, setHeaderLayout] = useState('normal');
   const [logoUrlInput, setLogoUrlInput] = useState('');
   const [coverUrlInput, setCoverUrlInput] = useState('');
@@ -401,6 +405,36 @@ const StoreOwnerDashboard = () => {
   const ingredients = Array.isArray(ingredientsData) ? ingredientsData : [];
 
   const {
+    data: productionRecipesData,
+    isLoading: loadingProductionRecipes
+  } = useQuery({
+    queryKey: ['store-production-recipes', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/inventory/${store.id}/production/recipes`);
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const productionRecipes = Array.isArray(productionRecipesData) ? productionRecipesData : [];
+
+  const {
+    data: productionBatchesData,
+    isLoading: loadingProductionBatches
+  } = useQuery({
+    queryKey: ['store-production-batches', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/inventory/${store.id}/production/batches`);
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const productionBatches = Array.isArray(productionBatchesData) ? productionBatchesData : [];
+
+  const {
     data: fiatContext
   } = useQuery({
     queryKey: ['fiat-context'],
@@ -520,6 +554,93 @@ const StoreOwnerDashboard = () => {
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al actualizar producto';
+      toast.error(message);
+    }
+  });
+
+  const createProductionRecipeMutation = useMutation({
+    mutationFn: async (payload) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.post(
+        `/api/store/inventory/${store.id}/production/recipes`,
+        payload
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Receta de producción creada');
+      queryClient.invalidateQueries(['store-production-recipes', store?.id]);
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.error || 'Error al crear receta de producción';
+      toast.error(message);
+    }
+  });
+
+  const updateProductionRecipeMutation = useMutation({
+    mutationFn: async ({ recipeId, payload }) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.put(
+        `/api/store/inventory/${store.id}/production/recipes/${recipeId}`,
+        payload
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Receta de producción actualizada');
+      queryClient.invalidateQueries(['store-production-recipes', store?.id]);
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.error || 'Error al actualizar receta de producción';
+      toast.error(message);
+    }
+  });
+
+  const deleteProductionRecipeMutation = useMutation({
+    mutationFn: async (recipeId) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.delete(
+        `/api/store/inventory/${store.id}/production/recipes/${recipeId}`
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Receta de producción desactivada');
+      queryClient.invalidateQueries(['store-production-recipes', store?.id]);
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.error || 'Error al desactivar receta de producción';
+      toast.error(message);
+    }
+  });
+
+  const createProductionBatchMutation = useMutation({
+    mutationFn: async ({ recipe_id, planned_quantity, notes }) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.post(
+        `/api/store/inventory/${store.id}/production/batches`,
+        { recipe_id, planned_quantity, notes }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['store-production-batches', store?.id]);
+      queryClient.invalidateQueries(['store-owner', slug]);
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.error || 'Error al ejecutar lote de producción';
       toast.error(message);
     }
   });
@@ -1008,6 +1129,251 @@ const StoreOwnerDashboard = () => {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-glass mt-4 pt-4 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-semibold text-text/80">Recetas de producción</h3>
+                <p className="text-[11px] text-text/60">
+                  Define fórmulas de producción usando ingredientes y productos compuestos. El costo se calcula
+                  automáticamente con base en el costo de cada componente.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProductionRecipe(null);
+                    setIsProductionRecipeModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 whitespace-nowrap"
+                >
+                  + Nueva receta de producción
+                </button>
+              </div>
+            </div>
+
+            {loadingProductionRecipes ? (
+              <p className="text-xs text-text/60">Cargando recetas de producción...</p>
+            ) : productionRecipes.length === 0 ? (
+              <p className="text-[11px] text-text/60">
+                Aún no has configurado recetas de producción. Crea tu primera receta para calcular el costo real de
+                salsas, bases y productos compuestos.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-[11px] align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass">
+                      <th className="py-1 pr-3 text-left">Receta</th>
+                      <th className="py-1 pr-3 text-left">Producto destino</th>
+                      <th className="py-1 pr-3 text-right">Rendimiento</th>
+                      <th className="py-1 pr-3 text-right">Costo total USDT</th>
+                      <th className="py-1 pr-3 text-right">Costo unitario</th>
+                      <th className="py-1 pr-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productionRecipes.map((r) => {
+                      const qty = Number(r.yields_quantity || 0);
+                      const totalCost = Number(r.total_cost_usdt || 0);
+                      const costPerUnit = qty > 0 ? totalCost / qty : 0;
+
+                      return (
+                        <tr key={r.id} className="border-b border-glass/40">
+                          <td className="py-1 pr-3 text-text/80">{r.name}</td>
+                          <td className="py-1 pr-3 text-text/70">{r.target_product_name || 'Sin producto asociado'}</td>
+                          <td className="py-1 pr-3 text-right text-text/70">
+                            <div>
+                              {qty.toFixed(2)} {r.yields_unit}
+                            </div>
+                            {(() => {
+                              const meta =
+                                r && typeof r.metadata === 'object' && r.metadata !== null
+                                  ? r.metadata
+                                  : {};
+                              const baseQty = Number(meta.base_input_quantity || 0);
+                              const baseUnit = meta.base_input_unit || null;
+                              if (!Number.isFinite(baseQty) || baseQty <= 0 || !baseUnit) {
+                                return null;
+                              }
+                              const ratio = qty > 0 ? qty / baseQty : 0;
+                              return (
+                                <div className="text-[10px] text-text/60">
+                                  desde {baseQty.toFixed(2)} {baseUnit} (
+                                  {ratio.toFixed(4)} {r.yields_unit}/{baseUnit})
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="py-1 pr-3 text-right text-text/80">{totalCost.toFixed(4)}</td>
+                          <td className="py-1 pr-3 text-right text-text/80">{costPerUnit.toFixed(4)}</td>
+                          <td className="py-1 pr-3 text-right text-text/70 space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingProductionRecipe(r);
+                                setIsProductionRecipeModalOpen(true);
+                              }}
+                              className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={productionRecipes.length === 0}
+                              onClick={async () => {
+                                const confirmed = window.confirm(
+                                  `¿Desactivar la receta "${r.name}"? Puedes volver a crearla más adelante.`
+                                );
+                                if (!confirmed) return;
+                                try {
+                                  await deleteProductionRecipeMutation.mutateAsync(r.id);
+                                  queryClient.invalidateQueries(['store-production-recipes', store?.id]);
+                                } catch (err) {
+                                  const message =
+                                    err?.response?.data?.error || 'Error al desactivar receta de producción';
+                                  toast.error(message);
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded-full bg-error/20 text-error hover:bg-error/30 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Desactivar
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-semibold text-text/80">Lotes de producción</h3>
+                  <p className="text-[11px] text-text/60">
+                    Ejecuta lotes de producción para descontar insumos del inventario y aumentar el stock del producto
+                    final.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs items-end">
+                  <div>
+                    <div className="text-[11px] text-text/60 mb-0.5">Receta</div>
+                    <select
+                      value={selectedRecipeForBatch?.id || ''}
+                      onChange={(e) => {
+                        const recipeId = e.target.value;
+                        const found = productionRecipes.find((r) => String(r.id) === String(recipeId));
+                        setSelectedRecipeForBatch(found || null);
+                      }}
+                      className="input-glass text-[11px] px-2 py-1 min-w-[180px]"
+                    >
+                      <option value="">Selecciona receta</option>
+                      {productionRecipes.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-text/60 mb-0.5">Cantidad a producir</div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="input-glass text-[11px] px-2 py-1 w-28"
+                      value={selectedRecipeForBatch?.__plannedQty || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedRecipeForBatch((prev) =>
+                          prev ? { ...prev, __plannedQty: value } : prev
+                        );
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      !selectedRecipeForBatch ||
+                      !selectedRecipeForBatch.__plannedQty ||
+                      Number(selectedRecipeForBatch.__plannedQty) <= 0
+                    }
+                    onClick={async () => {
+                      if (!store?.id || !selectedRecipeForBatch) return;
+                      const qty = Number(selectedRecipeForBatch.__plannedQty || 0);
+                      if (!Number.isFinite(qty) || qty <= 0) {
+                        toast.error('Cantidad de lote inválida');
+                        return;
+                      }
+                      try {
+                        await createProductionBatchMutation.mutateAsync({
+                          recipe_id: selectedRecipeForBatch.id,
+                          planned_quantity: qty,
+                          notes: null
+                        });
+                        toast.success('Lote de producción ejecutado');
+                        queryClient.invalidateQueries(['store-production-batches', store?.id]);
+                        setSelectedRecipeForBatch((prev) => (prev ? { ...prev, __plannedQty: '' } : prev));
+                      } catch (err) {
+                        const message =
+                          err?.response?.data?.error || 'Error al ejecutar lote de producción';
+                        toast.error(message);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Ejecutar lote
+                  </button>
+                </div>
+              </div>
+
+              {loadingProductionBatches ? (
+                <p className="text-xs text-text/60">Cargando lotes de producción...</p>
+              ) : productionBatches.length === 0 ? (
+                <p className="text-[11px] text-text/60">
+                  Aún no has ejecutado lotes de producción. Cuando ejecutes uno, verás aquí el historial.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-[11px] align-middle">
+                    <thead>
+                      <tr className="text-text/60 border-b border-glass">
+                        <th className="py-1 pr-3 text-left">Fecha</th>
+                        <th className="py-1 pr-3 text-left">Receta</th>
+                        <th className="py-1 pr-3 text-left">Producto destino</th>
+                        <th className="py-1 pr-3 text-right">Cantidad</th>
+                        <th className="py-1 pr-3 text-right">Costo total USDT</th>
+                        <th className="py-1 pr-3 text-right">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productionBatches.map((b) => {
+                        const totalCost = Number(b.total_cost_usdt || 0);
+                        const createdAt = b.completed_at || b.started_at || b.created_at;
+                        return (
+                          <tr key={b.id} className="border-b border-glass/40">
+                            <td className="py-1 pr-3 text-text/70">
+                              {createdAt ? new Date(createdAt).toLocaleString() : '-'}
+                            </td>
+                            <td className="py-1 pr-3 text-text/80">{b.recipe_name || '-'}</td>
+                            <td className="py-1 pr-3 text-text/70">{b.target_product_name || 'N/A'}</td>
+                            <td className="py-1 pr-3 text-right text-text/80">
+                              {Number(b.actual_quantity || b.planned_quantity || 0).toFixed(2)} {b.unit}
+                            </td>
+                            <td className="py-1 pr-3 text-right text-text/80">{totalCost.toFixed(4)}</td>
+                            <td className="py-1 pr-3 text-right text-text/70">{b.status}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -2380,6 +2746,35 @@ const StoreOwnerDashboard = () => {
           loading={createPurchaseMutation.isLoading}
         />
       )}
+      {isProductionRecipeModalOpen && (
+        <ProductionRecipeModal
+          storeId={store?.id}
+          products={products}
+          ingredients={ingredients}
+          recipe={editingProductionRecipe}
+          onClose={() => {
+            setIsProductionRecipeModalOpen(false);
+            setEditingProductionRecipe(null);
+          }}
+          onSave={async (payload) => {
+            if (editingProductionRecipe?.id) {
+              await updateProductionRecipeMutation.mutateAsync({
+                recipeId: editingProductionRecipe.id,
+                payload
+              });
+            } else {
+              await createProductionRecipeMutation.mutateAsync(payload);
+            }
+            setIsProductionRecipeModalOpen(false);
+            setEditingProductionRecipe(null);
+          }}
+          loading={
+            editingProductionRecipe?.id
+              ? updateProductionRecipeMutation.isLoading
+              : createProductionRecipeMutation.isLoading
+          }
+        />
+      )}
       {isCategoryManagerOpen && (
         <CategoryManagementModal
           categories={categories}
@@ -3020,6 +3415,519 @@ const ProductEditModal = ({
               className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const ProductionRecipeModal = ({
+  storeId,
+  products,
+  ingredients,
+  recipe,
+  onClose,
+  onSave,
+  loading
+}) => {
+  const isEdit = !!(recipe && recipe.id);
+  const normalizedMetadata =
+    recipe && typeof recipe.metadata === 'object' && recipe.metadata !== null
+      ? recipe.metadata
+      : {};
+
+  const [name, setName] = useState(recipe?.name || '');
+  const [description, setDescription] = useState(recipe?.description || '');
+  const [targetProductId, setTargetProductId] = useState(
+    recipe?.target_product_id ? String(recipe.target_product_id) : ''
+  );
+  const [yieldsQuantity, setYieldsQuantity] = useState(
+    recipe?.yields_quantity != null ? String(recipe.yields_quantity) : ''
+  );
+  const [yieldsUnit, setYieldsUnit] = useState(recipe?.yields_unit || 'unit');
+  const [baseInputQuantity, setBaseInputQuantity] = useState(
+    normalizedMetadata.base_input_quantity != null
+      ? String(normalizedMetadata.base_input_quantity)
+      : ''
+  );
+  const [baseInputUnit, setBaseInputUnit] = useState(
+    normalizedMetadata.base_input_unit || 'kg'
+  );
+  const [yieldNotes, setYieldNotes] = useState(
+    normalizedMetadata.yield_notes || ''
+  );
+  const [items, setItems] = useState([
+    {
+      id: `${Date.now()}_0`,
+      component_type: 'ingredient',
+      ingredient_id: '',
+      product_id: '',
+      quantity: '',
+      unit: 'unit'
+    }
+  ]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit || !storeId || !recipe?.id) return;
+
+    const fetchDetail = async () => {
+      try {
+        setLoadingDetail(true);
+        const response = await axios.get(
+          `/api/store/inventory/${storeId}/production/recipes/${recipe.id}`
+        );
+        const data = response.data || {};
+        const r = data.recipe || recipe;
+        const detailItems = Array.isArray(data.items) ? data.items : [];
+
+        setName(r.name || '');
+        setDescription(r.description || '');
+        setTargetProductId(
+          r.target_product_id ? String(r.target_product_id) : ''
+        );
+        setYieldsQuantity(
+          r.yields_quantity != null ? String(r.yields_quantity) : ''
+        );
+        setYieldsUnit(r.yields_unit || 'unit');
+
+        const meta =
+          r && typeof r.metadata === 'object' && r.metadata !== null
+            ? r.metadata
+            : {};
+        setBaseInputQuantity(
+          meta.base_input_quantity != null
+            ? String(meta.base_input_quantity)
+            : ''
+        );
+        setBaseInputUnit(meta.base_input_unit || 'kg');
+        setYieldNotes(meta.yield_notes || '');
+
+        if (detailItems.length > 0) {
+          setItems(
+            detailItems.map((it, index) => ({
+              id: it.id || `${Date.now()}_${index}`,
+              component_type: it.component_type || 'ingredient',
+              ingredient_id: it.ingredient_id ? String(it.ingredient_id) : '',
+              product_id: it.product_id ? String(it.product_id) : '',
+              quantity: it.quantity != null ? String(it.quantity) : '',
+              unit: it.unit || 'unit'
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching production recipe detail:', error);
+        const message =
+          error?.response?.data?.error ||
+          'No se pudo cargar el detalle de la receta de producción';
+        toast.error(message);
+      } finally {
+        setLoadingDetail(false);
+      }
+    };
+
+    fetchDetail();
+  }, [isEdit, storeId, recipe?.id, recipe]);
+
+  const handleItemChange = (index, changes) => {
+    setItems((prev) =>
+      prev.map((it, idx) => (idx === index ? { ...it, ...changes } : it))
+    );
+  };
+
+  const addItem = () => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${prev.length}`,
+        component_type: 'ingredient',
+        ingredient_id: '',
+        product_id: '',
+        quantity: '',
+        unit: 'unit'
+      }
+    ]);
+  };
+
+  const removeItem = (index) => {
+    setItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error('El nombre de la receta es obligatorio');
+      return;
+    }
+
+    const qtyNumber = parseFloat(yieldsQuantity || '0');
+    if (!Number.isFinite(qtyNumber) || qtyNumber <= 0) {
+      toast.error('El rendimiento debe ser mayor a 0');
+      return;
+    }
+
+    if (!yieldsUnit) {
+      toast.error('Selecciona una unidad de rendimiento');
+      return;
+    }
+
+    const preparedItems = items
+      .map((item) => {
+        const type = item.component_type === 'product' ? 'product' : 'ingredient';
+        const quantity = parseFloat(item.quantity || '0');
+        const ingredientId =
+          type === 'ingredient' ? (item.ingredient_id || '') : '';
+        const productId = type === 'product' ? (item.product_id || '') : '';
+        const unit = (item.unit || '').trim() || 'unit';
+
+        if (!Number.isFinite(quantity) || quantity <= 0) return null;
+        if (type === 'ingredient' && !ingredientId) return null;
+        if (type === 'product' && !productId) return null;
+
+        return {
+          component_type: type,
+          ingredient_id: ingredientId || null,
+          product_id: productId || null,
+          quantity,
+          unit
+        };
+      })
+      .filter(Boolean);
+
+    if (preparedItems.length === 0) {
+      toast.error('Agrega al menos un componente válido');
+      return;
+    }
+
+    const baseQtyNumber = parseFloat(baseInputQuantity || '0');
+    const metadata = {
+      ...(normalizedMetadata && typeof normalizedMetadata === 'object'
+        ? normalizedMetadata
+        : {}),
+      base_input_quantity:
+        Number.isFinite(baseQtyNumber) && baseQtyNumber > 0
+          ? baseQtyNumber
+          : null,
+      base_input_unit: baseInputUnit || null,
+      yield_notes: yieldNotes.trim() || null
+    };
+
+    const payload = {
+      target_product_id: targetProductId || null,
+      name: trimmedName,
+      description: description.trim() || null,
+      yields_quantity: qtyNumber,
+      yields_unit: yieldsUnit,
+      items: preparedItems,
+      metadata
+    };
+
+    await onSave(payload);
+  };
+
+  const isSubmitting = loading || loadingDetail;
+
+  const qtyPreview = parseFloat(yieldsQuantity || '0');
+  const baseQtyPreview = parseFloat(baseInputQuantity || '0');
+  const hasYieldRatio =
+    Number.isFinite(qtyPreview) &&
+    qtyPreview > 0 &&
+    Number.isFinite(baseQtyPreview) &&
+    baseQtyPreview > 0;
+  const yieldRatio = hasYieldRatio ? qtyPreview / baseQtyPreview : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto card-glass p-6 space-y-4"
+      >
+        <h3 className="text-lg font-bold">
+          {isEdit ? 'Editar receta de producción' : 'Nueva receta de producción'}
+        </h3>
+
+        {isEdit && loadingDetail && (
+          <p className="text-[11px] text-text/60">Cargando detalle de receta...</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <div className="text-text/60 mb-1">Nombre de la receta</div>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input-glass w-full"
+                required
+              />
+            </div>
+            <div>
+              <div className="text-text/60 mb-1">Producto destino (opcional)</div>
+              <select
+                value={targetProductId}
+                onChange={(e) => setTargetProductId(e.target.value)}
+                className="input-glass w-full"
+              >
+                <option value="">Sin producto asociado</option>
+                {Array.isArray(products) &&
+                  products.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <div className="text-text/60 mb-1">Rendimiento</div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={yieldsQuantity}
+                onChange={(e) => setYieldsQuantity(e.target.value)}
+                className="input-glass w-full"
+              />
+            </div>
+            <div>
+              <div className="text-text/60 mb-1">Unidad</div>
+              <select
+                value={yieldsUnit}
+                onChange={(e) => setYieldsUnit(e.target.value)}
+                className="input-glass w-full"
+              >
+                <option value="unit">Unidad</option>
+                <option value="kg">Kilogramos (kg)</option>
+                <option value="g">Gramos (g)</option>
+                <option value="L">Litros (L)</option>
+                <option value="ml">Mililitros (ml)</option>
+              </select>
+            </div>
+            <div>
+              <div className="text-text/60 mb-1">Insumo base (cantidad)</div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={baseInputQuantity}
+                onChange={(e) => setBaseInputQuantity(e.target.value)}
+                className="input-glass w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <div className="text-text/60 mb-1">Unidad insumo base</div>
+              <select
+                value={baseInputUnit}
+                onChange={(e) => setBaseInputUnit(e.target.value)}
+                className="input-glass w-full"
+              >
+                <option value="kg">Kilogramos (kg)</option>
+                <option value="g">Gramos (g)</option>
+                <option value="L">Litros (L)</option>
+                <option value="ml">Mililitros (ml)</option>
+                <option value="unit">Unidad</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-text/60 mb-1">Rendimiento técnico</div>
+              <div className="text-[11px] text-text/70 border border-glass rounded-lg px-2 py-1 min-h-[32px] flex items-center">
+                {hasYieldRatio ? (
+                  <span>
+                    {yieldsQuantity || '0'} {yieldsUnit} desde{' '}
+                    {baseInputQuantity || '0'} {baseInputUnit} (
+                    {yieldRatio.toFixed(4)} {yieldsUnit}/{baseInputUnit})
+                  </span>
+                ) : (
+                  <span className="text-text/50">
+                    Completa rendimiento e insumo base para ver la relación.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-text/60 mb-1">Descripción (opcional)</div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="input-glass w-full h-20 resize-none"
+            />
+          </div>
+
+          <div>
+            <div className="text-text/60 mb-1">Notas de rendimiento (opcional)</div>
+            <textarea
+              value={yieldNotes}
+              onChange={(e) => setYieldNotes(e.target.value)}
+              className="input-glass w-full h-16 resize-none text-[11px]"
+              placeholder="Ej: 22 kg de tomate fresco generan 18 L de salsa terminada."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-text/80">
+                Componentes de la receta
+              </h4>
+              <button
+                type="button"
+                onClick={addItem}
+                className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+              >
+                + Agregar componente
+              </button>
+            </div>
+
+            {items.map((item, index) => (
+              <div
+                key={item.id || index}
+                className="border border-glass rounded-lg p-2 space-y-2 bg-background-dark/40"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                  <div>
+                    <div className="text-[11px] text-text/60 mb-0.5">Tipo</div>
+                    <select
+                      value={
+                        item.component_type === 'product' ? 'product' : 'ingredient'
+                      }
+                      onChange={(e) => {
+                        const type =
+                          e.target.value === 'product' ? 'product' : 'ingredient';
+                        handleItemChange(index, {
+                          component_type: type,
+                          ingredient_id: '',
+                          product_id: ''
+                        });
+                      }}
+                      className="input-glass w-full text-[11px]"
+                    >
+                      <option value="ingredient">Ingrediente</option>
+                      <option value="product">Producto</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-[11px] text-text/60 mb-0.5">
+                      {item.component_type === 'product'
+                        ? 'Producto'
+                        : 'Ingrediente'}
+                    </div>
+                    {item.component_type === 'product' ? (
+                      <select
+                        value={item.product_id || ''}
+                        onChange={(e) =>
+                          handleItemChange(index, {
+                            product_id: e.target.value,
+                            ingredient_id: ''
+                          })
+                        }
+                        className="input-glass w-full text-[11px]"
+                      >
+                        <option value="">Selecciona producto</option>
+                        {Array.isArray(products) &&
+                          products.map((p) => (
+                            <option key={p.id} value={String(p.id)}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                    ) : (
+                      <select
+                        value={item.ingredient_id || ''}
+                        onChange={(e) =>
+                          handleItemChange(index, {
+                            ingredient_id: e.target.value,
+                            product_id: ''
+                          })
+                        }
+                        className="input-glass w-full text-[11px]"
+                      >
+                        <option value="">Selecciona ingrediente</option>
+                        {Array.isArray(ingredients) &&
+                          ingredients.map((ing) => (
+                            <option key={ing.id} value={String(ing.id)}>
+                              {ing.name} {ing.unit ? `(${ing.unit})` : ''}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-text/60 mb-0.5">Cantidad</div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleItemChange(index, { quantity: e.target.value })
+                      }
+                      className="input-glass w-full text-[11px]"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-text/60 mb-0.5">Unidad</div>
+                    <select
+                      value={item.unit || 'unit'}
+                      onChange={(e) =>
+                        handleItemChange(index, { unit: e.target.value })
+                      }
+                      className="input-glass w-full text-[11px]"
+                    >
+                      <option value="unit">Unidad</option>
+                      <option value="kg">Kilogramos (kg)</option>
+                      <option value="g">Gramos (g)</option>
+                      <option value="L">Litros (L)</option>
+                      <option value="ml">Mililitros (ml)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px] text-red-300"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-glass hover:bg-glass-hover"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting
+                ? 'Guardando…'
+                : isEdit
+                  ? 'Guardar receta'
+                  : 'Crear receta'}
             </button>
           </div>
         </form>

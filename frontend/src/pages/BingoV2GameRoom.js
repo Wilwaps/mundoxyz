@@ -31,6 +31,82 @@ const BingoV2GameRoom = () => {
   const [remainingTime, setRemainingTime] = useState(30);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  const loadRoomAndCards = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
+      const data = await response.json();
+      
+      console.log('🎰 Room data received:', data);
+      
+      if (data.success) {
+        setRoom(data.room);
+        setDrawnNumbers(data.room.drawn_numbers || []);
+        
+        // Get my cards
+        const myPlayer = data.room.players?.find(p => p.user_id === user?.id);
+        console.log('🎟️ My player data:', myPlayer);
+        console.log('🎟️ My cards:', myPlayer?.cards);
+        
+        if (myPlayer) {
+          const cards = myPlayer.cards || [];
+          
+          // Parsear grid si llega como string
+          const parsedCards = cards.map(card => {
+            let parsedGrid = card.grid;
+            
+            if (typeof card.grid === 'string') {
+              try {
+                parsedGrid = JSON.parse(card.grid);
+              } catch (e) {
+                console.error(`Error parsing grid for card ${card.id}:`, e);
+                parsedGrid = null;
+              }
+            }
+            
+            return {
+              ...card,
+              grid: parsedGrid
+            };
+          });
+          
+          setMyCards(parsedCards);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading room:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [code, user?.id]);
+
+  const loadUserExperience = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/bingo/v2/stats`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      
+      // Stats loaded successfully (reserved for future use)
+      if (data.success) {
+        // Future: Podemos agregar estadísticas aquí
+      }
+    } catch (err) {
+      console.error('Error loading user stats:', err);
+    }
+  }, []);
+
+  const highlightCalledNumber = useCallback((number) => {
+    // This will be handled in the card component
+    setMyCards(prevCards => 
+      prevCards.map(card => ({
+        ...card,
+        highlightedNumber: number
+      }))
+    );
+  }, []);
+
   // eslint-disable-next-line no-use-before-define
   useEffect(() => {
     // CRITICAL: Validate user authentication
@@ -121,82 +197,6 @@ const BingoV2GameRoom = () => {
       };
     }
   }, [socket, user, code, navigate, loadRoomAndCards, loadUserExperience, highlightCalledNumber]);
-
-  const loadRoomAndCards = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/bingo/v2/rooms/${code}`);
-      const data = await response.json();
-      
-      console.log('🎰 Room data received:', data);
-      
-      if (data.success) {
-        setRoom(data.room);
-        setDrawnNumbers(data.room.drawn_numbers || []);
-        
-        // Get my cards
-        const myPlayer = data.room.players?.find(p => p.user_id === user?.id);
-        console.log('🎟️ My player data:', myPlayer);
-        console.log('🎟️ My cards:', myPlayer?.cards);
-        
-        if (myPlayer) {
-          const cards = myPlayer.cards || [];
-          
-          // Parsear grid si llega como string
-          const parsedCards = cards.map(card => {
-            let parsedGrid = card.grid;
-            
-            if (typeof card.grid === 'string') {
-              try {
-                parsedGrid = JSON.parse(card.grid);
-              } catch (e) {
-                console.error(`Error parsing grid for card ${card.id}:`, e);
-                parsedGrid = null;
-              }
-            }
-            
-            return {
-              ...card,
-              grid: parsedGrid
-            };
-          });
-          
-          setMyCards(parsedCards);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading room:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [code, user?.id]);
-
-  const loadUserExperience = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/bingo/v2/stats`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      // Stats loaded successfully (reserved for future use)
-      if (data.success) {
-        // Future: Podemos agregar estadísticas aquí
-      }
-    } catch (err) {
-      console.error('Error loading user stats:', err);
-    }
-  }, []);
-
-  const highlightCalledNumber = useCallback((number) => {
-    // This will be handled in the card component
-    setMyCards(prevCards => 
-      prevCards.map(card => ({
-        ...card,
-        highlightedNumber: number
-      }))
-    );
-  }, []);
 
   const handleCallNumber = () => {
     if (socket && room && room.host_id === user.id && !isCallingNumber) {
