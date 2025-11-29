@@ -1,0 +1,9 @@
+providers = ["node"]
+
+[phases.setup]
+# Usamos el provider de Node por defecto, solo aseguramos NodeJS
+nixPkgs = ["nodejs"]
+
+# Devolvemos el control del comando de inicio a Railway (deploy.startCommand)
+[start]
+cmd = "npm start"
