@@ -6443,6 +6443,21 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
     return category ? category.name : 'Sin categoría';
   };
 
+  // Convert units to base for cost calculations
+  const convertToBaseUnit = (quantity, unit) => {
+    const q = parseFloat(quantity || '0');
+    if (!Number.isFinite(q) || q <= 0) return 0;
+    
+    switch (unit) {
+      case 'kg': return q; // kg is base unit
+      case 'g': return q / 1000; // 1000g = 1kg
+      case 'L': return q; // L is base unit
+      case 'ml': return q / 1000; // 1000ml = 1L
+      case 'unit': 
+      default: return q; // units are indivisible
+    }
+  };
+
   // Calculate price in Bs using historical rate for ingredients
   const calculateIngredientPriceBs = (ingredient) => {
     // Use the purchase_rate_usdt if available (historical rate at purchase time)
@@ -6459,6 +6474,28 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
   const calculatePriceBs = (priceUsdt) => {
     if (!vesPerUsdt || !priceUsdt || vesPerUsdt === 0) return 0;
     return safeNumber(priceUsdt) * safeNumber(vesPerUsdt);
+  };
+
+  // Calculate effective cost per base unit (handles unit conversion)
+  const calculateEffectiveCostPerBaseUnit = (ingredient) => {
+    const costPerUnit = safeNumber(ingredient.cost_per_unit_usdt);
+    if (costPerUnit === 0) return 0;
+    
+    // If ingredient uses a derived unit (g, ml), convert to base unit cost
+    switch (ingredient.unit) {
+      case 'g':
+        // Cost per gram = cost per kg / 1000
+        return costPerUnit / 1000;
+      case 'ml':
+        // Cost per ml = cost per L / 1000
+        return costPerUnit / 1000;
+      case 'kg':
+      case 'L':
+      case 'unit':
+      default:
+        // Already in base unit
+        return costPerUnit;
+    }
   };
 
   // Update ingredient field
@@ -6581,8 +6618,13 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
                       const overrideStock = safeNumber(ing.override_stock);
                       const availableStock = overrideStock > 0 ? overrideStock : realStock;
                       const minStock = safeNumber(ing.min_stock_alert);
-                      const cost = safeNumber(ing.cost_per_unit_usdt);
+                      
+                      // Calculate costs with unit conversion
+                      const costPerUnit = safeNumber(ing.cost_per_unit_usdt);
+                      const effectiveCostPerBaseUnit = calculateEffectiveCostPerBaseUnit(ing);
                       const costBs = calculateIngredientPriceBs(ing);
+                      const effectiveCostBs = effectiveCostPerBaseUnit * (ing.purchase_rate_usdt || vesPerUsdt || 1);
+                      
                       const usedRate = ing.purchase_rate_usdt || vesPerUsdt;
                       const isLowStock = availableStock <= minStock && availableStock > 0;
                       const isOutOfStock = availableStock === 0;
@@ -6604,7 +6646,7 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
                               <option value="ml">Mililitros (ml)</option>
                             </select>
                           </td>
-                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/50">{realStock.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/50">{realStock.toFixed(2)} {ing.unit}</td>
                           <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right">
                             {editingField === `${ing.id}-override_stock` ? (
                               <input
@@ -6625,7 +6667,7 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
                                 onClick={() => setEditingField(`${ing.id}-override_stock`)}
                                 className={`cursor-pointer text-right ${overrideStock > 0 ? 'text-accent font-medium' : 'text-text/60'}`}
                               >
-                                {overrideStock > 0 ? overrideStock.toFixed(2) : '-'}
+                                {overrideStock > 0 ? `${overrideStock.toFixed(2)} ${ing.unit}` : '-'}
                               </div>
                             )}
                           </td>
@@ -6654,8 +6696,26 @@ const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClo
                               </div>
                             )}
                           </td>
-                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{cost.toFixed(4)}</td>
-                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{costBs.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">
+                            <div>
+                              <div>{costPerUnit.toFixed(4)} USDT/{ing.unit}</div>
+                              {(ing.unit === 'g' || ing.unit === 'ml') && (
+                                <div className="text-[9px] text-text/60">
+                                  {effectiveCostPerBaseUnit.toFixed(6)} USDT/base
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">
+                            <div>
+                              <div>{costBs.toFixed(2)} Bs/{ing.unit}</div>
+                              {(ing.unit === 'g' || ing.unit === 'ml') && (
+                                <div className="text-[9px] text-text/60">
+                                  {effectiveCostBs.toFixed(4)} Bs/base
+                                </div>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/60 text-[10px] hidden xl:table-cell">
                             {usedRate ? usedRate.toFixed(2) : '-'}
                             {ing.purchase_rate_usdt && <span className="text-accent ml-1">▲</span>}

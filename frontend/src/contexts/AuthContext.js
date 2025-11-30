@@ -366,6 +366,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasRole = (role) => {
+    // Debug logging para APK
+    console.log('🔍 Debug Roles:', {
+      userId: user?.id,
+      username: user?.username,
+      roles: user?.roles,
+      checkingRole: role,
+      hasRole: user?.roles?.includes(role)
+    });
     return user?.roles?.includes(role) || false;
   };
 
