@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { getBaseUrl } from '../utils/urlHelper';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Users, Zap } from 'lucide-react';
@@ -118,7 +119,7 @@ const Games = () => {
     }
 
     try {
-      const url = `${window.location.origin}${path}`;
+      const url = `${getBaseUrl()}${path}`;
 
       if (navigator.share) {
         await navigator.share({

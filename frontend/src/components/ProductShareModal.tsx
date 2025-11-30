@@ -5,9 +5,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Share2, MessageCircle, Send, Copy, QrCode } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
 import { downloadQrForUrl } from '../utils/qr';
+import { getProductUrl } from '../utils/urlHelper';
 
 interface ProductShareModalProps {
   isOpen: boolean;
@@ -33,14 +34,7 @@ const ProductShareModal: React.FC<ProductShareModalProps> = ({
 
   // Generar URL con referido embebido
   const generateReferralUrl = () => {
-    const baseUrl = `${window.location.origin}/store/${product.store_slug}`;
-    
-    // Si el usuario tiene referido, agregar el parámetro
-    if (user?.my_referrer_code) {
-      return `${baseUrl}?ref=${user.my_referrer_code}&product=${product.id}`;
-    }
-    
-    return `${baseUrl}?product=${product.id}`;
+    return getProductUrl(product.store_slug, product.id, user?.my_referrer_code);
   };
 
   const shareUrl = generateReferralUrl();

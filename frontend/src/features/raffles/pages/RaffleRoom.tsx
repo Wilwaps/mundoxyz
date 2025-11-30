@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getBaseUrl } from '../../../utils/urlHelper';
 import {
   ArrowLeft,
   Users,
@@ -595,7 +596,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
   
   // Compartir rifa
   const shareRaffle = (platform: 'whatsapp' | 'telegram' | 'copy') => {
-    const shareUrl = `${window.location.origin}/raffles/public/${code}`;
+    const shareUrl = `${getBaseUrl()}/raffles/public/${code}`;
     const shareText = `¡Participa en la rifa "${raffle?.name}"! 🎉\n\nPremio: ${raffle?.prizeMeta?.prizeDescription || 'Increíble premio'}\nNúmeros disponibles: ${availableNumbers}\n\nÚnete aquí:`;
     
     switch (platform) {
@@ -1108,8 +1109,8 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
             <div
               className="bg-glass rounded-xl p-4 cursor-pointer hover:bg-glass/80 flex flex-col gap-2"
               onClick={() => {
-                const url = `${window.location.origin}/raffles/public/${raffle.code}`;
-                window.open(url, '_blank', 'noopener,noreferrer');
+                const shareUrl = `${getBaseUrl()}/raffles/public/${raffle.code}`;
+                window.open(shareUrl, '_blank', 'noopener,noreferrer');
               }}
             >
               <div className="text-xs text-text/60 mb-1">Landing pública</div>
@@ -1120,7 +1121,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const shareUrl = `${window.location.origin}/raffles/public/${code}`;
+                  const shareUrl = `${getBaseUrl()}/raffles/public/${code}`;
                   navigator.clipboard.writeText(shareUrl);
                   toast.success('Enlace de la landing copiado');
                 }}
@@ -1307,7 +1308,7 @@ const RaffleRoom: React.FC<RaffleRoomProps> = () => {
                     <span>
                       Vendidos: {stats.soldNumbers} • Reservados: {stats.reservedNumbers} • Disponibles: {stats.availableNumbers}
                     </span>
-                    <span>{window.location.origin}/raffles/{raffle.code}</span>
+                    <span>{getBaseUrl()}/raffles/{raffle.code}</span>
                   </div>
                 </div>
               </div>

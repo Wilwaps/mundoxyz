@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getStoreUrl } from '../../utils/urlHelper';
 import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Flame, Share2, MapPin } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -737,7 +738,7 @@ const StoreFront = () => {
             return;
         }
 
-        const shareUrl = `${window.location.origin}/store/${slugValue}`;
+        const shareUrl = getStoreUrl(slugValue);
         const shareText = `Mira la tienda "${store?.name || 'MundoXYZ'}" en MundoXYZ`;
 
         switch (platform) {
