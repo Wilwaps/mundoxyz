@@ -441,7 +441,7 @@ router.post('/register', async (req, res) => {
         throw new Error('El usuario ya está registrado');
       }
 
-      // Verificar si el email ya existe
+      // Verificar si el email ya existe (ignorar emails nulos)
       const emailCheck = await client.query(
         'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
         [email]

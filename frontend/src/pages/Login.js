@@ -21,13 +21,13 @@ const Login = () => {
   useEffect(() => {
     if (user) {
       const defaultTarget = user.home_store_slug ? `/store/${user.home_store_slug}` : safeNext;
-      if (isDevMode && user.must_change_password) {
+      if (user.must_change_password) {
         setShowPasswordModal(true);
         return;
       }
       navigate(defaultTarget, { replace: true });
     }
-  }, [user, navigate, safeNext, isDevMode]);
+  }, [user, navigate, safeNext]);
 
   useEffect(() => {
     // Check if running in Telegram WebApp
@@ -54,7 +54,7 @@ const Login = () => {
     if (result.success) {
       const loggedUser = result.user || user;
       const target = loggedUser?.home_store_slug ? `/store/${loggedUser.home_store_slug}` : safeNext;
-      if (isDevMode && loggedUser?.must_change_password) {
+      if (loggedUser?.must_change_password) {
         setShowPasswordModal(true);
       } else {
         navigate(target, { replace: true });
