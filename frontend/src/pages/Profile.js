@@ -15,7 +15,9 @@ import {
   LogOut,
   Lock,
   Share2,
-  Users
+  Users,
+  ShoppingBag,
+  ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
@@ -1118,6 +1120,85 @@ const Profile = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Mis Pedidos */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="card-glass mb-6"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            <ShoppingBag size={20} className="text-accent" />
+            Mis Pedidos
+          </h3>
+          {myOrdersLoading && (
+            <span className="text-[11px] text-text/60">Cargando...</span>
+          )}
+        </div>
+
+        {myOrdersError && (
+          <div className="text-[11px] text-red-400 mb-3">
+            Error al cargar tus pedidos.
+          </div>
+        )}
+
+        {!myOrdersLoading && myOrders.length === 0 ? (
+          <p className="text-sm text-text/60">Aún no has realizado pedidos.</p>
+        ) : (
+          <div className="space-y-2">
+            {myOrders.map((order) => {
+              const canOpenInvoice = order.invoice_number != null;
+              const formatInvoiceNumber = (n) => {
+                if (n === null || n === undefined) return '-';
+                const numeric = typeof n === 'number' ? n : parseInt(n, 10);
+                if (!Number.isFinite(numeric)) return String(n);
+                return String(numeric).padStart(7, '0');
+              };
+
+              return (
+                <div
+                  key={order.id}
+                  className={`glass-panel p-3 ${
+                    canOpenInvoice ? 'cursor-pointer hover:bg-glass' : ''
+                  }`}
+                  onClick={() => {
+                    if (!canOpenInvoice) return;
+                    window.open(
+                      `/store/${order.store_slug}/invoice/${order.invoice_number}?from=orders`,
+                      '_blank'
+                    );
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm">
+                          {order.store_name || 'Tienda'}
+                        </span>
+                        {canOpenInvoice && (
+                          <ExternalLink size={12} className="text-accent" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-text/60">
+                        <span>Factura #{formatInvoiceNumber(order.invoice_number)}</span>
+                        <span>{order.created_at ? new Date(order.created_at).toLocaleDateString() : '-'}</span>
+                        <span className="capitalize">{order.status || 'pending'}</span>
+                      </div>
+                      {order.total_usdt && (
+                        <div className="text-[11px] text-text/80 mt-1">
+                          Total: ${Number(order.total_usdt).toFixed(2)} USD
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
 
       {/* Rifas del usuario */}
       <motion.div 

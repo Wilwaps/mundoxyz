@@ -10,7 +10,19 @@ router.get('/:storeId/ingredients', verifyToken, async (req, res) => {
         const { storeId } = req.params;
 
         const result = await query(
-            `SELECT * FROM ingredients WHERE store_id = $1 ORDER BY name ASC`,
+            `SELECT i.*, lp.last_purchase_unit_cost_usdt
+       FROM ingredients i
+       LEFT JOIN LATERAL (
+         SELECT pii.unit_cost_usdt AS last_purchase_unit_cost_usdt
+         FROM purchase_invoice_items pii
+         JOIN purchase_invoices pi ON pi.id = pii.invoice_id
+         WHERE pii.ingredient_id = i.id
+           AND pi.store_id = i.store_id
+         ORDER BY pi.invoice_date DESC NULLS LAST, pi.created_at DESC, pi.id DESC
+         LIMIT 1
+       ) lp ON TRUE
+       WHERE i.store_id = $1
+       ORDER BY i.name ASC`,
             [storeId]
         );
 
@@ -37,6 +49,35 @@ router.post('/:storeId/ingredient', verifyToken, async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// PATCH /api/store/inventory/:storeId/ingredient/:ingredientId - Update ingredient basic fields (currently unit)
+router.patch('/:storeId/ingredient/:ingredientId', verifyToken, async (req, res) => {
+    try {
+        const { storeId, ingredientId } = req.params;
+        const { unit } = req.body || {};
+
+        if (!unit || typeof unit !== 'string') {
+            return res.status(400).json({ error: 'La unidad es obligatoria y debe ser un texto' });
+        }
+
+        const result = await query(
+            `UPDATE ingredients
+       SET unit = $1, updated_at = NOW()
+       WHERE store_id = $2 AND id = $3
+       RETURNING *`,
+            [unit, storeId, ingredientId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Ingrediente no encontrado' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error updating ingredient:', error);
         res.status(400).json({ error: error.message });
     }
 });

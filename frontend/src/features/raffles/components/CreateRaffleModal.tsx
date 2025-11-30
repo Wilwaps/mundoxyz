@@ -28,6 +28,7 @@ import { RAFFLE_LIMITS } from '../constants';
 import { VENEZUELAN_BANKS } from '../../../constants/banks';
 import { processImage } from '../utils/imageHelpers';
 import InsufficientFiresModal from '../../../components/InsufficientFiresModal';
+import CameraButton from '../../../components/CameraButton';
 
 interface CreateRaffleModalProps {
   isOpen: boolean;
@@ -489,7 +490,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   <label className="block text-sm text-text/80 mb-1">
                     Logo de la Empresa
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-2">
                     <input
                       type="file"
                       accept="image/*"
@@ -511,11 +512,24 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     />
                     <label
                       htmlFor="company-logo-upload"
-                      className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
+                      className="flex-1 px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
                     >
                       <Upload className="w-5 h-5" />
                       <span className="text-sm">{logoBase64 ? '✅ Logo cargado' : 'Subir logo de empresa'}</span>
                     </label>
+                    <CameraButton
+                      onPhotoTaken={async (file) => {
+                        const result = await processImage(file, 5);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setLogoBase64(result.base64);
+                          toast.success('Logo capturado exitosamente');
+                        }
+                      }}
+                      size="md"
+                      className="rounded-lg"
+                    />
                   </div>
                   <p className="text-xs text-text/60 mt-1">PNG o JPG. Máx. 2MB</p>
                 </div>
@@ -700,7 +714,7 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                   <label className="block text-sm text-text/80 mb-1">
                     Imagen del Premio
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-2">
                     <input
                       type="file"
                       accept="image/*"
@@ -721,11 +735,24 @@ const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({
                     />
                     <label
                       htmlFor="prize-image-upload"
-                      className="w-full px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
+                      className="flex-1 px-4 py-3 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-lighter transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
                     >
                       <Image className="w-5 h-5" />
                       <span className="text-sm">{prizeImageBase64 ? '✅ Imagen cargada' : 'Seleccionar imagen del premio'}</span>
                     </label>
+                    <CameraButton
+                      onPhotoTaken={async (file) => {
+                        const result = await processImage(file, 5);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setPrizeImageBase64(result.base64);
+                          toast.success('Imagen capturada exitosamente');
+                        }
+                      }}
+                      size="md"
+                      className="rounded-lg"
+                    />
                   </div>
                   <p className="text-xs text-text/60 mt-1">JPG, PNG o GIF. Máx. 5MB</p>
                 </div>

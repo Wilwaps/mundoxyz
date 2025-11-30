@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
@@ -7,6 +7,9 @@ import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Fla
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { downloadQrForUrl } from '../../utils/qr';
+import CameraButton from '../../components/CameraButton';
+import { openMapWithAutoClose, openLocationSearch } from '../../utils/mapHelper';
+import ProductShareModal from '../../components/ProductShareModal';
 import './StoreFront.css'; // Custom styles
 
 const COLOR_KEYWORDS = {
@@ -34,27 +37,50 @@ const parseModifierColorFromName = (rawName) => {
         return { label: '', color: null };
     }
 
-    const parts = trimmed.split(/\s+/);
-    const last = parts[parts.length - 1];
     let color = null;
     let label = trimmed;
 
-    if (last && last.startsWith('#') && last.length > 1) {
-        const token = last.slice(1).toLowerCase();
+    // Buscar patrones de color en cualquier parte del texto
+    const colorPatterns = [
+        // Patrones hexadecimales: #FF0000, #F00, etc.
+        /#([0-9a-f]{3}|[0-9a-f]{6})\b/gi,
+        // Patrones de palabras clave: rojo, azul, etc.
+        /\b(rojo|azul|verde|amarillo|naranja|morado|rosa|negro|blanco|gris|dorado|plateado)\b/gi
+    ];
 
-        if (/^[0-9a-f]{3}$|^[0-9a-f]{6}$/.test(token)) {
-            color = `#${token}`;
-        } else if (COLOR_KEYWORDS[token]) {
-            color = COLOR_KEYWORDS[token].color;
-        }
-
-        if (color) {
-            const base = parts.slice(0, -1).join(' ').trim();
-            if (base) {
-                label = base;
-            } else if (COLOR_KEYWORDS[token]) {
-                label = COLOR_KEYWORDS[token].label;
+    for (const pattern of colorPatterns) {
+        const matches = trimmed.match(pattern);
+        if (matches) {
+            for (const match of matches) {
+                // Si es un color hexadecimal
+                if (match.startsWith('#')) {
+                    const token = match.slice(1).toLowerCase();
+                    if (/^[0-9a-f]{3}$|^[0-9a-f]{6}$/.test(token)) {
+                        color = `#${token}`;
+                        break;
+                    }
+                } 
+                // Si es una palabra clave de color
+                else {
+                    const token = match.toLowerCase();
+                    if (COLOR_KEYWORDS[token]) {
+                        color = COLOR_KEYWORDS[token].color;
+                        break;
+                    }
+                }
             }
+            if (color) break;
+        }
+    }
+
+    // Si se encontró un color, mantener el nombre completo
+    if (color) {
+        // Para colores hexadecimales, mostrar el código como nombre si no hay otro texto
+        if (trimmed.match(/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i)) {
+            label = trimmed; // Mantener el código HEX como nombre
+        } else {
+            // Para colores con nombre, mantener el nombre original
+            label = trimmed;
         }
     }
 
@@ -88,7 +114,11 @@ const StoreFront = () => {
     const [selectedProduct, setSelectedProduct] = useState(null); // For modal
     const [productModalQuantity, setProductModalQuantity] = useState(1);
     const [productModalModifiers, setProductModalModifiers] = useState({});
+    const [showProductShareModal, setShowProductShareModal] = useState(false);
+    const [productToShare, setProductToShare] = useState(null);
     const [deliveryLocation, setDeliveryLocation] = useState('');
+    const [isScheduledOrder, setIsScheduledOrder] = useState(false);
+    const [scheduledDateTime, setScheduledDateTime] = useState('');
 
     // Pagos iniciales como strings vacíos para que no aparezca un '0' pegado al escribir
     const initialPayments = {
@@ -452,7 +482,7 @@ const StoreFront = () => {
                 setDeliveryLocation(mapsUrl);
 
                 try {
-                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                    openMapWithAutoClose(mapsUrl, 5000); // Mantener abierto 5 segundos para que usuario copie dirección
                 } catch {
                 }
             },
@@ -501,6 +531,20 @@ const StoreFront = () => {
             return;
         }
 
+        if (isScheduledOrder && !scheduledDateTime) {
+            toast.error('Selecciona una fecha y hora para tu pedido programado');
+            return;
+        }
+
+        if (isScheduledOrder && scheduledDateTime) {
+            const scheduledDate = new Date(scheduledDateTime);
+            const minDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hora en el futuro
+            if (scheduledDate < minDate) {
+                toast.error('El pedido debe programarse con al menos 1 hora de anticipación');
+                return;
+            }
+        }
+
         const guestInfo = !user
             ? {
                 name: guestName.trim() || null,
@@ -543,6 +587,10 @@ const StoreFront = () => {
             currency_snapshot: rates,
             customer_id: user?.id || null,
             delivery_info: deliveryInfo,
+            scheduled_order: isScheduledOrder && scheduledDateTime ? {
+                enabled: true,
+                scheduled_for: scheduledDateTime
+            } : { enabled: false },
             change_to_fires: giveChangeInFires && changeUSDT > 0 && user?.id
                 ? {
                     enabled: true,
@@ -576,6 +624,20 @@ const StoreFront = () => {
         if (guestWantsDelivery && !hasDeliveryLocation) {
             toast.error('Ingresa una dirección o link para el delivery');
             return;
+        }
+
+        if (isScheduledOrder && !scheduledDateTime) {
+            toast.error('Selecciona una fecha y hora para tu pedido programado');
+            return;
+        }
+
+        if (isScheduledOrder && scheduledDateTime) {
+            const scheduledDate = new Date(scheduledDateTime);
+            const minDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hora en el futuro
+            if (scheduledDate < minDate) {
+                toast.error('El pedido debe programarse con al menos 1 hora de anticipación');
+                return;
+            }
         }
 
         setGuestInfoConfirmed(true);
@@ -729,6 +791,7 @@ const StoreFront = () => {
         });
 
     return (
+        <>
         <div className="store-front min-h-screen bg-dark pb-24">
             {/* Hero Section */}
             <div className={`relative ${heroHeightClass} overflow-hidden`}>
@@ -744,10 +807,9 @@ const StoreFront = () => {
                             type="button"
                             onClick={() => {
                                 if (mapsUrl) {
-                                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                                    openMapWithAutoClose(mapsUrl);
                                 } else if (locationAddress) {
-                                    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`;
-                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                    openLocationSearch(locationAddress);
                                 }
                             }}
                             className="w-9 h-9 rounded-full bg-dark/70 hover:bg-dark/90 border border-white/20 flex items-center justify-center text-white/80 text-xs shadow-lg"
@@ -818,10 +880,9 @@ const StoreFront = () => {
                                             type="button"
                                             onClick={() => {
                                                 if (mapsUrl) {
-                                                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                                                    openMapWithAutoClose(mapsUrl);
                                                 } else if (locationAddress) {
-                                                    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`;
-                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                    openLocationSearch(locationAddress);
                                                 }
                                             }}
                                             className="flex items-center gap-1 hover:text-white underline-offset-2 hover:underline"
@@ -894,6 +955,21 @@ const StoreFront = () => {
                                         alt={product.name}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     />
+                                    {/* Share Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setProductToShare({
+                                                ...product,
+                                                store_slug: storeData.store.slug,
+                                                store_name: storeData.store.name
+                                            });
+                                            setShowProductShareModal(true);
+                                        }}
+                                        className="absolute top-3 left-3 w-8 h-8 bg-dark/80 hover:bg-dark/90 rounded-full flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors"
+                                    >
+                                        <Share2 size={16} className="text-white/80" />
+                                    </button>
                                     {totalQuantity === 0 ? (
                                         <button
                                             onClick={(e) => {
@@ -1449,6 +1525,39 @@ const StoreFront = () => {
                                         <span>Quiero delivery para este pedido</span>
                                     </label>
 
+                                    <label className="flex items-center gap-2 text-xs text-white/70">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4"
+                                            checked={isScheduledOrder}
+                                            onChange={(e) => {
+                                                setIsScheduledOrder(e.target.checked);
+                                                if (!e.target.checked) {
+                                                    setScheduledDateTime('');
+                                                }
+                                            }}
+                                        />
+                                        <span>Quiero programar este pedido para otra fecha y hora</span>
+                                    </label>
+
+                                    {isScheduledOrder && (
+                                        <div>
+                                            <label className="block text-[11px] text-white/60 mb-1">
+                                                Fecha y hora del pedido
+                                            </label>
+                                            <input
+                                                type="datetime-local"
+                                                className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                                value={scheduledDateTime}
+                                                onChange={(e) => setScheduledDateTime(e.target.value)}
+                                                min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)} // Mínimo 1 hora en el futuro
+                                            />
+                                            <div className="text-[10px] text-white/50 mt-1">
+                                                Programa tu pedido con al menos 1 hora de anticipación
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {guestWantsDelivery && (
                                         <div>
                                             <label className="block text-[11px] text-white/60 mb-1">
@@ -1737,6 +1846,13 @@ const StoreFront = () => {
                                                             onChange={handleCashProofChange}
                                                             className="text-[11px] text-white/70"
                                                         />
+                                                        <CameraButton
+                                                            onPhotoTaken={(file) => {
+                                                                handleCashProofChange({ target: { files: [file] } });
+                                                            }}
+                                                            size="sm"
+                                                            className="rounded-full"
+                                                        />
                                                         {cashProofName && (
                                                             <span className="text-[10px] text-emerald-400 truncate max-w-[140px]">
                                                                 {cashProofName}
@@ -1872,6 +1988,19 @@ const StoreFront = () => {
                 </div>
             )}
         </div>
+
+        {/* Product Share Modal */}
+        {showProductShareModal && productToShare && (
+            <ProductShareModal
+                isOpen={showProductShareModal}
+                onClose={() => {
+                    setShowProductShareModal(false);
+                    setProductToShare(null);
+                }}
+                product={productToShare}
+            />
+        )}
+        </>
     );
 };
 

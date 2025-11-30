@@ -6,6 +6,7 @@ import { Search, CreditCard, Banknote, Flame, RefreshCw, User, UserPlus } from '
 import toast from 'react-hot-toast';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import CameraButton from '../../components/CameraButton';
 
 const POS = () => {
     const { slug } = useParams(); // 'divorare04'
@@ -1156,6 +1157,13 @@ const POS = () => {
                                                 accept="image/*"
                                                 onChange={handleCashProofChange}
                                                 className="text-xs text-white/70"
+                                            />
+                                            <CameraButton
+                                                onPhotoTaken={(file) => {
+                                                    handleCashProofChange({ target: { files: [file] } });
+                                                }}
+                                                size="sm"
+                                                className="rounded-full"
                                             />
                                             {cashProofName && (
                                                 <span className="text-xs text-emerald-400 truncate max-w-[120px]">

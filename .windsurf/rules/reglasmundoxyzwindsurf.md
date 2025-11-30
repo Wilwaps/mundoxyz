@@ -43,10 +43,11 @@ En este proyecto los usuarios, la economia, la experiencia, las salas y tableros
 En PowerShell no necesitas Invoke-Expression para ejecutar git commit. Basta con lanzar el comando directamente. Ejemplo:
 
 powershell
-git commit -m "feat: FASE 1 reconexión TicTacToe"
+se utiliza ";" punto y coma para separar 
 Si prefieres seguir la cadena de comandos sugerida (con el mensaje en un archivo), sería:
 
 powershell
+
 git add -A
 if ($LASTEXITCODE -eq 0) { Set-Content -Path .git\COMMIT_MSG.txt -Value 'feat: FASE 1 reconexión TicTacToe' }
 if ($LASTEXITCODE -eq 0) { git commit -F .git\COMMIT_MSG.txt }

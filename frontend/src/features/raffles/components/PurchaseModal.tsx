@@ -18,6 +18,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { usePurchaseNumber, useReleaseNumber } from '../hooks/useRaffleData';
 import { PaymentMethod } from '../types';
 import { processImage } from '../utils/imageHelpers';
+import CameraButton from '../../../components/CameraButton';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -433,7 +434,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                     <label className="block text-sm text-text/80 mb-1">
                       Comprobante (opcional)
                     </label>
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                       <input
                         type="file"
                         accept="image/*"
@@ -446,13 +447,23 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                       />
                       <label
                         htmlFor="proof-upload"
-                        className="flex items-center justify-center gap-2 p-4 bg-glass/50 rounded-lg cursor-pointer hover:bg-glass transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 p-4 bg-glass/50 rounded-lg cursor-pointer hover:bg-glass transition-colors"
                       >
                         <Upload className="w-5 h-5 text-text/60" />
                         <span className="text-text/60">
                           {paymentData.proofImage ? paymentData.proofImage.name : 'Subir imagen'}
                         </span>
                       </label>
+                      <CameraButton
+                        onPhotoTaken={(file) => {
+                          setPaymentData({
+                            ...paymentData,
+                            proofImage: file
+                          });
+                        }}
+                        size="md"
+                        className="rounded-lg"
+                      />
                     </div>
                   </div>
                 </>

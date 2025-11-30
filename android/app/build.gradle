@@ -1,6 +1,22 @@
 apply plugin: 'com.android.application'
 
+// Define a signing config based on the keystore
+def keystoreFile = rootProject.file('app/my-release-key.keystore')
+def keystoreProperties = new Properties()
+if (keystoreFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystoreFile))
+}
+
 android {
+    signingConfigs {
+        release {
+            storeFile file('my-release-key.keystore')
+            storePassword MY_KEYSTORE_PASSWORD
+            keyAlias 'my-key-alias'
+            keyPassword MY_KEY_PASSWORD
+        }
+    }
+
     namespace "com.mundoxyz.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -18,6 +34,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

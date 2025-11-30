@@ -1,5 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { downloadQrForUrl } from '../../utils/qr';
+import { openMapWithAutoClose, openLocationSearch } from '../../utils/mapHelper';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ArrowLeft, MapPin, FileText, ShoppingBag, ListChecks, Share2 } from 'lucide-react';
@@ -124,7 +126,7 @@ const StoreFrontInvoicePage = () => {
 
   const handleOpenDeliveryMap = () => {
     if (!deliveryMapsUrl) return;
-    window.open(deliveryMapsUrl, '_blank', 'noopener,noreferrer');
+    openMapWithAutoClose(deliveryMapsUrl);
   };
 
   const handleShareDelivery = async () => {
@@ -202,12 +204,9 @@ const StoreFrontInvoicePage = () => {
 
   const handleOpenMap = () => {
     if (mapsUrl) {
-      window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+      openMapWithAutoClose(mapsUrl);
     } else if (locationAddress) {
-      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        locationAddress
-      )}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openLocationSearch(locationAddress);
     }
   };
 

@@ -146,13 +146,24 @@ router.get('/public/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
 
-        const storeResult = await query(
+        // Update views count in background (non-blocking)
+        query(
             `UPDATE stores
          SET views_count = views_count + 1,
              updated_at = NOW()
-         WHERE slug = $1
-         RETURNING id, name, slug, description, logo_url, cover_url,
-                   currency_config, settings, location, views_count`,
+         WHERE slug = $1`,
+            [slug]
+        ).catch(err => {
+            // Log error but don't block the response
+            logger.error('Error updating views_count:', err);
+        });
+
+        // Get store data immediately (don't wait for views update)
+        const storeResult = await query(
+            `SELECT id, name, slug, description, logo_url, cover_url,
+                   currency_config, settings, location, views_count
+       FROM stores
+       WHERE slug = $1`,
             [slug]
         );
 
@@ -162,19 +173,23 @@ router.get('/public/:slug', async (req, res) => {
 
         const store = storeResult.rows[0];
 
-        // Fetch categories and products
-        const categoriesResult = await query(
-            `SELECT * FROM categories WHERE store_id = $1 AND is_active = TRUE ORDER BY sort_order`,
-            [store.id]
-        );
-
-        const productsResult = await query(
-            `SELECT p.*, 
-              (SELECT json_agg(pm.*) FROM product_modifiers pm WHERE pm.product_id = p.id) as modifiers
+        // Fetch categories and products in parallel
+        const [categoriesResult, productsResult] = await Promise.all([
+            query(
+                `SELECT * FROM categories WHERE store_id = $1 AND is_active = TRUE ORDER BY sort_order`,
+                [store.id]
+            ),
+            query(
+                `SELECT p.*,
+              (SELECT json_agg(pm.*) 
+               FROM product_modifiers pm 
+               WHERE pm.product_id = p.id) AS modifiers
        FROM products p
-       WHERE p.store_id = $1 AND p.is_active = TRUE AND p.is_menu_item = TRUE`,
-            [store.id]
-        );
+       WHERE p.store_id = $1 AND p.is_active = TRUE AND p.is_menu_item = TRUE
+       ORDER BY p.name ASC`,
+                [store.id]
+            )
+        ]);
 
         res.json({
             store,
@@ -877,6 +892,55 @@ router.get('/:storeId/inventory/purchases', verifyToken, async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         logger.error('Error fetching purchase invoices:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// GET /api/store/:storeId/inventory/purchases/:invoiceId - Get a specific purchase invoice
+router.get('/:storeId/inventory/purchases/:invoiceId', verifyToken, async (req, res) => {
+    try {
+        const { storeId, invoiceId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        // Get invoice with supplier info
+        const invoiceResult = await query(
+            `SELECT pi.*, s.name AS supplier_name
+       FROM purchase_invoices pi
+       LEFT JOIN suppliers s ON pi.supplier_id = s.id
+       WHERE pi.store_id = $1 AND pi.id = $2`,
+            [storeId, invoiceId]
+        );
+
+        if (invoiceResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Factura no encontrada' });
+        }
+
+        // Get invoice items
+        const itemsResult = await query(
+            `SELECT pii.*, 
+              p.name AS product_name, 
+              i.name AS ingredient_name,
+              i.unit AS ingredient_unit,
+              m.name AS modifier_name
+       FROM purchase_invoice_items pii
+       LEFT JOIN products p ON pii.product_id = p.id
+       LEFT JOIN ingredients i ON pii.ingredient_id = i.id
+       LEFT JOIN product_modifiers m ON pii.modifier_id = m.id
+       WHERE pii.invoice_id = $1
+       ORDER BY pii.id`,
+            [invoiceId]
+        );
+
+        res.json({
+            invoice: invoiceResult.rows[0],
+            items: itemsResult.rows
+        });
+    } catch (error) {
+        logger.error('Error fetching purchase invoice:', error);
         res.status(400).json({ error: error.message });
     }
 });

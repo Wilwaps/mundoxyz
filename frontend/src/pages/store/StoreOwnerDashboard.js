@@ -2,8 +2,135 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { BarChart3, ShoppingBag, Megaphone, ListChecks, ExternalLink, ArrowLeft, Settings } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Edit2,
+  Trash2,
+  Save,
+  Camera,
+  MapPin,
+  ExternalLink,
+  Share2,
+  TrendingUp,
+  Users,
+  ShoppingCart,
+  Package,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  Star,
+  Filter,
+  Search,
+  Calendar,
+  Download,
+  Upload,
+  Eye,
+  EyeOff,
+  Copy,
+  RefreshCw,
+  BarChart3,
+  PieChart,
+  DollarSign,
+  Target,
+  Zap,
+  Award,
+  Gift,
+  Flame,
+  Heart,
+  MessageCircle,
+  Settings,
+  LogOut,
+  Lock,
+  ChevronRight,
+  ChevronLeft,
+  MoreVertical,
+  Grid,
+  List,
+  ArrowRight,
+  ArrowLeft,
+  Menu,
+  Bell,
+  User,
+  Mail,
+  Phone,
+  Globe,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Linkedin,
+  Tiktok,
+  Whatsapp,
+  Telegram,
+  Web,
+  Store,
+  CreditCard,
+  Banknote,
+  Coins,
+  Receipt,
+  FileText,
+  Clipboard,
+  CheckSquare,
+  Square,
+  Minus,
+  PlusCircle,
+  MinusCircle,
+  Info,
+  HelpCircle,
+  AlertTriangle,
+  Ban,
+  Shield,
+  Key,
+  Database,
+  Server,
+  Cloud,
+  Wifi,
+  Battery,
+  Signal,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Repeat,
+  Shuffle,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  ScreenShare,
+  Maximize2,
+  Minimize2,
+  Move,
+  Scissors,
+  Crop,
+  RotateCw,
+  RotateCcw,
+  FlipVertical,
+  FlipHorizontal,
+  Contrast,
+  Brightness,
+  Sun,
+  Moon,
+  Palette,
+  Droplet,
+  ShoppingBag,
+  ListChecks,
+  Megaphone
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { downloadQrForUrl } from '../../utils/qr';
+import CameraButton from '../../components/CameraButton';
+import { openMapWithAutoClose } from '../../utils/mapHelper';
+import ColorPickerModal from '../../components/ColorPickerModal';
 
 const MAX_PRODUCT_IMAGE_MB = 5;
 
@@ -129,10 +256,16 @@ const StoreOwnerDashboard = () => {
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isPurchaseDetailModalOpen, setIsPurchaseDetailModalOpen] = useState(false);
+  const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState(null);
+  const [isPurchaseDetailLoading, setIsPurchaseDetailLoading] = useState(false);
+  const [isIngredientsModalOpen, setIsIngredientsModalOpen] = useState(false);
 
   const [isProductionRecipeModalOpen, setIsProductionRecipeModalOpen] = useState(false);
   const [editingProductionRecipe, setEditingProductionRecipe] = useState(null);
   const [selectedRecipeForBatch, setSelectedRecipeForBatch] = useState(null);
+  const [isProductionCraftingModalOpen, setIsProductionCraftingModalOpen] = useState(false);
+  const [craftingRecipe, setCraftingRecipe] = useState(null);
 
   const [headerLayout, setHeaderLayout] = useState('normal');
   const [logoUrlInput, setLogoUrlInput] = useState('');
@@ -149,6 +282,50 @@ const StoreOwnerDashboard = () => {
   const [marketingPlanDraft, setMarketingPlanDraft] = useState('');
   const [reportInterval, setReportInterval] = useState('day');
   const [reportTypeFilter, setReportTypeFilter] = useState('all');
+  
+  // Estado para el selector de color personalizado
+  const [colorPickerModalOpen, setColorPickerModalOpen] = useState(false);
+  const [currentModifierInput, setCurrentModifierInput] = useState({ groupId: null, optionId: null, value: '' });
+
+  // Función para detectar #color y abrir el selector
+  const handleModifierInputChange = (groupId, optionId, value) => {
+    // Detectar si el usuario escribió "#color" exactamente
+    if (value.trim() === '#color') {
+      setCurrentModifierInput({ groupId, optionId, value: '' });
+      setColorPickerModalOpen(true);
+      return;
+    }
+    
+    // Si no es #color, actualizar normalmente
+    updateModifierOption(groupId, optionId, { name: value });
+  };
+
+  // Función para manejar la selección de color
+  const handleColorSelect = (color) => {
+    const { groupId, optionId } = currentModifierInput;
+    if (groupId && optionId) {
+      updateModifierOption(groupId, optionId, { name: color });
+    }
+    setCurrentModifierInput({ groupId: null, optionId: null, value: '' });
+  };
+
+  const updateModifierOption = (groupId, optionId, changes) => {
+    setModifierGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: g.options.map((opt) =>
+                opt.id === optionId ? { ...opt, ...changes } : opt
+              )
+            }
+          : g
+      )
+    );
+  };
+
+  // Estados para modificadores (movidos desde ProductEditModal)
+  const [modifierGroups, setModifierGroups] = useState([]);
 
   // Estado para filtros de pedidos activos
   const [orderColumnsFilter, setOrderColumnsFilter] = useState({
@@ -175,6 +352,8 @@ const StoreOwnerDashboard = () => {
   const store = storeData?.store;
   const categories = storeData?.categories || [];
   const products = storeData?.products || [];
+
+  const { user } = useAuth();
 
   // Sincronizar pestaña activa con query param ?tab= (overview, products, inventory, reports, marketing, settings)
   useEffect(() => {
@@ -388,6 +567,29 @@ const StoreOwnerDashboard = () => {
   });
 
   const purchases = Array.isArray(purchasesData) ? purchasesData : [];
+
+  const handleOpenPurchaseDetail = async (purchase) => {
+    if (!store?.id || !purchase?.id) return;
+
+    try {
+      setIsPurchaseDetailLoading(true);
+      setSelectedPurchaseDetail(null);
+      setIsPurchaseDetailModalOpen(true);
+
+      const response = await axios.get(
+        `/api/store/${store.id}/inventory/purchases/${purchase.id}`
+      );
+      setSelectedPurchaseDetail(response.data);
+    } catch (error) {
+      const message =
+        error?.response?.data?.error || 'No se pudo cargar la factura de compra';
+      toast.error(message);
+      setIsPurchaseDetailModalOpen(false);
+      setSelectedPurchaseDetail(null);
+    } finally {
+      setIsPurchaseDetailLoading(false);
+    }
+  };
 
   const {
     data: ingredientsData,
@@ -1116,7 +1318,11 @@ const StoreOwnerDashboard = () => {
                   </thead>
                   <tbody>
                     {purchases.map((p) => (
-                      <tr key={p.id} className="border-b border-glass/40">
+                      <tr
+                        key={p.id}
+                        className="border-b border-glass/40 hover:bg-glass cursor-pointer"
+                        onClick={() => handleOpenPurchaseDetail(p)}
+                      >
                         <td className="py-1 pr-3 text-text/70">
                           {p.invoice_date || (p.created_at ? new Date(p.created_at).toLocaleDateString() : '-')}
                         </td>
@@ -1143,6 +1349,13 @@ const StoreOwnerDashboard = () => {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsIngredientsModalOpen(true)}
+                  className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover whitespace-nowrap"
+                >
+                  Artículos / ingredientes
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1221,6 +1434,16 @@ const StoreOwnerDashboard = () => {
                               className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover"
                             >
                               Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCraftingRecipe(r);
+                                setIsProductionCraftingModalOpen(true);
+                              }}
+                              className="px-2 py-0.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 text-[10px]"
+                            >
+                              Craftear
                             </button>
                             <button
                               type="button"
@@ -1985,18 +2208,18 @@ const StoreOwnerDashboard = () => {
                                   {order.type || 'local'}
                                 </div>
                                 {hasDeliveryAddress && (
-                                  <a
-                                    href={`https://maps.google.com/?q=${encodeURIComponent(hasDeliveryAddress)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openMapWithAutoClose(`https://maps.google.com/?q=${encodeURIComponent(hasDeliveryAddress)}`);
+                                    }}
                                     className="text-[10px] text-accent hover:text-accent/80 flex items-center gap-1"
-                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                                     </svg>
                                     Ver dirección
-                                  </a>
+                                  </button>
                                 )}
                                 {order.table_number && (
                                   <div className="text-[10px] text-text/60">
@@ -2412,7 +2635,7 @@ const StoreOwnerDashboard = () => {
                     className="input-glass w-full"
                     placeholder="https://..."
                   />
-                  <div>
+                  <div className="flex items-center gap-2">
                     <input
                       id="store-logo-upload"
                       type="file"
@@ -2437,6 +2660,19 @@ const StoreOwnerDashboard = () => {
                     >
                       Subir logo desde archivo
                     </label>
+                    <CameraButton
+                      onPhotoTaken={async (file) => {
+                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setLogoUrlInput(result.base64);
+                          toast.success('Logo capturado exitosamente');
+                        }
+                      }}
+                      size="sm"
+                      className="rounded-full"
+                    />
                   </div>
                   {logoUrlInput && (
                     <div className="mt-1">
@@ -2460,7 +2696,7 @@ const StoreOwnerDashboard = () => {
                     className="input-glass w-full"
                     placeholder="https://..."
                   />
-                  <div>
+                  <div className="flex items-center gap-2">
                     <input
                       id="store-cover-upload"
                       type="file"
@@ -2485,6 +2721,19 @@ const StoreOwnerDashboard = () => {
                     >
                       Subir banner desde archivo
                     </label>
+                    <CameraButton
+                      onPhotoTaken={async (file) => {
+                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          setCoverUrlInput(result.base64);
+                          toast.success('Banner capturado exitosamente');
+                        }
+                      }}
+                      size="sm"
+                      className="rounded-full"
+                    />
                   </div>
                   {coverUrlInput && (
                     <div className="mt-1">
@@ -2702,6 +2951,10 @@ const StoreOwnerDashboard = () => {
           firesPerUsdt={firesPerUsdt}
           onClose={() => setEditingProduct(null)}
           onRequestNewCategory={() => setIsNewCategoryModalOpen(true)}
+          onModifierInputChange={handleModifierInputChange}
+          updateModifierOption={updateModifierOption}
+          modifierGroups={modifierGroups}
+          setModifierGroups={setModifierGroups}
           onSave={async (data) => {
             if (editingMode === 'edit') {
               await updateProductMutation.mutateAsync({ productId: editingProduct.id, data });
@@ -2746,6 +2999,28 @@ const StoreOwnerDashboard = () => {
           loading={createPurchaseMutation.isLoading}
         />
       )}
+      {isPurchaseDetailModalOpen && (
+        <PurchaseDetailModal
+          purchase={selectedPurchaseDetail}
+          loading={isPurchaseDetailLoading}
+          vesPerUsdt={vesPerUsdt}
+          store={store}
+          user={user}
+          onClose={() => {
+            setIsPurchaseDetailModalOpen(false);
+            setSelectedPurchaseDetail(null);
+          }}
+        />
+      )}
+      {isIngredientsModalOpen && (
+        <IngredientsModal
+          ingredients={ingredients}
+          products={products}
+          categories={categories}
+          vesPerUsdt={vesPerUsdt}
+          onClose={() => setIsIngredientsModalOpen(false)}
+        />
+      )}
       {isProductionRecipeModalOpen && (
         <ProductionRecipeModal
           storeId={store?.id}
@@ -2768,11 +3043,47 @@ const StoreOwnerDashboard = () => {
             setIsProductionRecipeModalOpen(false);
             setEditingProductionRecipe(null);
           }}
+          onRequestCraft={(recipeToCraft) => {
+            setIsProductionRecipeModalOpen(false);
+            setEditingProductionRecipe(null);
+            setCraftingRecipe(recipeToCraft);
+            setIsProductionCraftingModalOpen(true);
+          }}
           loading={
             editingProductionRecipe?.id
               ? updateProductionRecipeMutation.isLoading
               : createProductionRecipeMutation.isLoading
           }
+        />
+      )}
+      {isProductionCraftingModalOpen && craftingRecipe && (
+        <ProductionCraftingModal
+          recipe={craftingRecipe}
+          storeId={store?.id}
+          ingredients={ingredients}
+          products={products}
+          onClose={() => {
+            setIsProductionCraftingModalOpen(false);
+            setCraftingRecipe(null);
+          }}
+          onCraft={async (qty, notes) => {
+            if (!store?.id || !craftingRecipe?.id) return;
+            try {
+              await createProductionBatchMutation.mutateAsync({
+                recipe_id: craftingRecipe.id,
+                planned_quantity: qty,
+                notes
+              });
+              toast.success('Lote de producción ejecutado');
+              setIsProductionCraftingModalOpen(false);
+              setCraftingRecipe(null);
+            } catch (err) {
+              const message =
+                err?.response?.data?.error || 'Error al ejecutar lote de producción';
+              toast.error(message);
+            }
+          }}
+          loading={createProductionBatchMutation.isLoading}
         />
       )}
       {isCategoryManagerOpen && (
@@ -2793,6 +3104,17 @@ const StoreOwnerDashboard = () => {
           loadingDelete={deleteCategoryMutation.isLoading}
         />
       )}
+      
+      {/* Modal de Selector de Color Personalizado */}
+      <ColorPickerModal
+        isOpen={colorPickerModalOpen}
+        onClose={() => {
+          setColorPickerModalOpen(false);
+          setCurrentModifierInput({ groupId: null, optionId: null, value: '' });
+        }}
+        onColorSelect={handleColorSelect}
+        initialColor="#FF0000"
+      />
     </div>
   );
 };
@@ -2806,7 +3128,11 @@ const ProductEditModal = ({
   loading,
   vesPerUsdt,
   firesPerUsdt,
-  onRequestNewCategory
+  onRequestNewCategory,
+  onModifierInputChange,
+  updateModifierOption,
+  modifierGroups,
+  setModifierGroups
 }) => {
   const [sku, setSku] = useState(product?.sku ? String(product.sku) : '');
   const [name, setName] = useState(product?.name || '');
@@ -2832,8 +3158,6 @@ const ProductEditModal = ({
     () => (Array.isArray(product?.modifiers) ? product.modifiers : []),
     [product?.modifiers]
   );
-  const [modifierGroups, setModifierGroups] = useState([]);
-
   useEffect(() => {
     if (!Array.isArray(existingModifiers) || existingModifiers.length === 0) return;
 
@@ -2944,21 +3268,6 @@ const ProductEditModal = ({
                   priceAdjustmentUsdt: ''
                 }
               ]
-            }
-          : g
-      )
-    );
-  };
-
-  const updateModifierOption = (groupId, optionId, changes) => {
-    setModifierGroups((prev) =>
-      prev.map((g) =>
-        g.id === groupId
-          ? {
-              ...g,
-              options: g.options.map((opt) =>
-                opt.id === optionId ? { ...opt, ...changes } : opt
-              )
             }
           : g
       )
@@ -3185,12 +3494,27 @@ const ProductEditModal = ({
                   }
                 }}
               />
-              <label
-                htmlFor="product-image-upload"
-                className="w-full px-4 py-2 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-hover transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
-              >
-                <span className="text-xs">{imageUrl ? 'Cambiar imagen del producto' : 'Seleccionar imagen del producto'}</span>
-              </label>
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="product-image-upload"
+                  className="flex-1 px-4 py-2 bg-glass rounded-lg text-text cursor-pointer hover:bg-glass-hover transition-colors flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-accent/50"
+                >
+                  <span className="text-xs">{imageUrl ? 'Cambiar imagen del producto' : 'Seleccionar imagen del producto'}</span>
+                </label>
+                <CameraButton
+                  onPhotoTaken={async (file) => {
+                    const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                    if (result.error) {
+                      toast.error(result.error);
+                    } else {
+                      setImageUrl(result.base64);
+                      toast.success('Imagen capturada exitosamente');
+                    }
+                  }}
+                  size="md"
+                  className="rounded-lg"
+                />
+              </div>
             </div>
             {imageUrl && (
               <div className="mt-2">
@@ -3353,10 +3677,10 @@ const ProductEditModal = ({
                             type="text"
                             value={opt.name}
                             onChange={(e) =>
-                              updateModifierOption(group.id, opt.id, { name: e.target.value })
+                              onModifierInputChange(group.id, opt.id, e.target.value)
                             }
                             className="flex-1 input-glass text-[11px] py-1"
-                            placeholder="Nombre del elemento (Ej: Rojo #rojo, Carta, Oficio)"
+                            placeholder="Nombre del elemento (Ej: #color para selector, Rojo #rojo, Carta, Oficio)"
                           />
                           <div className="flex items-center gap-1">
                             {color && (
@@ -3430,7 +3754,8 @@ const ProductionRecipeModal = ({
   recipe,
   onClose,
   onSave,
-  loading
+  loading,
+  onRequestCraft
 }) => {
   const isEdit = !!(recipe && recipe.id);
   const normalizedMetadata =
@@ -3443,6 +3768,7 @@ const ProductionRecipeModal = ({
   const [targetProductId, setTargetProductId] = useState(
     recipe?.target_product_id ? String(recipe.target_product_id) : ''
   );
+  const [extraTargetProductIds, setExtraTargetProductIds] = useState([]);
   const [yieldsQuantity, setYieldsQuantity] = useState(
     recipe?.yields_quantity != null ? String(recipe.yields_quantity) : ''
   );
@@ -3485,9 +3811,6 @@ const ProductionRecipeModal = ({
 
         setName(r.name || '');
         setDescription(r.description || '');
-        setTargetProductId(
-          r.target_product_id ? String(r.target_product_id) : ''
-        );
         setYieldsQuantity(
           r.yields_quantity != null ? String(r.yields_quantity) : ''
         );
@@ -3497,6 +3820,20 @@ const ProductionRecipeModal = ({
           r && typeof r.metadata === 'object' && r.metadata !== null
             ? r.metadata
             : {};
+
+        const metaTargets = Array.isArray(meta.target_products)
+          ? meta.target_products.map((id) => String(id))
+          : [];
+        const primaryTarget =
+          metaTargets.length > 0
+            ? metaTargets[0]
+            : r.target_product_id
+              ? String(r.target_product_id)
+              : '';
+        const extraTargets = metaTargets.length > 1 ? metaTargets.slice(1) : [];
+
+        setTargetProductId(primaryTarget);
+        setExtraTargetProductIds(extraTargets);
         setBaseInputQuantity(
           meta.base_input_quantity != null
             ? String(meta.base_input_quantity)
@@ -3531,6 +3868,85 @@ const ProductionRecipeModal = ({
     fetchDetail();
   }, [isEdit, storeId, recipe?.id, recipe]);
 
+  // Helper: convertir unidades a base (kg o L) para sumar
+  const toBaseUnit = (qty, unit) => {
+    const q = parseFloat(qty || '0');
+    if (!Number.isFinite(q) || q <= 0) return 0;
+    switch (unit) {
+      case 'kg': return q;
+      case 'g': return q / 1000;
+      case 'L': return q;
+      case 'ml': return q / 1000;
+      default: return 0;
+    }
+  };
+
+  // Calcular insumo base y unidad base automáticamente
+  const autoBaseInput = useMemo(() => {
+    const validItems = items.filter(it => {
+      const qty = parseFloat(it.quantity || '0');
+      const unit = (it.unit || '').trim().toLowerCase();
+      return Number.isFinite(qty) && qty > 0 && ['kg', 'g', 'L', 'ml'].includes(unit);
+    });
+
+    if (validItems.length === 0) return { total: 0, unit: 'kg' };
+
+    // Prioridad: kg > g > L > ml
+    const candidateUnits = ['kg', 'g', 'L', 'ml'];
+    let chosenUnit = 'kg';
+    for (const u of candidateUnits) {
+      if (validItems.some(it => (it.unit || '').trim().toLowerCase() === u)) {
+        chosenUnit = u;
+        break;
+      }
+    }
+
+    const total = validItems.reduce((sum, it) => {
+      const unit = (it.unit || '').trim().toLowerCase();
+      return sum + toBaseUnit(it.quantity, unit);
+    }, 0);
+
+    // Normalizar a kg o L
+    const normalizedUnit = (chosenUnit === 'kg' || chosenUnit === 'g') ? 'kg' : 'L';
+    const normalizedTotal = (chosenUnit === 'kg' || chosenUnit === 'g') ? total : total;
+
+    return { total: normalizedTotal, unit: normalizedUnit };
+  }, [items]);
+
+  // Autocompletar insumo base cuando cambia autoBaseInput y el campo está vacío o coincide con el cálculo anterior
+  useEffect(() => {
+    if (!autoBaseInput || !autoBaseInput.unit) return;
+    const currentQty = parseFloat(baseInputQuantity || '0');
+    const currentUnit = (baseInputUnit || '').trim();
+    const autoQty = parseFloat(autoBaseInput.total.toFixed(3));
+    const autoUnit = autoBaseInput.unit;
+
+    // Si el campo está vacío o coincide con el cálculo anterior, lo actualizamos
+    if (
+      !baseInputQuantity ||
+      !Number.isFinite(currentQty) ||
+      currentQty <= 0 ||
+      (currentUnit === autoUnit && Math.abs(currentQty - autoQty) < 0.001)
+    ) {
+      setBaseInputQuantity(String(autoQty));
+      setBaseInputUnit(autoUnit);
+    }
+  }, [autoBaseInput, baseInputQuantity, baseInputUnit]);
+
+  // Calcular ratio de rendimiento técnico
+  const yieldRatio = useMemo(() => {
+    const qty = parseFloat(yieldsQuantity || '0');
+    const baseQty = parseFloat(baseInputQuantity || '0');
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(baseQty) || baseQty <= 0) return null;
+    return qty / baseQty;
+  }, [yieldsQuantity, baseInputQuantity, baseInputUnit]);
+
+  // Formatear ratio con unidades
+  const yieldRatioLabel = useMemo(() => {
+    if (!yieldRatio || !yieldsUnit || !baseInputUnit) return '';
+    return `${yieldRatio.toFixed(4)} ${yieldsUnit}/${baseInputUnit}`;
+  }, [yieldRatio, yieldsUnit, baseInputUnit]);
+
   const handleItemChange = (index, changes) => {
     setItems((prev) =>
       prev.map((it, idx) => (idx === index ? { ...it, ...changes } : it))
@@ -3546,13 +3962,27 @@ const ProductionRecipeModal = ({
         ingredient_id: '',
         product_id: '',
         quantity: '',
-        unit: 'unit'
+        unit: 'kg' // por defecto kg para facilitar el cálculo
       }
     ]);
   };
 
   const removeItem = (index) => {
     setItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const addTargetProduct = () => {
+    setExtraTargetProductIds((prev) => [...prev, '']);
+  };
+
+  const updateExtraTargetProduct = (index, value) => {
+    setExtraTargetProductIds((prev) =>
+      prev.map((id, idx) => (idx === index ? value : id))
+    );
+  };
+
+  const removeExtraTargetProduct = (index) => {
+    setExtraTargetProductIds((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -3604,6 +4034,13 @@ const ProductionRecipeModal = ({
     }
 
     const baseQtyNumber = parseFloat(baseInputQuantity || '0');
+
+    const allTargetIds = [
+      ...(targetProductId ? [targetProductId] : []),
+      ...extraTargetProductIds.filter((id) => id)
+    ];
+    const primaryTargetId = allTargetIds.length > 0 ? allTargetIds[0] : null;
+
     const metadata = {
       ...(normalizedMetadata && typeof normalizedMetadata === 'object'
         ? normalizedMetadata
@@ -3613,11 +4050,12 @@ const ProductionRecipeModal = ({
           ? baseQtyNumber
           : null,
       base_input_unit: baseInputUnit || null,
-      yield_notes: yieldNotes.trim() || null
+      yield_notes: yieldNotes.trim() || null,
+      target_products: allTargetIds.length > 0 ? allTargetIds : undefined
     };
 
     const payload = {
-      target_product_id: targetProductId || null,
+      target_product_id: primaryTargetId,
       name: trimmedName,
       description: description.trim() || null,
       yields_quantity: qtyNumber,
@@ -3638,7 +4076,7 @@ const ProductionRecipeModal = ({
     qtyPreview > 0 &&
     Number.isFinite(baseQtyPreview) &&
     baseQtyPreview > 0;
-  const yieldRatio = hasYieldRatio ? qtyPreview / baseQtyPreview : null;
+  const yieldRatioPreview = hasYieldRatio ? qtyPreview / baseQtyPreview : null;
 
   return (
     <div
@@ -3649,9 +4087,24 @@ const ProductionRecipeModal = ({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto card-glass p-6 space-y-4"
       >
-        <h3 className="text-lg font-bold">
-          {isEdit ? 'Editar receta de producción' : 'Nueva receta de producción'}
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-lg font-bold">
+            {isEdit ? 'Editar receta de producción' : 'Nueva receta de producción'}
+          </h3>
+          {isEdit && recipe?.id && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof onRequestCraft === 'function') {
+                  onRequestCraft(recipe);
+                }
+              }}
+              className="px-3 py-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 text-xs"
+            >
+              Craftear con esta receta
+            </button>
+          )}
+        </div>
 
         {isEdit && loadingDetail && (
           <p className="text-[11px] text-text/60">Cargando detalle de receta...</p>
@@ -3670,24 +4123,61 @@ const ProductionRecipeModal = ({
               />
             </div>
             <div>
-              <div className="text-text/60 mb-1">Producto destino (opcional)</div>
-              <select
-                value={targetProductId}
-                onChange={(e) => setTargetProductId(e.target.value)}
-                className="input-glass w-full"
-              >
-                <option value="">Sin producto asociado</option>
-                {Array.isArray(products) &&
-                  products.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-text/60">Producto destino (opcional)</span>
+                <button
+                  type="button"
+                  onClick={addTargetProduct}
+                  className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+                >
+                  + Agregar
+                </button>
+              </div>
+              <div className="space-y-2">
+                <select
+                  value={targetProductId}
+                  onChange={(e) => setTargetProductId(e.target.value)}
+                  className="input-glass w-full"
+                >
+                  <option value="">Sin producto asociado</option>
+                  {Array.isArray(products) &&
+                    products.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+                {extraTargetProductIds.map((id, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      value={id}
+                      onChange={(e) =>
+                        updateExtraTargetProduct(index, e.target.value)
+                      }
+                      className="input-glass w-full text-[11px]"
+                    >
+                      <option value="">Selecciona producto adicional</option>
+                      {Array.isArray(products) &&
+                        products.map((p) => (
+                          <option key={p.id} value={String(p.id)}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeExtraTargetProduct(index)}
+                      className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px] text-red-300"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="text-text/60 mb-1">Rendimiento</div>
               <input
@@ -3713,50 +4203,6 @@ const ProductionRecipeModal = ({
                 <option value="ml">Mililitros (ml)</option>
               </select>
             </div>
-            <div>
-              <div className="text-text/60 mb-1">Insumo base (cantidad)</div>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={baseInputQuantity}
-                onChange={(e) => setBaseInputQuantity(e.target.value)}
-                className="input-glass w-full"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <div className="text-text/60 mb-1">Unidad insumo base</div>
-              <select
-                value={baseInputUnit}
-                onChange={(e) => setBaseInputUnit(e.target.value)}
-                className="input-glass w-full"
-              >
-                <option value="kg">Kilogramos (kg)</option>
-                <option value="g">Gramos (g)</option>
-                <option value="L">Litros (L)</option>
-                <option value="ml">Mililitros (ml)</option>
-                <option value="unit">Unidad</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <div className="text-text/60 mb-1">Rendimiento técnico</div>
-              <div className="text-[11px] text-text/70 border border-glass rounded-lg px-2 py-1 min-h-[32px] flex items-center">
-                {hasYieldRatio ? (
-                  <span>
-                    {yieldsQuantity || '0'} {yieldsUnit} desde{' '}
-                    {baseInputQuantity || '0'} {baseInputUnit} (
-                    {yieldRatio.toFixed(4)} {yieldsUnit}/{baseInputUnit})
-                  </span>
-                ) : (
-                  <span className="text-text/50">
-                    Completa rendimiento e insumo base para ver la relación.
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
 
           <div>
@@ -3776,6 +4222,24 @@ const ProductionRecipeModal = ({
               className="input-glass w-full h-16 resize-none text-[11px]"
               placeholder="Ej: 22 kg de tomate fresco generan 18 L de salsa terminada."
             />
+          </div>
+
+          <div>
+            <div className="text-text/60 mb-1">Rendimiento técnico</div>
+            <div className="text-[11px] text-text/70 border border-glass rounded-lg px-2 py-1 min-h-[32px] flex items-center">
+              {hasYieldRatio ? (
+                <span>
+                  {yieldsQuantity || '0'} {yieldsUnit} desde{' '}
+                  {baseInputQuantity || '0'} {baseInputUnit} (
+                  {yieldRatio.toFixed(4)} {yieldsUnit}/{baseInputUnit})
+                </span>
+              ) : (
+                <span className="text-text/50">
+                  Agrega componentes con unidades de peso o volumen y completa el
+                  rendimiento para ver la relación.
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -3928,6 +4392,448 @@ const ProductionRecipeModal = ({
                 : isEdit
                   ? 'Guardar receta'
                   : 'Crear receta'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, ingredients, products }) => {
+  const [mode, setMode] = useState('byProduction'); // 'byProduction' o 'byIngredients'
+  const [plannedQuantity, setPlannedQuantity] = useState(
+    recipe?.yields_quantity != null ? String(recipe.yields_quantity) : ''
+  );
+  const [ingredientQuantities, setIngredientQuantities] = useState({});
+  const [notes, setNotes] = useState('');
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [inventoryData, setInventoryData] = useState({});
+
+  // Cargar inventario actual
+  useEffect(() => {
+    if (!storeId || !recipe?.id) return;
+    
+    const fetchInventory = async () => {
+      try {
+        setLoadingInventory(true);
+        const response = await axios.get(`/api/store/inventory/${storeId}`);
+        const data = response.data || {};
+        setInventoryData(data);
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+        toast.error('No se pudo cargar el inventario actual');
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+
+    fetchInventory();
+  }, [storeId, recipe?.id]);
+
+  // Calcular producción máxima basada en ingredientes disponibles
+  const maxProductionByIngredients = useMemo(() => {
+    if (!recipe?.items || !inventoryData?.ingredients || !inventoryData?.products) return null;
+
+    const recipeItems = recipe.items.filter(item => 
+      item.component_type === 'ingredient' || item.component_type === 'product'
+    );
+
+    if (recipeItems.length === 0) return null;
+
+    const productionLimits = recipeItems.map(item => {
+      const requiredQty = parseFloat(item.quantity || 0);
+      if (requiredQty <= 0) return Infinity;
+
+      let availableQty = 0;
+      if (item.component_type === 'ingredient') {
+        const ingredient = inventoryData.ingredients.find(inv => inv.id === item.ingredient_id);
+        availableQty = parseFloat(ingredient?.stock_quantity || 0);
+      } else if (item.component_type === 'product') {
+        const product = inventoryData.products.find(inv => inv.id === item.product_id);
+        availableQty = parseFloat(product?.stock_quantity || 0);
+      }
+
+      // Convertir unidades si es necesario
+      const availableInBaseUnit = convertToBaseUnit(availableQty, item.unit);
+      const requiredInBaseUnit = convertToBaseUnit(requiredQty, item.unit);
+
+      return availableInBaseUnit / requiredInBaseUnit;
+    });
+
+    const maxFactor = Math.min(...productionLimits);
+    const baseYield = parseFloat(recipe.yields_quantity || 0);
+    
+    return {
+      factor: maxFactor,
+      maxQuantity: baseYield * maxFactor,
+      unit: recipe.yields_unit || 'unit'
+    };
+  }, [recipe, inventoryData]);
+
+  // Convertir unidades a base para cálculos
+  const convertToBaseUnit = (qty, unit) => {
+    const q = parseFloat(qty || '0');
+    if (!Number.isFinite(q) || q <= 0) return 0;
+    switch (unit) {
+      case 'kg': return q;
+      case 'g': return q / 1000;
+      case 'L': return q;
+      case 'ml': return q / 1000;
+      default: return q;
+    }
+  };
+
+  // Calcular producción basada en ingredientes seleccionados
+  const productionByIngredients = useMemo(() => {
+    if (mode !== 'byIngredients' || !recipe?.items) return null;
+
+    const recipeItems = recipe.items.filter(item => 
+      item.component_type === 'ingredient' || item.component_type === 'product'
+    );
+
+    if (recipeItems.length === 0) return null;
+
+    const productionLimits = recipeItems.map(item => {
+      const requiredQty = parseFloat(item.quantity || 0);
+      if (requiredQty <= 0) return Infinity;
+
+      const ingredientKey = `${item.component_type}_${item.component_type === 'ingredient' ? item.ingredient_id : item.product_id}`;
+      const selectedQty = parseFloat(ingredientQuantities[ingredientKey] || 0);
+      
+      if (selectedQty <= 0) return Infinity;
+
+      const selectedInBaseUnit = convertToBaseUnit(selectedQty, item.unit);
+      const requiredInBaseUnit = convertToBaseUnit(requiredQty, item.unit);
+
+      return selectedInBaseUnit / requiredInBaseUnit;
+    });
+
+    const maxFactor = Math.min(...productionLimits);
+    const baseYield = parseFloat(recipe.yields_quantity || 0);
+    
+    return {
+      factor: maxFactor,
+      quantity: baseYield * maxFactor,
+      unit: recipe.yields_unit || 'unit'
+    };
+  }, [mode, recipe, ingredientQuantities]);
+
+  // Inicializar cantidades de ingredientes con inventario disponible
+  useEffect(() => {
+    if (mode !== 'byIngredients' || !recipe?.items || !inventoryData?.ingredients || !inventoryData?.products) return;
+
+    const initialQuantities = {};
+    recipe.items.forEach(item => {
+      if (item.component_type === 'ingredient' || item.component_type === 'product') {
+        const key = `${item.component_type}_${item.component_type === 'ingredient' ? item.ingredient_id : item.product_id}`;
+        
+        let availableQty = 0;
+        if (item.component_type === 'ingredient') {
+          const ingredient = inventoryData.ingredients.find(inv => inv.id === item.ingredient_id);
+          availableQty = parseFloat(ingredient?.stock_quantity || 0);
+        } else if (item.component_type === 'product') {
+          const product = inventoryData.products.find(inv => inv.id === item.product_id);
+          availableQty = parseFloat(product?.stock_quantity || 0);
+        }
+        
+        initialQuantities[key] = String(availableQty);
+      }
+    });
+    
+    setIngredientQuantities(initialQuantities);
+  }, [mode, recipe, inventoryData]);
+
+  const qtyNumber = parseFloat(plannedQuantity || '0');
+  const baseYield = parseFloat(recipe?.yields_quantity || '0');
+  const hasValidRatio =
+    Number.isFinite(qtyNumber) &&
+    qtyNumber > 0 &&
+    Number.isFinite(baseYield) &&
+    baseYield > 0;
+  const factor = hasValidRatio ? qtyNumber / baseYield : null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    let finalQuantity;
+    if (mode === 'byProduction') {
+      finalQuantity = parseFloat(plannedQuantity || '0');
+      if (!Number.isFinite(finalQuantity) || finalQuantity <= 0) {
+        toast.error('La cantidad a producir debe ser mayor a 0');
+        return;
+      }
+    } else {
+      finalQuantity = productionByIngredients?.quantity || 0;
+      if (!Number.isFinite(finalQuantity) || finalQuantity <= 0) {
+        toast.error('Debe seleccionar cantidades de ingredientes válidas');
+        return;
+      }
+    }
+
+    await onCraft(finalQuantity, notes.trim() || null);
+  };
+
+  const handleIngredientQuantityChange = (itemKey, value) => {
+    setIngredientQuantities(prev => ({
+      ...prev,
+      [itemKey]: value
+    }));
+  };
+
+  const getIngredientName = (item) => {
+    if (item.component_type === 'ingredient') {
+      const ingredient = ingredients.find(ing => ing.id === item.ingredient_id);
+      return ingredient?.name || 'Ingrediente desconocido';
+    } else {
+      const product = products.find(prod => prod.id === item.product_id);
+      return product?.name || 'Producto desconocido';
+    }
+  };
+
+  const getAvailableStock = (item) => {
+    if (item.component_type === 'ingredient') {
+      const ingredient = inventoryData.ingredients?.find(inv => inv.id === item.ingredient_id);
+      return parseFloat(ingredient?.stock_quantity || 0);
+    } else {
+      const product = inventoryData.products?.find(inv => inv.id === item.product_id);
+      return parseFloat(product?.stock_quantity || 0);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl max-h-[95vh] mx-auto overflow-y-auto card-glass p-4 sm:p-6 space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold">Centro de crafteo</h3>
+            <span className="text-xs text-text/70 truncate max-w-[220px] hidden sm:block">
+              {recipe?.name || 'Receta de producción'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-xs w-full sm:w-auto"
+          >
+            Cerrar
+          </button>
+        </div>
+
+        <div className="text-[11px] text-text/70 space-y-1">
+          <div>
+            <span className="font-semibold">Rendimiento base: </span>
+            <span>
+              {Number(recipe?.yields_quantity || 0).toFixed(2)} {recipe?.yields_unit}
+            </span>
+          </div>
+          {hasValidRatio && mode === 'byProduction' && (
+            <div>
+              <span className="font-semibold">Factor de producción: </span>
+              <span>{factor.toFixed(4)}x de la receta base</span>
+            </div>
+          )}
+          {maxProductionByIngredients && (
+            <div>
+              <span className="font-semibold">Producción máxima disponible: </span>
+              <span>
+                {maxProductionByIngredients.maxQuantity.toFixed(2)} {maxProductionByIngredients.unit}
+                <span className="text-text/50 ml-1">
+                  (basado en ingredientes disponibles)
+                </span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Selector de modo */}
+        <div className="flex flex-col sm:flex-row gap-2 p-1 bg-glass rounded-lg">
+          <button
+            type="button"
+            onClick={() => setMode('byProduction')}
+            className={`flex-1 px-3 py-1.5 rounded text-xs transition-colors ${
+              mode === 'byProduction'
+                ? 'bg-accent/20 text-accent'
+                : 'hover:bg-glass-hover text-text/80'
+            }`}
+          >
+ Por cantidad a producir
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('byIngredients')}
+            className={`flex-1 px-3 py-1.5 rounded text-xs transition-colors ${
+              mode === 'byIngredients'
+                ? 'bg-accent/20 text-accent'
+                : 'hover:bg-glass-hover text-text/80'
+            }`}
+          >
+ Por ingredientes disponibles
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          {/* Materiales requeridos para la producción */}
+          {mode === 'byProduction' && hasValidRatio && (
+            <div className="space-y-2">
+              <div className="text-text/60 font-semibold">Materiales requeridos para {qtyNumber} {recipe?.yields_unit}:</div>
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {recipe?.items?.filter(item => 
+                  item.component_type === 'ingredient' || item.component_type === 'product'
+                ).map((item, index) => {
+                  const requiredQty = parseFloat(item.quantity || 0);
+                  const totalRequired = requiredQty * factor;
+                  const availableStock = getAvailableStock(item);
+                  const hasEnoughStock = availableStock >= totalRequired;
+                  
+                  return (
+                    <div key={index} className={`flex items-center justify-between p-2 rounded ${
+                      hasEnoughStock ? 'bg-glass/30' : 'bg-red-500/10 border border-red-500/20'
+                    }`}>
+                      <div className="flex-1">
+                        <div className="font-medium text-[10px]">
+                          {getIngredientName(item)}
+                        </div>
+                        <div className="text-[9px] text-text/50">
+                          Requerido: {totalRequired.toFixed(2)} {item.unit}
+                        </div>
+                        <div className="text-[9px] text-text/50">
+                          Disponible: {availableStock} {item.unit}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-[9px] font-medium ${
+                          hasEnoughStock ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {hasEnoughStock ? '✓ Suficiente' : `✗ Faltan ${(totalRequired - availableStock).toFixed(2)} ${item.unit}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {mode === 'byProduction' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-text/60 mb-1">Cantidad a producir</div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={plannedQuantity}
+                  onChange={(e) => setPlannedQuantity(e.target.value)}
+                  className="input-glass w-full text-sm sm:text-xs"
+                />
+              </div>
+              <div>
+                <div className="text-text/60 mb-1">Unidad</div>
+                <div className="input-glass w-full flex items-center h-[36px]">
+                  <span className="text-[11px] sm:text-[10px] text-text/80">
+                    {recipe?.yields_unit || 'unit'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-text/60 font-semibold">Ingredientes disponibles:</div>
+              {loadingInventory ? (
+                <div className="text-center py-4 text-text/50">Cargando inventario...</div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {recipe?.items?.filter(item => 
+                    item.component_type === 'ingredient' || item.component_type === 'product'
+                  ).map((item, index) => {
+                    const itemKey = `${item.component_type}_${item.component_type === 'ingredient' ? item.ingredient_id : item.product_id}`;
+                    const availableStock = getAvailableStock(item);
+                    const requiredQty = parseFloat(item.quantity || 0);
+                    
+                    return (
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-glass/50 rounded">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-[10px] truncate">
+                            {getIngredientName(item)}
+                          </div>
+                          <div className="text-[9px] text-text/50">
+                            Requerido: {requiredQty} {item.unit}
+                          </div>
+                          <div className="text-[9px] text-text/50">
+                            Disponible: {availableStock} {item.unit}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            max={availableStock}
+                            step="0.01"
+                            value={ingredientQuantities[itemKey] || ''}
+                            onChange={(e) => handleIngredientQuantityChange(itemKey, e.target.value)}
+                            className="input-glass w-20 h-[24px] text-[10px]"
+                            placeholder="0"
+                          />
+                          <span className="text-[9px] text-text/60 w-8 flex-shrink-0">
+                            {item.unit}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {productionByIngredients && (
+                <div className="mt-3 p-3 bg-accent/10 rounded border border-accent/20">
+                  <div className="text-[10px] space-y-1">
+                    <div>
+                      <span className="font-semibold">Producción resultante: </span>
+                      <span className="text-accent">
+                        {productionByIngredients.quantity.toFixed(2)} {productionByIngredients.unit}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Factor de producción: </span>
+                      <span>{productionByIngredients.factor.toFixed(4)}x</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <div className="text-text/60 mb-1">Notas del lote (opcional)</div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="input-glass w-full h-20 resize-none"
+              placeholder="Ej: Salsa napolitana Divorare 04 – lote especial para promo."
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-glass hover:bg-glass-hover w-full sm:w-auto order-2 sm:order-1"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || loadingInventory}
+              className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto order-1 sm:order-2"
+            >
+              {loading ? 'Crafteando…' : 'Craftear ahora'}
             </button>
           </div>
         </form>
@@ -4541,26 +5447,41 @@ const NewPurchaseModal = ({
             <div className="space-y-2">
               <div className="text-text/60 text-[11px]">Foto de la factura (opcional)</div>
               <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
-                <label className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files && e.target.files[0];
-                      if (!file) return;
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (!file) return;
 
+                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else if (result.base64) {
+                          setInvoiceImage(result.base64);
+                          toast.success('Imagen de factura cargada');
+                        }
+                      }}
+                    />
+                    <span>Subir foto de factura</span>
+                  </label>
+                  <CameraButton
+                    onPhotoTaken={async (file) => {
                       const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
                       if (result.error) {
                         toast.error(result.error);
                       } else if (result.base64) {
                         setInvoiceImage(result.base64);
-                        toast.success('Imagen de factura cargada');
+                        toast.success('Foto de factura capturada');
                       }
                     }}
+                    size="sm"
+                    className="rounded-full"
                   />
-                  <span>Subir foto de factura</span>
-                </label>
+                </div>
 
                 {invoiceImage && (
                   <div className="flex items-center gap-2 text-[11px]">
@@ -5231,6 +6152,641 @@ const CategoryManagementModal = ({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+const PurchaseDetailModal = ({ purchase, loading, onClose, vesPerUsdt, store, user }) => {
+  const invoice = purchase?.invoice || {};
+  const items = Array.isArray(purchase?.items) ? purchase.items : [];
+
+  const safeNumber = (value) => {
+    const n = typeof value === 'number' ? value : parseFloat(String(value || '0'));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const totalUsdt = safeNumber(invoice.total_cost_usdt);
+  const hasVesRate =
+    typeof vesPerUsdt === 'number' && Number.isFinite(vesPerUsdt) && vesPerUsdt > 0;
+  const totalBs = hasVesRate ? totalUsdt * vesPerUsdt : null;
+
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+
+  const handlePrint = (mode) => {
+    if (!invoice) return;
+    const previousTitle = document.title;
+    const number = invoice.invoice_number || '';
+    const ticketClass = 'print-invoice';
+    const a4Class = 'print-purchase-invoice-a4';
+
+    document.title = `Factura de compra ${number}`;
+    if (mode === 'ticket') {
+      document.body.classList.add(ticketClass);
+    } else {
+      document.body.classList.add(a4Class);
+    }
+
+    try {
+      window.print();
+    } finally {
+      document.body.classList.remove(ticketClass);
+      document.body.classList.remove(a4Class);
+      document.title = previousTitle;
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl max-h-[90vh] card-glass p-6 space-y-4 overflow-y-auto purchase-invoice-print-root"
+      >
+        <div className="flex items-center justify-between gap-3 relative">
+          <div>
+            <h3 className="text-lg font-bold">Detalle de factura de compra</h3>
+            {invoice.invoice_number && (
+              <p className="text-xs text-text/60">Nº factura: {invoice.invoice_number}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPrintOptions((prev) => !prev)}
+              className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-xs"
+            >
+              Descargar / PDF
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-xs"
+            >
+              Cerrar
+            </button>
+            {showPrintOptions && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-background-dark border border-glass rounded-lg shadow-lg p-2 z-20 text-[11px]">
+                <div className="text-text/60 mb-1">Selecciona formato de impresión:</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPrintOptions(false);
+                    handlePrint('ticket');
+                  }}
+                  className="w-full text-left px-2 py-1 rounded-md hover:bg-glass"
+                >
+                  Ticket 80mm (rápido)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPrintOptions(false);
+                    handlePrint('a4');
+                  }}
+                  className="w-full text-left px-2 py-1 rounded-md hover:bg-glass mt-1"
+                >
+                  Carta / A4 (detallado)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-xs text-text/60">Cargando factura...</p>
+        ) : !invoice.id ? (
+          <p className="text-xs text-text/60">No se pudo cargar la información de la factura.</p>
+        ) : (
+          <div className="space-y-6 text-xs">
+            {/* Header de tienda (visible en PDF A4) */}
+            <div className="purchase-invoice-header">
+              <div className="flex items-start gap-4">
+                {store?.logo_url && (
+                  <img
+                    src={store.logo_url}
+                    alt="Logo de la tienda"
+                    className="h-16 w-auto object-contain"
+                  />
+                )}
+                <div className="flex-1 space-y-1">
+                  <div className="text-base font-bold text-text">{store?.name || 'Mi Tienda'}</div>
+                  {store?.address && (
+                    <div className="text-text/80 whitespace-pre-wrap">{store.address}</div>
+                  )}
+                  {store?.rif && (
+                    <div className="text-text/80">RIF: {store.rif}</div>
+                  )}
+                  {store?.phone && (
+                    <div className="text-text/80">Teléfono: {store.phone}</div>
+                  )}
+                </div>
+              </div>
+              <div className="text-[10px] text-text/50 mt-2 text-right">
+                Emitido por: {user?.name || 'Sistema'} • {new Date().toLocaleString()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <div>
+                  <span className="text-text/60">Proveedor: </span>
+                  <span className="text-text/80">{invoice.supplier_name || 'Sin proveedor'}</span>
+                </div>
+                <div>
+                  <span className="text-text/60">Fecha: </span>
+                  <span className="text-text/80">
+                    {invoice.invoice_date ||
+                      (invoice.created_at
+                        ? new Date(invoice.created_at).toLocaleDateString()
+                        : '-')}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="text-text/60">Notas:</div>
+                  <div className="text-text/80 whitespace-pre-wrap">{invoice.notes}</div>
+                </div>
+                {invoice.invoice_image_url && (
+                  <div>
+                    <div className="text-text/60 mb-1">Imagen adjunta</div>
+                    <div className="border border-glass rounded-lg overflow-hidden bg-black/40">
+                      <img
+                        src={invoice.invoice_image_url}
+                        alt="Imagen de la factura"
+                        className="max-h-48 w-full object-contain cursor-pointer"
+                        onClick={() => {
+                          try {
+                            window.open(invoice.invoice_image_url, '_blank', 'noopener,noreferrer');
+                          } catch (e) {
+                            // ignore
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="space-y-1 text-right">
+          <div>
+            <span className="text-text/60">Total USDT: </span>
+            <span className="text-text/80 font-semibold">{totalUsdt.toFixed(2)}</span>
+          </div>
+          {hasVesRate && (
+            <div className="text-[11px] text-text/70">
+              <span className="text-text/60 mr-1">Total Bs:</span>
+              <span className="text-text/80 font-semibold">
+                {totalBs.toFixed(2)}
+              </span>
+              <span className="text-text/50 ml-1">
+                (tasa {vesPerUsdt.toFixed(2)} Bs/USDT)
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="border-t border-glass mt-4 pt-3">
+          <h4 className="text-xs font-semibold text-text/80 mb-2">Ítems</h4>
+          {items.length === 0 ? (
+            <p className="text-[11px] text-text/60">Esta factura no tiene ítems registrados.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-[11px] align-middle">
+                <thead>
+                  <tr className="text-text/60 border-b border-glass">
+                    <th className="py-1 pr-3 text-left">Descripción</th>
+                    <th className="py-1 pr-3 text-right">Cantidad</th>
+                    <th className="py-1 pr-3 text-right">Unidad</th>
+                    <th className="py-1 pr-3 text-right">Costo unitario (USDT)</th>
+                    {hasVesRate && (
+                      <th className="py-1 pr-3 text-right">Costo unitario (Bs)</th>
+                    )}
+                    <th className="py-1 pr-3 text-right">Total (USDT)</th>
+                    {hasVesRate && (
+                      <th className="py-1 pr-3 text-right">Total (Bs)</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const qty = safeNumber(item.quantity);
+                    const unitCost = safeNumber(item.unit_cost_usdt);
+                    const lineTotal =
+                      safeNumber(item.total_cost_usdt) || qty * unitCost;
+
+                    const unitLabel =
+                      item.ingredient_unit || (item.product_id ? 'Unidad' : '');
+
+                    const unitCostBs = hasVesRate ? unitCost * vesPerUsdt : null;
+                    const lineTotalBs = hasVesRate ? lineTotal * vesPerUsdt : null;
+
+                    const label =
+                      item.description ||
+                      item.product_name ||
+                      item.ingredient_name ||
+                      item.modifier_name ||
+                      'Ítem';
+
+                    return (
+                      <tr key={item.id} className="border-b border-glass/40">
+                        <td className="py-1 pr-3 text-text/80 whitespace-pre-wrap">{label}</td>
+                        <td className="py-1 pr-3 text-right text-text/70">{qty.toFixed(2)}</td>
+                        <td className="py-1 pr-3 text-right text-text/70">{unitLabel || '-'}</td>
+                        <td className="py-1 pr-3 text-right text-text/70">{unitCost.toFixed(4)}</td>
+                        {hasVesRate && (
+                          <td className="py-1 pr-3 text-right text-text/70">
+                            {unitCostBs != null ? unitCostBs.toFixed(2) : '-'}
+                          </td>
+                        )}
+                        <td className="py-1 pr-3 text-right text-text/80">{lineTotal.toFixed(2)}</td>
+                        {hasVesRate && (
+                          <td className="py-1 pr-3 text-right text-text/80">
+                            {lineTotalBs != null ? lineTotalBs.toFixed(2) : '-'}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const IngredientsModal = ({ ingredients, products, categories, vesPerUsdt, onClose }) => {
+  const ingredientsList = Array.isArray(ingredients) ? ingredients : [];
+  const productsList = Array.isArray(products) ? products : [];
+  const categoriesList = Array.isArray(categories) ? categories : [];
+  const [activeTab, setActiveTab] = useState('ingredients');
+
+  const safeNumber = (value) => {
+    const n = typeof value === 'number' ? value : parseFloat(String(value || '0'));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const queryClient = useQueryClient();
+  const [savingId, setSavingId] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+
+  // Get category name by ID
+  const getCategoryName = (categoryId) => {
+    const category = categoriesList.find(cat => cat.id === categoryId);
+    return category ? category.name : 'Sin categoría';
+  };
+
+  // Calculate price in Bs using historical rate for ingredients
+  const calculateIngredientPriceBs = (ingredient) => {
+    // Use the purchase_rate_usdt if available (historical rate at purchase time)
+    // Otherwise fall back to current rate
+    const rateToUse = ingredient.purchase_rate_usdt || vesPerUsdt;
+    const costUsdt = safeNumber(ingredient.cost_per_unit_usdt);
+    
+    if (!rateToUse || rateToUse === 0 || costUsdt === 0) return 0;
+    
+    return costUsdt * rateToUse;
+  };
+
+  // Calculate price in Bs for products (current rate)
+  const calculatePriceBs = (priceUsdt) => {
+    if (!vesPerUsdt || !priceUsdt || vesPerUsdt === 0) return 0;
+    return safeNumber(priceUsdt) * safeNumber(vesPerUsdt);
+  };
+
+  // Update ingredient field
+  const handleUpdateIngredient = async (ingredient, field, value) => {
+    if (!ingredient?.id) return;
+    setSavingId(`${ingredient.id}-${field}`);
+    try {
+      await axios.patch(
+        `/api/store/inventory/${ingredient.store_id}/ingredient/${ingredient.id}`,
+        { [field]: value }
+      );
+      await queryClient.invalidateQueries({ queryKey: ['store-ingredients', ingredient.store_id] });
+      toast.success(`${field === 'min_stock_alert' ? 'Mínimo de alerta' : field === 'override_stock' ? 'Stock override' : 'Unidad'} actualizado`);
+      setEditingField(null);
+    } catch (error) {
+      const message = error?.response?.data?.error || 'No se pudo actualizar';
+      toast.error(message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // Update product field
+  const handleUpdateProduct = async (product, field, value) => {
+    if (!product?.id) return;
+    setSavingId(`${product.id}-${field}`);
+    try {
+      await axios.patch(
+        `/api/store/${product.store_id}/product/${product.id}`,
+        { [field]: value }
+      );
+      await queryClient.invalidateQueries({ queryKey: ['store-owner', product.store_slug] });
+      toast.success(`${field === 'min_stock_alert' ? 'Mínimo de alerta' : field === 'override_stock' ? 'Stock override' : 'Campo'} actualizado`);
+      setEditingField(null);
+    } catch (error) {
+      const message = error?.response?.data?.error || 'No se pudo actualizar';
+      toast.error(message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-6xl max-h-[95vh] mx-auto card-glass p-4 sm:p-6 space-y-4 overflow-y-auto overflow-x-auto"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold">Inventario completo</h3>
+            <p className="text-[11px] text-text/60 hidden sm:block">
+              Control de ingredientes internos y productos para la venta. Stock real y override para emergencias.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-xs w-full sm:w-auto"
+          >
+            Cerrar
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex flex-col sm:flex-row border-b border-glass">
+          <button
+            type="button"
+            onClick={() => setActiveTab('ingredients')}
+            className={`flex-1 px-3 sm:px-4 py-2 text-xs font-medium transition-colors border-b-2 ${
+              activeTab === 'ingredients'
+                ? 'text-accent border-accent'
+                : 'text-text/60 border-transparent hover:text-text/80'
+            }`}
+          >
+            <span className="block">Ingredientes</span>
+            <span className="text-[10px] opacity-70">({ingredientsList.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('products')}
+            className={`flex-1 px-3 sm:px-4 py-2 text-xs font-medium transition-colors border-b-2 ${
+              activeTab === 'products'
+                ? 'text-accent border-accent'
+                : 'text-text/60 border-transparent hover:text-text/80'
+            }`}
+          >
+            <span className="block">Stock de productos</span>
+            <span className="text-[10px] opacity-70">({productsList.length})</span>
+          </button>
+        </div>
+
+        {/* Content */}
+        {activeTab === 'ingredients' && (
+          <div className="space-y-2">
+            {ingredientsList.length === 0 ? (
+              <p className="text-[11px] text-text/60">Aún no tienes ingredientes registrados.</p>
+            ) : (
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="min-w-[600px] w-full text-[11px] align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass sticky top-0 bg-background-dark/90 backdrop-blur-sm z-10">
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-left">Nombre</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-left hidden sm:table-cell">Unidad</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock real</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock override</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock disponible</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden md:table-cell">Mínimo alerta</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden lg:table-cell">Costo USDT</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden lg:table-cell">Costo Bs</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden xl:table-cell">Tasa usada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ingredientsList.map((ing) => {
+                      const realStock = safeNumber(ing.current_stock);
+                      const overrideStock = safeNumber(ing.override_stock);
+                      const availableStock = overrideStock > 0 ? overrideStock : realStock;
+                      const minStock = safeNumber(ing.min_stock_alert);
+                      const cost = safeNumber(ing.cost_per_unit_usdt);
+                      const costBs = calculateIngredientPriceBs(ing);
+                      const usedRate = ing.purchase_rate_usdt || vesPerUsdt;
+                      const isLowStock = availableStock <= minStock && availableStock > 0;
+                      const isOutOfStock = availableStock === 0;
+
+                      return (
+                        <tr key={ing.id} className={`border-b ${isOutOfStock ? 'bg-red-500/5' : isLowStock ? 'bg-yellow-500/5' : 'border-glass/40'}`}>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-text/80 font-medium">{ing.name}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-text/70 hidden sm:table-cell">
+                            <select
+                              value={ing.unit || 'unit'}
+                              onChange={(e) => handleUpdateIngredient(ing, 'unit', e.target.value)}
+                              disabled={savingId === `${ing.id}-unit`}
+                              className="input-glass w-full text-[11px] py-0.5 pr-6"
+                            >
+                              <option value="unit">Unidad</option>
+                              <option value="kg">Kilogramos (kg)</option>
+                              <option value="g">Gramos (g)</option>
+                              <option value="L">Litros (L)</option>
+                              <option value="ml">Mililitros (ml)</option>
+                            </select>
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/50">{realStock.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right">
+                            {editingField === `${ing.id}-override_stock` ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={overrideStock}
+                                onBlur={(e) => handleUpdateIngredient(ing, 'override_stock', parseFloat(e.target.value) || 0)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateIngredient(ing, 'override_stock', parseFloat(e.target.value) || 0);
+                                  }
+                                }}
+                                className="input-glass w-16 sm:w-20 text-right text-[11px] py-0.5"
+                                autoFocus
+                              />
+                            ) : (
+                              <div
+                                onClick={() => setEditingField(`${ing.id}-override_stock`)}
+                                className={`cursor-pointer text-right ${overrideStock > 0 ? 'text-accent font-medium' : 'text-text/60'}`}
+                              >
+                                {overrideStock > 0 ? overrideStock.toFixed(2) : '-'}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 font-medium">{availableStock.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden md:table-cell">
+                            {editingField === `${ing.id}-min_stock_alert` ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={minStock}
+                                onBlur={(e) => handleUpdateIngredient(ing, 'min_stock_alert', parseFloat(e.target.value) || 0)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateIngredient(ing, 'min_stock_alert', parseFloat(e.target.value) || 0);
+                                  }
+                                }}
+                                className="input-glass w-16 sm:w-20 text-right text-[11px] py-0.5"
+                                autoFocus
+                              />
+                            ) : (
+                              <div
+                                onClick={() => setEditingField(`${ing.id}-min_stock_alert`)}
+                                className="cursor-pointer text-right text-text/70"
+                              >
+                                {minStock.toFixed(2)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{cost.toFixed(4)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{costBs.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/60 text-[10px] hidden xl:table-cell">
+                            {usedRate ? usedRate.toFixed(2) : '-'}
+                            {ing.purchase_rate_usdt && <span className="text-accent ml-1">▲</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'products' && (
+          <div className="space-y-2">
+            {productsList.length === 0 ? (
+              <p className="text-[11px] text-text/60">Aún no tienes productos registrados.</p>
+            ) : (
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="min-w-[600px] w-full text-[11px] align-middle">
+                  <thead>
+                    <tr className="text-text/60 border-b border-glass sticky top-0 bg-background-dark/90 backdrop-blur-sm z-10">
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-left">Producto</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-left hidden sm:table-cell">Categoría</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock real</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock override</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right">Stock disponible</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden md:table-cell">Mínimo alerta</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden lg:table-cell">Precio USDT</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden lg:table-cell">Precio Bs</th>
+                      <th className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden xl:table-cell">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productsList.map((product) => {
+                      const realStock = safeNumber(product.stock);
+                      const overrideStock = safeNumber(product.override_stock);
+                      const availableStock = overrideStock > 0 ? overrideStock : realStock;
+                      const minStock = safeNumber(product.min_stock_alert);
+                      const priceUsdt = safeNumber(product.price_usdt);
+                      const priceBs = calculatePriceBs(priceUsdt);
+                      const isAvailable = product.is_available && availableStock > 0;
+                      const isLowStock = availableStock <= minStock && availableStock > 0;
+                      const isOutOfStock = availableStock === 0;
+
+                      return (
+                        <tr key={product.id} className={`border-b ${isOutOfStock ? 'bg-red-500/5' : isLowStock ? 'bg-yellow-500/5' : 'border-glass/40'}`}>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-text/80">
+                            <div className="flex items-center gap-2">
+                              {product.image_url && (
+                                <img
+                                  src={product.image_url}
+                                  alt={product.name}
+                                  className="w-6 h-6 object-cover rounded flex-shrink-0"
+                                />
+                              )}
+                              <span className="font-medium truncate">{product.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-text/70 hidden sm:table-cell">{getCategoryName(product.category_id)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/50">{realStock.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right">
+                            {editingField === `${product.id}-override_stock` ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={overrideStock}
+                                onBlur={(e) => handleUpdateProduct(product, 'override_stock', parseFloat(e.target.value) || 0)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateProduct(product, 'override_stock', parseFloat(e.target.value) || 0);
+                                  }
+                                }}
+                                className="input-glass w-16 sm:w-20 text-right text-[11px] py-0.5"
+                                autoFocus
+                              />
+                            ) : (
+                              <div
+                                onClick={() => setEditingField(`${product.id}-override_stock`)}
+                                className={`cursor-pointer text-right ${overrideStock > 0 ? 'text-accent font-medium' : 'text-text/60'}`}
+                              >
+                                {overrideStock > 0 ? overrideStock.toFixed(2) : '-'}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 font-medium">{availableStock.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden md:table-cell">
+                            {editingField === `${product.id}-min_stock_alert` ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={minStock}
+                                onBlur={(e) => handleUpdateProduct(product, 'min_stock_alert', parseFloat(e.target.value) || 0)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateProduct(product, 'min_stock_alert', parseFloat(e.target.value) || 0);
+                                  }
+                                }}
+                                className="input-glass w-16 sm:w-20 text-right text-[11px] py-0.5"
+                                autoFocus
+                              />
+                            ) : (
+                              <div
+                                onClick={() => setEditingField(`${product.id}-min_stock_alert`)}
+                                className="cursor-pointer text-right text-text/70"
+                              >
+                                {minStock.toFixed(2)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{priceUsdt.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right text-text/80 hidden lg:table-cell">{priceBs.toFixed(2)}</td>
+                          <td className="py-2 px-2 sm:py-1 sm:pr-3 text-right hidden xl:table-cell">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                              isAvailable 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {isAvailable ? 'Disponible' : 'Agotado'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
