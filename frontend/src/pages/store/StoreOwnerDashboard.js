@@ -3102,6 +3102,8 @@ const StoreOwnerDashboard = () => {
           loadingCreate={createCategoryMutation.isLoading}
           loadingUpdate={updateCategoryMutation.isLoading}
           loadingDelete={deleteCategoryMutation.isLoading}
+          store={store}
+          queryClient={queryClient}
         />
       )}
       
@@ -5943,7 +5945,9 @@ const CategoryManagementModal = ({
   onDelete,
   loadingCreate,
   loadingUpdate,
-  loadingDelete
+  loadingDelete,
+  store,
+  queryClient
 }) => {
   const [newName, setNewName] = useState('');
   const [newSortOrder, setNewSortOrder] = useState('0');
@@ -5958,6 +5962,87 @@ const CategoryManagementModal = ({
           : '0'
     }));
   });
+
+  // Estados para arrastrar y soltar
+  const [draggedCategory, setDraggedCategory] = useState(null);
+  const [dragOverCategory, setDragOverCategory] = useState(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  // Funciones para arrastrar y soltar
+  const handleDragStart = (e, category) => {
+    setDraggedCategory(category);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, category) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCategory(category);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverCategory(null);
+  };
+
+  const handleDrop = (e, targetCategory) => {
+    e.preventDefault();
+    setDragOverCategory(null);
+
+    if (!draggedCategory || draggedCategory.id === targetCategory.id) {
+      return;
+    }
+
+    // Reordenar las categorías
+    const newCategories = [...editableCategories];
+    const draggedIndex = newCategories.findIndex(cat => cat.id === draggedCategory.id);
+    const targetIndex = newCategories.findIndex(cat => cat.id === targetCategory.id);
+
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+      // Mover la categoría arrastrada a la nueva posición
+      const [removed] = newCategories.splice(draggedIndex, 1);
+      newCategories.splice(targetIndex, 0, removed);
+
+      // Actualizar los valores de sortOrder basados en la nueva posición
+      const updatedCategories = newCategories.map((cat, index) => ({
+        ...cat,
+        sortOrder: String(index)
+      }));
+
+      setEditableCategories(updatedCategories);
+      setIsReordering(true);
+    }
+
+    setDraggedCategory(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCategory(null);
+    setDragOverCategory(null);
+  };
+
+  // Guardar todos los cambios de orden de categorías
+  const handleSaveOrder = async () => {
+    if (!store) return;
+
+    try {
+      const promises = editableCategories.map((cat) =>
+        axios.patch(`/api/store/${store.id}/categories/${cat.id}`, {
+          name: cat.name,
+          sort_order: parseInt(cat.sortOrder, 10)
+        })
+      );
+
+      await Promise.all(promises);
+      toast.success('Orden de categorías actualizado');
+      setIsReordering(false);
+      
+      // Refrescar categorías
+      await queryClient.invalidateQueries({ queryKey: ['store-owner', store.slug] });
+    } catch (error) {
+      const message = error?.response?.data?.error || 'No se pudo actualizar el orden';
+      toast.error(message);
+    }
+  };
 
   useEffect(() => {
     const list = Array.isArray(categories) ? categories : [];
@@ -6085,18 +6170,79 @@ const CategoryManagementModal = ({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-text/70 font-semibold">Categorías existentes</p>
-            <span className="text-[11px] text-text/50">{editableCategories.length} registradas</span>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-text/70 font-semibold">Categorías existentes</p>
+              <span className="text-[11px] text-text/50">{editableCategories.length} registradas</span>
+              {isReordering && (
+                <span className="text-[10px] text-accent bg-accent/20 px-2 py-0.5 rounded-full">
+                  Hay cambios sin guardar
+                </span>
+              )}
+            </div>
+            {isReordering && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveOrder}
+                  className="px-3 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px]"
+                >
+                  Guardar orden
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Resetear al orden original
+                    const list = Array.isArray(categories) ? categories : [];
+                    setEditableCategories(
+                      list.map((cat) => ({
+                        id: cat.id,
+                        name: cat.name || '',
+                        sortOrder:
+                          cat.sort_order !== undefined && cat.sort_order !== null
+                            ? String(cat.sort_order)
+                            : '0'
+                      }))
+                    );
+                    setIsReordering(false);
+                  }}
+                  className="px-3 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Instrucciones de uso */}
+          <div className="text-[10px] text-text/50 bg-glass/50 p-2 rounded">
+            💡 <strong>Para reordenar:</strong> Arrastra y suelta las categorías usando el icono ⋮⋮. Los cambios se marcarán como "sin guardar" hasta que presiones "Guardar orden".
           </div>
           {editableCategories.length === 0 ? (
             <p className="text-[11px] text-text/60">Aún no tienes categorías configuradas.</p>
           ) : (
             <div className="space-y-2 max-h-72 overflow-y-auto">
-              {editableCategories.map((cat) => (
+              {editableCategories.map((cat, index) => (
                 <div
                   key={cat.id}
-                  className="border border-glass rounded-lg p-2 flex flex-col md:flex-row md:items-center gap-2 bg-background-dark/40"
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, cat)}
+                  onDragOver={(e) => handleDragOver(e, cat)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, cat)}
+                  onDragEnd={handleDragEnd}
+                  className={`border rounded-lg p-2 flex flex-col md:flex-row md:items-center gap-2 bg-background-dark/40 transition-all cursor-move ${
+                    dragOverCategory?.id === cat.id ? 'border-accent bg-accent/10' : 'border-glass'
+                  } ${draggedCategory?.id === cat.id ? 'opacity-50' : ''}`}
                 >
+                  {/* Indicador de arrastre */}
+                  <div className="flex items-center gap-2">
+                    <div className="text-[10px] text-text/40 cursor-grab active:cursor-grabbing">
+                      ⋮⋮
+                    </div>
+                    <div className="text-[10px] text-text/50 bg-glass px-1.5 py-0.5 rounded">
+                      #{index}
+                    </div>
+                  </div>
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
                     <div className="md:col-span-2">
                       <div className="text-[11px] text-text/60 mb-0.5">Nombre</div>

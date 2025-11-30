@@ -142,9 +142,9 @@ const Layout = () => {
               {/* Language Indicator */}
               <div
                 className="badge-experience cursor-default"
-                title="Idioma: Español (España)"
+                title="Idioma: Español (Venezuela)"
               >
-                <span className="text-sm">🇪🇸</span>
+                <span className="text-sm">🇻🇪</span>
               </div>
               
               {/* Message Inbox Button */}

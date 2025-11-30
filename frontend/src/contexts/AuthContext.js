@@ -366,14 +366,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasRole = (role) => {
-    // Debug logging para APK
-    console.log('🔍 Debug Roles:', {
-      userId: user?.id,
-      username: user?.username,
-      roles: user?.roles,
-      checkingRole: role,
-      hasRole: user?.roles?.includes(role)
-    });
+    // Debug logging para APK - versión simplificada para Android
+    console.log('🔍 USER ID:', user?.id);
+    console.log('🔍 USERNAME:', user?.username);
+    console.log('🔍 ROLES:', JSON.stringify(user?.roles));
+    console.log('🔍 CHECKING ROLE:', role);
+    console.log('🔍 HAS ROLE:', user?.roles?.includes(role));
+    console.log('---');
     return user?.roles?.includes(role) || false;
   };
 
