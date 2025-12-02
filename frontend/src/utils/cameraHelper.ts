@@ -47,6 +47,14 @@ export const isCameraAvailable = async (): Promise<boolean> => {
  */
 export const requestCameraPermission = async (): Promise<boolean> => {
   try {
+    // Verificar estado actual de permisos antes de solicitar
+    const current = await Camera.checkPermissions();
+
+    if (current.camera === 'granted') {
+      return true;
+    }
+
+    // Solicitar permisos solo si aún no están concedidos
     const permissions = await Camera.requestPermissions({ permissions: ['camera'] });
     return permissions.camera === 'granted';
   } catch (error) {

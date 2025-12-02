@@ -39,7 +39,7 @@ const CameraButton: React.FC<CameraButtonProps> = ({
       // Solicitar permisos si es necesario
       const hasPermission = await requestCameraPermission();
       if (!hasPermission) {
-        toast.error('Se necesitan permisos de cámara para tomar fotos');
+        toast.error('Se necesitan permisos de cámara para tomar fotos. Revisa los permisos de la app en la configuración de tu dispositivo.');
         return;
       }
 
