@@ -157,6 +157,20 @@ COMMENT ON COLUMN market_redeems.payment_method IS 'Método de pago: bank_transf
 COMMENT ON COLUMN market_redeems.processor_id IS 'Admin que procesó la solicitud';
 
 -- ============================================
+
+-- 5. TABLA: suppliers
+-- ==================
+-- AÑADIR COLUMNA:
+--   tax_id VARCHAR(50)
+-- Razón: Necesario para almacenar identificador fiscal del proveedor (RIF, NIT, etc.)
+
+ALTER TABLE suppliers 
+ADD COLUMN IF NOT EXISTS tax_id VARCHAR(50);
+
+COMMENT ON COLUMN suppliers.tax_id IS 'Identificador fiscal del proveedor (RIF, NIT, etc.)';
+
+-- ============================================
+
 -- VISTA COMPLETA: users (PROPUESTA)
 -- ============================================
 

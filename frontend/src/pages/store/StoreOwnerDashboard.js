@@ -260,6 +260,8 @@ const StoreOwnerDashboard = () => {
   const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState(null);
   const [isPurchaseDetailLoading, setIsPurchaseDetailLoading] = useState(false);
   const [isIngredientsModalOpen, setIsIngredientsModalOpen] = useState(false);
+  const [isSupplierDetailModalOpen, setIsSupplierDetailModalOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
   const [isProductionRecipeModalOpen, setIsProductionRecipeModalOpen] = useState(false);
   const [editingProductionRecipe, setEditingProductionRecipe] = useState(null);
@@ -568,6 +570,12 @@ const StoreOwnerDashboard = () => {
 
   const purchases = Array.isArray(purchasesData) ? purchasesData : [];
 
+  const handleOpenSupplierDetail = (supplier) => {
+    if (!supplier) return;
+    setSelectedSupplier(supplier);
+    setIsSupplierDetailModalOpen(true);
+  };
+
   const handleOpenPurchaseDetail = async (purchase) => {
     if (!store?.id || !purchase?.id) return;
 
@@ -861,6 +869,27 @@ const StoreOwnerDashboard = () => {
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al crear proveedor';
+      toast.error(message);
+    }
+  });
+
+  const updateSupplierMutation = useMutation({
+    mutationFn: async ({ supplierId, data }) => {
+      if (!store?.id) {
+        throw new Error('Tienda no cargada');
+      }
+      const response = await axios.patch(
+        `/api/store/${store.id}/suppliers/${supplierId}`,
+        data
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Proveedor actualizado');
+      queryClient.invalidateQueries(['store-suppliers', store?.id]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'Error al actualizar proveedor';
       toast.error(message);
     }
   });
@@ -1288,7 +1317,11 @@ const StoreOwnerDashboard = () => {
                   </thead>
                   <tbody>
                     {suppliers.map((s) => (
-                      <tr key={s.id} className="border-b border-glass/40">
+                      <tr
+                        key={s.id}
+                        className="border-b border-glass/40 hover:bg-glass cursor-pointer"
+                        onClick={() => handleOpenSupplierDetail(s)}
+                      >
                         <td className="py-1 pr-3 text-text/80">{s.name}</td>
                         <td className="py-1 pr-3 text-text/70">{s.contact_name || '-'}</td>
                         <td className="py-1 pr-3 text-text/60">{s.phone || '-'}</td>
@@ -2972,6 +3005,13 @@ const StoreOwnerDashboard = () => {
       )}
       {isNewSupplierModalOpen && (
         <NewSupplierModal
+          suppliers={suppliers}
+          onSelectExistingSupplier={(supplier) => {
+            if (!supplier) return;
+            setIsNewSupplierModalOpen(false);
+            setSelectedSupplier(supplier);
+            setIsSupplierDetailModalOpen(true);
+          }}
           onClose={() => setIsNewSupplierModalOpen(false)}
           onSave={async (data) => {
             await createSupplierMutation.mutateAsync(data);
@@ -2980,12 +3020,31 @@ const StoreOwnerDashboard = () => {
           loading={createSupplierMutation.isLoading}
         />
       )}
+      {isSupplierDetailModalOpen && selectedSupplier && (
+        <SupplierDetailModal
+          supplier={selectedSupplier}
+          onClose={() => {
+            setIsSupplierDetailModalOpen(false);
+            setSelectedSupplier(null);
+          }}
+          onSave={async (data) => {
+            await updateSupplierMutation.mutateAsync({
+              supplierId: selectedSupplier.id,
+              data
+            });
+            setIsSupplierDetailModalOpen(false);
+            setSelectedSupplier(null);
+          }}
+          loading={updateSupplierMutation.isLoading}
+        />
+      )}
       {isNewInvoiceModalOpen && (
         <NewPurchaseModal
           suppliers={suppliers}
           products={products}
           ingredients={ingredients}
           categories={categories}
+          vesPerUsdt={vesPerUsdt}
           storeId={store?.id}
           onCreateProduct={async (data) => {
             const created = await createProductMutation.mutateAsync(data);
@@ -3062,6 +3121,11 @@ const StoreOwnerDashboard = () => {
           storeId={store?.id}
           ingredients={ingredients}
           products={products}
+          recipes={productionRecipes}
+          onSelectRecipe={(r) => {
+            if (!r) return;
+            setCraftingRecipe(r);
+          }}
           onClose={() => {
             setIsProductionCraftingModalOpen(false);
             setCraftingRecipe(null);
@@ -4402,7 +4466,7 @@ const ProductionRecipeModal = ({
   );
 };
 
-const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, ingredients, products }) => {
+const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, ingredients, products, recipes, onSelectRecipe }) => {
   const [mode, setMode] = useState('byProduction'); // 'byProduction' o 'byIngredients'
   const [plannedQuantity, setPlannedQuantity] = useState(
     recipe?.yields_quantity != null ? String(recipe.yields_quantity) : ''
@@ -4411,8 +4475,8 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
   const [notes, setNotes] = useState('');
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [inventoryData, setInventoryData] = useState({});
+  const [recipeSearch, setRecipeSearch] = useState('');
 
-  // Cargar inventario actual
   useEffect(() => {
     if (!storeId || !recipe?.id) return;
     
@@ -4433,7 +4497,20 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
     fetchInventory();
   }, [storeId, recipe?.id]);
 
-  // Calcular producción máxima basada en ingredientes disponibles
+  useEffect(() => {
+    if (!recipe) {
+      setPlannedQuantity('');
+      setIngredientQuantities({});
+      setMode('byProduction');
+      return;
+    }
+    setPlannedQuantity(
+      recipe.yields_quantity != null ? String(recipe.yields_quantity) : ''
+    );
+    setIngredientQuantities({});
+    setMode('byProduction');
+  }, [recipe?.id]);
+
   const maxProductionByIngredients = useMemo(() => {
     if (!recipe?.items || !inventoryData?.ingredients || !inventoryData?.products) return null;
 
@@ -4473,7 +4550,6 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
     };
   }, [recipe, inventoryData]);
 
-  // Convertir unidades a base para cálculos
   const convertToBaseUnit = (qty, unit) => {
     const q = parseFloat(qty || '0');
     if (!Number.isFinite(q) || q <= 0) return 0;
@@ -4486,7 +4562,6 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
     }
   };
 
-  // Calcular producción basada en ingredientes seleccionados
   const productionByIngredients = useMemo(() => {
     if (mode !== 'byIngredients' || !recipe?.items) return null;
 
@@ -4521,7 +4596,6 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
     };
   }, [mode, recipe, ingredientQuantities]);
 
-  // Inicializar cantidades de ingredientes con inventario disponible
   useEffect(() => {
     if (mode !== 'byIngredients' || !recipe?.items || !inventoryData?.ingredients || !inventoryData?.products) return;
 
@@ -4545,6 +4619,19 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
     
     setIngredientQuantities(initialQuantities);
   }, [mode, recipe, inventoryData]);
+
+  const availableRecipes = Array.isArray(recipes) ? recipes : [];
+
+  const filteredRecipes = useMemo(() => {
+    const term = recipeSearch.trim().toLowerCase();
+    if (!term) {
+      return availableRecipes;
+    }
+    return availableRecipes.filter((r) => {
+      if (!r || !r.name) return false;
+      return r.name.toLowerCase().includes(term);
+    });
+  }, [availableRecipes, recipeSearch]);
 
   const qtyNumber = parseFloat(plannedQuantity || '0');
   const baseYield = parseFloat(recipe?.yields_quantity || '0');
@@ -4628,6 +4715,51 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
           </button>
         </div>
 
+        {availableRecipes.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[11px] text-text/60">Seleccionar receta a craftear</div>
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                value={recipeSearch}
+                onChange={(e) => setRecipeSearch(e.target.value)}
+                placeholder="Buscar receta por nombre..."
+                className="input-glass w-full text-xs"
+              />
+              <div className="max-h-32 overflow-y-auto rounded-lg border border-glass bg-glass/60">
+                {filteredRecipes.map((r) => {
+                  const isActive = recipe && r.id === recipe.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => {
+                        if (!onSelectRecipe || (recipe && r.id === recipe.id)) return;
+                        onSelectRecipe(r);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-[11px] flex items-center justify-between gap-2 hover:bg-glass-hover ${
+                        isActive ? 'bg-accent/15 text-accent' : 'text-text/80'
+                      }`}
+                    >
+                      <span className="truncate">{r.name}</span>
+                      {typeof r.yields_quantity === 'number' && r.yields_unit && (
+                        <span className="text-[10px] text-text/60">
+                          {r.yields_quantity.toFixed(2)} {r.yields_unit}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {filteredRecipes.length === 0 && (
+                  <div className="px-3 py-2 text-[11px] text-text/60">
+                    No se encontraron recetas para ese término.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="text-[11px] text-text/70 space-y-1">
           <div>
             <span className="font-semibold">Rendimiento base: </span>
@@ -4681,44 +4813,53 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          {/* Materiales requeridos para la producción */}
+          {/* Materiales requeridos para la producción (solo lectura) */}
           {mode === 'byProduction' && hasValidRatio && (
             <div className="space-y-2">
-              <div className="text-text/60 font-semibold">Materiales requeridos para {qtyNumber} {recipe?.yields_unit}:</div>
+              <div className="text-text/60 font-semibold">
+                Materiales requeridos para {qtyNumber} {recipe?.yields_unit}:
+              </div>
               <div className="max-h-40 overflow-y-auto space-y-1">
-                {recipe?.items?.filter(item => 
-                  item.component_type === 'ingredient' || item.component_type === 'product'
-                ).map((item, index) => {
-                  const requiredQty = parseFloat(item.quantity || 0);
-                  const totalRequired = requiredQty * factor;
-                  const availableStock = getAvailableStock(item);
-                  const hasEnoughStock = availableStock >= totalRequired;
-                  
-                  return (
-                    <div key={index} className={`flex items-center justify-between p-2 rounded ${
-                      hasEnoughStock ? 'bg-glass/30' : 'bg-red-500/10 border border-red-500/20'
-                    }`}>
-                      <div className="flex-1">
-                        <div className="font-medium text-[10px]">
-                          {getIngredientName(item)}
+                {recipe?.items
+                  ?.filter(
+                    (item) =>
+                      item.component_type === 'ingredient' ||
+                      item.component_type === 'product'
+                  )
+                  .map((item, index) => {
+                    const baseQty = parseFloat(item.quantity || 0) || 0;
+                    const requiredQty = factor != null ? baseQty * factor : baseQty;
+                    const availableStock = getAvailableStock(item);
+                    const hasEnoughStock = availableStock >= requiredQty;
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-glass/50 rounded"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-[10px] truncate">
+                            {getIngredientName(item)}
+                          </div>
+                          <div className="text-[9px] text-text/50">
+                            Requerido: {requiredQty.toFixed(2)} {item.unit}
+                          </div>
+                          <div className="text-[9px] text-text/50">
+                            Disponible: {availableStock.toFixed(2)} {item.unit}
+                          </div>
                         </div>
-                        <div className="text-[9px] text-text/50">
-                          Requerido: {totalRequired.toFixed(2)} {item.unit}
-                        </div>
-                        <div className="text-[9px] text-text/50">
-                          Disponible: {availableStock} {item.unit}
+                        <div className="text-[9px] font-medium flex-shrink-0">
+                          {hasEnoughStock ? (
+                            <span className="text-green-400">✓ Suficiente</span>
+                          ) : (
+                            <span className="text-red-400">
+                              ✗ Faltan {(requiredQty - availableStock).toFixed(2)} {item.unit}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className={`text-[9px] font-medium ${
-                          hasEnoughStock ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {hasEnoughStock ? '✓ Suficiente' : `✗ Faltan ${(totalRequired - availableStock).toFixed(2)} ${item.unit}`}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -4844,18 +4985,114 @@ const ProductionCraftingModal = ({ recipe, onClose, onCraft, loading, storeId, i
   );
 };
 
-const NewSupplierModal = ({ onClose, onSave, loading }) => {
+const NewSupplierModal = ({
+  onClose,
+  onSave,
+  loading,
+  suppliers,
+  onSelectExistingSupplier,
+  initialTaxId
+}) => {
   const [name, setName] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [rifPrefix, setRifPrefix] = useState('J');
+  const [rifNumber, setRifNumber] = useState('');
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [matchedSupplierId, setMatchedSupplierId] = useState(null);
+
+  const supplierList = Array.isArray(suppliers) ? suppliers : [];
+
+  useEffect(() => {
+    if (!initialTaxId) {
+      return;
+    }
+
+    const raw = String(initialTaxId).trim().toUpperCase();
+
+    let prefix = 'J';
+    let body = raw;
+
+    if (/^[JVEC]/.test(raw)) {
+      prefix = raw.charAt(0);
+      body = raw.slice(1);
+    }
+
+    const digits = body.replace(/\D/g, '');
+
+    if (!digits) {
+      setTaxId('');
+      setRifNumber('');
+      setRifPrefix(prefix);
+      return;
+    }
+
+    let formatted = digits;
+    if (digits.length > 1) {
+      formatted = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+    }
+
+    setRifPrefix(prefix);
+    setRifNumber(formatted);
+    setTaxId(`${prefix}${digits}`);
+  }, [initialTaxId]);
+
+  const handleRifPrefixChange = (value) => {
+    setRifPrefix(value);
+    const digits = rifNumber.replace(/\D/g, '');
+    if (digits) {
+      setTaxId(`${value}${digits}`);
+    } else {
+      setTaxId('');
+    }
+  };
+
+  const handleRifNumberChange = (value) => {
+    const digits = value.replace(/\D/g, '');
+    let formatted = digits;
+    if (digits.length > 1) {
+      formatted = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+    }
+    setRifNumber(formatted);
+
+    if (digits) {
+      setTaxId(`${rifPrefix}${digits}`);
+    } else {
+      setTaxId('');
+    }
+  };
+
+  useEffect(() => {
+    if (!onSelectExistingSupplier || supplierList.length === 0) {
+      return;
+    }
+
+    const normalized = (taxId || '').replace(/-/g, '').trim().toUpperCase();
+    if (!normalized) {
+      setMatchedSupplierId(null);
+      return;
+    }
+
+    const existing = supplierList.find((s) => {
+      if (typeof s.tax_id !== 'string') return false;
+      const existingNorm = s.tax_id.replace(/-/g, '').trim().toUpperCase();
+      return existingNorm === normalized;
+    });
+
+    if (existing && existing.id !== matchedSupplierId) {
+      setMatchedSupplierId(existing.id);
+      onSelectExistingSupplier(existing);
+    }
+  }, [taxId, supplierList, onSelectExistingSupplier, matchedSupplierId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const payload = {
       name: name.trim(),
+      tax_id: taxId.trim() || undefined,
       contact_name: contactName.trim() || undefined,
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
@@ -4879,6 +5116,31 @@ const NewSupplierModal = ({ onClose, onSave, loading }) => {
         <h3 className="text-lg font-bold">Nuevo proveedor</h3>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <div className="text-text/60 mb-1">Identificador fiscal (RIF)</div>
+            <div className="flex gap-2">
+              <select
+                className="input-glass w-20 text-xs"
+                value={rifPrefix}
+                onChange={(e) => handleRifPrefixChange(e.target.value)}
+              >
+                <option value="J">J</option>
+                <option value="V">V</option>
+                <option value="E">E</option>
+                <option value="C">C</option>
+              </select>
+              <input
+                type="text"
+                value={rifNumber}
+                onChange={(e) => handleRifNumberChange(e.target.value)}
+                className="input-glass flex-1"
+                placeholder="50722367-1"
+              />
+            </div>
+            <div className="text-[10px] text-text/60 mt-0.5">
+              Escribe el RIF. Si ya existe un proveedor con ese RIF se cargarán sus datos.
+            </div>
+          </div>
           <div>
             <div className="text-text/60 mb-1">Nombre</div>
             <input
@@ -4949,11 +5211,164 @@ const NewSupplierModal = ({ onClose, onSave, loading }) => {
   );
 };
 
+const SupplierDetailModal = ({ supplier, onClose, onSave, loading }) => {
+  const formatRifForDisplay = (raw) => {
+    if (!raw) return '';
+    let s = String(raw).trim().toUpperCase();
+
+    let prefix = '';
+    let body = s;
+
+    if (/^[JVEC]/.test(s)) {
+      prefix = s.charAt(0);
+      body = s.slice(1);
+    }
+
+    const digits = body.replace(/\D/g, '');
+    if (!digits) return s;
+
+    let formattedNumber = digits;
+    if (digits.length > 1) {
+      formattedNumber = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+    }
+
+    return prefix ? `${prefix}-${formattedNumber}` : formattedNumber;
+  };
+
+  const [name, setName] = useState(supplier?.name || '');
+  const [contactName, setContactName] = useState(supplier?.contact_name || '');
+  const [phone, setPhone] = useState(supplier?.phone || '');
+  const [email, setEmail] = useState(supplier?.email || '');
+  const [address, setAddress] = useState(supplier?.address || '');
+
+  useEffect(() => {
+    setName(supplier?.name || '');
+    setContactName(supplier?.contact_name || '');
+    setPhone(supplier?.phone || '');
+    setEmail(supplier?.email || '');
+    setAddress(supplier?.address || '');
+  }, [supplier]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      name: name.trim(),
+      contact_name: contactName.trim() || undefined,
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
+      address: address.trim() || undefined
+    };
+
+    if (!payload.name) {
+      toast.error('El nombre del proveedor es obligatorio');
+      return;
+    }
+
+    await onSave(payload);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md card-glass p-6 space-y-4"
+      >
+        <h3 className="text-lg font-bold">Proveedor</h3>
+
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <div className="text-text/60 mb-1">Identificador fiscal (RIF)</div>
+            <input
+              type="text"
+              value={formatRifForDisplay(supplier?.tax_id || '')}
+              className="input-glass w-full opacity-75"
+              readOnly
+              disabled
+            />
+            <div className="text-[10px] text-text/60 mt-0.5">
+              El RIF no puede modificarse.
+            </div>
+          </div>
+          <div>
+            <div className="text-text/60 mb-1">Nombre</div>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-glass w-full"
+              required
+            />
+          </div>
+          <div>
+            <div className="text-text/60 mb-1">Persona de contacto</div>
+            <input
+              type="text"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              className="input-glass w-full"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-text/60 mb-1">Teléfono</div>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="input-glass w-full"
+              />
+            </div>
+            <div>
+              <div className="text-text/60 mb-1">Email</div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-glass w-full"
+              />
+            </div>
+          </div>
+          <div>
+            <div className="text-text/60 mb-1">Dirección</div>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="input-glass w-full h-20 resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-glass hover:bg-glass-hover"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const NewPurchaseModal = ({
   suppliers,
   products,
   ingredients,
   categories,
+  vesPerUsdt,
   storeId,
   onCreateProduct,
   onClose,
@@ -4961,16 +5376,31 @@ const NewPurchaseModal = ({
   loading
 }) => {
   const [supplierId, setSupplierId] = useState('');
+  const [rifPrefix, setRifPrefix] = useState('J');
+  const [rifNumber, setRifNumber] = useState('');
+  const [rifTaxIdSearch, setRifTaxIdSearch] = useState('');
+  const [matchedSupplier, setMatchedSupplier] = useState(null);
+  const [showSupplierDetailModal, setShowSupplierDetailModal] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
-  const [supplierAddress, setSupplierAddress] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [invoiceImage, setInvoiceImage] = useState('');
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(null);
+  
+  useEffect(() => {
+    if (vesPerUsdt == null) {
+      setExchangeRate(null);
+      return;
+    }
+    const parsed = Number(vesPerUsdt);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setExchangeRate(parsed);
+    } else {
+      setExchangeRate(null);
+    }
+  }, [vesPerUsdt]);
   const [createdProducts, setCreatedProducts] = useState([]);
   const [createdIngredients, setCreatedIngredients] = useState([]);
   const [items, setItems] = useState([
@@ -5006,6 +5436,16 @@ const NewPurchaseModal = ({
     [ingredients, createdIngredients]
   );
 
+  const categoryNameMap = useMemo(() => {
+    const map = {};
+    const list = Array.isArray(categories) ? categories : [];
+    for (const cat of list) {
+      if (!cat || cat.id == null) continue;
+      map[String(cat.id)] = cat.name || '';
+    }
+    return map;
+  }, [categories]);
+
   const getDefaultCategoryId = () => {
     if (Array.isArray(categories) && categories.length > 0) {
       return categories[0].id;
@@ -5016,41 +5456,135 @@ const NewPurchaseModal = ({
   const generateNumericSku = () =>
     String(Math.floor(100000000 + Math.random() * 900000000));
 
-  // Fetch BCV exchange rate
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const response = await axios.get('/api/economy/fiat-context');
-        const rawRate = response.data?.bcvRate?.rate;
-        const parsedRate =
-          typeof rawRate === 'number' ? rawRate : parseFloat(rawRate);
-        if (Number.isFinite(parsedRate) && parsedRate > 0) {
-          setExchangeRate(parsedRate);
-        } else {
-          setExchangeRate(null);
-        }
-      } catch (error) {
-        console.error('Error fetching exchange rate:', error);
-      }
-    };
-    
-    fetchExchangeRate();
-  }, []);
+  const supplierList = Array.isArray(suppliers) ? suppliers : [];
 
-  // Auto-fill supplier data when selected
+  const currentSupplier = useMemo(() => {
+    if (matchedSupplier) return matchedSupplier;
+    if (supplierId && supplierList.length) {
+      return (
+        supplierList.find((s) => String(s.id) === String(supplierId)) || null
+      );
+    }
+    return null;
+  }, [matchedSupplier, supplierId, supplierList]);
+
+  const formatRifForDisplay = (raw) => {
+    if (!raw) return '';
+    let s = String(raw).trim().toUpperCase();
+
+    let prefix = '';
+    let body = s;
+
+    if (/^[JVEC]/.test(s)) {
+      prefix = s.charAt(0);
+      body = s.slice(1);
+    }
+
+    const digits = body.replace(/\D/g, '');
+    if (!digits) return s;
+
+    let formattedNumber = digits;
+    if (digits.length > 1) {
+      formattedNumber = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+    }
+
+    return prefix ? `${prefix}-${formattedNumber}` : formattedNumber;
+  };
+
+  const handleRifSearchPrefixChange = (value) => {
+    setRifPrefix(value);
+    const digits = rifNumber.replace(/\D/g, '');
+    if (digits) {
+      setRifTaxIdSearch(`${value}${digits}`);
+    } else {
+      setRifTaxIdSearch('');
+    }
+  };
+
+  const handleRifSearchNumberChange = (value) => {
+    const digits = value.replace(/\D/g, '');
+    let formatted = digits;
+    if (digits.length > 1) {
+      formatted = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+    }
+    setRifNumber(formatted);
+
+    if (digits) {
+      setRifTaxIdSearch(`${rifPrefix}${digits}`);
+    } else {
+      setRifTaxIdSearch('');
+    }
+  };
+
   useEffect(() => {
-    if (supplierId && suppliers) {
-      const selectedSupplier = suppliers.find(s => s.id === supplierId);
-      if (selectedSupplier) {
-        setContactPhone(selectedSupplier.phone || '');
-        setContactEmail(selectedSupplier.email || '');
-        setSupplierAddress(selectedSupplier.address || '');
+    if (!rifTaxIdSearch) {
+      setMatchedSupplier(null);
+      return;
+    }
+
+    const list = Array.isArray(suppliers) ? suppliers : [];
+    if (list.length === 0) {
+      setMatchedSupplier(null);
+      return;
+    }
+
+    const normalized = rifTaxIdSearch.replace(/-/g, '').trim().toUpperCase();
+
+    const existing = list.find((s) => {
+      if (typeof s.tax_id !== 'string') return false;
+      const existingNorm = s.tax_id.replace(/-/g, '').trim().toUpperCase();
+      return existingNorm === normalized;
+    });
+
+    if (existing) {
+      setMatchedSupplier(existing);
+      const existingId = String(existing.id);
+      if (existingId !== String(supplierId || '')) {
+        setSupplierId(existing.id);
       }
     } else {
-      // Clear fields when no supplier is selected
-      setContactPhone('');
-      setContactEmail('');
-      setSupplierAddress('');
+      setMatchedSupplier(null);
+    }
+  }, [rifTaxIdSearch, suppliers, supplierId]);
+
+  useEffect(() => {
+    if (supplierId && suppliers) {
+      const selectedSupplier = suppliers.find(
+        (s) => String(s.id) === String(supplierId)
+      );
+      if (selectedSupplier) {
+        const rawTaxId = selectedSupplier.tax_id || '';
+        if (rawTaxId) {
+          let s = String(rawTaxId).trim().toUpperCase();
+
+          let prefix = 'J';
+          let body = s;
+
+          if (/^[JVEC]/.test(s)) {
+            prefix = s.charAt(0);
+            body = s.slice(1);
+          }
+
+          const digits = body.replace(/\D/g, '');
+
+          if (digits) {
+            let formatted = digits;
+            if (digits.length > 1) {
+              formatted = `${digits.slice(0, -1)}-${digits.slice(-1)}`;
+            }
+
+            setRifPrefix(prefix);
+            setRifNumber(formatted);
+            setRifTaxIdSearch(`${prefix}${digits}`);
+          } else {
+            setRifTaxIdSearch('');
+          }
+        } else {
+          setRifTaxIdSearch('');
+        }
+      }
+    } else {
+      setRifTaxIdSearch('');
     }
   }, [supplierId, suppliers]);
 
@@ -5303,16 +5837,10 @@ const NewPurchaseModal = ({
       return;
     }
 
-    const contactInfo = {};
-    if (contactPhone.trim()) contactInfo.phone = contactPhone.trim();
-    if (contactEmail.trim()) contactInfo.email = contactEmail.trim();
-
     const payload = {
       supplier_id: supplierId || null,
       invoice_number: invoiceNumber.trim() || null,
       invoice_date: invoiceDate || null,
-      supplier_address_snapshot: supplierAddress.trim() || null,
-      contact_info: Object.keys(contactInfo).length ? contactInfo : null,
       notes: notes.trim() || null,
       items: preparedItems,
       invoice_image_url: invoiceImage || null
@@ -5348,6 +5876,46 @@ const NewPurchaseModal = ({
           <h3 className="text-lg font-bold">Nueva factura de compra</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="space-y-2">
+            <div className="text-text/60 mb-1">Buscar proveedor por RIF</div>
+            <div className="flex gap-2">
+              <select
+                className="input-glass w-20 text-xs"
+                value={rifPrefix}
+                onChange={(e) => handleRifSearchPrefixChange(e.target.value)}
+              >
+                <option value="J">J</option>
+                <option value="V">V</option>
+                <option value="E">E</option>
+                <option value="C">C</option>
+              </select>
+              <input
+                type="text"
+                value={rifNumber}
+                onChange={(e) => handleRifSearchNumberChange(e.target.value)}
+                className="input-glass flex-1"
+                placeholder="50722367-1"
+              />
+            </div>
+            {currentSupplier ? (
+              <button
+                type="button"
+                onClick={() => setShowSupplierDetailModal(true)}
+                className="text-[10px] text-accent underline hover:text-accent/80 text-left"
+              >
+                RIF: {formatRifForDisplay(currentSupplier.tax_id || '')} – ver datos del proveedor
+              </button>
+            ) : rifTaxIdSearch ? (
+              <div className="text-[10px] text-text/60">
+                No se encontró proveedor con ese RIF. Puedes crearlo con "+ Nuevo".
+              </div>
+            ) : (
+              <div className="text-[10px] text-text/60">
+                Escribe el RIF del proveedor para buscarlo.
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="text-text/60 mb-1">Proveedor</div>
@@ -5358,7 +5926,7 @@ const NewPurchaseModal = ({
                   className="input-glass w-full"
                 >
                   <option value="">Sin proveedor</option>
-                  {suppliers.map((s) => (
+                  {supplierList.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
@@ -5366,7 +5934,13 @@ const NewPurchaseModal = ({
                 </select>
                 <button
                   type="button"
-                  onClick={() => setShowNewSupplierModal(true)}
+                  onClick={() => {
+                    if (currentSupplier) {
+                      setShowSupplierDetailModal(true);
+                      return;
+                    }
+                    setShowNewSupplierModal(true);
+                  }}
                   className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] whitespace-nowrap"
                 >
                   + Nuevo
@@ -5392,35 +5966,6 @@ const NewPurchaseModal = ({
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
                 className="input-glass w-full"
-              />
-            </div>
-            <div>
-              <div className="text-text/60 mb-1">Teléfono de contacto</div>
-              <input
-                type="text"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                className="input-glass w-full"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <div className="text-text/60 mb-1">Email de contacto</div>
-              <input
-                type="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                className="input-glass w-full"
-              />
-            </div>
-            <div>
-              <div className="text-text/60 mb-1">Dirección del proveedor</div>
-              <textarea
-                value={supplierAddress}
-                onChange={(e) => setSupplierAddress(e.target.value)}
-                className="input-glass w-full h-16 resize-none"
               />
             </div>
           </div>
@@ -5555,145 +6100,246 @@ const NewPurchaseModal = ({
             </div>
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {items.map((item, index) => (
-                <div
-                  key={index}
-                  className="border border-glass rounded-lg p-2 space-y-2 bg-background-dark/40"
-                >
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div>
-                      <div className="text-[11px] text-text/60 mb-0.5">Tipo</div>
-                      <select
-                        value={item.kind}
-                        onChange={(e) => {
-                          const kind = e.target.value === 'ingredient' ? 'ingredient' : 'product';
-                          updateItem(index, {
-                            kind,
-                            productId: '',
-                            ingredientId: ''
-                          });
-                        }}
-                        className="input-glass w-full text-[11px]"
-                      >
-                        <option value="product">Producto terminado</option>
-                        <option value="ingredient">Ingrediente</option>
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <div className="text-[11px] text-text/60 mb-0.5">Nombre / buscador</div>
-                      <input
-                        type="text"
-                        value={item.searchTerm}
-                        onChange={(e) => updateItem(index, { searchTerm: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                        placeholder={
-                          item.kind === 'product'
-                            ? 'Nombre o SKU de producto'
-                            : 'Nombre de ingrediente'
-                        }
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <div className="text-[11px] text-text/60 mb-0.5">
-                        {item.kind === 'product' ? 'Producto' : 'Ingrediente'}
-                      </div>
-                      {item.kind === 'product'
-                        ? (() => {
-                            const search = (item.searchTerm || '').toLowerCase();
-                            const list = extendedProducts.filter((p) => {
-                              const haystack = `${p.name || ''} ${p.sku || ''}`.toLowerCase();
-                              return !search || haystack.includes(search);
-                            });
-                            return (
-                              <>
-                                <select
-                                  value={item.productId}
-                                  onChange={(e) => {
+              {items.map((item, index) => {
+                const searchRaw = (item.searchTerm || '').trim().toLowerCase();
+
+                let suggestions = [];
+                if (searchRaw) {
+                  const productMatches = extendedProducts
+                    .filter((p) => {
+                      const haystack = `${p.name || ''} ${p.sku || ''}`.toLowerCase();
+                      return haystack.includes(searchRaw);
+                    })
+                    .slice(0, 4);
+
+                  const ingredientMatches = extendedIngredients
+                    .filter((ing) => {
+                      const haystack = `${ing.name || ''}`.toLowerCase();
+                      return haystack.includes(searchRaw);
+                    })
+                    .slice(0, 4);
+
+                  suggestions = [
+                    ...productMatches.map((p) => ({
+                      type: 'product',
+                      id: p.id,
+                      name: p.name || '',
+                      sku: p.sku || '',
+                      unit: p.unit || p.presentation_unit || ''
+                    })),
+                    ...ingredientMatches.map((ing) => ({
+                      type: 'ingredient',
+                      id: ing.id,
+                      name: ing.name || '',
+                      unit: ing.unit || ''
+                    }))
+                  ].slice(0, 4);
+                }
+
+                const selectedProduct =
+                  item.kind === 'product' && item.productId
+                    ? extendedProducts.find(
+                        (p) => String(p.id) === String(item.productId)
+                      )
+                    : null;
+                const mods = Array.isArray(selectedProduct?.modifiers)
+                  ? selectedProduct.modifiers
+                  : [];
+
+                let lastPrice = null;
+                if (item.kind === 'product' && selectedProduct) {
+                  const raw =
+                    selectedProduct.last_purchase_unit_cost_usdt != null
+                      ? Number(selectedProduct.last_purchase_unit_cost_usdt)
+                      : Number(selectedProduct.cost_usdt ?? NaN);
+                  if (Number.isFinite(raw) && raw > 0) lastPrice = raw;
+                } else if (item.kind === 'ingredient' && item.ingredientId) {
+                  const ing = extendedIngredients.find(
+                    (i) => String(i.id) === String(item.ingredientId)
+                  );
+                  if (ing && ing.last_purchase_unit_cost_usdt != null) {
+                    const raw = Number(ing.last_purchase_unit_cost_usdt);
+                    if (Number.isFinite(raw) && raw > 0) lastPrice = raw;
+                  }
+                }
+
+                let categoryName = null;
+                if (item.kind === 'product' && selectedProduct) {
+                  const catId = selectedProduct.category_id;
+                  if (catId) {
+                    categoryName = categoryNameMap[String(catId)] || null;
+                  }
+                }
+
+                const quantityNum = parseFloat(item.quantity || '0') || 0;
+                const unitCostUSDNum = parseFloat(item.unitCost || '0') || 0;
+                const unitCostVESNum = parseFloat(item.unitCostVES || '0') || 0;
+                const taxRateNum = parseFloat(item.taxRate || '0') || 0;
+
+                let pricePerOneUSD = null;
+                let pricePerOneVES = null;
+                if (quantityNum > 0 && (unitCostUSDNum > 0 || unitCostVESNum > 0)) {
+                  if (unitCostUSDNum > 0) pricePerOneUSD = unitCostUSDNum;
+                  if (unitCostVESNum > 0) pricePerOneVES = unitCostVESNum;
+                }
+
+                let taxLineUSD = 0;
+                let taxLineVES = 0;
+                if (
+                  quantityNum > 0 &&
+                  taxRateNum > 0 &&
+                  (unitCostUSDNum > 0 || unitCostVESNum > 0)
+                ) {
+                  const subtotalUSD = quantityNum * unitCostUSDNum;
+                  const subtotalVES = quantityNum * unitCostVESNum;
+                  taxLineUSD = subtotalUSD * (taxRateNum / 100);
+                  taxLineVES = subtotalVES * (taxRateNum / 100);
+                }
+
+                const unitLabel = item.unit || 'unidad';
+
+                return (
+                  <div
+                    key={index}
+                    className="border border-glass rounded-lg p-2 space-y-2 bg-background-dark/40"
+                  >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div className="md:col-span-2">
+                        <div className="text-[11px] text-text/60 mb-0.5">
+                          Nombre / buscador
+                        </div>
+                        <input
+                          type="text"
+                          value={item.searchTerm}
+                          onChange={(e) =>
+                            updateItem(index, { searchTerm: e.target.value })
+                          }
+                          className="input-glass w-full text-[11px]"
+                          placeholder={
+                            item.kind === 'product'
+                              ? 'Nombre o SKU de producto'
+                              : 'Nombre de ingrediente'
+                          }
+                        />
+                        {searchRaw && suggestions.length > 0 && (
+                          <div className="mt-1 space-y-1">
+                            {suggestions.map((s) => (
+                              <button
+                                key={`${s.type}-${s.id}`}
+                                type="button"
+                                onClick={() => {
+                                  if (s.type === 'product') {
                                     updateItem(index, {
-                                      productId: e.target.value,
+                                      kind: 'product',
+                                      productId: s.id,
                                       ingredientId: '',
-                                      modifierId: ''
+                                      modifierId: '',
+                                      searchTerm: s.name,
+                                      sku: s.sku || item.sku || '',
+                                      unit: s.unit || item.unit
                                     });
-                                  }}
-                                  className="input-glass w-full text-[11px] mb-1"
-                                >
-                                  <option value="">Selecciona producto</option>
-                                  {list.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name} {p.sku ? `(#${p.sku})` : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                                {item.searchTerm && list.length === 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateProductFromItem(index)}
-                                    className="px-2 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[10px]"
-                                  >
-                                    Crear producto "{item.searchTerm}"
-                                  </button>
-                                )}
-                              </>
-                            );
-                          })()
-                        : (() => {
-                            const search = (item.searchTerm || '').toLowerCase();
-                            const list = extendedIngredients.filter((ing) => {
-                              const haystack = `${ing.name || ''}`.toLowerCase();
-                              return !search || haystack.includes(search);
-                            });
-                            return (
-                              <>
-                                <select
-                                  value={item.ingredientId}
-                                  onChange={(e) => {
+                                  } else {
                                     updateItem(index, {
-                                      ingredientId: e.target.value,
-                                      productId: ''
+                                      kind: 'ingredient',
+                                      ingredientId: s.id,
+                                      productId: '',
+                                      modifierId: '',
+                                      searchTerm: s.name,
+                                      unit: s.unit || item.unit
                                     });
-                                  }}
-                                  className="input-glass w-full text-[11px] mb-1"
-                                >
-                                  <option value="">Selecciona ingrediente</option>
-                                  {list.map((ing) => (
-                                    <option key={ing.id} value={ing.id}>
-                                      {ing.name} ({ing.unit})
-                                    </option>
-                                  ))}
-                                </select>
-                                {item.searchTerm && list.length === 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateIngredientFromItem(index)}
-                                    className="px-2 py-1 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[10px]"
-                                  >
-                                    Crear ingrediente "{item.searchTerm}"
-                                  </button>
+                                  }
+                                }}
+                                className="w-full text-left px-2 py-1 rounded-md bg-glass hover:bg-glass-hover text-[10px]"
+                              >
+                                <span className="font-medium">{s.name}</span>
+                                {s.type === 'product' && s.sku && (
+                                  <span className="ml-1 text-text/60">#{s.sku}</span>
                                 )}
-                              </>
-                            );
-                          })()}
-                    </div>
-                    {item.kind === 'product' && (() => {
-                      const product = products.find((p) => String(p.id) === String(item.productId));
-                      const mods = Array.isArray(product?.modifiers) ? product.modifiers : [];
-
-                      if (!mods.length) return null;
-
-                      return (
+                                <span className="ml-2 text-text/60">
+                                  {s.type === 'product' ? 'Producto' : 'Ingrediente'}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-1">
+                          <div className="flex items-center justify-between mb-0.5 text-[11px] text-text/60">
+                            <span>SKU (solo números)</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateItem(index, { sku: generateNumericSku() })
+                              }
+                              className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[9px]"
+                            >
+                              Auto
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={item.sku}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              updateItem(index, { sku: value });
+                            }}
+                            className="input-glass w-full text-[11px]"
+                            placeholder="SKU numérico"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-text/60 mb-0.5">Tipo</div>
+                        <select
+                          value={item.kind}
+                          onChange={(e) => {
+                            const kind =
+                              e.target.value === 'ingredient' ? 'ingredient' : 'product';
+                            updateItem(index, {
+                              kind,
+                              productId: '',
+                              ingredientId: '',
+                              modifierId: ''
+                            });
+                          }}
+                          className="input-glass w-full text-[11px]"
+                        >
+                          <option value="product">Producto terminado</option>
+                          <option value="ingredient">Ingrediente</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-text/60 mb-0.5">
+                          Categoría (opcional)
+                        </div>
+                        <div className="input-glass w-full text-[10px] py-1 px-2 flex items-center">
+                          {categoryName ? (
+                            <span className="text-text/80 truncate">{categoryName}</span>
+                          ) : (
+                            <span className="text-text/40 italic truncate">
+                              Sin categoría
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {item.kind === 'product' && mods.length > 0 && (
                         <div className="md:col-span-2">
-                          <div className="text-[11px] text-text/60 mb-0.5">Variante (opcional)</div>
+                          <div className="text-[11px] text-text/60 mb-0.5">
+                            Variante (opcional)
+                          </div>
                           <select
                             value={item.modifierId || ''}
-                            onChange={(e) => updateItem(index, { modifierId: e.target.value })}
+                            onChange={(e) =>
+                              updateItem(index, { modifierId: e.target.value })
+                            }
                             className="input-glass w-full text-[11px]"
                           >
                             <option value="">Sin variante específica</option>
                             {mods.map((mod) => {
                               const extra = Number(mod.price_adjustment_usdt || 0);
-                              const extraLabel = Number.isFinite(extra) && extra !== 0
-                                ? ` (+$${extra.toFixed(2)})`
-                                : '';
+                              const extraLabel =
+                                Number.isFinite(extra) && extra !== 0
+                                  ? ` (+$${extra.toFixed(2)})`
+                                  : '';
                               const baseLabel = mod.group_name
                                 ? `${mod.group_name}: ${mod.name}`
                                 : mod.name;
@@ -5706,126 +6352,158 @@ const NewPurchaseModal = ({
                             })}
                           </select>
                         </div>
-                      );
-                    })()}
-                    <div className="md:col-span-2">
-                      <div className="text-[11px] text-text/60 mb-0.5">Costo unitario</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.0001"
-                            value={item.unitCost}
-                            onChange={(e) => updateItem(index, { unitCost: e.target.value })}
-                            className="input-glass w-full text-[11px]"
-                            placeholder="USD"
-                          />
-                          {exchangeRate && (
-                            <div className="text-[9px] text-text/50 mt-1">
-                              $1.00 USD = {exchangeRate.toFixed(2)} VES (BCV)
+                      )}
+                      <div className="md:col-span-2">
+                        <div className="text-[11px] text-text/60 mb-0.5">
+                          Costo unitario
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.0001"
+                              value={item.unitCost}
+                              onChange={(e) =>
+                                updateItem(index, { unitCost: e.target.value })
+                              }
+                              className="input-glass w-full text-[11px]"
+                              placeholder="USD"
+                            />
+                            {exchangeRate && (
+                              <div className="text-[9px] text-text/50 mt-1">
+                                $1.00 USD = {exchangeRate.toFixed(2)} VES (BCV)
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.unitCostVES}
+                              onChange={(e) =>
+                                updateItem(index, { unitCostVES: e.target.value })
+                              }
+                              className="input-glass w-full text-[11px]"
+                              placeholder="VES"
+                            />
+                          </div>
+                        </div>
+                        {lastPrice != null && (
+                          <div className="text-[9px] text-text/60 mt-1">
+                            Último precio registrado: ${lastPrice.toFixed(4)} USD
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-span-2 md:col-span-4 mt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div>
+                            <div className="text-[11px] text-text/60 mb-0.5">Cantidad</div>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                updateItem(index, { quantity: e.target.value })
+                              }
+                              className="input-glass w-full text-[11px]"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-text/60 mb-0.5">
+                              Presentación
+                            </div>
+                            <select
+                              value={item.unit}
+                              onChange={(e) => updateItem(index, { unit: e.target.value })}
+                              className="input-glass w-full text-[11px]"
+                            >
+                              <option value="">Seleccionar presentación</option>
+                              <option value="kg">Kilogramos (kg)</option>
+                              <option value="g">Gramos (g)</option>
+                              <option value="L">Litros (L)</option>
+                              <option value="ml">Mililitros (ml)</option>
+                              <option value="unit">Unidad (unit)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-text/60 mb-0.5">Impuesto (%)</div>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={item.taxRate}
+                              onChange={(e) =>
+                                updateItem(index, { taxRate: e.target.value })
+                              }
+                              className="input-glass w-full text-[11px]"
+                              placeholder="0"
+                            />
+                          </div>
+                          {(pricePerOneUSD != null ||
+                            pricePerOneVES != null ||
+                            taxLineUSD > 0 ||
+                            taxLineVES > 0) && (
+                            <div className="md:col-span-3 text-[9px] text-text/60 mt-1 flex flex-col md:flex-row md:items-center md:justify-between space-y-0.5 md:space-y-0">
+                              <div>
+                                {pricePerOneUSD != null || pricePerOneVES != null ? (
+                                  <>
+                                    Relación a 1 {unitLabel}:{' '}
+                                    {pricePerOneUSD != null &&
+                                      `$${pricePerOneUSD.toFixed(4)}`}
+                                    {pricePerOneVES != null && (
+                                      <>
+                                        {pricePerOneUSD != null ? ' / ' : ''}
+                                        {pricePerOneVES.toFixed(2)} VES
+                                      </>
+                                    )}
+                                  </>
+                                ) : (
+                                  'Relación a 1: N/A'
+                                )}
+                              </div>
+                              <div>
+                                {taxLineUSD > 0 || taxLineVES > 0
+                                  ? `Impuesto de esta línea: $${taxLineUSD.toFixed(
+                                      2
+                                    )} / ${taxLineVES.toFixed(2)} VES`
+                                  : 'Impuesto de esta línea: 0'}
+                              </div>
                             </div>
                           )}
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.unitCostVES}
-                            onChange={(e) => updateItem(index, { unitCostVES: e.target.value })}
-                            className="input-glass w-full text-[11px]"
-                            placeholder="VES"
-                          />
+                          <div className="md:col-span-3">
+                            <div className="text-[11px] text-text/60 mb-0.5">
+                              Descripción (opcional)
+                            </div>
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) =>
+                                updateItem(index, { description: e.target.value })
+                              }
+                              className="input-glass w-full text-[11px]"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-text/60 mb-0.5">Unidad</div>
-                      <select
-                        value={item.unit}
-                        onChange={(e) => updateItem(index, { unit: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                      >
-                        <option value="">Seleccionar unidad</option>
-                        <option value="kg">Kilogramos (kg)</option>
-                        <option value="g">Gramos (g)</option>
-                        <option value="L">Litros (L)</option>
-                        <option value="ml">Mililitros (ml)</option>
-                        <option value="unit">Unidad (unit)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-text/60 mb-0.5">Impuesto (%)</div>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={item.taxRate}
-                        onChange={(e) => updateItem(index, { taxRate: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <div>
-                      <div className="text-[11px] text-text/60 mb-0.5">Cantidad</div>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, { quantity: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-0.5 text-[11px] text-text/60">
-                        <span>SKU (solo números)</span>
-                        <button
-                          type="button"
-                          onClick={() => updateItem(index, { sku: generateNumericSku() })}
-                          className="px-2 py-0.5 rounded-full bg-glass hover:bg-glass-hover text-[9px]"
-                        >
-                          Auto
-                        </button>
+                      <div className="flex justify-end mt-1 md:col-span-3">
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px] text-red-300"
+                          >
+                            Quitar
+                          </button>
+                        )}
                       </div>
-                      <input
-                        type="text"
-                        value={item.sku}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          updateItem(index, { sku: value });
-                        }}
-                        className="input-glass w-full text-[11px]"
-                        placeholder="SKU numérico"
-                      />
-                    </div>
-                    <div className="md:col-span-1 md:col-start-1 md:col-end-4">
-                      <div className="text-[11px] text-text/60 mb-0.5">Descripción (opcional)</div>
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) => updateItem(index, { description: e.target.value })}
-                        className="input-glass w-full text-[11px]"
-                      />
-                    </div>
-                    <div className="flex justify-end mt-1 md:col-span-3">
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[11px] text-red-300"
-                        >
-                          Quitar
-                        </button>
-                      )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -5909,17 +6587,19 @@ const NewPurchaseModal = ({
         <NewSupplierModal
           onClose={() => setShowNewSupplierModal(false)}
           onSave={async (data) => {
-            // This will be handled by the parent component's mutation
-            // We need to pass the create function from parent
-            const response = await fetch(`/api/store/${window.location.pathname.split('/')[2]}/suppliers`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify(data)
-            });
-            
+            // This will be manejado por la mutación del componente padre
+            const response = await fetch(
+              `/api/store/${window.location.pathname.split('/')[2]}/suppliers`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(data)
+              }
+            );
+
             if (response.ok) {
               toast.success('Proveedor creado correctamente');
               setShowNewSupplierModal(false);
@@ -5928,6 +6608,46 @@ const NewPurchaseModal = ({
             } else {
               const error = await response.json();
               toast.error(error.error || 'Error al crear proveedor');
+            }
+          }}
+          loading={false}
+          suppliers={supplierList}
+          onSelectExistingSupplier={undefined}
+          initialTaxId={rifTaxIdSearch || ''}
+        />
+      )}
+
+      {/* Supplier Detail Modal desde factura de compra */}
+      {showSupplierDetailModal && matchedSupplier && (
+        <SupplierDetailModal
+          supplier={matchedSupplier}
+          onClose={() => setShowSupplierDetailModal(false)}
+          onSave={async (data) => {
+            try {
+              const storeSegment = window.location.pathname.split('/')[2];
+              const response = await fetch(
+                `/api/store/${storeSegment}/suppliers/${matchedSupplier.id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(data)
+                }
+              );
+
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al actualizar proveedor');
+              }
+
+              toast.success('Proveedor actualizado correctamente');
+              setShowSupplierDetailModal(false);
+              window.location.reload();
+            } catch (error) {
+              const message = error?.message || 'Error al actualizar proveedor';
+              toast.error(message);
             }
           }}
           loading={false}

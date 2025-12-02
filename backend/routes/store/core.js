@@ -1205,6 +1205,7 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
             phone,
             email,
             address,
+            tax_id,
             extra_contact
         } = req.body || {};
 
@@ -1217,10 +1218,13 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
             extraContactObj = extra_contact;
         }
 
+        const normalizedTaxId =
+            typeof tax_id === 'string' && tax_id.trim() ? tax_id.trim() : null;
+
         const result = await query(
             `INSERT INTO suppliers
-       (store_id, name, contact_name, phone, email, address, extra_contact)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (store_id, name, contact_name, phone, email, address, tax_id, extra_contact)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
             [
                 normalizedStoreId,
@@ -1229,6 +1233,7 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
                 phone || null,
                 email || null,
                 address || null,
+                normalizedTaxId,
                 JSON.stringify(extraContactObj)
             ]
         );
@@ -1236,6 +1241,100 @@ router.post('/:storeId/suppliers', verifyToken, async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         logger.error('Error creating supplier:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// PATCH /api/store/:storeId/suppliers/:supplierId - Update supplier data (RIF no editable)
+router.patch('/:storeId/suppliers/:supplierId', verifyToken, async (req, res) => {
+    try {
+        const { storeId, supplierId } = req.params;
+
+        const normalizedStoreId = await normalizeStoreId(storeId);
+        if (!normalizedStoreId) {
+            return res.status(404).json({ error: 'Tienda no encontrada' });
+        }
+
+        const canManage = await userCanManageStoreProducts(req.user, normalizedStoreId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar esta tienda' });
+        }
+
+        const {
+            name,
+            contact_name,
+            phone,
+            email,
+            address,
+            extra_contact
+        } = req.body || {};
+
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        if (name !== undefined) {
+            const trimmedName = typeof name === 'string' ? name.trim() : '';
+            if (!trimmedName) {
+                return res.status(400).json({ error: 'El nombre del proveedor es obligatorio' });
+            }
+            fields.push(`name = $${idx++}`);
+            values.push(trimmedName);
+        }
+
+        if (contact_name !== undefined) {
+            fields.push(`contact_name = $${idx++}`);
+            values.push(contact_name || null);
+        }
+
+        if (phone !== undefined) {
+            fields.push(`phone = $${idx++}`);
+            values.push(phone || null);
+        }
+
+        if (email !== undefined) {
+            fields.push(`email = $${idx++}`);
+            values.push(email || null);
+        }
+
+        if (address !== undefined) {
+            fields.push(`address = $${idx++}`);
+            values.push(address || null);
+        }
+
+        if (extra_contact !== undefined) {
+            let extraContactObj = {};
+            if (extra_contact && typeof extra_contact === 'object') {
+                extraContactObj = extra_contact;
+            }
+            fields.push(`extra_contact = $${idx++}`);
+            values.push(JSON.stringify(extraContactObj));
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay campos para actualizar' });
+        }
+
+        fields.push('updated_at = NOW()');
+
+        values.push(normalizedStoreId);
+        values.push(supplierId);
+
+        const result = await query(
+            `UPDATE suppliers
+       SET ${fields.join(', ')}
+       WHERE store_id = $${idx++} AND id = $${idx}
+       RETURNING *`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Proveedor no encontrado' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error updating supplier:', error);
         res.status(400).json({ error: error.message });
     }
 });
