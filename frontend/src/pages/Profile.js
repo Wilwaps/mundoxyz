@@ -17,7 +17,8 @@ import {
   Share2,
   Users,
   ShoppingBag,
-  ExternalLink
+  ExternalLink,
+  Settings
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PasswordChangeModal from '../components/PasswordChangeModal';
@@ -62,6 +63,7 @@ const Profile = () => {
   const [generatedLink, setGeneratedLink] = useState(null);
   const [showReferralsModal, setShowReferralsModal] = useState(false);
   const [shareStoreMenuId, setShareStoreMenuId] = useState(null);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
@@ -338,6 +340,12 @@ const Profile = () => {
     }
   };
 
+  const handleForceAppUpdate = () => {
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.origin}/app/download/android`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const handleLogout = async () => {
     if (window.confirm('¿Seguro que quieres cerrar sesión?')) {
       await logout();
@@ -459,11 +467,11 @@ const Profile = () => {
           </motion.div>
         </div>
 
-        {/* Roles */}
-        {user?.roles?.length > 0 && (
+        {/* Roles + Configuración rápida de perfil */}
+        {(user?.roles?.length > 0 || true) && (
           <div className="mt-4 pt-4 border-t border-glass">
-            <div className="flex flex-wrap gap-2">
-              {(Array.isArray(user.roles) ? user.roles : []).map((role) => {
+            <div className="flex flex-wrap gap-2 items-center">
+              {(Array.isArray(user?.roles) ? user.roles : []).map((role) => {
                 const isAdminRole = role === 'tote' || role === 'admin';
                 const isTitoRole = role === 'tito';
                 const isClickable = isAdminRole || isTitoRole;
@@ -504,7 +512,32 @@ const Profile = () => {
                   </span>
                 );
               })}
+
+              {/* Botón de configuración de perfil (tuerca) */}
+              <button
+                type="button"
+                onClick={() => setShowProfileSettings((prev) => !prev)}
+                className="badge-experience cursor-pointer hover:scale-105 transition-transform ml-1"
+                title="Configuración de perfil"
+              >
+                <Settings size={14} />
+              </button>
             </div>
+
+            {showProfileSettings && (
+              <div className="mt-3 flex flex-wrap gap-2 items-center text-xs">
+                <button
+                  type="button"
+                  onClick={handleForceAppUpdate}
+                  className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 whitespace-nowrap"
+                >
+                  Actualizar app
+                </button>
+                <span className="text-[11px] text-text/60">
+                  Usa este botón si la actualización automática no se aplicó correctamente.
+                </span>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

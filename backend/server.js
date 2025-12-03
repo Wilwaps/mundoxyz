@@ -329,6 +329,22 @@ app.use('/api/raffles/v2', rafflesV2Routes);
 app.use('/api/experience', experienceRoutes);
 app.use('/api/messages', messagesRoutes);
 
+// Public APK download endpoint for mobile app updates
+app.get('/app/download/android', (req, res) => {
+  const apkUrl = process.env.ANDROID_APK_DOWNLOAD_URL;
+
+  if (!apkUrl) {
+    return res.status(503).json({
+      error: 'ANDROID_APK_DOWNLOAD_URL is not configured on the server',
+      message:
+        'Configura la variable de entorno ANDROID_APK_DOWNLOAD_URL con la URL pública de la APK más reciente.'
+    });
+  }
+
+  // Temporary redirect to the configured APK URL
+  return res.redirect(302, apkUrl);
+});
+
 // Config endpoint for frontend
 app.get('/config.js', (req, res) => {
   res.type('application/javascript');
