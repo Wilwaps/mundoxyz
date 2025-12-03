@@ -250,6 +250,7 @@ const StoreOwnerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [productSearch, setProductSearch] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
+  const [productTypeFilter, setProductTypeFilter] = useState('all'); // all | product | service
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingMode, setEditingMode] = useState('edit');
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
@@ -1182,6 +1183,11 @@ const StoreOwnerDashboard = () => {
         return false;
       }
 
+      if (productTypeFilter !== 'all') {
+        const type = product.product_type || 'product';
+        if (type !== productTypeFilter) return false;
+      }
+
       if (!normalizedSearch) return true;
 
       const haystack = `${product.name || ''} ${product.description || ''} ${product.sku || ''}`.toLowerCase();
@@ -1223,6 +1229,12 @@ const StoreOwnerDashboard = () => {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 text-xs">
+          <div className="px-2 py-1 rounded-full bg-glass text-[11px] text-text/70 flex items-center gap-1">
+            <span className="font-semibold">BCV</span>
+            <span>1 USDT = {vesPerUsdt
+              ? vesPerUsdt.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs'
+              : 'sin tasa disponible'}</span>
+          </div>
           <button
             type="button"
             onClick={() => navigate(`/store/${store.slug}`)}
@@ -1759,6 +1771,7 @@ const StoreOwnerDashboard = () => {
                     <th className="py-1 pr-3 text-left">SKU</th>
                     <th className="py-1 pr-3 text-left">Nombre</th>
                     <th className="py-1 pr-3 text-left">Categoría</th>
+                    <th className="py-1 pr-3 text-left">Tipo</th>
                     <th className="py-1 pr-3 text-right">USDT / Bs</th>
                     <th className="py-1 pr-3 text-right">Fires / USDT / Bs</th>
                     <th className="py-1 pr-3 text-left">Modificadores</th>
@@ -1845,6 +1858,9 @@ const StoreOwnerDashboard = () => {
                         <td className="py-1 pr-3 text-text/70">{product.sku || '-'}</td>
                         <td className="py-1 pr-3 text-text/80">{product.name}</td>
                         <td className="py-1 pr-3 text-text/60">{cat?.name || '-'}</td>
+                        <td className="py-1 pr-3 text-text/60">
+                          {(product.product_type || 'product') === 'service' ? 'Serv' : 'Prod'}
+                        </td>
                         <td className="py-1 pr-3 text-right text-text/80">
                           <div>{priceUsdtNumber.toFixed(2)} USDT</div>
                           {vesFromUsdt != null && (
@@ -3252,6 +3268,7 @@ const ProductEditModal = ({
 }) => {
   const [sku, setSku] = useState(product?.sku ? String(product.sku) : '');
   const [name, setName] = useState(product?.name || '');
+  const [productType, setProductType] = useState(product?.product_type || 'product');
   const [categoryId, setCategoryId] = useState(product?.category_id ? String(product.category_id) : '');
   const [description, setDescription] = useState(product?.description || '');
   const [priceUsdt, setPriceUsdt] = useState(
@@ -3406,7 +3423,10 @@ const ProductEditModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    let normalizedStock = parseInt(stock, 10);
+    // Para servicios, ignorar stock y mantenerlo en 0
+    const effectiveStockInput = productType === 'service' ? '0' : stock;
+
+    let normalizedStock = parseInt(effectiveStockInput, 10);
     if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
       normalizedStock = 0;
     }
@@ -3476,6 +3496,7 @@ const ProductEditModal = ({
       category_id: categoryId || undefined,
       price_usdt: priceUsdt,
       price_fires: priceFires,
+      product_type: productType,
       is_menu_item: isMenuItem,
       has_modifiers: hasModifiers,
       accepts_fires: acceptsFires,
@@ -3501,6 +3522,18 @@ const ProductEditModal = ({
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <div className="text-text/60 mb-1">Tipo de ítem</div>
+            <select
+              value={productType}
+              onChange={(e) => setProductType(e.target.value === 'service' ? 'service' : 'product')}
+              className="input-glass w-full"
+            >
+              <option value="product">Producto</option>
+              <option value="service">Servicio</option>
+            </select>
+          </div>
+
           <div>
             <div className="text-text/60 mb-1">Nombre</div>
             <input
@@ -3546,10 +3579,16 @@ const ProductEditModal = ({
                 type="number"
                 min="0"
                 step="1"
-                value={stock}
+                value={productType === 'service' ? '0' : stock}
                 onChange={(e) => setStock(e.target.value)}
-                className="input-glass w-full"
+                className="input-glass w-full disabled:opacity-50"
+                disabled={productType === 'service'}
               />
+              {productType === 'service' && (
+                <div className="mt-0.5 text-[10px] text-text/60">
+                  Los servicios no usan stock (se trata como 0 siempre).
+                </div>
+              )}
             </div>
           </div>
 
@@ -5685,9 +5724,18 @@ const NewPurchaseModal = ({
     setItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
+  const formatVESForDisplay = (value) => {
+    const amount = Number(value) || 0;
+    const formatted = new Intl.NumberFormat('es-VE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+    return `${formatted} Bs`;
+  };
+
   // Calculate summary totals
   const calculateSummary = () => {
-    return items.map(item => {
+    return items.map((item) => {
       const quantity = parseFloat(item.quantity) || 0;
       const unitCostUSD = parseFloat(item.unitCost) || 0;
       const unitCostVES = parseFloat(item.unitCostVES) || 0;
@@ -5858,18 +5906,107 @@ const NewPurchaseModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const preparedItems = items
+    // Trabajar sobre una copia local de los ítems para poder auto-crear productos si es necesario
+    const workingItems = items.map((it) => ({ ...it }));
+
+    // Paso 1: intentar auto-crear productos para líneas de tipo producto sin vínculo pero con cantidad y costo
+    for (let index = 0; index < workingItems.length; index += 1) {
+      const item = workingItems[index];
+
+      const quantity = parseFloat(item.quantity || '0');
+      const unitCostUSDInput = parseFloat(item.unitCost || '0');
+      const unitCostVESInput = parseFloat(item.unitCostVES || '0');
+
+      let unitCost = Number.isFinite(unitCostUSDInput) ? unitCostUSDInput : 0;
+      if ((!Number.isFinite(unitCost) || unitCost <= 0) && exchangeRate && Number.isFinite(unitCostVESInput) && unitCostVESInput > 0) {
+        unitCost = unitCostVESInput / exchangeRate;
+      }
+
+      const hasBasicValues = Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitCost) && unitCost > 0;
+      const hasLink = (item.kind === 'product' && item.productId) || (item.kind === 'ingredient' && item.ingredientId);
+
+      if (!hasBasicValues || hasLink) {
+        continue;
+      }
+
+      // Si es un producto, tenemos onCreateProduct y un nombre, intentamos crearlo automáticamente
+      if (item.kind === 'product' && onCreateProduct) {
+        const name = (item.searchTerm || '').trim();
+        if (!name) {
+          continue;
+        }
+
+        const defaultCategoryId = getDefaultCategoryId();
+        if (!defaultCategoryId) {
+          // Sin categoría por defecto no podemos crear el producto aquí
+          continue;
+        }
+
+        const sku = (item.sku || '').trim() || generateNumericSku();
+        const priceUsdt = unitCost;
+
+        try {
+          const payload = {
+            sku,
+            name,
+            description: (item.description || '').trim(),
+            category_id: defaultCategoryId,
+            price_usdt: priceUsdt,
+            price_fires: '',
+            is_menu_item: true,
+            has_modifiers: false,
+            accepts_fires: false,
+            stock: 0,
+            min_stock_alert: 0
+          };
+
+          const newProduct = await onCreateProduct(payload);
+          if (newProduct && newProduct.id) {
+            // Actualizar copia local
+            workingItems[index] = {
+              ...item,
+              kind: 'product',
+              productId: newProduct.id,
+              ingredientId: '',
+              searchTerm: newProduct.name || name,
+              sku: newProduct.sku || sku
+            };
+
+            // Mantener lista extendida para futuras sugerencias
+            setCreatedProducts((prev) => [...prev, newProduct]);
+          }
+        } catch (err) {
+          console.error('Error auto-creando producto desde factura en submit:', err);
+          const message = err?.response?.data?.error || 'Error al crear producto desde la factura';
+          toast.error(message);
+        }
+      }
+    }
+
+    let hasLinesWithoutLink = false;
+
+    const preparedItems = workingItems
       .map((item) => {
         const quantity = parseFloat(item.quantity || '0');
-        const unitCost = parseFloat(item.unitCost || '0');
+        const unitCostUSDInput = parseFloat(item.unitCost || '0');
+        const unitCostVESInput = parseFloat(item.unitCostVES || '0');
+
+        let unitCost = Number.isFinite(unitCostUSDInput) ? unitCostUSDInput : 0;
+
+        if ((!Number.isFinite(unitCost) || unitCost <= 0) && exchangeRate && Number.isFinite(unitCostVESInput) && unitCostVESInput > 0) {
+          unitCost = unitCostVESInput / exchangeRate;
+        }
 
         if (!Number.isFinite(quantity) || quantity <= 0) return null;
-        if (!Number.isFinite(unitCost) || unitCost < 0) return null;
+        if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
 
         const isProduct = item.kind === 'product' && item.productId;
         const isIngredient = item.kind === 'ingredient' && item.ingredientId;
 
-        if (!isProduct && !isIngredient) return null;
+        if (!isProduct && !isIngredient) {
+          hasLinesWithoutLink = true;
+          return null;
+        }
 
         return {
           product_id: isProduct ? item.productId : null,
@@ -5883,7 +6020,11 @@ const NewPurchaseModal = ({
       .filter(Boolean);
 
     if (preparedItems.length === 0) {
-      toast.error('Agrega al menos un ítem válido');
+      if (hasLinesWithoutLink) {
+        toast.error('Selecciona o crea el producto/ingrediente para cada línea con cantidad y costo antes de registrar la compra');
+      } else {
+        toast.error('Agrega al menos un ítem válido');
+      }
       return;
     }
 
@@ -6588,23 +6729,23 @@ const NewPurchaseModal = ({
                         </td>
                         <td className="py-1 pr-2 text-center">{item.quantity}</td>
                         <td className="py-1 pr-2 text-center">${item.unitCostUSD.toFixed(4)}</td>
-                        <td className="py-1 pr-2 text-center">{item.unitCostVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">{formatVESForDisplay(item.unitCostVES)}</td>
                         <td className="py-1 pr-2 text-center">${item.subtotalUSD.toFixed(2)}</td>
-                        <td className="py-1 pr-2 text-center">{item.subtotalVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">{formatVESForDisplay(item.subtotalVES)}</td>
                         <td className="py-1 pr-2 text-center">${item.taxUSD.toFixed(2)}</td>
-                        <td className="py-1 pr-2 text-center">{item.taxVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center">{formatVESForDisplay(item.taxVES)}</td>
                         <td className="py-1 pr-2 text-center font-semibold">${item.totalUSD.toFixed(2)}</td>
-                        <td className="py-1 pr-2 text-center font-semibold">{item.totalVES.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold">{formatVESForDisplay(item.totalVES)}</td>
                       </tr>
                     ))}
                     <tr className="font-semibold text-accent">
                       <td colSpan="4" className="py-2 pr-2 text-right">TOTAL:</td>
                       <td className="py-2 pr-2 text-center">${grandTotalUSD.toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-center">{grandTotalVES.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{formatVESForDisplay(grandTotalVES)}</td>
                       <td className="py-2 pr-2 text-center">${summaryItems.reduce((sum, item) => sum + item.taxUSD, 0).toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-center">{summaryItems.reduce((sum, item) => sum + item.taxVES, 0).toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{formatVESForDisplay(summaryItems.reduce((sum, item) => sum + item.taxVES, 0))}</td>
                       <td className="py-2 pr-2 text-center">${grandTotalUSD.toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-center">{grandTotalVES.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-center">{formatVESForDisplay(grandTotalVES)}</td>
                     </tr>
                   </tbody>
                 </table>

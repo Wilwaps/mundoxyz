@@ -740,29 +740,40 @@ const StoreFront = () => {
 
         const shareUrl = getStoreUrl(slugValue);
         const shareText = `Mira la tienda "${store?.name || 'MundoXYZ'}" en MundoXYZ`;
+        const locationLink = mapsUrl
+            ? mapsUrl
+            : locationAddress
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`
+            : '';
+
+        const messageLines = [shareText, shareUrl];
+        if (locationLink) {
+            messageLines.push(`Ubicación: ${locationLink}`);
+        }
+        const shareMessage = messageLines.join('\n');
 
         switch (platform) {
             case 'whatsapp': {
-                const url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+                const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
                 window.open(url, '_blank', 'noopener,noreferrer');
                 break;
             }
             case 'telegram': {
-                const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+                const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareMessage)}`;
                 window.open(url, '_blank', 'noopener,noreferrer');
                 break;
             }
             case 'copy': {
                 try {
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                        await navigator.clipboard.writeText(shareUrl);
-                        toast.success('Enlace copiado al portapapeles');
+                        await navigator.clipboard.writeText(shareMessage);
+                        toast.success('Información copiada al portapapeles');
                     } else {
-                        window.prompt('Copia este link de la tienda:', shareUrl);
+                        window.prompt('Copia este detalle de la tienda:', shareMessage);
                     }
                 } catch (err) {
-                    console.error('Error copiando enlace de tienda:', err);
-                    window.prompt('Copia este link de la tienda:', shareUrl);
+                    console.error('Error copiando información de la tienda:', err);
+                    window.prompt('Copia este detalle de la tienda:', shareMessage);
                 }
                 break;
             }

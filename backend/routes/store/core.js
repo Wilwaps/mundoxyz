@@ -180,21 +180,42 @@ router.get('/public/:slug', async (req, res) => {
                 [store.id]
             ),
             query(
-                `SELECT p.*,
-              (SELECT json_agg(pm.*) 
-               FROM product_modifiers pm 
-               WHERE pm.product_id = p.id) AS modifiers
-       FROM products p
-       WHERE p.store_id = $1 AND p.is_active = TRUE AND p.is_menu_item = TRUE
-       ORDER BY p.name ASC`,
+                `SELECT p.*
+         FROM products p
+         WHERE p.store_id = $1 AND p.is_active = TRUE AND p.is_menu_item = TRUE
+         ORDER BY p.name ASC`,
                 [store.id]
             )
         ]);
 
+        const productIds = productsResult.rows.map((product) => product.id).filter(Boolean);
+        let modifiersResult = { rows: [] };
+
+        if (productIds.length > 0) {
+            modifiersResult = await query(
+                `SELECT pm.*
+         FROM product_modifiers pm
+         WHERE pm.product_id = ANY($1::uuid[])`,
+                [productIds]
+            );
+        }
+
+        const modifiersByProduct = modifiersResult.rows.reduce((acc, modifier) => {
+            if (!modifier || !modifier.product_id) return acc;
+            if (!acc[modifier.product_id]) {
+                acc[modifier.product_id] = [];
+            }
+            acc[modifier.product_id].push(modifier);
+            return acc;
+        }, {});
+
         res.json({
             store,
             categories: categoriesResult.rows,
-            products: productsResult.rows
+            products: productsResult.rows.map((product) => ({
+                ...product,
+                modifiers: modifiersByProduct[product.id] || []
+            }))
         });
     } catch (error) {
         logger.error('Error fetching store:', error);
@@ -1498,13 +1519,14 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             image_url,
             price_usdt,
             price_fires,
+            product_type,
             is_menu_item,
             has_modifiers,
             accepts_fires,
-            min_stock_alert,
-            modifierGroups,
             stock,
-            is_active
+            min_stock_alert,
+            is_active,
+            modifierGroups
         } = req.body || {};
 
         const canManage = await userCanManageStoreProducts(req.user, storeId);
@@ -1554,11 +1576,13 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             }
         }
 
+        const normalizedProductType = product_type === 'service' ? 'service' : 'product';
+
         const insertResult = await query(
             `INSERT INTO products 
        (store_id, category_id, sku, name, description, image_url, 
-        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        product_type, price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
             [
                 storeId,
@@ -1567,6 +1591,7 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 name,
                 description,
                 image_url,
+                normalizedProductType,
                 normalizedPriceUsdt,
                 normalizedPriceFires,
                 normalizedStock,
@@ -1651,19 +1676,41 @@ router.get('/:storeId/products', verifyToken, async (req, res) => {
         }
 
         const result = await query(
-            `SELECT p.*,
-                COALESCE((
-                    SELECT json_agg(pm ORDER BY pm.group_name, pm.name)
-                    FROM product_modifiers pm
-                    WHERE pm.product_id = p.id
-                ), '[]'::json) AS modifiers
+            `SELECT p.*
              FROM products p
              WHERE p.store_id = $1
              ORDER BY p.name ASC`,
             [storeId]
         );
 
-        res.json(result.rows);
+        const productIds = result.rows.map((product) => product.id).filter(Boolean);
+        let modifiersResult = { rows: [] };
+
+        if (productIds.length > 0) {
+            modifiersResult = await query(
+                `SELECT pm.*
+                 FROM product_modifiers pm
+                 WHERE pm.product_id = ANY($1::uuid[])
+                 ORDER BY pm.group_name, pm.name`,
+                [productIds]
+            );
+        }
+
+        const modifiersByProduct = modifiersResult.rows.reduce((acc, modifier) => {
+            if (!modifier || !modifier.product_id) return acc;
+            if (!acc[modifier.product_id]) {
+                acc[modifier.product_id] = [];
+            }
+            acc[modifier.product_id].push(modifier);
+            return acc;
+        }, {});
+
+        res.json(
+            result.rows.map((product) => ({
+                ...product,
+                modifiers: modifiersByProduct[product.id] || []
+            }))
+        );
     } catch (error) {
         logger.error('Error fetching products for store:', error);
         res.status(400).json({ error: error.message });
@@ -1719,6 +1766,7 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             image_url,
             price_usdt,
             price_fires,
+            product_type,
             is_menu_item,
             has_modifiers,
             accepts_fires,
@@ -1752,13 +1800,31 @@ router.patch('/product/:productId', verifyToken, async (req, res) => {
             fields.push(`image_url = $${idx++}`);
             values.push(image_url);
         }
+        const normalizeProductType = (rawType) => {
+            return rawType === 'service' ? 'service' : 'product';
+        };
+
+        if (product_type !== undefined) {
+            fields.push(`product_type = $${idx++}`);
+            values.push(normalizeProductType(product_type));
+        }
+        const normalizeNumericField = (raw) => {
+            if (raw === '' || raw === null || raw === undefined) {
+                return null;
+            }
+            const parsed = Number(String(raw).replace(',', '.'));
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+
         if (price_usdt !== undefined) {
+            const normalizedPriceUsdt = normalizeNumericField(price_usdt);
             fields.push(`price_usdt = $${idx++}`);
-            values.push(price_usdt);
+            values.push(normalizedPriceUsdt);
         }
         if (price_fires !== undefined) {
+            const normalizedPriceFires = normalizeNumericField(price_fires);
             fields.push(`price_fires = $${idx++}`);
-            values.push(price_fires);
+            values.push(normalizedPriceFires);
         }
         if (is_menu_item !== undefined) {
             fields.push(`is_menu_item = $${idx++}`);
@@ -1884,8 +1950,8 @@ router.post('/product/:productId/duplicate', verifyToken, async (req, res) => {
             const insertProduct = await client.query(
                 `INSERT INTO products 
            (store_id, category_id, sku, name, description, image_url, 
-            price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            product_type, price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            RETURNING *`,
                 [
                     original.store_id,
@@ -1894,6 +1960,7 @@ router.post('/product/:productId/duplicate', verifyToken, async (req, res) => {
                     newName,
                     original.description,
                     original.image_url,
+                    original.product_type || 'product',
                     original.price_usdt,
                     original.price_fires,
                     0,

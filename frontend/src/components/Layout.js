@@ -57,6 +57,29 @@ const Layout = () => {
 
   const onlineUsers = publicStats?.users?.onlineNow ?? 0;
 
+  // Tasa BCV / tasa operativa para mostrar precio de referencia en Bs
+  const { data: fiatContext } = useQuery({
+    queryKey: ['fiat-context-header'],
+    queryFn: async () => {
+      const response = await axios.get('/api/economy/fiat-context');
+      return response.data;
+    }
+  });
+
+  let vesPerUsdt = null;
+  if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
+    const bcvParsed = parseFloat(String(fiatContext.bcvRate.rate));
+    if (Number.isFinite(bcvParsed) && bcvParsed > 0) {
+      vesPerUsdt = bcvParsed;
+    }
+  }
+  if (!vesPerUsdt && fiatContext?.operationalRate?.rate != null) {
+    const opParsed = parseFloat(String(fiatContext.operationalRate.rate));
+    if (Number.isFinite(opParsed) && opParsed > 0) {
+      vesPerUsdt = opParsed;
+    }
+  }
+
   // Verificar si el usuario es tote (admin mayor)
   const isTote = user?.roles?.includes('tote');
 
@@ -96,14 +119,6 @@ const Layout = () => {
             {/* Balance Display - Clickeable */}
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <div 
-                className="badge-experience cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => setShowExperienceModal(true)}
-                title="Ver detalles de experiencia"
-              >
-                <span className="text-xs font-medium">⭐</span>
-                <span className="text-xs font-semibold">{displayExperience} XP</span>
-              </div>
-              <div 
                 className="badge-coins cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => setShowBuyExperienceModal(true)}
                 title="Comprar experiencia"
@@ -121,6 +136,19 @@ const Layout = () => {
               >
                 <span className="text-sm">🔥</span>
                 <span className="text-xs font-semibold">{displayFires.toFixed(2)}</span>
+              </div>
+              <div
+                className="badge-coins cursor-default"
+                title="Referencia BCV aprox. en Bs por USDT"
+              >
+                <span className="text-xs font-semibold">
+                  {vesPerUsdt
+                    ? vesPerUsdt.toLocaleString('es-VE', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      }) + ' Bs'
+                    : '--- Bs'}
+                </span>
               </div>
               <div
                 className="badge-experience cursor-default"
