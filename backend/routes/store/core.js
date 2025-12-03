@@ -1502,14 +1502,26 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             has_modifiers,
             accepts_fires,
             min_stock_alert,
-            modifierGroups
+            modifierGroups,
+            stock,
+            is_active
         } = req.body || {};
 
-        const normalizedAcceptsFires = accepts_fires === true;
-        let normalizedStock = 0;
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar productos de esta tienda' });
+        }
 
-        if (req.body && req.body.stock !== undefined) {
-            const parsedStock = parseInt(req.body.stock, 10);
+        const normalizedSku = sku && String(sku).trim() !== '' ? String(sku).trim() : null;
+
+        const normalizedIsMenuItem = is_menu_item === undefined ? true : Boolean(is_menu_item);
+        const normalizedHasModifiers = has_modifiers === undefined ? false : Boolean(has_modifiers);
+        const normalizedIsActive = is_active === undefined ? true : Boolean(is_active);
+        const normalizedAcceptsFires = accepts_fires === true;
+
+        let normalizedStock = 0;
+        if (stock !== undefined && stock !== null && String(stock).trim() !== '') {
+            const parsedStock = parseInt(stock, 10);
             if (Number.isFinite(parsedStock) && parsedStock >= 0) {
                 normalizedStock = parsedStock;
             }
@@ -1522,8 +1534,6 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 normalizedMinStockAlert = parsedMin;
             }
         }
-
-        const normalizedSku = sku && String(sku).trim() !== '' ? String(sku).trim() : null;
 
         // Normalizar precios para evitar errores "invalid input syntax for type numeric: \"\""
         // price_usdt: por defecto 0 si no es un número válido o viene vacío
@@ -1544,11 +1554,11 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             }
         }
 
-        const result = await query(
+        const insertResult = await query(
             `INSERT INTO products 
        (store_id, category_id, sku, name, description, image_url, 
-        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        price_usdt, price_fires, stock, is_menu_item, has_modifiers, accepts_fires, min_stock_alert, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
             [
                 storeId,
@@ -1560,13 +1570,14 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
                 normalizedPriceUsdt,
                 normalizedPriceFires,
                 normalizedStock,
-                is_menu_item,
-                has_modifiers,
+                normalizedIsMenuItem,
+                normalizedHasModifiers,
                 normalizedAcceptsFires,
-                normalizedMinStockAlert
+                normalizedMinStockAlert,
+                normalizedIsActive
             ]
         );
-        const product = result.rows[0];
+        const product = insertResult.rows[0];
 
         // Persistir modificadores si vienen desde el dashboard
         if (Array.isArray(modifierGroups) && modifierGroups.length > 0) {
@@ -1611,8 +1622,50 @@ router.post('/:storeId/product', verifyToken, async (req, res) => {
             }
         }
 
-        res.json(product);
+        const detailedResult = await query(
+            `SELECT p.*,
+                COALESCE((
+                    SELECT json_agg(pm ORDER BY pm.group_name, pm.name)
+                    FROM product_modifiers pm
+                    WHERE pm.product_id = p.id
+                ), '[]'::json) AS modifiers
+            FROM products p
+            WHERE p.id = $1
+            LIMIT 1`,
+            [product.id]
+        );
+
+        res.json(detailedResult.rows[0] || product);
     } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.get('/:storeId/products', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        const canManage = await userCanManageStoreProducts(req.user, storeId);
+        if (!canManage) {
+            return res.status(403).json({ error: 'No autorizado para gestionar productos de esta tienda' });
+        }
+
+        const result = await query(
+            `SELECT p.*,
+                COALESCE((
+                    SELECT json_agg(pm ORDER BY pm.group_name, pm.name)
+                    FROM product_modifiers pm
+                    WHERE pm.product_id = p.id
+                ), '[]'::json) AS modifiers
+             FROM products p
+             WHERE p.store_id = $1
+             ORDER BY p.name ASC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching products for store:', error);
         res.status(400).json({ error: error.message });
     }
 });

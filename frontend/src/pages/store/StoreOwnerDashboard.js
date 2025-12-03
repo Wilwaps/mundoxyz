@@ -353,7 +353,25 @@ const StoreOwnerDashboard = () => {
 
   const store = storeData?.store;
   const categories = storeData?.categories || [];
-  const products = storeData?.products || [];
+
+  const {
+    data: productsData,
+    isLoading: loadingProducts,
+    error: productsError
+  } = useQuery({
+    queryKey: ['store-products', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/${store.id}/products`);
+      return response.data;
+    },
+    enabled: !!store?.id
+  });
+
+  const products = useMemo(
+    () => (Array.isArray(productsData) ? productsData : []),
+    [productsData]
+  );
 
   const { user } = useAuth();
 
@@ -758,9 +776,14 @@ const StoreOwnerDashboard = () => {
       const response = await axios.patch(`/api/store/product/${productId}`, data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (updatedProduct) => {
       toast.success('Producto actualizado');
-      queryClient.invalidateQueries(['store-owner', slug]);
+      queryClient.setQueryData(['store-products', store?.id], (previous) => {
+        if (!Array.isArray(previous)) return previous;
+        return previous.map((item) =>
+          item && item.id === updatedProduct.id ? { ...updatedProduct } : item
+        );
+      });
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al actualizar producto';
@@ -921,9 +944,20 @@ const StoreOwnerDashboard = () => {
       const response = await axios.post(`/api/store/${store.id}/product`, data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (createdProduct) => {
       toast.success('Producto creado');
-      queryClient.invalidateQueries(['store-owner', slug]);
+      queryClient.setQueryData(['store-products', store?.id], (previous) => {
+        if (!Array.isArray(previous)) {
+          return Array.isArray(previous) ? previous : [createdProduct];
+        }
+        const exists = previous.some((item) => item && item.id === createdProduct.id);
+        if (exists) {
+          return previous.map((item) =>
+            item && item.id === createdProduct.id ? { ...createdProduct } : item
+          );
+        }
+        return [createdProduct, ...previous];
+      });
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al crear producto';
@@ -936,9 +970,25 @@ const StoreOwnerDashboard = () => {
       const response = await axios.post(`/api/store/product/${productId}/duplicate`);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const duplicatedProduct = result?.product || result?.product?.product || result?.product;
       toast.success('Producto duplicado');
-      queryClient.invalidateQueries(['store-owner', slug]);
+      if (duplicatedProduct) {
+        queryClient.setQueryData(['store-products', store?.id], (previous) => {
+          if (!Array.isArray(previous)) {
+            return Array.isArray(previous) ? previous : [duplicatedProduct];
+          }
+          const exists = previous.some((item) => item && item.id === duplicatedProduct.id);
+          if (exists) {
+            return previous.map((item) =>
+              item && item.id === duplicatedProduct.id ? { ...duplicatedProduct } : item
+            );
+          }
+          return [duplicatedProduct, ...previous];
+        });
+      } else {
+        queryClient.invalidateQueries(['store-products', store?.id]);
+      }
     },
     onError: (error) => {
       const message = error?.response?.data?.error || 'Error al duplicar producto';
