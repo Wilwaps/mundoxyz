@@ -18,6 +18,8 @@ const Layout = () => {
   const [showBuyExperienceModal, setShowBuyExperienceModal] = useState(false);
   const [showWalletHistoryModal, setShowWalletHistoryModal] = useState(false);
   const [walletHistoryInitialTab, setWalletHistoryInitialTab] = useState('fires');
+  const [showBcvCalculator, setShowBcvCalculator] = useState(false);
+  const [bcvCalculatorInput, setBcvCalculatorInput] = useState('');
 
   // Fetch balance en tiempo real
   const { data: balanceData } = useQuery({
@@ -137,9 +139,14 @@ const Layout = () => {
                 <span className="text-sm">🔥</span>
                 <span className="text-xs font-semibold">{displayFires.toFixed(2)}</span>
               </div>
-              <div
-                className="badge-coins cursor-default"
-                title="Referencia BCV aprox. en Bs por USDT"
+              <button
+                type="button"
+                className="badge-coins cursor-pointer hover:scale-105 transition-transform"
+                title="Calculadora rápida en Bs (BCV)"
+                onClick={() => {
+                  if (!vesPerUsdt) return;
+                  setShowBcvCalculator(true);
+                }}
               >
                 <span className="text-xs font-semibold">
                   {vesPerUsdt
@@ -149,7 +156,7 @@ const Layout = () => {
                       }) + ' Bs'
                     : '--- Bs'}
                 </span>
-              </div>
+              </button>
               <div
                 className="badge-experience cursor-default"
                 title="Usuarios conectados ahora mismo"
@@ -186,6 +193,74 @@ const Layout = () => {
       <main className="flex-1 overflow-y-auto pb-20">
         <Outlet />
       </main>
+
+      {/* BCV Quick Calculator */}
+      {showBcvCalculator && vesPerUsdt && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setShowBcvCalculator(false)}
+        >
+          <div
+            className="card-glass p-4 rounded-xl max-w-xs w-full space-y-3 text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Calculadora rápida Bs</h2>
+              <button
+                type="button"
+                className="text-[11px] text-text/60 hover:text-text"
+                onClick={() => setShowBcvCalculator(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <p className="text-[11px] text-text/60">
+              Ingresa un monto y se multiplicará por la tasa BCV actual.
+            </p>
+
+            <div className="space-y-1">
+              <div className="text-text/60">Monto base (ej. USDT)</div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={bcvCalculatorInput}
+                onChange={(e) => setBcvCalculatorInput(e.target.value)}
+                className="input-glass w-full"
+                placeholder="Ej: 10"
+              />
+            </div>
+
+            {(() => {
+              const parsed = parseFloat(bcvCalculatorInput || '0');
+              const isValid = Number.isFinite(parsed) && parsed >= 0;
+              const result = isValid ? parsed * vesPerUsdt : 0;
+              return (
+                <div className="mt-2 p-2 rounded-lg bg-glass flex flex-col gap-1">
+                  <div className="text-[11px] text-text/60">
+                    Resultado
+                  </div>
+                  <div className="text-sm font-semibold text-text/90">
+                    {isValid
+                      ? result.toLocaleString('es-VE', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        }) + ' Bs'
+                      : '0,00 Bs'}
+                  </div>
+                  <div className="text-[10px] text-text/50">
+                    Tasa BCV: {vesPerUsdt.toLocaleString('es-VE', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })} Bs
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-glass px-2 py-1 safe-bottom">
