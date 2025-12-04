@@ -8,18 +8,40 @@ const StoreQrPaymentPage = () => {
     const { slug, qrSessionId } = useParams();
     const navigate = useNavigate();
 
-    const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ['store-qr-session', qrSessionId],
+    const hasQrSessionIdInUrl = !!qrSessionId;
+
+    const {
+        data,
+        isLoading,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: hasQrSessionIdInUrl ? ['store-qr-session', qrSessionId] : ['store-qr-latest', slug],
         queryFn: async () => {
-            const response = await axios.get(`/api/store/order/qr/${qrSessionId}`);
+            if (hasQrSessionIdInUrl) {
+                const response = await axios.get(`/api/store/order/qr/${qrSessionId}`);
+                return response.data;
+            }
+
+            if (!slug) {
+                throw new Error('Slug de tienda no definido');
+            }
+
+            const response = await axios.get('/api/store/order/qr/latest', {
+                params: { storeSlug: slug }
+            });
             return response.data;
-        },
-        enabled: !!qrSessionId
+        }
     });
+
+    const effectiveQrSessionId = hasQrSessionIdInUrl ? qrSessionId : data?.qr_session_id;
 
     const payMutation = useMutation({
         mutationFn: async () => {
-            const response = await axios.post(`/api/store/order/qr/${qrSessionId}/pay`);
+            if (!effectiveQrSessionId) {
+                throw new Error('Sesión de pago QR no disponible');
+            }
+            const response = await axios.post(`/api/store/order/qr/${effectiveQrSessionId}/pay`);
             return response.data;
         },
         onSuccess: (res) => {
@@ -30,7 +52,6 @@ const StoreQrPaymentPage = () => {
             if (slug && invoiceNumber != null) {
                 navigate(`/store/${slug}/invoice/${invoiceNumber}`);
             } else if (storeId) {
-                // Fallback: recargar sesión por si se actualizó en backend
                 void refetch();
             }
         },

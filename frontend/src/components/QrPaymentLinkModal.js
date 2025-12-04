@@ -4,7 +4,7 @@ import { X, QrCode, ArrowRight, Clock, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { isCapacitorApp, scanQrCodeFromCamera } from '../utils/cameraHelper';
+import { isCapacitorApp, scanQrCodeFromCamera, scanQrCodeLive } from '../utils/cameraHelper';
 
 const QrPaymentLinkModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -111,8 +111,8 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
         return;
       }
 
-      // De momento usamos un único flujo basado en foto + jsQR
-      const scanned = await scanQrCodeFromCamera();
+      // Escaneo solo en directo (vídeo + jsQR)
+      const scanned = await scanQrCodeLive();
 
       if (!scanned) {
         toast.error('No se detectó ningún código QR válido');

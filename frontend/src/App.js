@@ -193,6 +193,11 @@ function App() {
                       <StoreFrontInvoicePage />
                     </ProtectedStoreRouteBySlug>
                   } />
+                  <Route path="store/:slug/qr" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="pos">
+                      <StoreQrPaymentPage />
+                    </ProtectedStoreRouteBySlug>
+                  } />
                   <Route path="store/:slug/qr/:qrSessionId" element={
                     <ProtectedStoreRouteBySlug requiredPermission="pos">
                       <StoreQrPaymentPage />

@@ -37,6 +37,10 @@ export const getStoreUrl = (storeSlug) => {
   return `${getBaseUrl()}/store/${storeSlug}`;
 };
 
+export const getStoreQrUrl = (storeSlug) => {
+  return `${getBaseUrl()}/store/${storeSlug}/qr`;
+};
+
 export const getProductUrl = (storeSlug, productId, referrerCode = null) => {
   const baseUrl = getStoreUrl(storeSlug);
   const params = new URLSearchParams();

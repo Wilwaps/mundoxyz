@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { getStoreUrl } from '../../utils/urlHelper';
+import { getStoreUrl, getStoreQrUrl } from '../../utils/urlHelper';
 import { downloadQrForUrl } from '../../utils/qr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -2630,7 +2630,7 @@ const StoreOwnerDashboard = () => {
                     try {
                       const slugValue = store?.slug;
                       if (!slugValue) return;
-                      const url = getStoreUrl(slugValue);
+                      const url = getStoreQrUrl(slugValue);
                       await downloadQrForUrl(url, `tienda-${slugValue}-qr.png`);
                     } catch (err) {
                       console.error('Error generando QR de tienda desde dashboard:', err);

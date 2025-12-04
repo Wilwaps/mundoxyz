@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getStoreUrl } from '../../utils/urlHelper';
+import { getStoreUrl, getStoreQrUrl } from '../../utils/urlHelper';
 import { ShoppingBag, Plus, Minus, X, ChevronRight, Star, Clock, CreditCard, Flame, Share2, MapPin } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -779,7 +779,8 @@ const StoreFront = () => {
             }
             case 'qr': {
                 try {
-                    await downloadQrForUrl(shareUrl, `tienda-${slugValue}-qr.png`);
+                    const qrUrl = getStoreQrUrl(slugValue);
+                    await downloadQrForUrl(qrUrl, `tienda-${slugValue}-qr.png`);
                 } catch (err) {
                     console.error('Error generando QR de tienda:', err);
                 }

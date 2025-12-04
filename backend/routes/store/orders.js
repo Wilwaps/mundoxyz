@@ -958,6 +958,72 @@ router.post('/qr/start', verifyToken, async (req, res) => {
     }
 });
 
+// GET /api/store/order/qr/latest?storeSlug=:slug
+// Devuelve la última sesión de pago QR pendiente para el cliente actual en una tienda
+router.get('/qr/latest', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { storeSlug } = req.query;
+
+        if (!storeSlug) {
+            return res.status(400).json({ error: 'storeSlug es requerido' });
+        }
+
+        const result = await query(
+            `SELECT 
+                o.id,
+                o.store_id,
+                o.qr_session_id,
+                o.qr_expires_at,
+                o.total_fires,
+                o.payment_status,
+                o.total_usdt,
+                o.invoice_number,
+                s.slug AS store_slug,
+                s.name AS store_name,
+                s.logo_url
+             FROM orders o
+             JOIN stores s ON s.id = o.store_id
+             WHERE s.slug = $1
+               AND o.customer_id = $2
+               AND o.payment_status = 'unpaid'
+               AND o.qr_session_id IS NOT NULL
+               AND (o.qr_expires_at IS NULL OR o.qr_expires_at > NOW())
+             ORDER BY o.created_at DESC
+             LIMIT 1`,
+            [storeSlug, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No hay sesiones de pago QR pendientes para esta tienda y usuario' });
+        }
+
+        const row = result.rows[0];
+
+        const now = new Date();
+        const expiresAt = row.qr_expires_at ? new Date(row.qr_expires_at) : null;
+        const isExpired = !!expiresAt && expiresAt.getTime() < now.getTime();
+
+        res.json({
+            order_id: row.id,
+            store_id: row.store_id,
+            store_slug: row.store_slug,
+            store_name: row.store_name,
+            store_logo_url: row.logo_url,
+            qr_session_id: row.qr_session_id,
+            qr_expires_at: row.qr_expires_at,
+            is_expired: isExpired,
+            payment_status: row.payment_status,
+            total_fires: Number(row.total_fires || 0),
+            total_usdt: Number(row.total_usdt || 0),
+            invoice_number: row.invoice_number
+        });
+    } catch (error) {
+        logger.error('[Store][QR] Error obteniendo sesión QR más reciente', error);
+        res.status(400).json({ error: error.message || 'Error al obtener sesión QR más reciente' });
+    }
+});
+
 // GET /api/store/order/qr/:qrSessionId
 // Devuelve datos públicos de una sesión de pago QR para que el cliente pueda mostrar el pago
 router.get('/qr/:qrSessionId', optionalAuth, async (req, res) => {

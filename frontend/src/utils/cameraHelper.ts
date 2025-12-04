@@ -179,3 +179,97 @@ export const scanQrCodeFromCamera = async (): Promise<string | null> => {
     return null;
   }
 };
+
+export const scanQrCodeLive = async (): Promise<string | null> => {
+  try {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return null;
+    }
+
+    const mediaDevices: any = (navigator as any).mediaDevices;
+    if (!mediaDevices || typeof mediaDevices.getUserMedia !== 'function') {
+      return null;
+    }
+
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      return null;
+    }
+
+    const stream = await mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false,
+    });
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    (video as any).playsInline = true;
+    (video as any).webkitPlaysInline = true;
+    video.muted = true;
+    video.srcObject = stream as any;
+    video.style.position = 'fixed';
+    video.style.opacity = '0';
+    video.style.pointerEvents = 'none';
+    video.style.top = '-10000px';
+    video.style.left = '-10000px';
+    document.body.appendChild(video);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      video.remove();
+      return null;
+    }
+
+    await new Promise<void>((resolve) => {
+      const onLoaded = () => {
+        resolve();
+      };
+      video.addEventListener('loadedmetadata', onLoaded, { once: true });
+      if (video.readyState >= 1) {
+        resolve();
+      }
+    });
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const start = (window.performance || Date).now();
+    const maxDurationMs = 15000;
+
+    const result = await new Promise<string | null>((resolve) => {
+      const scanFrame = () => {
+        const now = (window.performance || Date).now();
+        if (now - start > maxDurationMs) {
+          resolve(null);
+          return;
+        }
+
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && typeof code.data === 'string' && code.data.trim() !== '') {
+            resolve(code.data.trim());
+            return;
+          }
+        } catch {
+          // ignorar errores de frame y seguir intentando
+        }
+
+        window.requestAnimationFrame(scanFrame);
+      };
+
+      window.requestAnimationFrame(scanFrame);
+    });
+
+    stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+    video.remove();
+
+    return result;
+  } catch (error) {
+    console.error('Error en escaneo en vivo de QR:', error);
+    return null;
+  }
+};
