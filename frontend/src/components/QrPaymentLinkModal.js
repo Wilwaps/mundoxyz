@@ -119,7 +119,34 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
         return;
       }
 
-      setQrLinkInput(scanned);
+      // Normalizar contenido escaneado: a veces puede venir la URL y el id en líneas separadas
+      const rawText = String(scanned).trim();
+      const parts = rawText.split(/\s+/).filter(Boolean);
+      let finalUrl = rawText;
+
+      if (parts.length > 1) {
+        const urlPart = parts.find((p) => p.startsWith('http://') || p.startsWith('https://'));
+        const possibleId = parts.find((p) => /[0-9a-fA-F-]{16,}/.test(p));
+
+        if (urlPart && possibleId && !urlPart.endsWith(possibleId)) {
+          try {
+            const u = new URL(urlPart);
+            let pathname = u.pathname || '';
+            if (!pathname.endsWith('/')) {
+              pathname += '/';
+            }
+            pathname += possibleId;
+            u.pathname = pathname;
+            finalUrl = u.toString();
+          } catch {
+            finalUrl = urlPart;
+          }
+        } else if (urlPart) {
+          finalUrl = urlPart;
+        }
+      }
+
+      setQrLinkInput(finalUrl);
       handleOpenLink();
     } catch (error) {
       console.error('Error en escaneo de QR:', error);

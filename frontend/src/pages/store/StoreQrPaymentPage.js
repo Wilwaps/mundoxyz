@@ -62,16 +62,6 @@ const StoreQrPaymentPage = () => {
         }
     });
 
-    if (!qrSessionId) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh] px-4">
-                <div className="max-w-sm w-full bg-slate-900/70 border border-white/10 rounded-xl p-4 text-center text-sm text-white/80">
-                    Sesión de pago QR no encontrada.
-                </div>
-            </div>
-        );
-    }
-
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -84,7 +74,9 @@ const StoreQrPaymentPage = () => {
         return (
             <div className="flex items-center justify-center min-h-[60vh] px-4">
                 <div className="max-w-sm w-full bg-slate-900/70 border border-red-500/40 rounded-xl p-4 text-center text-sm text-white/80">
-                    Ocurrió un error al cargar la sesión de pago QR.
+                    {hasQrSessionIdInUrl
+                        ? 'Ocurrió un error al cargar la sesión de pago QR.'
+                        : 'No se encontró ninguna sesión de pago QR pendiente para esta tienda.'}
                 </div>
             </div>
         );
