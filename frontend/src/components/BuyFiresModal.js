@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingCart, Copy, Check, Send } from 'lucide-react';
+import { X, ShoppingCart, Copy, Check, Send, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +9,7 @@ import PasswordRequiredModal from './PasswordRequiredModal';
 
 const BuyFiresModal = ({ isOpen, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('bs'); // 'bs' | 'usdt_tron'
   const [formData, setFormData] = useState({
     amount: '',
@@ -221,6 +223,16 @@ Pago`;
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClose();
+                    navigate('/profile?tab=fires');
+                  }}
+                  className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <div className="w-10 h-10 rounded-full bg-fire-orange/20 flex items-center justify-center">
                   <ShoppingCart size={20} className="text-fire-orange" />
                 </div>

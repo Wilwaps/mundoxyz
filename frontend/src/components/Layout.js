@@ -9,6 +9,7 @@ import { User, DoorOpen, Gamepad2, Trophy, Store, Settings } from 'lucide-react'
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
 import WalletHistoryModal from './WalletHistoryModal';
+import QrPaymentLinkModal from './QrPaymentLinkModal';
 
 const Layout = () => {
   const { user, isAdmin, updateUser } = useAuth();
@@ -20,6 +21,7 @@ const Layout = () => {
   const [walletHistoryInitialTab, setWalletHistoryInitialTab] = useState('fires');
   const [showBcvCalculator, setShowBcvCalculator] = useState(false);
   const [bcvCalculatorInput, setBcvCalculatorInput] = useState('');
+  const [showQrPaymentModal, setShowQrPaymentModal] = useState(false);
 
   // Fetch balance en tiempo real
   const { data: balanceData } = useQuery({
@@ -102,6 +104,53 @@ const Layout = () => {
     location.pathname.startsWith('/store/') &&
     location.pathname.includes('/pos');
 
+  const handleGreenBadgeClick = () => {
+    if (!user) {
+      navigate('/profile');
+      return;
+    }
+
+    let action = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const key = `green_button_action_${user.id}`;
+        const stored = window.localStorage.getItem(key);
+        if (stored && typeof stored === 'string') {
+          action = stored;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const homeSlug = user?.home_store_slug;
+
+    if (action === 'pay') {
+      setShowQrPaymentModal(true);
+      return;
+    }
+
+    if (action === 'pos') {
+      if (homeSlug) {
+        navigate(`/store/${homeSlug}/pos`);
+      } else {
+        navigate('/profile?greenTarget=pos');
+      }
+      return;
+    }
+
+    if (action === 'store_dashboard') {
+      if (homeSlug) {
+        navigate(`/store/${homeSlug}/dashboard`);
+      } else {
+        navigate('/profile?greenTarget=store_dashboard');
+      }
+      return;
+    }
+
+    navigate('/profile');
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background-dark">
       {/* Header */}
@@ -157,13 +206,15 @@ const Layout = () => {
                     : '--- Bs'}
                 </span>
               </button>
-              <div
-                className="badge-experience cursor-default"
+              <button
+                type="button"
+                className="badge-experience cursor-pointer hover:scale-105 transition-transform"
                 title="Usuarios conectados ahora mismo"
+                onClick={handleGreenBadgeClick}
               >
                 <span className="text-xs font-medium">🟢</span>
                 <span className="text-xs font-semibold">{onlineUsers}</span>
-              </div>
+              </button>
               
               {/* Telegram Group Shortcut */}
               <button
@@ -327,6 +378,12 @@ const Layout = () => {
           }
         }}
         initialTab={walletHistoryInitialTab}
+      />
+
+      {/* QR Payment Link Modal (Botón verde Pagar) */}
+      <QrPaymentLinkModal
+        isOpen={showQrPaymentModal}
+        onClose={() => setShowQrPaymentModal(false)}
       />
 
       {/* Unified Chat System */}

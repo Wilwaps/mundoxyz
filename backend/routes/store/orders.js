@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../../db');
-const { verifyToken, optionalAuth } = require('../../middleware/auth');
+const { verifyToken, optionalAuth, requireWalletAccess } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const ubicacionService = require('../../services/ubicacion/ubicacionService');
@@ -274,7 +274,9 @@ router.post('/create', optionalAuth, async (req, res) => {
         let initialPaymentStatus = 'unpaid';
         if (!isStorefront) {
             initialStatus = 'confirmed';
-            initialPaymentStatus = 'paid';
+            // Para pagos POS con QR, la orden comienza como no pagada y se liquidará
+            // cuando el cliente complete el pago con fuegos desde su billetera.
+            initialPaymentStatus = pm.source === 'pos_qr' ? 'unpaid' : 'paid';
         }
 
         // 3. Create Order Transaction
@@ -849,6 +851,319 @@ router.post('/:orderId/status', verifyToken, async (req, res) => {
         res.json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// POST /api/store/order/qr/start
+// Crea o renueva una sesión de pago QR para una orden existente y no pagada
+router.post('/qr/start', verifyToken, async (req, res) => {
+    try {
+        const { order_id, total_fires, expires_in_seconds } = req.body || {};
+
+        if (!order_id) {
+            return res.status(400).json({ error: 'order_id es requerido' });
+        }
+
+        const orderResult = await query(
+            `SELECT id, store_id, payment_status
+             FROM orders
+             WHERE id = $1`,
+            [order_id]
+        );
+
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Orden no encontrada' });
+        }
+
+        const order = orderResult.rows[0];
+
+        // Verificar alquiler activo
+        const rentalActive = await isStoreRentalActive(order.store_id);
+        if (!rentalActive) {
+            return res.status(403).json({ error: 'Store Rental Expired' });
+        }
+
+        // Verificar permisos POS sobre la tienda
+        const canAccess = await userCanAccessStoreOrders(req.user, order.store_id);
+        if (!canAccess) {
+            return res.status(403).json({ error: 'No autorizado para gestionar pagos QR en esta tienda' });
+        }
+
+        if (order.payment_status !== 'unpaid') {
+            return res.status(400).json({ error: 'Solo se pueden generar sesiones QR para órdenes no pagadas' });
+        }
+
+        const amountFiresRaw = total_fires != null ? Number(total_fires) : NaN;
+        if (!Number.isFinite(amountFiresRaw) || amountFiresRaw <= 0) {
+            return res.status(400).json({ error: 'total_fires debe ser un número positivo' });
+        }
+
+        const ttlSecondsRaw = expires_in_seconds != null ? Number(expires_in_seconds) : NaN;
+        let ttlSeconds = Number.isFinite(ttlSecondsRaw) ? ttlSecondsRaw : 300; // 5 minutos por defecto
+        if (ttlSeconds < 60) ttlSeconds = 60;
+        if (ttlSeconds > 1800) ttlSeconds = 1800; // Máx 30 minutos
+
+        const qrSessionId = uuidv4();
+        const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+
+        const updateResult = await query(
+            `UPDATE orders
+             SET qr_session_id = $1,
+                 qr_expires_at = $2,
+                 total_fires = $3,
+                 updated_at = NOW()
+             WHERE id = $4
+             RETURNING id, store_id, qr_session_id, qr_expires_at, total_fires`,
+            [qrSessionId, expiresAt.toISOString(), amountFiresRaw, order_id]
+        );
+
+        const updated = updateResult.rows[0];
+
+        res.json({
+            success: true,
+            order_id: updated.id,
+            store_id: updated.store_id,
+            qr_session_id: updated.qr_session_id,
+            qr_expires_at: updated.qr_expires_at,
+            total_fires: Number(updated.total_fires || 0)
+        });
+    } catch (error) {
+        logger.error('[Store][QR] Error creando sesión QR', error);
+        res.status(400).json({ error: error.message || 'Error al crear sesión QR' });
+    }
+});
+
+// GET /api/store/order/qr/:qrSessionId
+// Devuelve datos públicos de una sesión de pago QR para que el cliente pueda mostrar el pago
+router.get('/qr/:qrSessionId', optionalAuth, async (req, res) => {
+    try {
+        const { qrSessionId } = req.params;
+
+        const result = await query(
+            `SELECT 
+                o.id,
+                o.store_id,
+                o.qr_session_id,
+                o.qr_expires_at,
+                o.total_fires,
+                o.payment_status,
+                o.total_usdt,
+                s.slug AS store_slug,
+                s.name AS store_name,
+                s.logo_url
+             FROM orders o
+             JOIN stores s ON s.id = o.store_id
+             WHERE o.qr_session_id = $1`,
+            [qrSessionId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Sesión de pago QR no encontrada' });
+        }
+
+        const row = result.rows[0];
+
+        const now = new Date();
+        const expiresAt = row.qr_expires_at ? new Date(row.qr_expires_at) : null;
+        const isExpired = !!expiresAt && expiresAt.getTime() < now.getTime();
+
+        res.json({
+            order_id: row.id,
+            store_id: row.store_id,
+            store_slug: row.store_slug,
+            store_name: row.store_name,
+            store_logo_url: row.logo_url,
+            qr_session_id: row.qr_session_id,
+            qr_expires_at: row.qr_expires_at,
+            is_expired: isExpired,
+            payment_status: row.payment_status,
+            total_fires: Number(row.total_fires || 0),
+            total_usdt: Number(row.total_usdt || 0)
+        });
+    } catch (error) {
+        logger.error('[Store][QR] Error obteniendo sesión QR', error);
+        res.status(400).json({ error: error.message || 'Error al obtener sesión QR' });
+    }
+});
+
+// POST /api/store/order/qr/:qrSessionId/pay
+// El cliente paga la orden con Fuegos de su billetera, acreditando a la billetera de la tienda
+router.post('/qr/:qrSessionId/pay', verifyToken, requireWalletAccess, async (req, res) => {
+    try {
+        const { qrSessionId } = req.params;
+        const userId = req.user.id;
+
+        const result = await transaction(async (client) => {
+            // Bloquear orden y tienda asociada
+            const orderRes = await client.query(
+                `SELECT 
+                    o.*, 
+                    s.fires_wallet_balance AS store_fires_balance,
+                    s.id AS store_id
+                 FROM orders o
+                 JOIN stores s ON s.id = o.store_id
+                 WHERE o.qr_session_id = $1
+                 FOR UPDATE`,
+                [qrSessionId]
+            );
+
+            if (orderRes.rows.length === 0) {
+                throw new Error('Sesión de pago QR no encontrada');
+            }
+
+            const order = orderRes.rows[0];
+
+            const now = new Date();
+            const expiresAt = order.qr_expires_at ? new Date(order.qr_expires_at) : null;
+            if (expiresAt && expiresAt.getTime() < now.getTime()) {
+                throw new Error('La sesión de pago QR ha expirado');
+            }
+
+            if (order.payment_status !== 'unpaid') {
+                throw new Error('Esta orden ya fue pagada o cancelada');
+            }
+
+            const amountFiresRaw = order.total_fires != null ? Number(order.total_fires) : NaN;
+            if (!Number.isFinite(amountFiresRaw) || amountFiresRaw <= 0) {
+                throw new Error('Monto de Fuegos inválido para esta orden');
+            }
+
+            // Obtener wallet del usuario
+            const walletRes = await client.query(
+                'SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE',
+                [userId]
+            );
+
+            if (walletRes.rows.length === 0) {
+                throw new Error('Wallet del usuario no encontrada');
+            }
+
+            const wallet = walletRes.rows[0];
+            const firesBalanceRaw = wallet.fires_balance != null ? Number(wallet.fires_balance) : 0;
+            const firesBalance = Number.isFinite(firesBalanceRaw) ? firesBalanceRaw : 0;
+
+            if (firesBalance < amountFiresRaw) {
+                throw new Error('Saldo de Fuegos insuficiente para completar el pago');
+            }
+
+            const userBalanceBefore = firesBalance;
+            const userBalanceAfter = firesBalance - amountFiresRaw;
+
+            // Debitar Fuegos del usuario
+            await client.query(
+                `UPDATE wallets
+                 SET fires_balance = fires_balance - $1,
+                     total_fires_spent = total_fires_spent + $1,
+                     updated_at = NOW()
+                 WHERE id = $2`,
+                [amountFiresRaw, wallet.id]
+            );
+
+            // Registrar transacción en wallet del usuario
+            await client.query(
+                `INSERT INTO wallet_transactions
+                 (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+                 VALUES ($1, 'store_qr_payment', 'fires', $2, $3, $4, $5, $6)`,
+                [
+                    wallet.id,
+                    amountFiresRaw,
+                    userBalanceBefore,
+                    userBalanceAfter,
+                    `Pago QR en tienda ${order.store_id}`,
+                    `store_order_${order.id}`
+                ]
+            );
+
+            // Acreditar a billetera de la tienda
+            const storeBalanceRaw = order.store_fires_balance != null ? Number(order.store_fires_balance) : 0;
+            const storeBalanceBefore = Number.isFinite(storeBalanceRaw) ? storeBalanceRaw : 0;
+            const storeBalanceAfter = storeBalanceBefore + amountFiresRaw;
+
+            await client.query(
+                `UPDATE stores
+                 SET fires_wallet_balance = fires_wallet_balance + $1,
+                     updated_at = NOW()
+                 WHERE id = $2`,
+                [amountFiresRaw, order.store_id]
+            );
+
+            await client.query(
+                `INSERT INTO store_wallet_transactions
+                 (store_id, user_id, order_id, type, amount_fires, balance_after, metadata)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                    order.store_id,
+                    userId,
+                    order.id,
+                    'qr_payment_in',
+                    amountFiresRaw,
+                    storeBalanceAfter,
+                    JSON.stringify({ qr_session_id: qrSessionId })
+                ]
+            );
+
+            // Actualizar estado de pago de la orden
+            let paymentMethod = order.payment_method || {};
+            if (typeof paymentMethod === 'string') {
+                try {
+                    paymentMethod = JSON.parse(paymentMethod);
+                } catch (e) {
+                    paymentMethod = {};
+                }
+            }
+
+            paymentMethod.qr_fires = (paymentMethod.qr_fires != null
+                ? Number(paymentMethod.qr_fires) || 0
+                : 0) + amountFiresRaw;
+
+            const updatedOrderRes = await client.query(
+                `UPDATE orders
+                 SET payment_status = 'paid',
+                     payment_method = $1,
+                     updated_at = NOW()
+                 WHERE id = $2
+                 RETURNING id, store_id, payment_status, payment_method`,
+                [JSON.stringify(paymentMethod), order.id]
+            );
+
+            const updatedOrder = updatedOrderRes.rows[0];
+
+            return {
+                order: updatedOrder,
+                amountFires: amountFiresRaw,
+                userBalanceAfter,
+                storeBalanceAfter
+            };
+        });
+
+        // Notificar al POS / tienda vía Socket.IO si está disponible
+        if (req.io && result.order && result.order.store_id) {
+            try {
+                req.io.to(`store:${result.order.store_id}:orders`).emit('store:order-paid', {
+                    orderId: result.order.id,
+                    paymentStatus: result.order.payment_status,
+                    method: 'qr_fires'
+                });
+            } catch (e) {
+                logger.warn('[Store][QR] Error emitiendo evento store:order-paid', {
+                    storeId: result.order.store_id,
+                    orderId: result.order.id,
+                    error: e?.message
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            order_id: result.order.id,
+            store_id: result.order.store_id,
+            amount_fires: result.amountFires,
+            user_balance_after: result.userBalanceAfter,
+            store_balance_after: result.storeBalanceAfter
+        });
+    } catch (error) {
+        logger.error('[Store][QR] Error procesando pago QR', error);
+        res.status(400).json({ error: error.message || 'Error al procesar pago QR' });
     }
 });
 

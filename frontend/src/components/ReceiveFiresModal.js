@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, Check, Wallet } from 'lucide-react';
+import { X, Copy, Check, Wallet, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const ReceiveFiresModal = ({ isOpen, onClose, walletAddress }) => {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
 
   const handleCopy = async () => {
     try {
@@ -43,6 +45,16 @@ const ReceiveFiresModal = ({ isOpen, onClose, walletAddress }) => {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    navigate('/profile?tab=fires');
+                  }}
+                  className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <div className="w-10 h-10 rounded-full bg-fire-orange/20 flex items-center justify-center">
                   <Wallet size={20} className="text-fire-orange" />
                 </div>

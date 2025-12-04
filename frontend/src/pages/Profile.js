@@ -64,12 +64,17 @@ const Profile = () => {
   const [showReferralsModal, setShowReferralsModal] = useState(false);
   const [shareStoreMenuId, setShareStoreMenuId] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [greenButtonAction, setGreenButtonAction] = useState(''); // '', 'pay', 'pos', 'store_dashboard'
+  const [greenTarget, setGreenTarget] = useState(null); // 'pay' | null
+  const [qrLinkInput, setQrLinkInput] = useState('');
+  const [appearanceTheme, setAppearanceTheme] = useState('blue-cristal');
 
   // Detectar query params para abrir modales de wallet/fuegos
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
     const open = params.get('open'); // 'send' | 'buy' | 'receive'
+    const gt = params.get('greenTarget');
     const initial = (tab === 'coins' || tab === 'fires') ? tab : 'fires';
     setWalletHistoryInitialTab(initial);
 
@@ -92,7 +97,24 @@ const Profile = () => {
     if (tab === 'fires' || tab === 'coins') {
       setShowFiresHistory(true);
     }
+    setGreenTarget(gt === 'pay' ? 'pay' : null);
   }, [location.search]);
+
+  // Inicializar tema de apariencia desde localStorage
+  useEffect(() => {
+    try {
+      const stored = typeof window !== 'undefined'
+        ? window.localStorage.getItem('app_theme')
+        : null;
+      const theme = stored || 'blue-cristal';
+      setAppearanceTheme(theme);
+      if (typeof document !== 'undefined') {
+        document.documentElement.dataset.theme = theme;
+      }
+    } catch {
+      setAppearanceTheme('blue-cristal');
+    }
+  }, []);
 
   const fetchGiftLinks = React.useCallback(async () => {
     if (!user || !Array.isArray(user.roles) || !user.roles.includes('tote')) return;
@@ -141,6 +163,20 @@ const Profile = () => {
       setWalletAddress(user.wallet_address);
     }
   }, [user?.wallet_address]);
+
+  // Load green button behavior preference from localStorage when user changes
+  useEffect(() => {
+    if (!user?.id || typeof window === 'undefined') return;
+    try {
+      const key = `green_button_action_${user.id}`;
+      const stored = window.localStorage.getItem(key);
+      if (stored && typeof stored === 'string') {
+        setGreenButtonAction(stored);
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [user?.id]);
 
   // Fetch user stats
   const { data: stats } = useQuery({
@@ -280,6 +316,43 @@ const Profile = () => {
 
   const myActiveRaffles = createdRaffles.filter((r) => r.status === 'active');
   const myFinishedRaffles = createdRaffles.filter((r) => r.status === 'finished');
+
+  // Auto-navegación suave cuando venimos desde el botón verde con greenTarget
+  useEffect(() => {
+    if (!user || !Array.isArray(myStores) || myStores.length === 0) return;
+
+    const params = new URLSearchParams(location.search);
+    const greenTarget = params.get('greenTarget');
+    if (!greenTarget) return;
+
+    if (greenTarget === 'pos') {
+      const eligible = myStores.filter((row) => {
+        const role = row.role;
+        return (
+          role === 'owner' ||
+          role === 'admin' ||
+          role === 'manager' ||
+          role === 'seller'
+        );
+      });
+
+      if (eligible.length === 1 && eligible[0].store_slug) {
+        navigate(`/store/${eligible[0].store_slug}/pos`, { replace: true });
+      }
+      return;
+    }
+
+    if (greenTarget === 'store_dashboard') {
+      const eligible = myStores.filter((row) => {
+        const role = row.role;
+        return role === 'owner' || role === 'admin' || role === 'manager';
+      });
+
+      if (eligible.length === 1 && eligible[0].store_slug) {
+        navigate(`/store/${eligible[0].store_slug}/dashboard`, { replace: true });
+      }
+    }
+  }, [user, myStores, location.search, navigate]);
 
   const getStoreRoleLabel = (role) => {
     if (role === 'owner') return 'Dueño';
@@ -466,6 +539,52 @@ const Profile = () => {
             <div className="text-xs text-text/60">Fuegos</div>
           </motion.div>
         </div>
+        {greenTarget === 'pay' && (
+          <div className="mt-4 glass-panel p-4 text-xs space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-text/80">Pagar con QR (Fuegos)</div>
+                <p className="text-[11px] text-text/60">
+                  Pega aquí el link de pago QR que recibiste para abrir la pantalla de pago.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 mt-2">
+              <input
+                type="text"
+                value={qrLinkInput}
+                onChange={(e) => setQrLinkInput(e.target.value)}
+                className="input-glass flex-1 text-[11px]"
+                placeholder="https://.../store/mi-tienda/qr/qrSessionId"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const raw = (qrLinkInput || '').trim();
+                  if (!raw) {
+                    toast.error('Pega el link de pago QR primero');
+                    return;
+                  }
+                  try {
+                    const base = typeof window !== 'undefined' ? window.location.origin : undefined;
+                    const url = new URL(raw, base);
+                    if (typeof window !== 'undefined' && url.origin === window.location.origin) {
+                      navigate(url.pathname + url.search);
+                    } else if (typeof window !== 'undefined') {
+                      window.location.href = url.toString();
+                    }
+                  } catch (err) {
+                    console.error('Invalid QR payment link:', err);
+                    toast.error('Link de pago QR inválido');
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 text-[11px] whitespace-nowrap"
+              >
+                Abrir pago QR
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Roles + Configuración rápida de perfil */}
         {(user?.roles?.length > 0 || true) && (
@@ -536,6 +655,67 @@ const Profile = () => {
                 <span className="text-[11px] text-text/60">
                   Usa este botón si la actualización automática no se aplicó correctamente.
                 </span>
+
+                {/* Apariencia / Tema */}
+                <div className="w-full mt-3 flex flex-col gap-1">
+                  <span className="text-[11px] text-text/60">
+                    Apariencia de la app:
+                  </span>
+                  <select
+                    value={appearanceTheme}
+                    onChange={(e) => {
+                      const value = e.target.value || 'blue-cristal';
+                      setAppearanceTheme(value);
+                      if (typeof document !== 'undefined') {
+                        document.documentElement.dataset.theme = value;
+                      }
+                      if (typeof window !== 'undefined') {
+                        try {
+                          window.localStorage.setItem('app_theme', value);
+                        } catch {
+                          // ignore storage errors
+                        }
+                      }
+                    }}
+                    className="input-glass w-full max-w-xs text-[11px]"
+                  >
+                    <option value="blue-cristal">Blue Cristal (Predeterminado)</option>
+                    <option value="white-sky">White Sky (Claro)</option>
+                  </select>
+                  <span className="text-[10px] text-text/50">
+                    Cambia entre el tema oscuro de cristal azul y un tema claro tipo cielo.
+                  </span>
+                </div>
+
+                {/* Configuración del botón verde */}
+                <div className="w-full mt-3 flex flex-col gap-1">
+                  <span className="text-[11px] text-text/60">
+                    Comportamiento del botón verde (usuarios online):
+                  </span>
+                  <select
+                    value={greenButtonAction}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setGreenButtonAction(value);
+                      if (!user?.id || typeof window === 'undefined') return;
+                      try {
+                        const key = `green_button_action_${user.id}`;
+                        window.localStorage.setItem(key, value || '');
+                      } catch {
+                        // ignore storage errors
+                      }
+                    }}
+                    className="input-glass w-full max-w-xs text-[11px]"
+                  >
+                    <option value="">Sin acción especial</option>
+                    <option value="pay">Pagar (scanner QR)</option>
+                    <option value="pos">POS de mi tienda</option>
+                    <option value="store_dashboard">Panel de tienda</option>
+                  </select>
+                  <span className="text-[10px] text-text/50">
+                    Si tienes varias tiendas y eliges POS o Panel de tienda, el botón verde usará tu tienda principal o te enviará al perfil para elegir.
+                  </span>
+                </div>
               </div>
             )}
           </div>

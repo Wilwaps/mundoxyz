@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, ArrowLeft, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,6 +11,7 @@ import PasswordRequiredModal from './PasswordRequiredModal';
 const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [step, setStep] = useState('form'); // 'form', 'confirm', or 'password'
   const [formData, setFormData] = useState({
     to_wallet_id: '',
@@ -179,14 +181,19 @@ const SendFiresModal = ({ isOpen, onClose, currentBalance, onSuccess }) => {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                {step === 'confirm' && (
-                  <button
-                    onClick={() => setStep('form')}
-                    className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    if (step === 'confirm') {
+                      setStep('form');
+                    } else {
+                      handleClose();
+                      navigate('/profile?tab=fires');
+                    }
+                  }}
+                  className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <div className="w-10 h-10 rounded-full bg-fire-orange/20 flex items-center justify-center">
                   <Send size={20} className="text-fire-orange" />
                 </div>

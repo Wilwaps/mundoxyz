@@ -38,6 +38,7 @@ import StoreFrontInvoicePage from './pages/store/StoreFrontInvoicePage';
 import POS from './pages/store/POS';
 import KitchenDisplay from './pages/store/KitchenDisplay';
 import StoreOwnerDashboard from './pages/store/StoreOwnerDashboard';
+import StoreQrPaymentPage from './pages/store/StoreQrPaymentPage';
 import ProtectedStoreRouteBySlug from './components/ProtectedStoreRouteBySlug';
 
 // Create a client
@@ -97,6 +98,17 @@ function App() {
 
     setViewportHeight();
     window.addEventListener('resize', setViewportHeight);
+
+    // Initialize appearance theme from localStorage
+    try {
+      const stored = typeof window !== 'undefined'
+        ? window.localStorage.getItem('app_theme')
+        : null;
+      const theme = stored || 'blue-cristal';
+      document.documentElement.dataset.theme = theme;
+    } catch {
+      document.documentElement.dataset.theme = 'blue-cristal';
+    }
 
     return () => window.removeEventListener('resize', setViewportHeight);
   }, []);
@@ -179,6 +191,11 @@ function App() {
                   <Route path="store/:slug/invoice/:invoiceNumber" element={
                     <ProtectedStoreRouteBySlug requiredPermission="invoices">
                       <StoreFrontInvoicePage />
+                    </ProtectedStoreRouteBySlug>
+                  } />
+                  <Route path="store/:slug/qr/:qrSessionId" element={
+                    <ProtectedStoreRouteBySlug requiredPermission="pos">
+                      <StoreQrPaymentPage />
                     </ProtectedStoreRouteBySlug>
                   } />
                   <Route path="store/:slug/dashboard" element={

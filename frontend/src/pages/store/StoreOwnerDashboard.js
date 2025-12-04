@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { getStoreUrl } from '../../utils/urlHelper';
+import { downloadQrForUrl } from '../../utils/qr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -127,7 +129,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { downloadQrForUrl } from '../../utils/qr';
 import CameraButton from '../../components/CameraButton';
 import { openMapWithAutoClose } from '../../utils/mapHelper';
 import ColorPickerModal from '../../components/ColorPickerModal';
@@ -2614,14 +2615,32 @@ const StoreOwnerDashboard = () => {
             </div>
             <div>
               <p className="text-text/60 mb-1">Link público</p>
-              <a
-                href={`/store/${store.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-accent break-all underline"
-              >
-                {`/store/${store.slug}`}
-              </a>
+              <div className="space-y-1">
+                <a
+                  href={`/store/${store.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-accent break-all underline"
+                >
+                  {`/store/${store.slug}`}
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const slugValue = store?.slug;
+                      if (!slugValue) return;
+                      const url = getStoreUrl(slugValue);
+                      await downloadQrForUrl(url, `tienda-${slugValue}-qr.png`);
+                    } catch (err) {
+                      console.error('Error generando QR de tienda desde dashboard:', err);
+                    }
+                  }}
+                  className="inline-flex items-center px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[10px] text-text/80 border border-glass mt-1"
+                >
+                  Descargar QR de la tienda
+                </button>
+              </div>
             </div>
           </div>
 

@@ -327,4 +327,270 @@ router.get('/:storeId/cash/sessions', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/store/:storeId/wallet
+// Devuelve el saldo de la billetera de Fuegos de la tienda y sus movimientos recientes
+router.get('/:storeId/wallet', verifyToken, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    // Verificar alquiler activo
+    const rentalActive = await isStoreRentalActive(storeId);
+    if (!rentalActive) {
+      return res.status(403).json({ error: 'Store Rental Expired' });
+    }
+
+    // Verificar permisos de gestión en la tienda
+    const canManage = await userCanManageStoreOperations(req.user, storeId);
+    if (!canManage) {
+      return res.status(403).json({ error: 'No autorizado para ver la billetera de esta tienda' });
+    }
+
+    const storeResult = await query(
+      `SELECT id, name, fires_wallet_balance
+       FROM stores
+       WHERE id = $1`,
+      [storeId]
+    );
+
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tienda no encontrada' });
+    }
+
+    const store = storeResult.rows[0];
+    const balanceRaw = store.fires_wallet_balance != null ? Number(store.fires_wallet_balance) : 0;
+    const balance = Number.isFinite(balanceRaw) ? balanceRaw : 0;
+
+    const txResult = await query(
+      `SELECT
+         id,
+         user_id,
+         order_id,
+         type,
+         amount_fires,
+         balance_after,
+         metadata,
+         created_at
+       FROM store_wallet_transactions
+       WHERE store_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [storeId, limit, offset]
+    );
+
+    res.json({
+      store: {
+        id: store.id,
+        name: store.name,
+        fires_wallet_balance: balance
+      },
+      transactions: txResult.rows.map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        order_id: row.order_id,
+        type: row.type,
+        amount_fires: Number(row.amount_fires || 0),
+        balance_after: row.balance_after != null ? Number(row.balance_after) : null,
+        metadata: row.metadata || {},
+        created_at: row.created_at
+      })),
+      pagination: {
+        limit,
+        offset
+      }
+    });
+  } catch (error) {
+    logger.error('[Store][Wallet] Error obteniendo billetera de tienda', error);
+    res.status(500).json({ error: 'Error al obtener billetera de tienda' });
+  }
+});
+
+// POST /api/store/:storeId/wallet/withdraw-to-owner
+// Retiro de Fuegos desde la billetera de la tienda hacia la wallet de un socio/dueño específico sin comisión
+router.post('/:storeId/wallet/withdraw-to-owner', verifyToken, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { amount_fires, target_user_id } = req.body || {};
+
+    const amountRaw = amount_fires != null ? Number(amount_fires) : NaN;
+    if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
+      return res.status(400).json({ error: 'amount_fires debe ser un número positivo' });
+    }
+
+    if (!target_user_id) {
+      return res.status(400).json({ error: 'target_user_id es requerido' });
+    }
+
+    // Verificar alquiler activo
+    const rentalActive = await isStoreRentalActive(storeId);
+    if (!rentalActive) {
+      return res.status(403).json({ error: 'Store Rental Expired' });
+    }
+
+    const userId = req.user.id;
+    const roles = Array.isArray(req.user.roles) ? req.user.roles : [];
+    const isGlobalAdmin = roles.includes('tote') || roles.includes('admin');
+
+    const result = await transaction(async (client) => {
+      // Bloquear tienda y obtener saldo actual
+      const storeRes = await client.query(
+        `SELECT id, name, fires_wallet_balance
+         FROM stores
+         WHERE id = $1
+         FOR UPDATE`,
+        [storeId]
+      );
+
+      if (storeRes.rows.length === 0) {
+        throw new Error('Tienda no encontrada');
+      }
+
+      const store = storeRes.rows[0];
+
+      // Verificar que el usuario que ejecuta la acción tenga permisos altos en la tienda
+      // (owner/admin/manager) o sea admin/tote global.
+      const staffRes = await client.query(
+        `SELECT role, user_id
+         FROM store_staff
+         WHERE store_id = $1 AND user_id = $2 AND is_active = TRUE
+         LIMIT 1`,
+        [storeId, userId]
+      );
+
+      const callerStaff = staffRes.rows[0] || null;
+      const highRoles = ['owner', 'admin', 'manager'];
+      const callerHasHighRole = callerStaff && highRoles.includes(callerStaff.role);
+
+      if (!callerHasHighRole && !isGlobalAdmin) {
+        throw new Error('No autorizado para iniciar retiros de la billetera de la tienda');
+      }
+
+      // Validar que el destinatario (target_user_id) sea staff de la tienda, típicamente con rol owner
+      const targetStaffRes = await client.query(
+        `SELECT role, user_id
+         FROM store_staff
+         WHERE store_id = $1 AND user_id = $2 AND is_active = TRUE
+         LIMIT 1`,
+        [storeId, target_user_id]
+      );
+
+      if (targetStaffRes.rows.length === 0) {
+        throw new Error('El usuario destino no pertenece al staff activo de esta tienda');
+      }
+
+      const targetStaff = targetStaffRes.rows[0];
+      const targetHighRoles = ['owner', 'admin'];
+      if (!targetHighRoles.includes(targetStaff.role)) {
+        throw new Error('Solo se pueden hacer retiros hacia usuarios con rol de dueño/admin de la tienda');
+      }
+
+      const currentBalanceRaw = store.fires_wallet_balance != null ? Number(store.fires_wallet_balance) : 0;
+      const currentBalance = Number.isFinite(currentBalanceRaw) ? currentBalanceRaw : 0;
+
+      if (currentBalance < amountRaw) {
+        throw new Error('Saldo insuficiente en la billetera de la tienda');
+      }
+
+      const newStoreBalance = currentBalance - amountRaw;
+
+      // Actualizar saldo de la tienda
+      await client.query(
+        `UPDATE stores
+         SET fires_wallet_balance = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [newStoreBalance, store.id]
+      );
+
+      // Registrar movimiento en billetera de tienda (monto negativo)
+      await client.query(
+        `INSERT INTO store_wallet_transactions
+         (store_id, user_id, order_id, type, amount_fires, balance_after, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          store.id,
+          userId,
+          null,
+          'owner_withdraw',
+          -amountRaw,
+          newStoreBalance,
+          JSON.stringify({ reason: 'withdraw_to_owner', target_user_id })
+        ]
+      );
+
+      // Asegurar wallet del destinatario y bloquearla
+      let ownerWalletRes = await client.query(
+        'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+        [target_user_id]
+      );
+
+      if (ownerWalletRes.rows.length === 0) {
+        await client.query(
+          `INSERT INTO wallets (user_id, coins_balance, fires_balance, created_at, updated_at)
+           VALUES ($1, 0, 0, NOW(), NOW())
+           ON CONFLICT (user_id) DO NOTHING`,
+          [target_user_id]
+        );
+
+        ownerWalletRes = await client.query(
+          'SELECT id, fires_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+          [target_user_id]
+        );
+      }
+
+      if (ownerWalletRes.rows.length === 0) {
+        throw new Error('No se pudo crear o encontrar la wallet del dueño');
+      }
+
+      const ownerWallet = ownerWalletRes.rows[0];
+      const ownerBalanceRaw = ownerWallet.fires_balance != null ? Number(ownerWallet.fires_balance) : 0;
+      const ownerBalanceBefore = Number.isFinite(ownerBalanceRaw) ? ownerBalanceRaw : 0;
+      const ownerBalanceAfter = ownerBalanceBefore + amountRaw;
+
+      // Actualizar wallet del dueño (sin comisión)
+      await client.query(
+        `UPDATE wallets
+         SET fires_balance = fires_balance + $1,
+             total_fires_earned = total_fires_earned + $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [amountRaw, ownerWallet.id]
+      );
+
+      await client.query(
+        `INSERT INTO wallet_transactions
+         (wallet_id, type, currency, amount, balance_before, balance_after, description, reference)
+         VALUES ($1, 'store_owner_withdraw', 'fires', $2, $3, $4, $5, $6)`,
+        [
+          ownerWallet.id,
+          amountRaw,
+          ownerBalanceBefore,
+          ownerBalanceAfter,
+          `Retiro de Fuegos desde tienda ${store.name}`,
+          `store_${store.id}_withdraw`
+        ]
+      );
+
+      return {
+        store_id: store.id,
+        store_name: store.name,
+        store_balance_after: newStoreBalance,
+        owner_user_id: target_user_id,
+        owner_wallet_id: ownerWallet.id,
+        owner_balance_after: ownerBalanceAfter,
+        amount_fires: amountRaw
+      };
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error('[Store][Wallet] Error en withdraw-to-owner', error);
+    res.status(400).json({ error: error.message || 'Error al retirar Fuegos de la tienda' });
+  }
+});
+
 module.exports = router;

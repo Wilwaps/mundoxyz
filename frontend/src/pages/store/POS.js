@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import CameraButton from '../../components/CameraButton';
+import { useSocket } from '../../contexts/SocketContext';
 
 const POS = () => {
     const { slug } = useParams(); // 'divorare04'
@@ -49,6 +50,12 @@ const POS = () => {
     const [activeTableCartSnapshot, setActiveTableCartSnapshot] = useState(null); // Snapshot del carrito guardado para detectar cambios
 
     const draftsStorageKey = slug ? `pos_drafts_${slug}` : 'pos_drafts_default';
+
+    // Socket para eventos en tiempo real (orden pagada vía QR, etc.)
+    const { socket } = useSocket();
+
+    // Estado local para mostrar que una orden está pendiente de pago por QR
+    const [qrPaymentOrder, setQrPaymentOrder] = useState(null); // { orderId, fires, storeId }
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -596,6 +603,130 @@ const POS = () => {
         createOrderMutation.mutate(orderData);
     };
 
+    const handleCheckoutWithQrFires = () => {
+        if (!cart.length) {
+            toast.error('No hay productos en el carrito');
+            return;
+        }
+
+        // Verificar que todo el pedido pueda ser pagado con Fires
+        const epsilon = 0.01;
+        if (firesEligibleUSDT + epsilon < totalUSDT) {
+            toast.error('Este pedido no puede pagarse 100% con Fires (verifica que todos los productos acepten Fires).');
+            return;
+        }
+
+        // Evitar mezclar otros métodos de pago cuando se usa QR
+        const hasOtherPayments =
+            parseAmount(payments.cash_usdt) > 0 ||
+            parseAmount(payments.usdt_tron) > 0 ||
+            parseAmount(payments.bs) > 0 ||
+            parseAmount(payments.bs_cash) > 0 ||
+            parseAmount(payments.fires) > 0;
+
+        if (hasOtherPayments) {
+            toast.error('Para pago QR con Fires, deja todos los campos de pago en cero.');
+            return;
+        }
+
+        const customerInfo = (customerName || customerPhone)
+            ? {
+                customer: {
+                    name: customerName || null,
+                    phone: customerPhone || null
+                }
+            }
+            : null;
+
+        const orderData = {
+            store_id: storeData.store.id,
+            items: cart.map(item => ({
+                product_id: item.id,
+                quantity: item.quantity,
+                modifiers: []
+            })),
+            type: 'dine_in',
+            payment_method: {
+                source: 'pos_qr',
+                fires: 0,
+                meta: {
+                    mode: 'qr_fires_only'
+                }
+            },
+            currency_snapshot: rates,
+            table_number: effectiveTable,
+            delivery_info: customerInfo,
+            customer_id: selectedCustomer?.id || null,
+            change_to_fires: { enabled: false }
+        };
+
+        const totalFiresForOrderRaw = firesEligibleUSDT * rates.fires;
+        const totalFiresForOrder = Math.max(0, Math.floor(totalFiresForOrderRaw));
+
+        if (!Number.isFinite(totalFiresForOrder) || totalFiresForOrder <= 0) {
+            toast.error('No se pudo calcular el monto en Fires para el pago QR.');
+            return;
+        }
+
+        createOrderMutation.mutate(orderData, {
+            onSuccess: async (response) => {
+                try {
+                    const createdOrder = response?.data?.order || response?.data;
+                    if (!createdOrder?.id) {
+                        toast.error('Orden creada pero sin ID válido para pago QR');
+                        return;
+                    }
+
+                    const qrResp = await axios.post('/api/store/order/qr/start', {
+                        order_id: createdOrder.id,
+                        total_fires: totalFiresForOrder
+                    });
+
+                    const qrData = qrResp?.data || {};
+                    const firesAmount = Number(qrData.total_fires || totalFiresForOrder);
+                    const qrSessionId = qrData.qr_session_id || null;
+
+                    setQrPaymentOrder({
+                        orderId: createdOrder.id,
+                        fires: Number.isFinite(firesAmount) ? firesAmount : totalFiresForOrder,
+                        storeId: storeId,
+                        qrSessionId: qrSessionId
+                    });
+                    toast.success(
+                        `Orden lista para pago QR: ${Number.isFinite(firesAmount) ? firesAmount : totalFiresForOrder} Fires`
+                    );
+                } catch (err) {
+                    console.error('Error al iniciar sesión QR para la orden POS:', err);
+                    toast.error('Orden creada, pero falló la creación de la sesión de pago QR');
+                }
+            }
+        });
+    };
+
+    // Escuchar confirmaciones de pago QR desde el backend
+    useEffect(() => {
+        if (!socket || !storeId || !qrPaymentOrder?.orderId) return;
+
+        const handleOrderPaid = (payload) => {
+            try {
+                if (!payload || String(payload.orderId) !== String(qrPaymentOrder.orderId)) {
+                    return;
+                }
+
+                toast.success('Pago QR confirmado para la orden actual');
+                setQrPaymentOrder(null);
+            } catch (err) {
+                console.error('Error manejando evento store:order-paid en POS:', err);
+            }
+        };
+
+        socket.on('store:order-paid', handleOrderPaid);
+
+        return () => {
+            socket.off('store:order-paid', handleOrderPaid);
+        };
+    }, [socket, storeId, qrPaymentOrder?.orderId]);
+
     const handleNewBilling = () => {
         // Reinicia la venta actual sin tocar clientes recientes ni historial
         setCart([]);
@@ -918,6 +1049,31 @@ const POS = () => {
                             />
                         </div>
                     </div>
+
+                    {qrPaymentOrder && (
+                        <div className="mb-3 p-3 rounded-lg bg-accent/10 border border-accent/40 text-xs text-accent">
+                            <div className="font-semibold text-[13px] mb-1">Pago QR en espera</div>
+                            <div className="flex flex-col gap-0.5 text-[11px] text-white/80">
+                                <span>
+                                    Orden ID: <span className="font-mono text-white/90">{String(qrPaymentOrder.orderId).slice(0, 8)}...</span>
+                                </span>
+                                <span>
+                                    Monto a pagar: <span className="font-semibold text-orange-300">{qrPaymentOrder.fires}</span> Fires
+                                </span>
+                                {qrPaymentOrder.qrSessionId && (
+                                    <span className="mt-1">
+                                        Link de pago:
+                                        <div className="mt-0.5 text-[10px] break-all text-white/70 select-all">
+                                            {`${window.location.origin}/store/${slug}/qr/${qrPaymentOrder.qrSessionId}`}
+                                        </div>
+                                    </span>
+                                )}
+                                <span className="text-white/60">
+                                    Pide al cliente que escanee el QR de la tienda desde su app y confirme el pago.
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -1301,6 +1457,16 @@ const POS = () => {
                                         className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Confirmar Pago
+                                    </button>
+                                </div>
+                                <div className="flex gap-4 mt-3 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={handleCheckoutWithQrFires}
+                                        disabled={!canUseFires || !cart.length}
+                                        className="flex-1 py-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Crear pago QR (Fires)
                                     </button>
                                 </div>
                             </div>
