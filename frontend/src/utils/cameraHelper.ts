@@ -1,4 +1,5 @@
 import { Camera, CameraResultType } from '@capacitor/camera/dist/esm/index.js';
+import jsQR from 'jsqr';
 
 /**
  * Toma una foto usando la cámara del dispositivo
@@ -105,25 +106,18 @@ export const scanQrCodeFromCamera = async (): Promise<string | null> => {
       return null;
     }
 
-    // Verificar soporte de BarcodeDetector en el runtime actual
-    const BarcodeDetectorCtor: any = (window as any).BarcodeDetector;
-    if (!BarcodeDetectorCtor) {
-      console.warn('BarcodeDetector API no disponible en este dispositivo');
-      return null;
-    }
-
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
       console.warn('Permiso de cámara denegado para escanear QR');
       return null;
     }
 
-    const photoDataUrl = await takePhoto({ quality: 0.8, allowEditing: false, correctOrientation: true });
+    const photoDataUrl = await takePhoto({ quality: 0.9, allowEditing: false, correctOrientation: true });
     if (!photoDataUrl) {
       return null;
     }
 
-    // Cargar la imagen en un objeto Image para que BarcodeDetector pueda procesarla
+    // Cargar la imagen en un objeto Image para procesarla
     const img = new Image();
     img.src = photoDataUrl;
 
@@ -132,17 +126,54 @@ export const scanQrCodeFromCamera = async (): Promise<string | null> => {
       img.onerror = () => reject(new Error('No se pudo cargar la imagen para escanear QR'));
     });
 
-    const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
-    const barcodes = await detector.detect(img);
-
-    if (!Array.isArray(barcodes) || barcodes.length === 0) {
-      console.warn('No se detectó ningún código QR en la foto tomada');
+    // Dibujar en canvas para obtener ImageData
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.warn('No se pudo crear contexto 2D para escanear QR');
       return null;
     }
 
-    const first = barcodes[0];
-    const rawValue = typeof first.rawValue === 'string' ? first.rawValue : null;
-    return rawValue || null;
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+
+    if (!width || !height) {
+      console.warn('Dimensiones de imagen inválidas para escanear QR');
+      return null;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const imageData = ctx.getImageData(0, 0, width, height);
+
+    // 1) Intentar con BarcodeDetector si está disponible
+    const BarcodeDetectorCtor: any = (window as any).BarcodeDetector;
+    if (BarcodeDetectorCtor) {
+      try {
+        const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+        const barcodes = await detector.detect(canvas);
+        if (Array.isArray(barcodes) && barcodes.length > 0) {
+          const first = barcodes[0];
+          const rawValue = typeof first.rawValue === 'string' ? first.rawValue : null;
+          if (rawValue) {
+            return rawValue;
+          }
+        }
+      } catch (e) {
+        console.warn('Error usando BarcodeDetector, intentando jsQR...', e);
+      }
+    }
+
+    // 2) Fallback: usar jsQR sobre el ImageData
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if (code && typeof code.data === 'string' && code.data.trim() !== '') {
+      return code.data.trim();
+    }
+
+    console.warn('No se detectó ningún código QR en la imagen');
+    return null;
   } catch (error) {
     console.error('Error al escanear código QR desde la cámara:', error);
     return null;

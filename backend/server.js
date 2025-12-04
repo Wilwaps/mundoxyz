@@ -280,7 +280,43 @@ if (fs.existsSync(marketingPath)) {
   logger.info(`Serving marketing command center from: ${marketingPath}`);
 }
 
-// Serve APK files from /apk (place app-latest.apk or similar inside backend/apk)
+// Serve APK files
+// 1) Ruta específica /apk/mundoxyz-app-debug.apk leyendo directamente la APK generada por Android
+//    en android/app/build/outputs/apk/debug/app-debug.apk (si existe en el filesystem del servidor).
+// 2) Fallback: carpeta backend/apk para otros archivos o si se prefiere colocar la APK allí.
+
+const androidApkOutputPath = path.join(
+  __dirname,
+  '..',
+  'android',
+  'app',
+  'build',
+  'outputs',
+  'apk',
+  'debug',
+  'app-debug.apk'
+);
+
+if (fs.existsSync(androidApkOutputPath)) {
+  app.get('/apk/mundoxyz-app-debug.apk', (req, res) => {
+    logger.info('Serving Android APK from android build outputs', { path: androidApkOutputPath });
+    res.sendFile(androidApkOutputPath, (err) => {
+      if (err) {
+        logger.error('Error sending Android APK from android build outputs', {
+          path: androidApkOutputPath,
+          error: err?.message
+        });
+        if (!res.headersSent) {
+          res.status(500).send('No se pudo enviar la APK');
+        }
+      }
+    });
+  });
+} else {
+  logger.warn('Android APK output not found at expected path', { path: androidApkOutputPath });
+}
+
+// Carpeta backend/apk como fallback general bajo /apk
 const apkPath = path.join(__dirname, 'apk');
 if (fs.existsSync(apkPath)) {
   app.use('/apk', express.static(apkPath));
