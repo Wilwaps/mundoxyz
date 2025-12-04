@@ -96,7 +96,7 @@ export const isCapacitorApp = (): boolean => {
 };
 
 /**
- * Escanea un código QR usando la cámara (foto estática + BarcodeDetector)
+ * Escanea un código QR usando la cámara (foto estática + jsQR)
  * Devuelve el texto del QR o null si no se pudo leer.
  */
 export const scanQrCodeFromCamera = async (): Promise<string | null> => {

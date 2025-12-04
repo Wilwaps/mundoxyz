@@ -111,8 +111,7 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
         return;
       }
 
-      // En web de escritorio sin Capacitor puede seguir funcionando si BarcodeDetector está presente,
-      // pero priorizamos la experiencia en app móvil.
+      // De momento usamos un único flujo basado en foto + jsQR
       const scanned = await scanQrCodeFromCamera();
 
       if (!scanned) {
@@ -121,8 +120,6 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
       }
 
       setQrLinkInput(scanned);
-
-      // Opcional: abrir directamente el link después de escanear
       handleOpenLink();
     } catch (error) {
       console.error('Error en escaneo de QR:', error);

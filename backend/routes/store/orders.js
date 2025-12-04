@@ -1039,6 +1039,11 @@ router.post('/qr/:qrSessionId/pay', verifyToken, requireWalletAccess, async (req
 
             const order = orderRes.rows[0];
 
+            // Si la orden tiene un cliente asociado, solo ese usuario puede completar el pago QR
+            if (order.customer_id && String(order.customer_id) !== String(userId)) {
+                throw new Error('Este pago QR está asociado a otro cliente');
+            }
+
             const now = new Date();
             const expiresAt = order.qr_expires_at ? new Date(order.qr_expires_at) : null;
             if (expiresAt && expiresAt.getTime() < now.getTime()) {
