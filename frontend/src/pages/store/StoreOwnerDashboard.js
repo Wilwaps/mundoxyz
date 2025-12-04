@@ -691,6 +691,61 @@ const StoreOwnerDashboard = () => {
 
   const queryClient = useQueryClient();
 
+  const {
+    data: cashStatusData,
+    isLoading: loadingCashStatus
+  } = useQuery({
+    queryKey: ['store-cash-status', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return null;
+      const response = await axios.get(`/api/store/${store.id}/cash/status`);
+      return response.data?.session || null;
+    },
+    enabled: !!store?.id
+  });
+
+  const cashSession = cashStatusData;
+
+  const openCashMutation = useMutation({
+    mutationFn: async () => {
+      if (!store?.id) return null;
+      const payload = {
+        opening_balance: {
+          usdt: 0,
+          fires: 0,
+          bs: 0,
+          tron: 0
+        }
+      };
+      const response = await axios.post(`/api/store/${store.id}/cash/open`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Caja abierta');
+      queryClient.invalidateQueries(['store-cash-status', store?.id]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'No se pudo abrir la caja';
+      toast.error(message);
+    }
+  });
+
+  const closeCashMutation = useMutation({
+    mutationFn: async () => {
+      if (!store?.id) return null;
+      const response = await axios.post(`/api/store/${store.id}/cash/close`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Caja cerrada');
+      queryClient.invalidateQueries(['store-cash-status', store?.id]);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'No se pudo cerrar la caja';
+      toast.error(message);
+    }
+  });
+
   const normalizedReportType = useMemo(
     () => (reportTypeFilter === 'all' ? null : reportTypeFilter),
     [reportTypeFilter]
@@ -2152,6 +2207,54 @@ const StoreOwnerDashboard = () => {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          </div>
+
+          <div className="card-glass p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  cashSession ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
+                }`}
+              ></div>
+              <div>
+                <h2 className="text-sm font-semibold text-text/90">Caja</h2>
+                {loadingCashStatus ? (
+                  <p className="text-[11px] text-text/60">Cargando estado de caja...</p>
+                ) : cashSession ? (
+                  <p className="text-[11px] text-text/60">
+                    Caja abierta desde{' '}
+                    {new Date(cashSession.opened_at).toLocaleTimeString('es-VE', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-text/60">Caja cerrada actualmente.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {!cashSession ? (
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
+                  onClick={() => openCashMutation.mutate()}
+                  disabled={openCashMutation.isLoading || loadingCashStatus}
+                >
+                  {openCashMutation.isLoading ? 'Abriendo caja...' : 'Abrir caja'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/30 disabled:opacity-50"
+                  onClick={() => closeCashMutation.mutate()}
+                  disabled={closeCashMutation.isLoading || loadingCashStatus}
+                >
+                  {closeCashMutation.isLoading ? 'Cerrando caja...' : 'Cerrar caja'}
+                </button>
               )}
             </div>
           </div>

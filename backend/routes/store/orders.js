@@ -835,6 +835,65 @@ router.get('/:storeId/orders/active', verifyToken, async (req, res) => {
     }
 });
 
+// Helper: cancelar orden y reponer stock si estaba sin pagar y en estado activo
+async function cancelOrderAndRestock(orderId) {
+    return transaction(async (client) => {
+        const orderRes = await client.query(
+            `SELECT id, status, payment_status, store_id, user_id, code
+             FROM orders
+             WHERE id = $1
+             FOR UPDATE`,
+            [orderId]
+        );
+
+        if (orderRes.rows.length === 0) {
+            throw new Error('Orden no encontrada');
+        }
+
+        const order = orderRes.rows[0];
+        const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
+
+        if (order.payment_status !== 'unpaid' || !activeStatuses.includes(order.status)) {
+            return { order, restocked: false };
+        }
+
+        const itemsRes = await client.query(
+            `SELECT product_id, quantity
+             FROM order_items
+             WHERE order_id = $1`,
+            [orderId]
+        );
+
+        const byProduct = new Map();
+        for (const row of itemsRes.rows) {
+            const qty = Number(row.quantity) || 0;
+            if (!qty) continue;
+            byProduct.set(row.product_id, (byProduct.get(row.product_id) || 0) + qty);
+        }
+
+        for (const [productId, qty] of byProduct.entries()) {
+            await client.query(
+                `UPDATE products
+                 SET stock = stock + $2
+                 WHERE id = $1`,
+                [productId, qty]
+            );
+        }
+
+        const updatedRes = await client.query(
+            `UPDATE orders
+             SET status = 'cancelled',
+                 payment_status = 'cancelled',
+                 updated_at = NOW()
+             WHERE id = $1
+             RETURNING *`,
+            [orderId]
+        );
+
+        return { order: updatedRes.rows[0], restocked: true };
+    });
+}
+
 // POST /api/store/order/:orderId/status (For KDS/Driver)
 router.post('/:orderId/status', verifyToken, async (req, res) => {
     try {
@@ -857,18 +916,24 @@ router.post('/:orderId/status', verifyToken, async (req, res) => {
             return res.status(403).json({ error: 'No autorizado para actualizar pedidos de esta tienda' });
         }
 
-        const result = await query(
-            `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-            [status, orderId]
-        );
+        let order;
 
-        const order = result.rows[0];
+        if (status === 'cancelled') {
+            const result = await cancelOrderAndRestock(orderId);
+            order = result.order;
+        } else {
+            const result = await query(
+                `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                [status, orderId]
+            );
+            order = result.rows[0];
+        }
 
         // Notify Customer
         if (req.io && order.user_id) {
             req.io.to(`user:${order.user_id}`).emit('store:order-update', {
                 orderId,
-                status,
+                status: order.status,
                 code: order.code
             });
         }
@@ -1004,19 +1069,36 @@ router.get('/qr/latest', verifyToken, async (req, res) => {
         const expiresAt = row.qr_expires_at ? new Date(row.qr_expires_at) : null;
         const isExpired = !!expiresAt && expiresAt.getTime() < now.getTime();
 
+        let finalRow = row;
+        let wasCancelled = false;
+
+        if (isExpired && row.payment_status === 'unpaid') {
+            try {
+                const cancelResult = await cancelOrderAndRestock(row.id);
+                finalRow = cancelResult.order || row;
+                wasCancelled = true;
+            } catch (e) {
+                logger.warn('[Store][QR] Error cancelando orden con QR expirado', {
+                    orderId: row.id,
+                    error: e?.message
+                });
+            }
+        }
+
         res.json({
-            order_id: row.id,
-            store_id: row.store_id,
+            order_id: finalRow.id,
+            store_id: finalRow.store_id,
             store_slug: row.store_slug,
             store_name: row.store_name,
             store_logo_url: row.logo_url,
             qr_session_id: row.qr_session_id,
             qr_expires_at: row.qr_expires_at,
             is_expired: isExpired,
-            payment_status: row.payment_status,
+            payment_status: finalRow.payment_status,
             total_fires: Number(row.total_fires || 0),
             total_usdt: Number(row.total_usdt || 0),
-            invoice_number: row.invoice_number
+            invoice_number: finalRow.invoice_number,
+            was_cancelled: wasCancelled
         });
     } catch (error) {
         logger.error('[Store][QR] Error obteniendo sesión QR más reciente', error);
@@ -1213,14 +1295,19 @@ router.post('/qr/:qrSessionId/pay', verifyToken, requireWalletAccess, async (req
                 ? Number(paymentMethod.qr_fires) || 0
                 : 0) + amountFiresRaw;
 
+            // Si la orden todavía está en un estado activo, pasarla a 'delivered' al completar el pago
+            const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
+            const shouldAutoDeliver = activeStatuses.includes(order.status);
+
             const updatedOrderRes = await client.query(
                 `UPDATE orders
                  SET payment_status = 'paid',
                      payment_method = $1,
+                     status = CASE WHEN $3::boolean = true THEN 'delivered' ELSE status END,
                      updated_at = NOW()
                  WHERE id = $2
-                 RETURNING id, store_id, invoice_number, payment_status, payment_method`,
-                [JSON.stringify(paymentMethod), order.id]
+                 RETURNING id, store_id, invoice_number, payment_status, payment_method, status`,
+                [JSON.stringify(paymentMethod), order.id, shouldAutoDeliver]
             );
 
             const updatedOrder = updatedOrderRes.rows[0];

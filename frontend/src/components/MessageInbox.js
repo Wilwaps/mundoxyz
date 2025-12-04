@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,6 +16,7 @@ const MessageInbox = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const handleAcceptWelcome = async (message) => {
     try {
@@ -131,6 +133,27 @@ const MessageInbox = () => {
     return msg.category === filter;
   });
 
+  const handleMessageClick = async (message) => {
+    try {
+      // Si es resultado de rifa con código asociado, redirigir a la rifa
+      const raffleCode = message?.metadata?.raffleCode;
+      if (raffleCode) {
+        await markAsRead(message.id);
+        setIsOpen(false);
+        navigate(`/raffles/${raffleCode}`);
+        return;
+      }
+
+      // Comportamiento por defecto: solo marcar como leído si está sin leer
+      if (!message.is_read) {
+        await markAsRead(message.id);
+      }
+    } catch (err) {
+      // Silenciar errores para no romper UX del inbox
+      // console.error('Error handling message click:', err);
+    }
+  };
+
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -208,7 +231,7 @@ const MessageInbox = () => {
                   <div 
                     key={message.id} 
                     className={`message-item ${!message.is_read ? 'unread' : ''}`}
-                    onClick={() => !message.is_read && markAsRead(message.id)}
+                    onClick={() => handleMessageClick(message)}
                   >
                     <div className="message-header">
                       <span className="message-category">

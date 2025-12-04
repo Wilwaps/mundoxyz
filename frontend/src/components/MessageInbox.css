@@ -76,7 +76,7 @@
 }
 
 .inbox-modal {
-  background: white;
+  background: rgba(15, 23, 42, 0.96); /* slate-900 glass */
   border-radius: 20px;
   width: 90%;
   max-width: 600px;
@@ -84,6 +84,8 @@
   display: flex;
   flex-direction: column;
   animation: slideIn 0.3s;
+  border: 1px solid rgba(148, 163, 184, 0.4); /* slate-400/40 */
+  color: #e5e7eb; /* text-slate-200 */
 }
 
 @keyframes slideIn {
@@ -130,24 +132,25 @@
   display: flex;
   gap: 5px;
   padding: 15px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
 }
 
 .tab {
   flex: 1;
   padding: 10px;
-  background: white;
-  border: 1px solid #dee2e6;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 8px;
   cursor: pointer;
   text-align: center;
   transition: all 0.3s;
   font-weight: 500;
+  color: #e5e7eb;
 }
 
 .tab.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
   color: white;
   border-color: transparent;
 }
@@ -160,6 +163,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 15px;
+  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.08), transparent);
 }
 
 .no-messages {
@@ -173,14 +177,15 @@
 }
 
 .message-item {
-  background: white;
-  border: 1px solid #dee2e6;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 10px;
   padding: 15px;
   margin-bottom: 10px;
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
+  color: #e5e7eb;
 }
 
 .message-item:hover {
@@ -189,8 +194,8 @@
 }
 
 .message-item.unread {
-  background: #f0f7ff;
-  border-color: #667eea;
+  background: rgba(30, 64, 175, 0.85);
+  border-color: #38bdf8;
   border-width: 2px;
 }
 
@@ -228,12 +233,12 @@
 
 .message-title {
   margin: 0 0 8px 0;
-  color: #333;
+  color: #f9fafb;
   font-size: 1.1rem;
 }
 
 .message-content {
-  color: #666;
+  color: #e5e7eb;
   margin: 0 0 8px 0;
   line-height: 1.4;
 }
@@ -247,7 +252,7 @@
 }
 
 .message-metadata span {
-  background: #f8f9fa;
+  background: rgba(15, 23, 42, 0.9);
   padding: 4px 8px;
   border-radius: 4px;
 }

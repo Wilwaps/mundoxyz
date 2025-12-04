@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { Search, CreditCard, Banknote, Flame, RefreshCw, User, UserPlus } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useSocket } from '../../contexts/SocketContext';
 
 const POS = () => {
     const { slug } = useParams(); // 'divorare04'
+    const navigate = useNavigate();
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -56,6 +57,7 @@ const POS = () => {
 
     // Estado local para mostrar que una orden está pendiente de pago por QR
     const [qrPaymentOrder, setQrPaymentOrder] = useState(null); // { orderId, fires, storeId }
+    const [hasNewActiveOrder, setHasNewActiveOrder] = useState(false);
 
     // Fetch Store & Products
     const { data: storeData } = useQuery({
@@ -113,6 +115,60 @@ const POS = () => {
     }
     const isRestaurantMode = tablesCount > 0;
     const effectiveTable = currentTable || (isRestaurantMode ? 'Mesa 1' : 'POS-1');
+
+    // Estado de caja para POS (usa los mismos endpoints que el panel de tienda)
+    const {
+        data: cashStatusData,
+        isLoading: loadingCashStatus
+    } = useQuery({
+        queryKey: ['store-cash-status', storeId],
+        queryFn: async () => {
+            if (!storeId) return null;
+            const response = await axios.get(`/api/store/${storeId}/cash/status`);
+            return response.data?.session || null;
+        },
+        enabled: !!storeId
+    });
+
+    const cashSession = cashStatusData;
+
+    const openCashMutation = useMutation({
+        mutationFn: async () => {
+            if (!storeId) return null;
+            const payload = {
+                opening_balance: {
+                    usdt: 0,
+                    fires: 0,
+                    bs: 0,
+                    tron: 0
+                }
+            };
+            const response = await axios.post(`/api/store/${storeId}/cash/open`, payload);
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('Caja abierta');
+        },
+        onError: (error) => {
+            const message = error?.response?.data?.error || 'No se pudo abrir la caja';
+            toast.error(message);
+        }
+    });
+
+    const closeCashMutation = useMutation({
+        mutationFn: async () => {
+            if (!storeId) return null;
+            const response = await axios.post(`/api/store/${storeId}/cash/close`, {});
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('Caja cerrada');
+        },
+        onError: (error) => {
+            const message = error?.response?.data?.error || 'No se pudo cerrar la caja';
+            toast.error(message);
+        }
+    });
 
     // Normaliza montos de entrada (strings, vacío, etc.) a números >= 0
     const parseAmount = (value) => {
@@ -775,6 +831,29 @@ const POS = () => {
         };
     }, [socket, storeId, qrPaymentOrder?.orderId]);
 
+    // Escuchar nuevos pedidos activos (externos al POS) para resaltar el botón "Pedidos activos"
+    useEffect(() => {
+        if (!socket || !storeId) return;
+
+        const handleNewOrder = (payload) => {
+            try {
+                // Payload genérico: cualquier nueva orden de esta tienda hace brillar el botón
+                if (!payload || String(payload.storeId || payload.store_id || '') !== String(storeId)) {
+                    return;
+                }
+                setHasNewActiveOrder(true);
+            } catch (err) {
+                console.error('Error manejando evento store:new-order en POS:', err);
+            }
+        };
+
+        socket.on('store:new-order', handleNewOrder);
+
+        return () => {
+            socket.off('store:new-order', handleNewOrder);
+        };
+    }, [socket, storeId]);
+
     const handleNewBilling = () => {
         // Reinicia la venta actual sin tocar clientes recientes ni historial
         setCart([]);
@@ -972,13 +1051,51 @@ const POS = () => {
 
             {/* Right: Cart, Customer & Payment */}
             <div className="w-full lg:w-96 flex flex-col bg-dark-lighter border-t border-white/10 lg:border-t-0">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between gap-2">
-                    <div className="font-bold text-base md:text-lg">Orden Actual</div>
-                    {isRestaurantMode && (
-                        <div className="text-xs text-white/60">
-                            {effectiveTable}
+                <div className="p-4 border-b border-white/10 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-base md:text-lg">Orden Actual</div>
+                        {isRestaurantMode && (
+                            <div className="text-xs text-white/60">
+                                {effectiveTable}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Estado de caja en POS */}
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <div className="flex items-center gap-2">
+                            <span
+                                className={`w-2 h-2 rounded-full ${
+                                    cashSession ? 'bg-emerald-400' : 'bg-red-400'
+                                }`}
+                            ></span>
+                            <span className="text-white/70">
+                                {loadingCashStatus
+                                    ? 'Caja: cargando...'
+                                    : cashSession
+                                    ? 'Caja abierta'
+                                    : 'Caja cerrada'}
+                            </span>
                         </div>
-                    )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (cashSession) {
+                                    closeCashMutation.mutate();
+                                } else {
+                                    openCashMutation.mutate();
+                                }
+                            }}
+                            disabled={openCashMutation.isLoading || closeCashMutation.isLoading || loadingCashStatus}
+                            className="px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[10px] disabled:opacity-50"
+                        >
+                            {openCashMutation.isLoading || closeCashMutation.isLoading
+                                ? 'Procesando...'
+                                : cashSession
+                                ? 'Cerrar caja'
+                                : 'Abrir caja'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Cliente */}
@@ -1305,13 +1422,29 @@ const POS = () => {
                             Recuperar facturas
                         </button>
                     </div>
-                    <div className="mt-2">
+                    <div className="flex items-center justify-between mb-3 gap-2">
                         <button
                             type="button"
                             onClick={() => setIsInvoiceHistoryOpen(true)}
-                            className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs"
+                            className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-center"
                         >
                             Ver facturas recientes
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setHasNewActiveOrder(false);
+                                if (storeData?.store?.slug) {
+                                    navigate(`/store/${storeData.store.slug}/dashboard?tab=reports`);
+                                }
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-xs text-center border transition-all ${
+                                hasNewActiveOrder
+                                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.6)] animate-pulse'
+                                    : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/80'
+                            }`}
+                        >
+                            Pedidos activos
                         </button>
                     </div>
                 </div>
