@@ -985,7 +985,7 @@ router.get('/qr/latest', verifyToken, async (req, res) => {
              FROM orders o
              JOIN stores s ON s.id = o.store_id
              WHERE s.slug = $1
-               AND o.customer_id = $2
+               AND (o.customer_id IS NULL OR o.customer_id = $2)
                AND o.payment_status = 'unpaid'
                AND o.qr_session_id IS NOT NULL
                AND (o.qr_expires_at IS NULL OR o.qr_expires_at > NOW())
