@@ -4,7 +4,7 @@ import { X, QrCode, ArrowRight, Clock, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { isCapacitorApp } from '../utils/cameraHelper';
+import { isCapacitorApp, scanQrCodeFromCamera } from '../utils/cameraHelper';
 
 const QrPaymentLinkModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -104,9 +104,30 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleScan = () => {
-    // TODO: Integrar escáner real (Cámara + lector QR) y rellenar qrLinkInput
-    toast.error('Escáner de QR aún no está disponible en esta versión');
+  const handleScan = async () => {
+    try {
+      if (typeof window === 'undefined') {
+        toast.error('Escáner de QR no disponible en este entorno');
+        return;
+      }
+
+      // En web de escritorio sin Capacitor puede seguir funcionando si BarcodeDetector está presente,
+      // pero priorizamos la experiencia en app móvil.
+      const scanned = await scanQrCodeFromCamera();
+
+      if (!scanned) {
+        toast.error('No se detectó ningún código QR válido');
+        return;
+      }
+
+      setQrLinkInput(scanned);
+
+      // Opcional: abrir directamente el link después de escanear
+      handleOpenLink();
+    } catch (error) {
+      console.error('Error en escaneo de QR:', error);
+      toast.error('No se pudo escanear el código QR');
+    }
   };
 
   return (

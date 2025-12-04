@@ -29,6 +29,9 @@ const StoreQrPaymentPage = () => {
 
             if (slug && invoiceNumber != null) {
                 navigate(`/store/${slug}/invoice/${invoiceNumber}`);
+            } else if (storeId) {
+                // Fallback: recargar sesión por si se actualizó en backend
+                void refetch();
             }
         },
         onError: (error) => {

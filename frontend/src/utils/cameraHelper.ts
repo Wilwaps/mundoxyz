@@ -93,3 +93,58 @@ export const base64ToFile = (dataUrl: string, filename: string, mimeType: string
 export const isCapacitorApp = (): boolean => {
   return typeof window !== 'undefined' && 'Capacitor' in window;
 };
+
+/**
+ * Escanea un código QR usando la cámara (foto estática + BarcodeDetector)
+ * Devuelve el texto del QR o null si no se pudo leer.
+ */
+export const scanQrCodeFromCamera = async (): Promise<string | null> => {
+  try {
+    if (typeof window === 'undefined') {
+      console.warn('scanQrCodeFromCamera solo está disponible en entorno navegador');
+      return null;
+    }
+
+    // Verificar soporte de BarcodeDetector en el runtime actual
+    const BarcodeDetectorCtor: any = (window as any).BarcodeDetector;
+    if (!BarcodeDetectorCtor) {
+      console.warn('BarcodeDetector API no disponible en este dispositivo');
+      return null;
+    }
+
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      console.warn('Permiso de cámara denegado para escanear QR');
+      return null;
+    }
+
+    const photoDataUrl = await takePhoto({ quality: 0.8, allowEditing: false, correctOrientation: true });
+    if (!photoDataUrl) {
+      return null;
+    }
+
+    // Cargar la imagen en un objeto Image para que BarcodeDetector pueda procesarla
+    const img = new Image();
+    img.src = photoDataUrl;
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('No se pudo cargar la imagen para escanear QR'));
+    });
+
+    const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+    const barcodes = await detector.detect(img);
+
+    if (!Array.isArray(barcodes) || barcodes.length === 0) {
+      console.warn('No se detectó ningún código QR en la foto tomada');
+      return null;
+    }
+
+    const first = barcodes[0];
+    const rawValue = typeof first.rawValue === 'string' ? first.rawValue : null;
+    return rawValue || null;
+  } catch (error) {
+    console.error('Error al escanear código QR desde la cámara:', error);
+    return null;
+  }
+};

@@ -584,6 +584,7 @@ router.get('/my', verifyToken, async (req, res) => {
             `SELECT 
                 o.id,
                 o.store_id,
+                o.invoice_number,
                 s.name AS store_name,
                 s.slug AS store_slug,
                 o.code,
@@ -643,6 +644,9 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
                 o.table_number,
                 o.total_usdt,
                 o.created_at,
+                o.qr_session_id,
+                o.qr_expires_at,
+                o.total_fires,
                 u.display_name AS customer_name,
                 u.ci_full AS customer_ci,
                 u.phone AS customer_phone,
@@ -654,7 +658,10 @@ router.get('/:storeId/orders/history', verifyToken, async (req, res) => {
            LEFT JOIN users u ON u.id = o.customer_id
            LEFT JOIN users su ON su.id = o.user_id
            WHERE o.store_id = $1
-             AND o.status NOT IN ('pending', 'confirmed', 'preparing', 'ready')
+             AND (
+                 o.status NOT IN ('pending', 'confirmed', 'preparing', 'ready')
+                 OR (o.payment_status = 'unpaid' AND o.qr_session_id IS NOT NULL)
+             )
            ORDER BY o.created_at DESC
            LIMIT $2 OFFSET $3`,
             [storeId, limit, offset]
@@ -693,6 +700,9 @@ router.get('/:storeId/invoice/:invoiceNumber', optionalAuth, async (req, res) =>
                 o.discount_usdt,
                 o.total_usdt,
                 o.table_number,
+                o.qr_session_id,
+                o.qr_expires_at,
+                o.total_fires,
                 o.notes,
                 o.delivery_info,
                 o.created_at,
@@ -993,7 +1003,8 @@ router.get('/qr/:qrSessionId', optionalAuth, async (req, res) => {
             is_expired: isExpired,
             payment_status: row.payment_status,
             total_fires: Number(row.total_fires || 0),
-            total_usdt: Number(row.total_usdt || 0)
+            total_usdt: Number(row.total_usdt || 0),
+            invoice_number: row.invoice_number
         });
     } catch (error) {
         logger.error('[Store][QR] Error obteniendo sesión QR', error);
@@ -1137,7 +1148,7 @@ router.post('/qr/:qrSessionId/pay', verifyToken, requireWalletAccess, async (req
                      payment_method = $1,
                      updated_at = NOW()
                  WHERE id = $2
-                 RETURNING id, store_id, payment_status, payment_method`,
+                 RETURNING id, store_id, invoice_number, payment_status, payment_method`,
                 [JSON.stringify(paymentMethod), order.id]
             );
 
@@ -1172,6 +1183,7 @@ router.post('/qr/:qrSessionId/pay', verifyToken, requireWalletAccess, async (req
             success: true,
             order_id: result.order.id,
             store_id: result.order.store_id,
+            invoice_number: result.order.invoice_number,
             amount_fires: result.amountFires,
             user_balance_after: result.userBalanceAfter,
             store_balance_after: result.storeBalanceAfter

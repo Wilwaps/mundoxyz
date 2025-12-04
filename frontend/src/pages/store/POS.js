@@ -183,7 +183,11 @@ const POS = () => {
                 });
             }
         },
-        onError: (err) => toast.error('Error al crear orden')
+        onError: (err) => {
+            console.error('Error al crear orden POS:', err);
+            const message = err?.response?.data?.error || 'Error al crear orden';
+            toast.error(message);
+        }
     });
 
     const [allowFiresPayments, setAllowFiresPayments] = useState(false);
@@ -253,6 +257,27 @@ const POS = () => {
     const bsCashAmount = parseAmount(payments.bs_cash);
     const rawFiresAmount = parseAmount(payments.fires);
     const firesAmount = canUseFires ? Math.min(rawFiresAmount, maxFiresTokens) : 0;
+
+    // Estimación de Fires que se pagarían si toda la parte elegible se liquida por QR
+    const estimatedQrFiresForCartRaw = cart.reduce((sum, item) => {
+        if (!item.accepts_fires) return sum;
+        const qty = parseAmount(item.quantity || 0);
+        if (qty <= 0) return sum;
+
+        const rawPriceFires = item.price_fires != null ? Number(item.price_fires) : NaN;
+        let firesPerUnit;
+
+        if (Number.isFinite(rawPriceFires) && rawPriceFires > 0) {
+            firesPerUnit = rawPriceFires;
+        } else {
+            const priceUsdt = parseAmount(item.price_usdt);
+            firesPerUnit = priceUsdt * rates.fires;
+        }
+
+        const tokens = firesPerUnit * qty;
+        return sum + (Number.isFinite(tokens) && tokens > 0 ? tokens : 0);
+    }, 0);
+    const estimatedQrFiresForCart = Math.max(0, Math.floor(estimatedQrFiresForCartRaw));
 
     const totalPaidUSDT =
         cashUsdt +
@@ -706,12 +731,14 @@ const POS = () => {
                     const qrData = qrResp?.data || {};
                     const firesAmount = Number(qrData.total_fires || totalFiresForOrder);
                     const qrSessionId = qrData.qr_session_id || null;
+                    const qrExpiresAt = qrData.qr_expires_at || null;
 
                     setQrPaymentOrder({
                         orderId: createdOrder.id,
                         fires: Number.isFinite(firesAmount) ? firesAmount : totalFiresForOrder,
                         storeId: storeId,
-                        qrSessionId: qrSessionId
+                        qrSessionId: qrSessionId,
+                        expiresAt: qrExpiresAt
                     });
                     toast.success(
                         `Orden lista para pago QR: ${Number.isFinite(firesAmount) ? firesAmount : totalFiresForOrder} Fires`
@@ -1081,11 +1108,46 @@ const POS = () => {
                                 <span>
                                     Monto a pagar: <span className="font-semibold text-orange-300">{qrPaymentOrder.fires}</span> Fires
                                 </span>
+                                {qrPaymentOrder.expiresAt && (
+                                    <span className="text-white/70">
+                                        Expira en:{' '}
+                                        {(() => {
+                                            try {
+                                                const now = new Date();
+                                                const exp = new Date(qrPaymentOrder.expiresAt);
+                                                const diffMs = exp.getTime() - now.getTime();
+                                                if (diffMs <= 0) return '0 min';
+                                                const totalSec = Math.floor(diffMs / 1000);
+                                                const min = Math.floor(totalSec / 60);
+                                                const sec = totalSec % 60;
+                                                if (min <= 0) return `${sec}s`;
+                                                return `${min}m ${sec}s`;
+                                            } catch {
+                                                return '';
+                                            }
+                                        })()}
+                                    </span>
+                                )}
                                 {qrPaymentOrder.qrSessionId && (
                                     <span className="mt-1">
                                         Link de pago:
                                         <div className="mt-0.5 text-[10px] break-all text-white/70 select-all">
-                                            {`${window.location.origin}/store/${slug}/qr/${qrPaymentOrder.qrSessionId}`}
+                                            {(() => {
+                                                if (typeof window === 'undefined') {
+                                                    return `/store/${slug}/qr/${qrPaymentOrder.qrSessionId}`;
+                                                }
+                                                const origin = window.location.origin || '';
+                                                try {
+                                                    const url = new URL(origin);
+                                                    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+                                                    const base = isLocal
+                                                        ? 'https://mundoxyz-production.up.railway.app'
+                                                        : origin;
+                                                    return `${base}/store/${slug}/qr/${qrPaymentOrder.qrSessionId}`;
+                                                } catch {
+                                                    return `/store/${slug}/qr/${qrPaymentOrder.qrSessionId}`;
+                                                }
+                                            })()}
                                         </div>
                                     </span>
                                 )}
@@ -1394,6 +1456,14 @@ const POS = () => {
                                         <div className="absolute right-3 top-3 text-xs text-white/40">
                                             = {(firesAmount / rates.fires).toFixed(2)}
                                         </div>
+                                        {allowFiresPayments && estimatedQrFiresForCart > 0 && !isPaid && (
+                                            <div className="mt-6 text-[11px] text-white/70 flex justify-between">
+                                                <span>Pago QR estimado</span>
+                                                <span className="font-semibold text-orange-300">
+                                                    {estimatedQrFiresForCart} Fires
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1564,6 +1634,7 @@ const POS = () => {
                     storeId={invoiceModal.storeId}
                     invoiceNumber={invoiceModal.invoiceNumber}
                     vesPerUsdt={vesPerUsdt}
+                    slug={slug}
                     onClose={() => setInvoiceModal(null)}
                 />
             )}
@@ -1571,7 +1642,7 @@ const POS = () => {
     );
 };
 
-const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) => {
+const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, slug, onClose }) => {
     const { data, isLoading, error } = useQuery({
         queryKey: ['pos-invoice-detail', storeId, invoiceNumber],
         queryFn: async () => {
@@ -1693,6 +1764,50 @@ const POSInvoiceDetailModal = ({ storeId, invoiceNumber, vesPerUsdt, onClose }) 
                                 )}
                             </div>
                         </div>
+
+                        {order.qr_session_id && (
+                            <div className="mt-1 mb-2 p-3 rounded-lg bg-accent/10 border border-accent/40 text-[11px] text-white/80">
+                                <div className="font-semibold text-accent mb-1">
+                                    Pago QR (Fires)
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span>
+                                        Monto QR: <span className="font-semibold text-orange-300">{Number(order.total_fires || 0).toFixed(0)}</span> Fires
+                                    </span>
+                                    {order.qr_expires_at && (
+                                        <span className="text-white/70">
+                                            Expira el{' '}
+                                            {new Date(order.qr_expires_at).toLocaleString('es-VE', {
+                                                day: '2-digit',
+                                                month: 'short',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
+                                    )}
+                                    <span className="mt-1">
+                                        Link de pago:
+                                        <div className="mt-0.5 text-[10px] break-all text-white/70 select-all">
+                                            {(() => {
+                                                const path = `/store/${slug}/qr/${order.qr_session_id}`;
+                                                if (typeof window === 'undefined') return path;
+                                                const origin = window.location.origin || '';
+                                                try {
+                                                    const url = new URL(origin);
+                                                    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+                                                    const base = isLocal
+                                                        ? 'https://mundoxyz-production.up.railway.app'
+                                                        : origin;
+                                                    return `${base}${path}`;
+                                                } catch {
+                                                    return path;
+                                                }
+                                            })()}
+                                        </div>
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                             <table className="min-w-full text-[11px] align-middle">
@@ -1826,6 +1941,14 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
 
     const orders = Array.isArray(data) ? data : [];
 
+    const pendingQrOrders = orders.filter((order) =>
+        order && order.payment_status === 'unpaid' && order.qr_session_id
+    );
+
+    const completedOrders = orders.filter((order) =>
+        !order || order.payment_status !== 'unpaid' || !order.qr_session_id
+    );
+
     const formatInvoiceNumber = (n) => {
         if (n === null || n === undefined) return '-';
         const numeric = typeof n === 'number' ? n : parseInt(n, 10);
@@ -1858,7 +1981,78 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
                     <p className="text-white/60 text-xs">Aún no hay facturas registradas.</p>
                 )}
 
-                {orders.length > 0 && (
+                {pendingQrOrders.length > 0 && (
+                    <div className="mb-4">
+                        <div className="mb-1 text-[11px] font-semibold text-orange-300">
+                            Pendientes de pago QR
+                        </div>
+                        <div className="space-y-1">
+                            {pendingQrOrders.map((order) => {
+                                const firesAmount = Number(order.total_fires || 0);
+                                const created = order.created_at ? new Date(order.created_at) : null;
+                                const expiresAt = order.qr_expires_at ? new Date(order.qr_expires_at) : null;
+                                let remainingLabel = '';
+                                if (expiresAt) {
+                                    const diffMs = expiresAt.getTime() - Date.now();
+                                    if (diffMs <= 0) {
+                                        remainingLabel = 'Expirada';
+                                    } else {
+                                        const totalSec = Math.floor(diffMs / 1000);
+                                        const min = Math.floor(totalSec / 60);
+                                        const sec = totalSec % 60;
+                                        remainingLabel = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
+                                    }
+                                }
+
+                                return (
+                                    <div
+                                        key={order.id}
+                                        className="flex items-center justify-between px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between gap-2">
+                                                <span className="text-white/80">
+                                                    #{formatInvoiceNumber(order.invoice_number)}
+                                                </span>
+                                                <span className="text-orange-300 font-semibold">
+                                                    {firesAmount.toFixed(0)} Fires
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-[10px] text-white/60 mt-0.5">
+                                                <span>
+                                                    {created
+                                                        ? created.toLocaleString('es-VE', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              hour: '2-digit',
+                                                              minute: '2-digit'
+                                                          })
+                                                        : ''}
+                                                </span>
+                                                {remainingLabel && <span>{remainingLabel}</span>}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                // Abrir directamente la factura si ya tiene número
+                                                if (order.invoice_number != null) {
+                                                    onSelectInvoice(order.invoice_number);
+                                                    onClose();
+                                                }
+                                            }}
+                                            className="ml-2 px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[10px]"
+                                        >
+                                            Ver
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {completedOrders.length > 0 && (
                     <table className="min-w-full text-[11px] align-middle">
                         <thead>
                             <tr className="text-white/60 border-b border-white/10">
@@ -1870,7 +2064,7 @@ const POSInvoiceHistoryModal = ({ storeId, onClose, onSelectInvoice }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.map((order) => {
+                            {completedOrders.map((order) => {
                                 const totalUsdt = Number(order.total_usdt || 0);
                                 const sellerLabel =
                                     order.seller_display_name || order.seller_username || '-';
