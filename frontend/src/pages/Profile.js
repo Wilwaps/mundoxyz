@@ -32,6 +32,7 @@ import * as raffleApi from '../features/raffles/api';
 import { useUserRaffles } from '../features/raffles/hooks/useRaffleData';
 import RaffleCard from '../features/raffles/components/RaffleCard';
 import { downloadQrForUrl } from '../utils/qr';
+import { isCapacitorApp } from '../utils/cameraHelper';
 
 const Profile = () => {
   const location = useLocation();
@@ -415,6 +416,17 @@ const Profile = () => {
 
   const handleForceAppUpdate = () => {
     if (typeof window === 'undefined') return;
+
+    // URL pública de descarga del APK en producción
+    const productionDownloadUrl = 'https://mundoxyz-production.up.railway.app/app/download/android';
+
+    // Dentro del APK (Capacitor) o en web: abrir en una nueva pestaña/ventana
+    if (isCapacitorApp()) {
+      window.open(productionDownloadUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // En web normal, usar el origin actual (dev / prod)
     const url = `${window.location.origin}/app/download/android`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };

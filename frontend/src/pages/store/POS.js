@@ -186,6 +186,8 @@ const POS = () => {
         onError: (err) => toast.error('Error al crear orden')
     });
 
+    const [allowFiresPayments, setAllowFiresPayments] = useState(false);
+
     const addToCart = (product) => {
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
@@ -243,7 +245,7 @@ const POS = () => {
         Number.isFinite(firesRateForCart) && firesRateForCart > 0
             ? Math.floor(firesEligibleUSDT * firesRateForCart)
             : 0;
-    const canUseFires = maxFiresTokens > 0;
+    const canUseFires = maxFiresTokens > 0 && allowFiresPayments;
 
     const cashUsdt = parseAmount(payments.cash_usdt);
     const usdtTronUsdt = parseAmount(payments.usdt_tron);
@@ -660,7 +662,26 @@ const POS = () => {
             change_to_fires: { enabled: false }
         };
 
-        const totalFiresForOrderRaw = firesEligibleUSDT * rates.fires;
+        // Calcular Fires totales priorizando price_fires por producto
+        const totalFiresForOrderRaw = cart.reduce((sum, item) => {
+            if (!item.accepts_fires) return sum;
+
+            const qty = parseAmount(item.quantity || 0);
+            if (qty <= 0) return sum;
+
+            const rawPriceFires = item.price_fires != null ? Number(item.price_fires) : NaN;
+            let firesPerUnit;
+
+            if (Number.isFinite(rawPriceFires) && rawPriceFires > 0) {
+                firesPerUnit = rawPriceFires;
+            } else {
+                const priceUsdt = parseAmount(item.price_usdt);
+                firesPerUnit = priceUsdt * rates.fires;
+            }
+
+            const tokens = firesPerUnit * qty;
+            return sum + (Number.isFinite(tokens) && tokens > 0 ? tokens : 0);
+        }, 0);
         const totalFiresForOrder = Math.max(0, Math.floor(totalFiresForOrderRaw));
 
         if (!Number.isFinite(totalFiresForOrder) || totalFiresForOrder <= 0) {
@@ -1330,7 +1351,26 @@ const POS = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Fires (Tasa: {rates.fires})</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-sm text-white/60">Fires (Tasa: {rates.fires})</label>
+                                        {maxFiresTokens > 0 && (
+                                            <label className="inline-flex items-center gap-2 text-xs text-white/70 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="form-checkbox h-3.5 w-3.5 text-accent"
+                                                    checked={allowFiresPayments}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setAllowFiresPayments(checked);
+                                                        if (!checked) {
+                                                            setPayments(prev => ({ ...prev, fires: '' }));
+                                                        }
+                                                    }}
+                                                />
+                                                <span>Permitir pagos con Fuegos</span>
+                                            </label>
+                                        )}
+                                    </div>
                                     <div className="relative">
                                         <Flame className="absolute left-3 top-3 text-orange-500" size={20} />
                                         <input

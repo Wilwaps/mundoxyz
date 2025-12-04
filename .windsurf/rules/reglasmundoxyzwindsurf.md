@@ -13,6 +13,15 @@ MANTENER ACTUALIZADO SCHEMA MAESTRO ANTE LA CREACION, MODIFICACION, DE TABLAS EN
 ANALIZA LA DOCUMENTACION DE CHROME DEVTOOLS PARA SACARLE TODO EL PROVECHO
 https://github.com/ChromeDevTools/chrome-devtools-mcp/
 
+
+Para que el flujo de actualización de la APK funcione correctamente en MundoXYZ, se debe seguir siempre este proceso:
+1) Colocar la APK de la versión actual en `backend/apk/` dentro del repo (por ejemplo `backend/apk/mundoxyz-app-<version>.apk`).
+2) Asegurarse de que el backend tenga configurado `app.use('/apk', express.static(path.join(__dirname, 'apk')));` (ya implementado).
+3) En Railway, ajustar la variable de entorno `ANDROID_APK_DOWNLOAD_URL` para que apunte a la URL estática del archivo, por ejemplo `https://mundoxyz-production.up.railway.app/apk/mundoxyz-app-<version>.apk`.
+4) El endpoint `/app/download/android` siempre hace un 302 hacia `ANDROID_APK_DOWNLOAD_URL`, y el botón "Actualizar app" del perfil abre esa ruta.
+5) Para nuevas versiones, solo hay que subir la nueva APK a `backend/apk/` y actualizar `ANDROID_APK_DOWNLOAD_URL`; no hace falta tocar código en frontend ni backend.
+
+
 RAILWAY NO TIENE QUERY!!
 https://railway.com/project/9ed64502-9a9f-4129-8cb5-00a50f074995/service/68a15835-82a9-4897-ad6f-fa55a2ec9326?environmentId=dc0d6ff4-7c00-435c-89d8-d6433b4f598d
 Esta es la direccion del proyecto para analizarlo con chromedevtools

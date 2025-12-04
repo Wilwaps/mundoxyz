@@ -169,6 +169,22 @@ router.post('/create', optionalAuth, async (req, res) => {
         const storeRow = storeSettingsResult.rows[0];
         const settings = storeRow.settings || {};
 
+        // Validación específica para flujos POS QR con Fuegos solamente
+        const source = payment_method && typeof payment_method === 'object' ? payment_method.source : null;
+        if (source === 'pos_qr') {
+            const epsilon = 0.01;
+            if (fires_eligible_subtotal_usdt + epsilon < subtotal_usdt) {
+                return res.status(400).json({
+                    error:
+                        'Este pedido no puede pagarse 100% con Fuegos. Verifica que todos los productos acepten Fuegos.',
+                    details: {
+                        subtotal_usdt,
+                        fires_eligible_subtotal_usdt
+                    }
+                });
+            }
+        }
+
         // Normalizar comisión de tienda (0-100)
         const rawCommission = storeRow.commission_percentage;
         let commission_percentage = Number(rawCommission);

@@ -280,6 +280,13 @@ if (fs.existsSync(marketingPath)) {
   logger.info(`Serving marketing command center from: ${marketingPath}`);
 }
 
+// Serve APK files from /apk (place app-latest.apk or similar inside backend/apk)
+const apkPath = path.join(__dirname, 'apk');
+if (fs.existsSync(apkPath)) {
+  app.use('/apk', express.static(apkPath));
+  logger.info(`Serving APK files from: ${apkPath}`);
+}
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
