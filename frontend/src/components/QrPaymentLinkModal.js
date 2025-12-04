@@ -62,8 +62,9 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleOpenLink = () => {
-    const raw = (qrLinkInput || '').trim();
+  const handleOpenLink = (overrideUrl) => {
+    const raw = ((overrideUrl != null ? overrideUrl : qrLinkInput) || '').trim();
+
     if (!raw) {
       toast.error('Pega el link de pago QR primero');
       return;
@@ -147,7 +148,7 @@ const QrPaymentLinkModal = ({ isOpen, onClose }) => {
       }
 
       setQrLinkInput(finalUrl);
-      handleOpenLink();
+      handleOpenLink(finalUrl);
     } catch (error) {
       console.error('Error en escaneo de QR:', error);
       toast.error('No se pudo escanear el código QR');
