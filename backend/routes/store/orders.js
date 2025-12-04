@@ -170,7 +170,6 @@ router.post('/create', optionalAuth, async (req, res) => {
         const settings = storeRow.settings || {};
 
         // Validación específica para flujos POS QR con Fuegos solamente
-        const source = payment_method && typeof payment_method === 'object' ? payment_method.source : null;
         if (source === 'pos_qr') {
             const epsilon = 0.01;
             if (fires_eligible_subtotal_usdt + epsilon < subtotal_usdt) {
