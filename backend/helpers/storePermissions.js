@@ -11,7 +11,8 @@ async function getStoreStaffAndRole(userId, storeId) {
 
   const staffResult = await query(
     `SELECT s.role AS role_key, r.id AS store_role_id, r.display_name, r.description, r.permissions, r.is_system
-     FROM store_staff s
+     FROM store_staff
+      s
      LEFT JOIN store_roles r
        ON r.store_id = s.store_id
       AND r.role_key = s.role

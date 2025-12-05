@@ -267,6 +267,39 @@ router.get('/public-list', verifyToken, async (req, res) => {
 
 // --- POS CUSTOMERS (CI-based) ---
 
+// GET /api/store/:storeId/customers
+// Lista todos los clientes asociados a la tienda (store_customers).
+router.get('/:storeId/customers', verifyToken, async (req, res) => {
+    try {
+        const { storeId } = req.params;
+
+        if (!storeId) {
+            return res.status(400).json({ error: 'storeId requerido' });
+        }
+
+        const result = await query(
+            `SELECT sc.store_id,
+                    sc.user_id,
+                    u.id,
+                    u.display_name,
+                    u.username,
+                    u.phone,
+                    u.email,
+                    sc.created_at
+             FROM store_customers sc
+             JOIN users u ON u.id = sc.user_id
+             WHERE sc.store_id = $1
+             ORDER BY sc.created_at DESC`,
+            [storeId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error listing store customers:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // POST /api/store/:storeId/customers
 // Crea (o reutiliza) un usuario basado en CI y lo asocia a la tienda.
 // IMPORTANTE: solo los usuarios NUEVOS creados desde este flujo reciben home_store_id = storeId.

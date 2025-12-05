@@ -281,6 +281,10 @@ const StoreOwnerDashboard = () => {
   const [messagingEnabled, setMessagingEnabled] = useState(true);
   const [messagingNotifyRoles, setMessagingNotifyRoles] = useState(['owner', 'admin', 'marketing']);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState({});
+  const [isPaymentMethodsModalOpen, setIsPaymentMethodsModalOpen] = useState(false);
+  const [isStoreRolesModalOpen, setIsStoreRolesModalOpen] = useState(false);
+  const [isCustomersModalOpen, setIsCustomersModalOpen] = useState(false);
+  const [rolesActiveTab, setRolesActiveTab] = useState('roles'); // 'roles' | 'staff' | 'permissions'
   const [settingsInitialized, setSettingsInitialized] = useState(false);
   const [marketingPlan, setMarketingPlan] = useState(null);
   const [marketingPlanDraft, setMarketingPlanDraft] = useState('');
@@ -355,6 +359,84 @@ const StoreOwnerDashboard = () => {
 
   const store = storeData?.store;
   const categories = storeData?.categories || [];
+
+  const {
+    data: storeCustomers,
+    isLoading: storeCustomersLoading
+  } = useQuery({
+    queryKey: ['store-customers', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/${store.id}/customers`);
+      return Array.isArray(response.data) ? response.data : [];
+    },
+    enabled: !!store?.id && isCustomersModalOpen
+  });
+
+  const {
+    data: storeRoles,
+    isLoading: storeRolesLoading,
+    refetch: refetchStoreRoles
+  } = useQuery({
+    queryKey: ['store-roles', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/${store.id}/roles`);
+      return response.data || [];
+    },
+    enabled: !!store?.id && isStoreRolesModalOpen
+  });
+
+  const assignStoreStaffRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleKey }) => {
+      if (!store?.id) throw new Error('Tienda no cargada');
+      const response = await axios.post(`/api/store/${store.id}/roles/assign`, {
+        user_id: userId,
+        role_key: roleKey
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      refetchStoreStaffRoles();
+      toast.success('Rol de staff actualizado');
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.error || 'No se pudo actualizar el rol de staff';
+      toast.error(message);
+    }
+  });
+
+  const updateStoreRolePermissionsMutation = useMutation({
+    mutationFn: async ({ roleId, payload }) => {
+      if (!store?.id || !roleId) {
+        throw new Error('Tienda o rol no cargado');
+      }
+      const response = await axios.put(`/api/store/${store.id}/roles/${roleId}`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      refetchStoreRoles();
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.error || 'No se pudo actualizar los permisos del rol de tienda';
+      toast.error(message);
+    }
+  });
+
+  const {
+    data: storeStaffRoles,
+    isLoading: storeStaffRolesLoading,
+    refetch: refetchStoreStaffRoles
+  } = useQuery({
+    queryKey: ['store-roles-staff', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const response = await axios.get(`/api/store/${store.id}/roles/staff`);
+      return response.data || [];
+    },
+    enabled: !!store?.id && isStoreRolesModalOpen
+  });
 
   const {
     data: productsData,
@@ -1328,18 +1410,65 @@ const StoreOwnerDashboard = () => {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="card-glass p-4">
-            <p className="text-xs text-text/60 mb-1">Categorías activas</p>
-            <p className="text-2xl font-bold text-accent">{categories.length}</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card-glass p-4">
+              <p className="text-xs text-text/60 mb-1">Vistas de la tienda</p>
+              <p className="text-2xl font-bold text-accent">
+                {storeMetrics?.views_count != null ? Number(storeMetrics.views_count) : 0}
+              </p>
+            </div>
+            <div className="card-glass p-4 cursor-pointer" onClick={() => setIsCustomersModalOpen(true)}>
+              <p className="text-xs text-text/60 mb-1">Clientes registrados</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                {storeMetrics?.customers_count != null ? Number(storeMetrics.customers_count) : 0}
+              </p>
+              <p className="text-[10px] text-text/60 mt-1">Haz clic para ver el listado de clientes.</p>
+            </div>
+            <div className="card-glass p-4">
+              <p className="text-xs text-text/60 mb-1">Link público</p>
+              <div className="space-y-1">
+                <a
+                  href={`/store/${store.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-accent break-all underline"
+                >
+                  {`/store/${store.slug}`}
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const slugValue = store?.slug;
+                      if (!slugValue) return;
+                      const url = getStoreQrUrl(slugValue);
+                      await downloadQrForUrl(url, `tienda-${slugValue}-qr.png`);
+                    } catch (err) {
+                      console.error('Error generando QR de tienda desde dashboard:', err);
+                    }
+                  }}
+                  className="inline-flex items-center px-2 py-1 rounded-full bg-glass hover:bg-glass-hover text-[10px] text-text/80 border border-glass mt-1"
+                >
+                  Descargar QR de la tienda
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="card-glass p-4">
-            <p className="text-xs text-text/60 mb-1">Productos en menú</p>
-            <p className="text-2xl font-bold text-emerald-400">{products.length}</p>
-          </div>
-          <div className="card-glass p-4">
-            <p className="text-xs text-text/60 mb-1">Configuración de moneda</p>
-            <p className="text-sm font-semibold text-text/90">{currencyConfigLabel}</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card-glass p-4">
+              <p className="text-xs text-text/60 mb-1">Categorías activas</p>
+              <p className="text-2xl font-bold text-accent">{categories.length}</p>
+            </div>
+            <div className="card-glass p-4">
+              <p className="text-xs text-text/60 mb-1">Productos en menú</p>
+              <p className="text-2xl font-bold text-emerald-400">{products.length}</p>
+            </div>
+            <div className="card-glass p-4">
+              <p className="text-xs text-text/60 mb-1">Configuración de moneda</p>
+              <p className="text-sm font-semibold text-text/90">{currencyConfigLabel}</p>
+            </div>
           </div>
         </div>
       )}
@@ -2747,361 +2876,349 @@ const StoreOwnerDashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div>
-                <p className="text-text/60 mb-1">Tamaño del header</p>
-                <div className="flex gap-2">
-                  {[
-                    { id: 'compact', label: 'Compacto' },
-                    { id: 'normal', label: 'Normal' },
-                    { id: 'full', label: 'Completo' }
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setHeaderLayout(opt.id)}
-                      className={`px-3 py-1.5 rounded-full text-[11px] border transition-colors ${
-                        headerLayout === opt.id
-                          ? 'bg-accent text-background-dark border-accent'
-                          : 'bg-glass text-text/70 border-glass hover:text-text'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-text/60 mb-1">Número de mesas (modo restaurante)</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={tablesCountInput}
-                    onChange={(e) => setTablesCountInput(e.target.value)}
-                    className="input-glass w-24"
-                  />
-                  <span className="text-[11px] text-text/60">
-                    0 desactiva el modo restaurante en el POS.
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-text/60 mb-1">Mensajería de tienda</p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-[11px] text-text/80">
-                    <input
-                      type="checkbox"
-                      checked={messagingEnabled}
-                      onChange={(e) => setMessagingEnabled(e.target.checked)}
-                      className="rounded border-glass"
-                    />
-                    <span>Activar mensajería para esta tienda</span>
-                  </label>
-                  <div className="mt-1 space-y-1">
-                    <p className="text-[11px] text-text/60">
-                      ¿Quién debe ser notificado cuando un cliente escribe a la tienda?
-                    </p>
-                    <div className="grid grid-cols-2 gap-1">
-                      {[
-                        { id: 'owner', label: 'Dueño' },
-                        { id: 'admin', label: 'Admin' },
-                        { id: 'manager', label: 'Manager' },
-                        { id: 'seller', label: 'Vendedor' },
-                        { id: 'marketing', label: 'Marketing' },
-                        { id: 'mesonero', label: 'Mesonero' },
-                        { id: 'delivery', label: 'Delivery' }
-                      ].map((opt) => {
-                        const checked = messagingNotifyRoles.includes(opt.id);
-                        return (
-                          <label
-                            key={opt.id}
-                            className="flex items-center gap-2 text-[11px] text-text/70"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const isChecked = e.target.checked;
-                                setMessagingNotifyRoles((prev) => {
-                                  if (isChecked) {
-                                    if (prev.includes(opt.id)) return prev;
-                                    return [...prev, opt.id];
-                                  }
-                                  return prev.filter((roleId) => roleId !== opt.id);
-                                });
-                              }}
-                              className="rounded border-glass"
-                            />
-                            <span>{opt.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="border border-glass rounded-lg bg-glass/30 p-3 space-y-3">
+                <p className="text-[11px] font-semibold text-text/80">Header, logo y banner</p>
+                <div>
+                  <p className="text-text/60 mb-1">Tamaño del header</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'compact', label: 'Compacto' },
+                      { id: 'normal', label: 'Normal' },
+                      { id: 'full', label: 'Completo' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setHeaderLayout(opt.id)}
+                        className={`px-3 py-1.5 rounded-full text-[11px] border transition-colors ${
+                          headerLayout === opt.id
+                            ? 'bg-accent text-background-dark border-accent'
+                            : 'bg-glass text-text/70 border-glass hover:text-text'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <p className="text-text/60 mb-1">URL del logo (perfil)</p>
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    value={logoUrlInput}
-                    onChange={(e) => setLogoUrlInput(e.target.value)}
-                    className="input-glass w-full"
-                    placeholder="https://..."
-                  />
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="store-logo-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files && e.target.files[0];
-                        if (!file) return;
-
-                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
-                        if (result.error) {
-                          toast.error(result.error);
-                        } else {
-                          setLogoUrlInput(result.base64);
-                          toast.success('Logo cargado exitosamente');
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="store-logo-upload"
-                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
-                    >
-                      Subir logo desde archivo
-                    </label>
-                    <CameraButton
-                      onPhotoTaken={async (file) => {
-                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
-                        if (result.error) {
-                          toast.error(result.error);
-                        } else {
-                          setLogoUrlInput(result.base64);
-                          toast.success('Logo capturado exitosamente');
-                        }
-                      }}
-                      size="sm"
-                      className="rounded-full"
-                    />
-                  </div>
-                  {logoUrlInput && (
-                    <div className="mt-1">
-                      <img
-                        src={logoUrlInput}
-                        alt={store.name || 'Logo de tienda'}
-                        className="w-16 h-16 rounded-full object-cover border border-glass"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-text/60 mb-1">URL del banner (header)</p>
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    value={coverUrlInput}
-                    onChange={(e) => setCoverUrlInput(e.target.value)}
-                    className="input-glass w-full"
-                    placeholder="https://..."
-                  />
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="store-cover-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files && e.target.files[0];
-                        if (!file) return;
-
-                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
-                        if (result.error) {
-                          toast.error(result.error);
-                        } else {
-                          setCoverUrlInput(result.base64);
-                          toast.success('Banner cargado exitosamente');
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="store-cover-upload"
-                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
-                    >
-                      Subir banner desde archivo
-                    </label>
-                    <CameraButton
-                      onPhotoTaken={async (file) => {
-                        const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
-                        if (result.error) {
-                          toast.error(result.error);
-                        } else {
-                          setCoverUrlInput(result.base64);
-                          toast.success('Banner capturado exitosamente');
-                        }
-                      }}
-                      size="sm"
-                      className="rounded-full"
-                    />
-                  </div>
-                  {coverUrlInput && (
-                    <div className="mt-1">
-                      <img
-                        src={coverUrlInput}
-                        alt={store.name || 'Banner de tienda'}
-                        className="w-full h-24 md:h-32 object-cover rounded-lg border border-glass"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <p className="text-text/60 mb-1">Dirección pública</p>
-                <textarea
-                  value={locationAddress}
-                  onChange={(e) => setLocationAddress(e.target.value)}
-                  className="input-glass w-full h-20 resize-none"
-                />
-              </div>
-              <div>
-                <p className="text-text/60 mb-1">Link de Google Maps / ubicación</p>
-                <input
-                  type="text"
-                  value={locationMapsUrl}
-                  onChange={(e) => setLocationMapsUrl(e.target.value)}
-                  className="input-glass w-full"
-                  placeholder="https://maps.google.com/..."
-                />
-                {locationMapsUrl && (
-                  <div className="mt-1 text-[11px] text-text/60">
-                    {locationPreview ? (
-                      <>
-                        Coordenadas detectadas:{' '}
-                        <span className="font-mono">
-                          {locationPreview.lat.toFixed(6)}, {locationPreview.lng.toFixed(6)}
-                        </span>
-                      </>
-                    ) : (
-                      <span>
-                        No se pudieron leer coordenadas del enlace. Evita usar links cortos como
-                        share.google o maps.app.goo.gl. Abre el mapa y copia la URL completa desde la barra
-                        de direcciones de Google Maps para mejorar la precisión.
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 border-t border-glass pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-text/80 flex items-center gap-1">
-                Métodos de pago (checkout tienda)
-              </h3>
-            </div>
-            <p className="text-[11px] text-text/60">
-              Configura cómo verán los métodos de pago tus clientes al hacer checkout en tu tienda pública.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                {
-                  key: 'bs_transfer',
-                  title: 'Pago mvil / Transferencia en Bs',
-                  placeholder:
-                    'Datos de pago mvil o transferencia en Bs (banco, alias, CI, teléfono, etc.)'
-                },
-                {
-                  key: 'bs_cash',
-                  title: 'Bs en efectivo',
-                  placeholder: 'Instrucciones para pagar en efectivo en Bs (caja, mostrador, etc.)'
-                },
-                {
-                  key: 'usdt_tron',
-                  title: 'USDT Tron',
-                  placeholder: 'Correo o datos de cuenta USDT Tron que verá el cliente'
-                },
-                {
-                  key: 'cash_usdt',
-                  title: 'Efectivo (USDT)',
-                  placeholder: 'Notas para pagos en efectivo en USDT (en tienda, delivery, etc.)'
-                },
-                {
-                  key: 'fires',
-                  title: 'Pago con Fuegos',
-                  placeholder:
-                    'Explica cómo funciona el pago con Fuegos en tu tienda o si aplica alguna condición especial'
-                }
-              ].map((cfg) => {
-                const current = paymentMethodsConfig[cfg.key] || {
-                  label: cfg.title,
-                  instructions: ''
-                };
-
-                return (
-                  <div
-                    key={cfg.key}
-                    className="border border-glass rounded-lg p-3 space-y-2 bg-glass/40"
-                  >
-                    <div>
-                      <p className="text-[11px] text-text/60 mb-1">Nombre que verá el cliente</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-text/60 mb-1">URL del logo (perfil)</p>
+                    <div className="flex flex-col gap-2">
                       <input
                         type="text"
-                        value={current.label}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPaymentMethodsConfig((prev) => ({
-                            ...prev,
-                            [cfg.key]: {
-                              label: value,
-                              instructions: prev[cfg.key]?.instructions || ''
-                            }
-                          }));
-                        }}
-                        className="input-glass w-full text-xs"
+                        value={logoUrlInput}
+                        onChange={(e) => setLogoUrlInput(e.target.value)}
+                        className="input-glass w-full"
+                        placeholder="https://..."
                       />
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-text/60 mb-1">Datos e instrucciones</p>
-                      <textarea
-                        value={current.instructions}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPaymentMethodsConfig((prev) => ({
-                            ...prev,
-                            [cfg.key]: {
-                              label: prev[cfg.key]?.label || current.label,
-                              instructions: value
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="store-logo-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+
+                            const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                            if (result.error) {
+                              toast.error(result.error);
+                            } else {
+                              setLogoUrlInput(result.base64);
+                              toast.success('Logo cargado exitosamente');
                             }
-                          }));
-                        }}
-                        className="input-glass w-full h-20 resize-none text-[11px]"
-                        placeholder={cfg.placeholder}
-                      />
+                          }}
+                        />
+                        <label
+                          htmlFor="store-logo-upload"
+                          className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
+                        >
+                          Subir logo desde archivo
+                        </label>
+                        <CameraButton
+                          onPhotoTaken={async (file) => {
+                            const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                            if (result.error) {
+                              toast.error(result.error);
+                            } else {
+                              setLogoUrlInput(result.base64);
+                              toast.success('Logo capturado exitosamente');
+                            }
+                          }}
+                          size="sm"
+                          className="rounded-full"
+                        />
+                      </div>
+                      {logoUrlInput && (
+                        <div className="mt-1">
+                          <img
+                            src={logoUrlInput}
+                            alt={store.name || 'Logo de tienda'}
+                            className="w-16 h-16 rounded-full object-cover border border-glass"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+
+                  <div>
+                    <p className="text-text/60 mb-1">URL del banner (header)</p>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={coverUrlInput}
+                        onChange={(e) => setCoverUrlInput(e.target.value)}
+                        className="input-glass w-full"
+                        placeholder="https://..."
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="store-cover-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+
+                            const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                            if (result.error) {
+                              toast.error(result.error);
+                            } else {
+                              setCoverUrlInput(result.base64);
+                              toast.success('Banner cargado exitosamente');
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor="store-cover-upload"
+                          className="inline-flex items-center px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] cursor-pointer border border-glass"
+                        >
+                          Subir banner desde archivo
+                        </label>
+                        <CameraButton
+                          onPhotoTaken={async (file) => {
+                            const result = await processProductImageFile(file, MAX_PRODUCT_IMAGE_MB);
+                            if (result.error) {
+                              toast.error(result.error);
+                            } else {
+                              setCoverUrlInput(result.base64);
+                              toast.success('Banner capturado exitosamente');
+                            }
+                          }}
+                          size="sm"
+                          className="rounded-full"
+                        />
+                      </div>
+                      {coverUrlInput && (
+                        <div className="mt-1">
+                          <img
+                            src={coverUrlInput}
+                            alt={store.name || 'Banner de tienda'}
+                            className="w-full h-24 md:h-32 object-cover rounded-lg border border-glass"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-glass rounded-lg bg-glass/30 p-3 space-y-3">
+                <p className="text-[11px] font-semibold text-text/80">Operación y mensajería</p>
+                <div>
+                  <p className="text-text/60 mb-1">Número de mesas (modo restaurante)</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={tablesCountInput}
+                      onChange={(e) => setTablesCountInput(e.target.value)}
+                      className="input-glass w-24"
+                    />
+                    <span className="text-[11px] text-text/60">
+                      0 desactiva el modo restaurante en el POS.
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-text/60 mb-1">Mensajería de tienda</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[11px] text-text/80">
+                      <input
+                        type="checkbox"
+                        checked={messagingEnabled}
+                        onChange={(e) => setMessagingEnabled(e.target.checked)}
+                        className="rounded border-glass"
+                      />
+                      <span>Activar mensajería para esta tienda</span>
+                    </label>
+                    <div className="mt-1 space-y-1">
+                      <p className="text-[11px] text-text/60">
+                        ¿Quién debe ser notificado cuando un cliente escribe a la tienda?
+                      </p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {[
+                          { id: 'owner', label: 'Dueño' },
+                          { id: 'admin', label: 'Admin' },
+                          { id: 'manager', label: 'Manager' },
+                          { id: 'seller', label: 'Vendedor' },
+                          { id: 'marketing', label: 'Marketing' },
+                          { id: 'mesonero', label: 'Mesonero' },
+                          { id: 'delivery', label: 'Delivery' }
+                        ].map((opt) => {
+                          const checked = messagingNotifyRoles.includes(opt.id);
+                          return (
+                            <label
+                              key={opt.id}
+                              className="flex items-center gap-2 text-[11px] text-text/70"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setMessagingNotifyRoles((prev) => {
+                                    if (isChecked) {
+                                      if (prev.includes(opt.id)) return prev;
+                                      return [...prev, opt.id];
+                                    }
+                                    return prev.filter((roleId) => roleId !== opt.id);
+                                  });
+                                }}
+                                className="rounded border-glass"
+                              />
+                              <span>{opt.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="border border-glass rounded-lg bg-glass/30 p-3 space-y-3">
+                <p className="text-[11px] font-semibold text-text/80">Ubicación de la tienda</p>
+                <div>
+                  <p className="text-text/60 mb-1">Dirección pública</p>
+                  <textarea
+                    value={locationAddress}
+                    onChange={(e) => setLocationAddress(e.target.value)}
+                    className="input-glass w-full h-20 resize-none"
+                  />
+                </div>
+                <div>
+                  <p className="text-text/60 mb-1">Link de Google Maps / ubicación</p>
+                  <input
+                    type="text"
+                    value={locationMapsUrl}
+                    onChange={(e) => setLocationMapsUrl(e.target.value)}
+                    className="input-glass w-full"
+                    placeholder="https://maps.google.com/..."
+                  />
+                  {locationMapsUrl && (
+                    <div className="mt-1 text-[11px] text-text/60">
+                      {locationPreview ? (
+                        <>
+                          Coordenadas detectadas:{' '}
+                          <span className="font-mono">
+                            {locationPreview.lat.toFixed(6)}, {locationPreview.lng.toFixed(6)}
+                          </span>
+                        </>
+                      ) : (
+                        <span>
+                          No se pudieron leer coordenadas del enlace. Evita usar links cortos como
+                          share.google o maps.app.goo.gl. Abre el mapa y copia la URL completa desde la barra
+                          de direcciones de Google Maps para mejorar la precisión.
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-glass rounded-lg bg-glass/30 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-text/80 flex items-center gap-1">
+                  Métodos de pago (checkout tienda)
+                </h3>
+              </div>
+              <p className="text-[11px] text-text/60">
+                Resumen de los métodos que verá el cliente al pagar en la tienda pública.
+              </p>
+
+              <div className="flex flex-wrap gap-1 mt-1">
+                {['bs_transfer', 'bs_cash', 'usdt_tron', 'cash_usdt', 'fires'].map((key) => {
+                  const cfg = paymentMethodsConfig[key];
+                  const label = cfg?.label ||
+                    (key === 'bs_transfer'
+                      ? 'Bs transferencia'
+                      : key === 'bs_cash'
+                      ? 'Bs efectivo'
+                      : key === 'usdt_tron'
+                      ? 'USDT Tron'
+                      : key === 'cash_usdt'
+                      ? 'Efectivo USDT'
+                      : 'Fuegos');
+                  return (
+                    <span
+                      key={key}
+                      className="px-2 py-0.5 rounded-full bg-glass text-[10px] text-text/80 border border-glass"
+                    >
+                      {label}
+                    </span>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentMethodsModalOpen(true)}
+                  className="px-3 py-1.5 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-[11px] font-semibold"
+                >
+                  Configurar métodos de pago…
+                </button>
+              </div>
+            </div>
+
+            <div className="border border-glass rounded-lg bg-glass/30 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-text/80 flex items-center gap-1">
+                  Roles y Staff de tienda
+                </h3>
+              </div>
+              <p className="text-[11px] text-text/60">
+                Define roles internos para tu tienda y qué usuarios forman parte del staff. Aquí podrás conectar
+                permisos con caja y billetera de la tienda.
+              </p>
+
+              <div className="flex justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsStoreRolesModalOpen(true)}
+                  className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px] font-semibold"
+                >
+                  Gestionar Roles / Staff…
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-6">
             <button
               type="button"
               onClick={async () => {
@@ -3267,6 +3384,413 @@ const StoreOwnerDashboard = () => {
           vesPerUsdt={vesPerUsdt}
           onClose={() => setIsIngredientsModalOpen(false)}
         />
+      )}
+      {isCustomersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto card-glass p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-text/90">Clientes registrados de la tienda</h3>
+              <button
+                type="button"
+                onClick={() => setIsCustomersModalOpen(false)}
+                className="text-[11px] text-text/60 hover:text-text/90"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {storeCustomersLoading ? (
+              <p className="text-[11px] text-text/60">Cargando clientes…</p>
+            ) : !storeCustomers || storeCustomers.length === 0 ? (
+              <p className="text-[11px] text-text/60">
+                Aún no hay clientes registrados para esta tienda mediante el POS.
+              </p>
+            ) : (
+              <div className="border border-glass rounded-lg overflow-hidden mt-1">
+                <table className="w-full text-[11px]">
+                  <thead className="bg-glass/60">
+                    <tr>
+                      <th className="px-2 py-1 text-left text-text/60 font-semibold">Nombre</th>
+                      <th className="px-2 py-1 text-left text-text/60 font-semibold">Usuario</th>
+                      <th className="px-2 py-1 text-left text-text/60 font-semibold">Teléfono</th>
+                      <th className="px-2 py-1 text-left text-text/60 font-semibold">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {storeCustomers.map((c) => (
+                      <tr key={c.id || c.user_id} className="border-t border-glass/60">
+                        <td className="px-2 py-1 text-text/80">{c.display_name || c.username || '—'}</td>
+                        <td className="px-2 py-1 text-text/80">{c.username || '—'}</td>
+                        <td className="px-2 py-1 text-text/80">{c.phone || '—'}</td>
+                        <td className="px-2 py-1 text-text/80">{c.email || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {isStoreRolesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto card-glass p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-text/90">Roles y Staff de tienda</h3>
+              <button
+                type="button"
+                onClick={() => setIsStoreRolesModalOpen(false)}
+                className="text-[11px] text-text/60 hover:text-text/90"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="flex gap-2 text-[11px] mb-3">
+              <button
+                type="button"
+                onClick={() => setRolesActiveTab('roles')}
+                className={`px-3 py-1.5 rounded-full font-semibold ${
+                  rolesActiveTab === 'roles'
+                    ? 'bg-accent/20 text-accent'
+                    : 'bg-glass text-text/80 hover:bg-glass-hover'
+                }`}
+              >
+                Roles
+              </button>
+              <button
+                type="button"
+                onClick={() => setRolesActiveTab('staff')}
+                className={`px-3 py-1.5 rounded-full font-semibold ${
+                  rolesActiveTab === 'staff'
+                    ? 'bg-accent/20 text-accent'
+                    : 'bg-glass text-text/80 hover:bg-glass-hover'
+                }`}
+              >
+                Staff
+              </button>
+              <button
+                type="button"
+                onClick={() => setRolesActiveTab('permissions')}
+                className={`px-3 py-1.5 rounded-full font-semibold ${
+                  rolesActiveTab === 'permissions'
+                    ? 'bg-accent/20 text-accent'
+                    : 'bg-glass text-text/80 hover:bg-glass-hover'
+                }`}
+              >
+                Permisos
+              </button>
+            </div>
+
+            {rolesActiveTab === 'roles' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-text/80 mb-1">Roles configurados</p>
+                  {storeRolesLoading ? (
+                    <p className="text-[11px] text-text/60">Cargando roles…</p>
+                  ) : !storeRoles || storeRoles.length === 0 ? (
+                    <p className="text-[11px] text-text/60">
+                      Aún no hay roles configurados para esta tienda. El dueño seguirá teniendo acceso completo
+                      por defecto.
+                    </p>
+                  ) : (
+                    <div className="border border-glass rounded-lg divide-y divide-glass mt-1">
+                      {storeRoles.map((role) => (
+                        <div key={role.id} className="p-2 flex flex-col gap-0.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold text-text/90">
+                                {role.display_name || role.role_key}
+                              </span>
+                              <span className="text-[10px] text-text/60 font-mono">
+                                {role.role_key}
+                              </span>
+                              {role.is_system && (
+                                <span className="px-2 py-0.5 rounded-full bg-glass text-[9px] text-text/70 border border-glass">
+                                  System
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {role.description && (
+                            <p className="text-[10px] text-text/70">{role.description}</p>
+                          )}
+                          <p className="text-[10px] text-text/60 mt-0.5">
+                            Permisos: {Array.isArray(role.permissions) ? role.permissions.join(', ') : '—'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rolesActiveTab === 'staff' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-text/80 mb-1">Staff actual</p>
+                  {storeStaffRolesLoading ? (
+                    <p className="text-[11px] text-text/60">Cargando staff…</p>
+                  ) : !storeStaffRoles || storeStaffRoles.length === 0 ? (
+                    <p className="text-[11px] text-text/60">
+                      No hay registros de staff para esta tienda todavía.
+                    </p>
+                  ) : (
+                    <div className="border border-glass rounded-lg mt-1 overflow-hidden">
+                      <table className="w-full text-[11px]">
+                        <thead className="bg-glass/60">
+                          <tr>
+                            <th className="px-2 py-1 text-left text-text/60 font-semibold">Usuario</th>
+                            <th className="px-2 py-1 text-left text-text/60 font-semibold">Nombre</th>
+                            <th className="px-2 py-1 text-left text-text/60 font-semibold">Rol</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {storeStaffRoles.map((s) => (
+                            <tr key={s.id} className="border-t border-glass/60">
+                              <td className="px-2 py-1 text-text/80">{s.username || s.user_id}</td>
+                              <td className="px-2 py-1 text-text/80">{s.display_name || '—'}</td>
+                              <td className="px-2 py-1 text-text/80">
+                                <select
+                                  className="bg-transparent border border-glass rounded px-2 py-1 text-[11px] font-mono"
+                                  value={s.role || ''}
+                                  onChange={async (e) => {
+                                    const newRoleKey = e.target.value;
+                                    if (!newRoleKey || newRoleKey === s.role) return;
+                                    try {
+                                      await assignStoreStaffRoleMutation.mutateAsync({
+                                        userId: s.user_id,
+                                        roleKey: newRoleKey
+                                      });
+                                    } catch (err) {
+                                      // manejado por onError del mutation
+                                    }
+                                  }}
+                                  disabled={assignStoreStaffRoleMutation.isLoading}
+                                >
+                                  <option value="" disabled>
+                                    Seleccionar rol…
+                                  </option>
+                                  {storeRoles.map((role) => (
+                                    <option key={role.id} value={role.role_key}>
+                                      {role.role_key}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rolesActiveTab === 'permissions' && (
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold text-text/80 mb-1">Matriz de permisos por rol</p>
+                {!storeRoles || storeRoles.length === 0 ? (
+                  <p className="text-[11px] text-text/60">
+                    Aún no hay roles configurados para esta tienda.
+                  </p>
+                ) : (
+                  <div className="border border-glass rounded-lg overflow-auto">
+                    <table className="min-w-full text-[10px]">
+                      <thead className="bg-glass/60">
+                        <tr>
+                          <th className="px-2 py-1 text-left text-text/60 font-semibold">Permiso</th>
+                          {storeRoles.map((role) => (
+                            <th
+                              key={role.id}
+                              className="px-2 py-1 text-center text-text/60 font-semibold"
+                            >
+                              {role.role_key}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from(
+                          new Set(
+                            storeRoles.flatMap((r) =>
+                              Array.isArray(r.permissions)
+                                ? r.permissions.filter((p) => typeof p === 'string')
+                                : []
+                            )
+                          )
+                        ).map((perm) => (
+                          <tr key={perm} className="border-t border-glass/60">
+                            <td className="px-2 py-1 text-text/80 font-mono">{perm}</td>
+                            {storeRoles.map((role) => {
+                              const hasPerm = Array.isArray(role.permissions)
+                                ? role.permissions.includes(perm)
+                                : false;
+                              const isUpdating = updateStoreRolePermissionsMutation.isLoading;
+                              return (
+                                <td
+                                  key={role.id + perm}
+                                  className="px-2 py-1 text-center"
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={isUpdating}
+                                    onClick={async () => {
+                                      if (!Array.isArray(role.permissions)) {
+                                        return;
+                                      }
+                                      const nextPerms = hasPerm
+                                        ? role.permissions.filter((p) => p !== perm)
+                                        : [...role.permissions, perm];
+                                      try {
+                                        await updateStoreRolePermissionsMutation.mutateAsync({
+                                          roleId: role.id,
+                                          payload: {
+                                            display_name: role.display_name,
+                                            description: role.description,
+                                            permissions: nextPerms
+                                          }
+                                        });
+                                      } catch (e) {
+                                        // el error ya se maneja en onError del mutation
+                                      }
+                                    }}
+                                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full border transition-colors ${
+                                      hasPerm
+                                        ? 'bg-emerald-500 border-emerald-400'
+                                        : 'bg-transparent border-glass hover:bg-glass'
+                                    } ${isUpdating ? 'opacity-60 cursor-wait' : ''}`}
+                                  >
+                                    {hasPerm && (
+                                      <span className="w-2 h-2 rounded-full bg-background-dark" />
+                                    )}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {isPaymentMethodsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto card-glass p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-text/90">Configurar métodos de pago</h3>
+              <button
+                type="button"
+                onClick={() => setIsPaymentMethodsModalOpen(false)}
+                className="text-[11px] text-text/60 hover:text-text/90"
+              >
+                Cerrar
+              </button>
+            </div>
+            <p className="text-[11px] text-text/60">
+              Edita el nombre visible y las instrucciones de cada método de pago que verán tus clientes en el
+              checkout de la tienda.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+              {[
+                {
+                  key: 'bs_transfer',
+                  title: 'Pago móvil / Transferencia en Bs',
+                  placeholder:
+                    'Datos de pago móvil o transferencia en Bs (banco, alias, CI, teléfono, etc.)'
+                },
+                {
+                  key: 'bs_cash',
+                  title: 'Bs en efectivo',
+                  placeholder: 'Instrucciones para pagar en efectivo en Bs (caja, mostrador, etc.)'
+                },
+                {
+                  key: 'usdt_tron',
+                  title: 'USDT Tron',
+                  placeholder: 'Correo o datos de cuenta USDT Tron que verá el cliente'
+                },
+                {
+                  key: 'cash_usdt',
+                  title: 'Efectivo (USDT)',
+                  placeholder: 'Notas para pagos en efectivo en USDT (en tienda, delivery, etc.)'
+                },
+                {
+                  key: 'fires',
+                  title: 'Pago con Fuegos',
+                  placeholder:
+                    'Explica cómo funciona el pago con Fuegos en tu tienda o si aplica alguna condición especial'
+                }
+              ].map((cfg) => {
+                const current = paymentMethodsConfig[cfg.key] || {
+                  label: cfg.title,
+                  instructions: ''
+                };
+
+                return (
+                  <div
+                    key={cfg.key}
+                    className="border border-glass rounded-lg p-3 space-y-2 bg-glass/40"
+                  >
+                    <div>
+                      <p className="text-[11px] text-text/60 mb-1">Nombre que verá el cliente</p>
+                      <input
+                        type="text"
+                        value={current.label}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPaymentMethodsConfig((prev) => ({
+                            ...prev,
+                            [cfg.key]: {
+                              label: value,
+                              instructions: prev[cfg.key]?.instructions || ''
+                            }
+                          }));
+                        }}
+                        className="input-glass w-full text-xs"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-text/60 mb-1">Datos e instrucciones</p>
+                      <textarea
+                        value={current.instructions}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPaymentMethodsConfig((prev) => ({
+                            ...prev,
+                            [cfg.key]: {
+                              label: prev[cfg.key]?.label || current.label,
+                              instructions: value
+                            }
+                          }));
+                        }}
+                        className="input-glass w-full h-20 resize-none text-[11px]"
+                        placeholder={cfg.placeholder}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setIsPaymentMethodsModalOpen(false)}
+                className="px-3 py-1.5 rounded-full bg-glass hover:bg-glass-hover text-[11px]"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {isProductionRecipeModalOpen && (
         <ProductionRecipeModal
