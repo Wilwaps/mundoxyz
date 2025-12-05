@@ -43,6 +43,7 @@ const storeInventoryRoutes = require('./routes/store/inventory');
 const storeMessagingRoutes = require('./routes/store/messaging');
 const storeCashRoutes = require('./routes/store/cash');
 const storeReportsRoutes = require('./routes/store/reports');
+const storeRolesRoutes = require('./routes/store/roles');
 const storeStaffRoutes = require('./routes/admin/store-staff');
 const referralRoutes = require('./routes/referrals');
 
@@ -354,6 +355,7 @@ app.use('/api/store/inventory', (req, res, next) => { req.io = io; next(); }, st
 app.use('/api/store/messaging', (req, res, next) => { req.io = io; next(); }, storeMessagingRoutes);
 app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeCashRoutes);
 app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeReportsRoutes);
+app.use('/api/store', (req, res, next) => { req.io = io; next(); }, storeRolesRoutes);
 app.use('/api/admin/store-staff', storeStaffRoutes);
 
 app.use('/api/bingo/v2', (req, res, next) => {

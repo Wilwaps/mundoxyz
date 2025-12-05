@@ -1339,7 +1339,31 @@ CREATE INDEX IF NOT EXISTS idx_recipe_cost_history_recipe
   ON recipe_cost_history(recipe_id);
 
 -- ============================================
--- 36. MIGRATIONS
+-- 36. STORE_ROLES (ROLES POR TIENDA)
+-- ============================================
+CREATE TABLE IF NOT EXISTS store_roles (
+  id SERIAL PRIMARY KEY,
+  store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  role_key VARCHAR(50) NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  description TEXT,
+  permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  is_system BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (store_id, role_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_store_roles_store ON store_roles(store_id);
+CREATE INDEX IF NOT EXISTS idx_store_roles_store_role_key ON store_roles(store_id, role_key);
+CREATE INDEX IF NOT EXISTS idx_store_roles_is_system ON store_roles(is_system) WHERE is_system = TRUE;
+
+COMMENT ON TABLE store_roles IS 'Definición de roles por tienda y permisos asociados';
+COMMENT ON COLUMN store_roles.role_key IS 'Clave interna del rol (coincide con store_staff.role)';
+COMMENT ON COLUMN store_roles.permissions IS 'Array de llaves de permiso (JSONB) para este rol';
+
+-- ============================================
+-- 37. MIGRATIONS
 -- ============================================
 CREATE TABLE IF NOT EXISTS migrations (
   id SERIAL PRIMARY KEY,

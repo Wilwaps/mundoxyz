@@ -44,6 +44,7 @@ const POS = () => {
 
     const [draftInvoices, setDraftInvoices] = useState([]);
     const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+    const [isCustomerSearchFocused, setIsCustomerSearchFocused] = useState(false);
 
     const [currentTable, setCurrentTable] = useState(null); // Mesa actualmente cargada en el carrito (si aplica)
     const [tableTabs, setTableTabs] = useState({}); // { 'Mesa 1': { total_usdt, version, cart?: [...] } }
@@ -1141,8 +1142,10 @@ const POS = () => {
                                 className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={customerSearch}
                                 onChange={(e) => setCustomerSearch(e.target.value)}
+                                onFocus={() => setIsCustomerSearchFocused(true)}
+                                onBlur={() => setIsCustomerSearchFocused(false)}
                             />
-                            {customerSearch && (
+                            {customerSearch && isCustomerSearchFocused && (
                                 <div className="absolute left-0 right-0 mt-1 bg-black/95 border border-white/10 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 text-xs">
                                     {isSearchingCustomers && (
                                         <div className="px-3 py-2 text-white/50">

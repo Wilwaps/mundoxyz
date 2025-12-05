@@ -111,6 +111,7 @@ async function userCanViewStoreReports(user, storeId) {
 }
 
 module.exports = {
+  getStoreBasics,
   isStoreRentalActive,
   userCanManageStoreOperations,
   userCanViewStoreReports,

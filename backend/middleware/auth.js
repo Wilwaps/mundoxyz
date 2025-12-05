@@ -9,6 +9,43 @@ function getBaseGlobalLevel(roles) {
   return 3;
 }
 
+// Require a specific permission within a store context
+function requireStorePermission(permissionKey, options = {}) {
+  const { storeIdParam = 'storeId' } = options;
+
+  return async (req, res, next) => {
+    try {
+      // Asegurar autenticación primero
+      if (!req.user) {
+        await verifyToken(req, res, () => {});
+        if (!req.user) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+      }
+
+      const storeId = req.params?.[storeIdParam] || req.body?.[storeIdParam];
+
+      if (!storeId) {
+        return res.status(400).json({ error: 'storeId is required for permission check' });
+      }
+
+      const allowed = await userHasStorePermission(req.user, storeId, permissionKey);
+
+      if (!allowed) {
+        return res.status(403).json({
+          error: 'Insufficient store permissions',
+          permission: permissionKey,
+        });
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Store permission check error:', error);
+      return res.status(500).json({ error: 'Authorization error' });
+    }
+  };
+}
+
 function computeEffectiveStoreLevel(userRow, roles) {
   const baseLevel = getBaseGlobalLevel(roles);
 
@@ -137,6 +174,8 @@ async function optionalAuth(req, res, next) {
     next();
   }
 }
+
+const { userHasStorePermission } = require('../helpers/storePermissions');
 
 // Check if user has specific role
 function requireRole(...roles) {
@@ -354,6 +393,7 @@ module.exports = {
   verifyToken,
   optionalAuth,
   requireRole,
+  requireStorePermission,
   requireTote,
   requireAdmin,
   requireWalletAccess,
