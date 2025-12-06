@@ -1999,9 +1999,9 @@ const StoreFront = () => {
                             </button>
                             <button
                                 type="button"
-                                onClick={handleConfirmClick}
-                                disabled={!isPaid || createOrderMutation.isLoading}
+                                disabled={createOrderMutation.isLoading}
                                 className="flex-1 py-3 rounded-lg bg-accent text-dark font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                onClick={handleCheckout}
                             >
                                 {createOrderMutation.isLoading ? 'Enviando...' : 'Confirmar pedido'}
                             </button>

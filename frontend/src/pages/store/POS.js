@@ -1905,7 +1905,7 @@ const POS = () => {
                                     </button>
                                     <button
                                         onClick={handleCheckout}
-                                        disabled={!isPaid}
+                                        disabled={createOrderMutation.isLoading}
                                         className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Confirmar Pago
