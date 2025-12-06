@@ -447,10 +447,11 @@ class RaffleServiceV2 {
         created: 'r.created_at',
         ending: 'r.ends_at',
         pot: 'GREATEST(r.pot_fires, r.pot_coins)',
-        sold: 'numbers_sold'
+        sold: 'COALESCE(numbers_sold, 0)'
       };
-      const orderBy = `${orderMap[sortBy] || 'r.created_at'} ${sortOrder}`;
-      
+      const orderByExpression = orderMap[sortBy] || 'r.created_at';
+      const orderBy = `${orderByExpression} ${sortOrder}`;
+
       // Contar total
       const countResult = await query(
         `SELECT COUNT(DISTINCT r.id) as total
@@ -458,37 +459,93 @@ class RaffleServiceV2 {
          ${whereClause}`,
         params
       );
-      
+
       const total = parseInt(countResult.rows[0].total);
       const totalPages = Math.ceil(total / limit);
       const offset = (page - 1) * limit;
-      
-      // Obtener rifas con estadísticas
-      params.push(limit, offset);
-      
-      const result = await query(
-        `SELECT 
-          r.*,
-          u.username as host_username,
-          COUNT(CASE WHEN rn.state = 'sold' THEN 1 END) as numbers_sold,
-          COUNT(CASE WHEN rn.state = 'reserved' THEN 1 END) as numbers_reserved,
-          rc.company_name,
-          rc.brand_color as primary_color,
-          rc.secondary_color,
-          rc.logo_url,
-          rc.logo_base64
-         FROM raffles r
-         JOIN users u ON r.host_id = u.id
-         LEFT JOIN raffle_numbers rn ON rn.raffle_id = r.id
-         LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
-         ${whereClause}
-         GROUP BY r.id, u.username, rc.company_name, rc.brand_color, rc.secondary_color, rc.logo_url, rc.logo_base64
-         ORDER BY ${orderBy}
-         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-        params
-      );
-      
-      const raffles = result.rows.map(r => this.formatRaffleResponse(r));
+      const paramsWithPagination = [...params, limit, offset];
+
+      let rows;
+
+      if (sortBy === 'sold') {
+        const result = await query(
+          `SELECT 
+            r.*,
+            u.username as host_username,
+            stats.numbers_sold,
+            stats.numbers_reserved,
+            rc.company_name,
+            rc.brand_color as primary_color,
+            rc.secondary_color,
+            rc.logo_url,
+            rc.logo_base64
+           FROM raffles r
+           JOIN users u ON r.host_id = u.id
+           LEFT JOIN LATERAL (
+             SELECT 
+               COUNT(*) FILTER (WHERE rn.state = 'sold') AS numbers_sold,
+               COUNT(*) FILTER (WHERE rn.state = 'reserved') AS numbers_reserved
+             FROM raffle_numbers rn
+             WHERE rn.raffle_id = r.id
+           ) stats ON TRUE
+           LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
+           ${whereClause}
+           ORDER BY ${orderBy}
+           LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+          paramsWithPagination
+        );
+        rows = result.rows;
+      } else {
+        const basicResult = await query(
+          `SELECT 
+            r.*,
+            u.username as host_username,
+            rc.company_name,
+            rc.brand_color as primary_color,
+            rc.secondary_color,
+            rc.logo_url,
+            rc.logo_base64
+           FROM raffles r
+           JOIN users u ON r.host_id = u.id
+           LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
+           ${whereClause}
+           ORDER BY ${orderBy}
+           LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+          paramsWithPagination
+        );
+
+        const rafflesRows = basicResult.rows;
+        const raffleIds = rafflesRows.map(r => r.id);
+
+        let statsById = new Map();
+        if (raffleIds.length > 0) {
+          const statsResult = await query(
+            `SELECT 
+               raffle_id,
+               COUNT(*) FILTER (WHERE state = 'sold') AS numbers_sold,
+               COUNT(*) FILTER (WHERE state = 'reserved') AS numbers_reserved
+             FROM raffle_numbers
+             WHERE raffle_id = ANY($1)
+             GROUP BY raffle_id`,
+            [raffleIds]
+          );
+
+          statsById = new Map(
+            statsResult.rows.map(row => [row.raffle_id, row])
+          );
+        }
+
+        rows = rafflesRows.map(row => {
+          const stats = statsById.get(row.id) || { numbers_sold: 0, numbers_reserved: 0 };
+          return {
+            ...row,
+            numbers_sold: parseInt(stats.numbers_sold, 10) || 0,
+            numbers_reserved: parseInt(stats.numbers_reserved, 10) || 0
+          };
+        });
+      }
+
+      const raffles = rows.map(r => this.formatRaffleResponse(r));
       
       return {
         raffles,

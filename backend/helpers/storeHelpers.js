@@ -18,13 +18,22 @@ const setStoreCache = (storeId, data) => {
   });
 };
 
-const getStoreBasics = async (storeId) => {
+const getStoreCacheEntry = (storeId) => {
   if (!storeId) return null;
 
   const cached = storeCache.get(storeId);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
+
+  return null;
+};
+
+const getStoreBasics = async (storeId) => {
+  if (!storeId) return null;
+
+  const cached = getStoreCacheEntry(storeId);
+  if (cached) return cached;
 
   const result = await query(
     `SELECT id, owner_id
@@ -116,5 +125,9 @@ module.exports = {
   userCanManageStoreOperations,
   userCanViewStoreReports,
   invalidateStoreCache,
-  clearStoreCache
+  clearStoreCache,
+  getStoreCacheEntry,
+  setStoreCache,
+  storeCache,
+  STORE_CACHE_TTL_MS
 };

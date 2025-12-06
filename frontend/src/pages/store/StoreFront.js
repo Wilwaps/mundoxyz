@@ -12,6 +12,9 @@ import CameraButton from '../../components/CameraButton';
 import { openMapWithAutoClose, openLocationSearch } from '../../utils/mapHelper';
 import ProductShareModal from '../../components/ProductShareModal';
 import './StoreFront.css'; // Custom styles
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
+import usePublicStore from '../../hooks/usePublicStore';
+import useFiatContext from '../../hooks/useFiatContext';
 
 const COLOR_KEYWORDS = {
     rojo: { color: '#ef4444', label: 'Rojo' },
@@ -105,6 +108,7 @@ const buildModifierSignature = (modifiers) => {
 };
 
 const StoreFront = () => {
+    useDisableRaffleQueries();
     const { slug } = useParams(); // e.g., 'divorare04'
     const navigate = useNavigate();
     const { user, loginWithCredentials, loading: authLoading } = useAuth();
@@ -159,22 +163,10 @@ const StoreFront = () => {
     ]);
     const [nextPaymentLineId, setNextPaymentLineId] = useState(2);
 
-    // Fetch Store Data
-    const { data: storeData, isLoading } = useQuery({
-        queryKey: ['store', slug],
-        queryFn: async () => {
-            const response = await axios.get(`/api/store/public/${slug}`);
-            return response.data;
-        }
-    });
+    // Fetch Store Data (cacheada por slug)
+    const { data: storeData, isLoading } = usePublicStore(slug);
 
-    const { data: fiatContext } = useQuery({
-        queryKey: ['fiat-context'],
-        queryFn: async () => {
-            const response = await axios.get('/api/economy/fiat-context');
-            return response.data;
-        }
-    });
+    const { data: fiatContext } = useFiatContext();
 
     let vesPerUsdt = null;
     if (fiatContext?.bcvRate && fiatContext.bcvRate.rate != null) {
@@ -224,21 +216,35 @@ const StoreFront = () => {
             if (!Array.isArray(mods) || mods.length === 0) return;
 
             const maxSelection = mods[0]?.max_selection || 1;
+            const effectiveMax = maxSelection > 0 ? maxSelection : 1;
 
             const requiredIds = mods
                 .filter((m) => m && m.is_required === true)
                 .map((m) => m.id)
                 .filter((id) => id != null);
 
+            const optionalIds = mods
+                .filter((m) => m && m.is_required !== true)
+                .map((m) => m.id)
+                .filter((id) => id != null);
+
             let ids = [];
 
-            if (requiredIds.length > 0) {
-                ids = requiredIds;
-            } else if (maxSelection > 1) {
-                // Para grupos multi-selección sin requeridos, seleccionar todos por defecto
-                ids = mods
+            // Primero, todos los requeridos
+            ids = [...requiredIds];
+
+            // Completar hasta effectiveMax con opcionales en orden original
+            if (ids.length < effectiveMax) {
+                const remainingSlots = effectiveMax - ids.length;
+                ids = ids.concat(optionalIds.slice(0, remainingSlots));
+            }
+
+            // Si hay menos modificadores que el máximo, simplemente tomamos todos
+            if (ids.length === 0) {
+                const allIds = mods
                     .map((m) => m && m.id)
                     .filter((id) => id != null);
+                ids = allIds.slice(0, effectiveMax);
             }
 
             if (ids.length > 0) {
@@ -1356,15 +1362,18 @@ const StoreFront = () => {
                                                                         };
                                                                     }
 
-                                                                    // Selección múltiple
+                                                                    // Selección múltiple con límite y rotación FIFO
                                                                     let next;
                                                                     if (current.includes(id)) {
+                                                                        // Desmarcar si ya estaba seleccionado
                                                                         next = current.filter((mId) => mId !== id);
                                                                     } else {
-                                                                        next = [...current, id];
-                                                                        if (maxSelection > 0 && next.length > maxSelection) {
-                                                                            toast.error(`Máximo ${maxSelection} opciones para ${groupName}`);
-                                                                            return prev;
+                                                                        if (maxSelection > 0 && current.length >= maxSelection) {
+                                                                            // Eliminar el más antiguo (primer elemento) y agregar el nuevo
+                                                                            const [, ...rest] = current;
+                                                                            next = [...rest, id];
+                                                                        } else {
+                                                                            next = [...current, id];
                                                                         }
                                                                     }
 

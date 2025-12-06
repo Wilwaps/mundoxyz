@@ -8,8 +8,11 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import CameraButton from '../../components/CameraButton';
 import { useSocket } from '../../contexts/SocketContext';
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
+import usePublicStore from '../../hooks/usePublicStore';
 
 const POS = () => {
+    useDisableRaffleQueries();
     const { slug } = useParams(); // 'divorare04'
     const navigate = useNavigate();
     const [cart, setCart] = useState([]);
@@ -60,14 +63,8 @@ const POS = () => {
     const [qrPaymentOrder, setQrPaymentOrder] = useState(null); // { orderId, fires, storeId }
     const [hasNewActiveOrder, setHasNewActiveOrder] = useState(false);
 
-    // Fetch Store & Products
-    const { data: storeData } = useQuery({
-        queryKey: ['store-pos', slug],
-        queryFn: async () => {
-            const response = await axios.get(`/api/store/public/${slug}`);
-            return response.data;
-        }
-    });
+    // Fetch Store & Products (reutiliza cache pública por slug)
+    const { data: storeData } = usePublicStore(slug);
 
     // Fetch FIAT context for dynamic rates (USDT -> Bs, USDT -> Fires)
     const { data: fiatContext } = useQuery({
@@ -660,7 +657,8 @@ const POS = () => {
             items: cart.map(item => ({
                 product_id: item.id,
                 quantity: item.quantity,
-                modifiers: [] // TODO: Add modifier support in POS
+                // Pasar modificadores si existen en el item del carrito
+                modifiers: Array.isArray(item.modifiers) ? item.modifiers : []
             })),
             type: 'dine_in', // Default
             payment_method: {
@@ -727,7 +725,8 @@ const POS = () => {
             items: cart.map(item => ({
                 product_id: item.id,
                 quantity: item.quantity,
-                modifiers: []
+                // Pasar modificadores si existen en el item del carrito
+                modifiers: Array.isArray(item.modifiers) ? item.modifiers : []
             })),
             type: 'dine_in',
             payment_method: {
@@ -1289,6 +1288,35 @@ const POS = () => {
                                 <div className="min-w-0">
                                     <div className="font-medium truncate max-w-[140px] sm:max-w-[200px]">{item.name}</div>
                                     <div className="text-xs text-white/60">${Number(item.price_usdt || 0).toFixed(2)} c/u</div>
+
+                                    {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                                        <div className="mt-1 text-[11px] text-white/70 space-y-0.5">
+                                            {Object.entries(
+                                                item.modifiers.reduce((groups, mod) => {
+                                                    if (!mod) return groups;
+                                                    const groupName = mod.group_name || 'Extras';
+                                                    if (!groups[groupName]) groups[groupName] = [];
+                                                    groups[groupName].push(mod);
+                                                    return groups;
+                                                }, {})
+                                            ).map(([groupName, mods]) => (
+                                                <div
+                                                    key={groupName}
+                                                    className="flex flex-wrap items-center gap-1"
+                                                >
+                                                    <span className="font-semibold mr-1">{groupName}:</span>
+                                                    {mods.map((mod) => (
+                                                        <span
+                                                            key={mod.id}
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 text-[10px]"
+                                                        >
+                                                            <span>{mod.name}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">

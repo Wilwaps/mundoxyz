@@ -6,6 +6,25 @@ const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 
+// Simple in-memory cache with TTL (short-lived to avoid stale data)
+const memoryCache = new Map();
+const CACHE_TTL_MS = 30_000; // 30s
+
+function getCache(key) {
+    const entry = memoryCache.get(key);
+    if (!entry) return null;
+    const { expiresAt, value } = entry;
+    if (Date.now() > expiresAt) {
+        memoryCache.delete(key);
+        return null;
+    }
+    return value;
+}
+
+function setCache(key, value, ttlMs = CACHE_TTL_MS) {
+    memoryCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
 async function normalizeStoreId(rawStoreId) {
     if (!rawStoreId) return null;
 
@@ -217,6 +236,14 @@ router.get('/public/:slug', async (req, res) => {
                 modifiers: modifiersByProduct[product.id] || []
             }))
         });
+        setCache(cacheKey, {
+            store,
+            categories: categoriesResult.rows,
+            products: productsResult.rows.map((product) => ({
+                ...product,
+                modifiers: modifiersByProduct[product.id] || []
+            }))
+        });
     } catch (error) {
         logger.error('Error fetching store:', error);
         res.status(500).json({ error: error.message });
@@ -228,6 +255,12 @@ router.get('/public/:slug', async (req, res) => {
 router.get('/by-slug/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
+
+        const cacheKey = `store_slug:${slug}`;
+        const cached = getCache(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
 
         const result = await query(
             `SELECT id, slug, name
@@ -241,6 +274,7 @@ router.get('/by-slug/:slug', async (req, res) => {
             return res.status(404).json({ error: 'Store not found' });
         }
 
+        setCache(cacheKey, result.rows[0]);
         res.json(result.rows[0]);
     } catch (error) {
         logger.error('Error fetching store by slug:', error);

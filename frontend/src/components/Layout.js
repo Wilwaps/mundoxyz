@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import MessageInbox from './MessageInbox';
 import UnifiedChat from './chat/UnifiedChat';
-import { User, DoorOpen, Gamepad2, Trophy, Store, Settings } from 'lucide-react';
+import { User, DoorOpen, Gamepad2, Store, Settings, Trophy } from 'lucide-react';
 import ExperienceModal from './ExperienceModal';
 import BuyExperienceModal from './BuyExperienceModal';
 import WalletHistoryModal from './WalletHistoryModal';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -132,6 +132,7 @@ import toast from 'react-hot-toast';
 import CameraButton from '../../components/CameraButton';
 import { openMapWithAutoClose } from '../../utils/mapHelper';
 import ColorPickerModal from '../../components/ColorPickerModal';
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
 
 const MAX_PRODUCT_IMAGE_MB = 5;
 
@@ -245,6 +246,7 @@ const parseModifierColorFromName = (rawName) => {
 };
 
 const StoreOwnerDashboard = () => {
+  useDisableRaffleQueries();
   const { slug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();

@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
 
 const StoreQrPaymentPage = () => {
+    useDisableRaffleQueries();
     const { slug, qrSessionId } = useParams();
     const navigate = useNavigate();
 

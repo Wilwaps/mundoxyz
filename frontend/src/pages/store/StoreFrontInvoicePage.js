@@ -5,6 +5,8 @@ import { openMapWithAutoClose, openLocationSearch } from '../../utils/mapHelper'
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ArrowLeft, MapPin, FileText, ShoppingBag, ListChecks, Share2 } from 'lucide-react';
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
+import usePublicStore from '../../hooks/usePublicStore';
 
 const COLOR_KEYWORDS = {
   rojo: { color: '#ef4444', label: 'Rojo' },
@@ -59,6 +61,7 @@ const parseModifierColorFromName = (rawName) => {
 };
 
 const StoreFrontInvoicePage = () => {
+  useDisableRaffleQueries();
   const { slug, invoiceNumber } = useParams();
   const navigate = useNavigate();
   const locationRouter = useLocation();
@@ -67,13 +70,7 @@ const StoreFrontInvoicePage = () => {
   const fromOrders = fromParam === 'orders';
   const fromReports = fromParam === 'reports';
 
-  const { data: storeData, isLoading: loadingStore, error: storeError } = useQuery({
-    queryKey: ['store', slug],
-    queryFn: async () => {
-      const response = await axios.get(`/api/store/public/${slug}`);
-      return response.data;
-    }
-  });
+  const { data: storeData, isLoading: loadingStore, error: storeError } = usePublicStore(slug);
 
   const store = storeData?.store;
   const storeId = store?.id;

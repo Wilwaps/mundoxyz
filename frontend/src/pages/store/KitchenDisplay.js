@@ -5,23 +5,25 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, CheckCircle, ChefHat, AlertCircle } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketContext';
+import useDisableRaffleQueries from '../../hooks/useDisableRaffleQueries';
+import usePublicStore from '../../hooks/usePublicStore';
 import toast from 'react-hot-toast';
 
 const KitchenDisplay = () => {
+    useDisableRaffleQueries();
     const { slug } = useParams();
     const queryClient = useQueryClient();
     const { socket } = useSocket();
     const [storeId, setStoreId] = useState(null);
 
-    // Fetch Store ID first
-    const { data: storeData } = useQuery({
-        queryKey: ['store-kds-meta', slug],
-        queryFn: async () => {
-            const res = await axios.get(`/api/store/public/${slug}`);
-            setStoreId(res.data.store.id);
-            return res.data;
+    // Fetch Store metadata from public endpoint (cacheado)
+    const { data: storeData } = usePublicStore(slug);
+
+    useEffect(() => {
+        if (storeData?.store?.id) {
+            setStoreId(storeData.store.id);
         }
-    });
+    }, [storeData]);
 
     // Check if restaurant mode is enabled
     const storeSettingsRaw = storeData?.store?.settings || {};
