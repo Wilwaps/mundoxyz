@@ -21,6 +21,25 @@ const {
 // ID de la plataforma (Telegram)
 const PLATFORM_TELEGRAM_ID = '1417856820';
 
+// Cache in-memory de listas de rifas (mis rifas) con TTL corto
+const rafflesCache = new Map();
+const RAFFLES_CACHE_TTL_MS = 30_000; // 30s
+
+function getCache(key) {
+  const entry = rafflesCache.get(key);
+  if (!entry) return null;
+  const { value, expiresAt } = entry;
+  if (Date.now() > expiresAt) {
+    rafflesCache.delete(key);
+    return null;
+  }
+  return value;
+}
+
+function setCache(key, value, ttlMs = RAFFLES_CACHE_TTL_MS) {
+  rafflesCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
 class RaffleServiceV2 {
   /**
    * Crear nueva rifa
@@ -368,6 +387,7 @@ class RaffleServiceV2 {
    */
   async getRaffles(filters = {}, userId = null) {
     try {
+      const t0 = Date.now();
       const {
         status,
         mode,
@@ -382,6 +402,39 @@ class RaffleServiceV2 {
         limit = 20
       } = filters;
       
+      // Cache solo para mis rifas (host)
+      const cacheKey =
+        hostId &&
+        `raffles:${hostId}:${JSON.stringify({
+          status,
+          mode,
+          visibility,
+          sortBy,
+          sortOrder,
+          page,
+          limit,
+          minPot,
+          maxPot,
+          search
+        })}`;
+
+      if (cacheKey) {
+        const cached = getCache(cacheKey);
+        if (cached) {
+          logger.info('[RaffleServiceV2] getRaffles cache hit', {
+            hostId,
+            page,
+            limit,
+            sortBy,
+            sortOrder,
+            visibility,
+            status,
+            cache_hit: true
+          });
+          return cached;
+        }
+      }
+
       let conditions = [];
       let params = [];
       let paramIndex = 1;
@@ -452,6 +505,8 @@ class RaffleServiceV2 {
       const orderByExpression = orderMap[sortBy] || 'r.created_at';
       const orderBy = `${orderByExpression} ${sortOrder}`;
 
+      const tBuild = Date.now();
+
       // Contar total
       const countResult = await query(
         `SELECT COUNT(DISTINCT r.id) as total
@@ -460,25 +515,53 @@ class RaffleServiceV2 {
         params
       );
 
+      const tCount = Date.now();
+
       const total = parseInt(countResult.rows[0].total);
       const totalPages = Math.ceil(total / limit);
       const offset = (page - 1) * limit;
       const paramsWithPagination = [...params, limit, offset];
 
       let rows;
+      let dataDurationMs = 0;
 
       if (sortBy === 'sold') {
+        const tDataStart = Date.now();
         const result = await query(
           `SELECT 
-            r.*,
+            r.id,
+            r.code,
+            r.name,
+            r.description,
+            r.status,
+            r.mode,
+            r.visibility,
+            r.host_id,
+            r.numbers_range,
+            r.entry_price_fire,
+            r.entry_price_coin,
+            r.pot_fires,
+            r.pot_coins,
+            r.winner_id,
+            r.winner_number,
+            r.created_at,
+            r.starts_at,
+            r.ends_at,
+            r.finished_at,
+            r.allow_fires_payment,
+            r.draw_mode,
+            r.scheduled_draw_at,
+            r.prize_meta,
+            r.terms_conditions,
             u.username as host_username,
             stats.numbers_sold,
             stats.numbers_reserved,
             rc.company_name,
+            rc.rif_number,
             rc.brand_color as primary_color,
             rc.secondary_color,
             rc.logo_url,
-            rc.logo_base64
+            rc.website_url
            FROM raffles r
            JOIN users u ON r.host_id = u.id
            LEFT JOIN LATERAL (
@@ -495,16 +578,42 @@ class RaffleServiceV2 {
           paramsWithPagination
         );
         rows = result.rows;
+        dataDurationMs = Date.now() - tDataStart;
       } else {
-        const basicResult = await query(
+        const tDataStart = Date.now();
+        const result = await query(
           `SELECT 
-            r.*,
+            r.id,
+            r.code,
+            r.name,
+            r.description,
+            r.status,
+            r.mode,
+            r.visibility,
+            r.host_id,
+            r.numbers_range,
+            r.entry_price_fire,
+            r.entry_price_coin,
+            r.pot_fires,
+            r.pot_coins,
+            r.winner_id,
+            r.winner_number,
+            r.created_at,
+            r.starts_at,
+            r.ends_at,
+            r.finished_at,
+            r.allow_fires_payment,
+            r.draw_mode,
+            r.scheduled_draw_at,
+            r.prize_meta,
+            r.terms_conditions,
             u.username as host_username,
             rc.company_name,
+            rc.rif_number,
             rc.brand_color as primary_color,
             rc.secondary_color,
             rc.logo_url,
-            rc.logo_base64
+            rc.website_url
            FROM raffles r
            JOIN users u ON r.host_id = u.id
            LEFT JOIN raffle_companies rc ON rc.raffle_id = r.id
@@ -514,8 +623,10 @@ class RaffleServiceV2 {
           paramsWithPagination
         );
 
-        const rafflesRows = basicResult.rows;
-        const raffleIds = rafflesRows.map(r => r.id);
+        rows = result.rows;
+        dataDurationMs = Date.now() - tDataStart;
+
+        const raffleIds = rows.map(r => r.id);
 
         let statsById = new Map();
         if (raffleIds.length > 0) {
@@ -535,7 +646,7 @@ class RaffleServiceV2 {
           );
         }
 
-        rows = rafflesRows.map(row => {
+        rows = rows.map(row => {
           const stats = statsById.get(row.id) || { numbers_sold: 0, numbers_reserved: 0 };
           return {
             ...row,
@@ -546,11 +657,34 @@ class RaffleServiceV2 {
       }
 
       const raffles = rows.map(r => this.formatRaffleResponse(r));
-      
+
+      const elapsed = Date.now() - t0;
+      logger.info('[RaffleServiceV2] getRaffles timing', {
+        hostId: hostId || null,
+        visibility,
+        status,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        total,
+        totalPages,
+        count: raffles.length,
+        build_ms: tBuild - t0,
+        count_ms: tCount - tBuild,
+        data_ms: dataDurationMs,
+        elapsed_ms: elapsed
+      });
+
+      if (cacheKey) {
+        setCache(cacheKey, { raffles, total, page, limit });
+      }
+
       return {
         raffles,
         total,
         page,
+        limit,
         totalPages
       };
       

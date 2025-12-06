@@ -164,6 +164,20 @@ router.get('/list', verifyToken, async (req, res) => {
 router.get('/public/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
+        const t0 = Date.now();
+
+        // Cache respuesta pública (tienda + categorías + productos) para clientes
+        const cacheKey = `store_public:${slug}`;
+        const cached = getCache(cacheKey);
+        if (cached) {
+            logger.info('[StorePublic] cache hit', {
+                slug,
+                elapsed_ms: Date.now() - t0,
+                categories: Array.isArray(cached.categories) ? cached.categories.length : 0,
+                products: Array.isArray(cached.products) ? cached.products.length : 0
+            });
+            return res.json(cached);
+        }
 
         // Update views count in background (non-blocking)
         query(
@@ -227,6 +241,13 @@ router.get('/public/:slug', async (req, res) => {
             acc[modifier.product_id].push(modifier);
             return acc;
         }, {});
+
+        logger.info('[StorePublic] done', {
+            slug,
+            elapsed_ms: Date.now() - t0,
+            categories: categoriesResult.rows.length,
+            products: productsResult.rows.length
+        });
 
         res.json({
             store,

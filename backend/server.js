@@ -14,6 +14,7 @@ const config = require('./config/config');
 const { initDatabase } = require('./db');
 const { initRedis } = require('./services/redis');
 const fiatRatesScheduler = require('./jobs/fiatRatesScheduler');
+const { resolveShortCode } = require('./services/shortLinkService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -46,6 +47,7 @@ const storeReportsRoutes = require('./routes/store/reports');
 const storeRolesRoutes = require('./routes/store/roles');
 const storeStaffRoutes = require('./routes/admin/store-staff');
 const referralRoutes = require('./routes/referrals');
+const shortLinksRoutes = require('./routes/shortLinks');
 
 // Create Express app
 const app = express();
@@ -373,6 +375,7 @@ app.use('/api/telegram', telegramWebhookRoutes);
 app.use('/api/raffles/v2', rafflesV2Routes);
 app.use('/api/experience', experienceRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/short-links', shortLinksRoutes);
 
 // Public APK download endpoint for mobile app updates
 app.get('/app/download/android', (req, res) => {
@@ -403,6 +406,25 @@ app.get('/config.js', (req, res) => {
       WELCOME_AUTOSTART: ${config.features.welcomeAutostart}
     }
   };`);
+});
+
+app.get('/:code(\\d{6})', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const target = await resolveShortCode(code);
+
+    if (!target) {
+      return res.status(404).send('Link no encontrado');
+    }
+
+    return res.redirect(302, target);
+  } catch (error) {
+    logger.error('Error resolving short link', {
+      error: error?.message,
+      stack: error?.stack,
+    });
+    return res.status(500).send('Error al resolver link');
+  }
 });
 
 // Catch-all route for React app (production)

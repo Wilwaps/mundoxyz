@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Search, CreditCard, Banknote, Flame, RefreshCw, User, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,10 +15,19 @@ const POS = () => {
     useDisableRaffleQueries();
     const { slug } = useParams(); // 'divorare04'
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [openCashModalOpen, setOpenCashModalOpen] = useState(false);
+    const [openCashForm, setOpenCashForm] = useState({
+        usdt: '',
+        bs: '',
+        fires: '',
+        tron: ''
+    });
+    const [cashCloseSummary, setCashCloseSummary] = useState(null);
 
     // Payment State (strings vacíos para evitar ceros iniciales en los inputs)
     const initialPayments = {
@@ -130,22 +139,40 @@ const POS = () => {
 
     const cashSession = cashStatusData;
 
+    const cashCloseSession = cashCloseSummary?.session || null;
+    const cashCloseStats = cashCloseSummary?.summary || null;
+    const openingBalance = cashCloseSession?.opening_balance || {};
+    const closingTotals = cashCloseSession?.closing_totals || {};
+
     const openCashMutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (values) => {
             if (!storeId) return null;
-            const payload = {
-                opening_balance: {
-                    usdt: 0,
-                    fires: 0,
-                    bs: 0,
-                    tron: 0
-                }
+
+            const normalize = (value) => {
+                const n = typeof value === 'number'
+                    ? value
+                    : parseFloat(String(value ?? '').replace(',', '.'));
+                return Number.isFinite(n) && n >= 0 ? n : 0;
             };
+
+            const opening_balance = {
+                usdt: normalize(values?.usdt),
+                bs: normalize(values?.bs),
+                fires: normalize(values?.fires),
+                tron: normalize(values?.tron)
+            };
+
+            const payload = { opening_balance };
             const response = await axios.post(`/api/store/${storeId}/cash/open`, payload);
             return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             toast.success('Caja abierta');
+            const session = data?.session || null;
+            queryClient.setQueryData(['store-cash-status', storeId], session);
+            queryClient.invalidateQueries(['store-cash-status', storeId]);
+            setOpenCashModalOpen(false);
+            setOpenCashForm({ usdt: '', bs: '', fires: '', tron: '' });
         },
         onError: (error) => {
             const message = error?.response?.data?.error || 'No se pudo abrir la caja';
@@ -159,8 +186,11 @@ const POS = () => {
             const response = await axios.post(`/api/store/${storeId}/cash/close`, {});
             return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             toast.success('Caja cerrada');
+            queryClient.setQueryData(['store-cash-status', storeId], null);
+            queryClient.invalidateQueries(['store-cash-status', storeId]);
+            setCashCloseSummary(data || null);
         },
         onError: (error) => {
             const message = error?.response?.data?.error || 'No se pudo cerrar la caja';
@@ -1083,7 +1113,7 @@ const POS = () => {
                                 if (cashSession) {
                                     closeCashMutation.mutate();
                                 } else {
-                                    openCashMutation.mutate();
+                                    setOpenCashModalOpen(true);
                                 }
                             }}
                             disabled={openCashMutation.isLoading || closeCashMutation.isLoading || loadingCashStatus}
@@ -1480,6 +1510,154 @@ const POS = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Modal abrir caja: monto de inicio */}
+            {openCashModalOpen && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="bg-dark border border-white/10 p-6 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 className="text-xl font-bold mb-4">Abrir caja</h2>
+                        <p className="text-xs text-white/70 mb-4">
+                            Ingresa el monto de inicio en caja. Este monto es la base y <span className="font-semibold">no se contabiliza como ventas del d eda</span>.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <label className="block mb-1 text-white/70">Monto inicio USDT</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={openCashForm.usdt}
+                                    onChange={(e) => setOpenCashForm(prev => ({ ...prev, usdt: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-white/70">Monto inicio Bs</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={openCashForm.bs}
+                                    onChange={(e) => setOpenCashForm(prev => ({ ...prev, bs: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-white/70">Monto inicio Fuegos</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={openCashForm.fires}
+                                    onChange={(e) => setOpenCashForm(prev => ({ ...prev, fires: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-white/70">Monto inicio TRON</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                                    value={openCashForm.tron}
+                                    onChange={(e) => setOpenCashForm(prev => ({ ...prev, tron: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={() => setOpenCashModalOpen(false)}
+                                className="flex-1 btn-secondary"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => openCashMutation.mutate(openCashForm)}
+                                disabled={openCashMutation.isLoading}
+                                className="flex-1 btn-primary disabled:opacity-50"
+                            >
+                                {openCashMutation.isLoading ? 'Abriendo caja...' : 'Confirmar apertura'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Resumen de cierre de caja */}
+            {cashCloseSummary && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="bg-dark border border-white/10 p-6 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 className="text-xl font-bold mb-4">Cierre de caja</h2>
+                        <p className="text-xs text-white/70 mb-4">
+                            Resumen del lote de caja desde la apertura hasta el momento del cierre.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs mb-4">
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-semibold text-white/80">Monto de inicio</h3>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">USDT</span>
+                                    <span className="font-semibold">{Number(openingBalance.usdt || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Bs</span>
+                                    <span className="font-semibold">{Number(openingBalance.bs || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Fuegos</span>
+                                    <span className="font-semibold">{Number(openingBalance.fires || 0).toFixed(0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">TRON</span>
+                                    <span className="font-semibold">{Number(openingBalance.tron || 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-semibold text-white/80">Ventas del turno</h3>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Total ventas (USDT)</span>
+                                    <span className="font-semibold">{Number(closingTotals.usdt || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Órdenes</span>
+                                    <span className="font-semibold">{Number(cashCloseStats?.order_count || 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Artículos vendidos</span>
+                                    <span className="font-semibold">{Number(cashCloseStats?.items_sold || 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/60">Comisión plataforma (USDT)</span>
+                                    <span className="font-semibold">{Number(cashCloseStats?.commission_usdt || 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-[11px] text-white/60 mb-4">
+                            <p>
+                                El monto de inicio se usa como base y no se suma a las ventas del turno. Las ventas
+                                listadas arriba corresponden solo a las órdenes confirmadas durante la sesión de caja.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                type="button"
+                                onClick={() => setCashCloseSummary(null)}
+                                className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs"
+                            >
+                                Cerrar resumen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Payment Modal */}
             {paymentModalOpen && (

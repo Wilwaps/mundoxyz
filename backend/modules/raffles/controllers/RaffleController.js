@@ -503,15 +503,23 @@ class RaffleController {
   async getUserRaffles(req, res) {
     try {
       const userId = req.user.id;
-      
+      const t0 = Date.now();
+
       const filters = {
         hostId: userId,
         visibility: ['public', 'private', 'company'],
         limit: 50
       };
-      
+
       const result = await raffleService.getRaffles(filters, userId);
-      
+
+      const elapsed = Date.now() - t0;
+      logger.info('[RaffleController] getUserRaffles done', {
+        hostId: userId,
+        elapsed_ms: elapsed,
+        count: result?.raffles?.length ?? 0
+      });
+
       res.json({
         success: true,
         raffles: result.raffles

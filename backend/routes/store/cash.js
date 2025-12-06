@@ -125,7 +125,22 @@ router.post('/:storeId/cash/close', verifyToken, async (req, res) => {
       [storeId, session.opened_at]
     );
 
-    const sales = salesResult.rows[0];
+    const sales = salesResult.rows[0] || {};
+
+    // Calcular cantidad total de artículos vendidos en el mismo rango
+    const itemsResult = await query(
+      `SELECT COALESCE(SUM(oi.quantity), 0) AS items_sold
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.store_id = $1
+         AND o.status IN ('confirmed', 'completed', 'preparing', 'ready')
+         AND o.created_at >= $2
+         AND o.created_at <= NOW()`,
+      [storeId, session.opened_at]
+    );
+
+    const itemsSold = Number(itemsResult.rows[0]?.items_sold || 0);
+
     const closing_totals = {
       usdt: Number(sales.total_usdt || 0),
       fires: 0,
@@ -228,7 +243,8 @@ router.post('/:storeId/cash/close', verifyToken, async (req, res) => {
       },
       summary: {
         order_count: Number(sales.order_count || 0),
-        commission_usdt: Number(sales.commission_usdt || 0)
+        commission_usdt: Number(sales.commission_usdt || 0),
+        items_sold: itemsSold
       }
     });
   } catch (error) {

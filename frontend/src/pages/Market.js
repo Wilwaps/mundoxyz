@@ -241,6 +241,49 @@ const Market = () => {
     }
   };
 
+  const handleShareStore = async (store) => {
+    try {
+      if (!store || !store.slug) return;
+
+      const refPart = user?.username ? `?ref=${encodeURIComponent(user.username)}` : '';
+      const targetUrl = `/store/${store.slug}${refPart}`;
+
+      let shareUrl = '';
+
+      try {
+        const response = await axios.post('/api/short-links', {
+          target_url: targetUrl,
+          metadata: {
+            type: 'store_referral',
+            store_id: store.id || null,
+            store_slug: store.slug,
+          },
+        });
+
+        shareUrl = response.data?.short_url || '';
+      } catch (apiError) {
+        console.error('Error creating short link, falling back to direct URL', apiError);
+        const baseUrl = window.location.origin.replace(/\/$/, '');
+        shareUrl = `${baseUrl}${targetUrl}`;
+      }
+
+      if (!shareUrl) {
+        throw new Error('No share URL available');
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link de tienda copiado');
+      } else {
+        // Fallback
+        window.prompt('Copia este link de tienda:', shareUrl);
+      }
+    } catch (error) {
+      console.error('Error copying store link', error);
+      toast.error('No se pudo copiar el link');
+    }
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold text-center mb-8 text-gradient-violet">Mercado</h1>
@@ -328,19 +371,70 @@ const Market = () => {
         )}
       </motion.div>
 
+      {stores && stores.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="card-glass mt-6"
+        >
+          <h3 className="text-lg font-bold mb-4">Tiendas disponibles</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stores.map((store) => (
+              <div
+                key={store.id}
+                className="glass-panel p-4 flex gap-3 items-center cursor-pointer hover:bg-white/5 transition-colors"
+                onClick={() => {
+                  window.location.href = `/store/${store.slug}`;
+                }}
+              >
+                <img
+                  src={store.logo_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(store.name)}
+                  alt={store.name}
+                  className="w-12 h-12 rounded-lg object-cover bg-white/10 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="font-semibold text-text truncate">{store.name}</h4>
+                      {store.description && (
+                        <p className="text-xs text-text/60 line-clamp-2">{store.description}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareStore(store);
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 text-text/80 flex-shrink-0"
+                    >
+                      Compartir
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-accent hover:underline">
+                    Entrar a la tienda
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* Store marketplace: venta de tiendas */}
       {storePlans && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
+          transition={{ delay: 0.18 }}
           className="card-glass mt-6 bg-gradient-to-br from-indigo-600/30 via-fuchsia-500/20 to-cyan-400/20 border border-white/10"
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
               <h2 className="text-lg font-bold text-white">Tu Propia Tienda Digital</h2>
               <p className="text-xs text-white/80">
-                Activa una tienda profesional dentro de MundoXYZ con todo el ecosistema de juegos y economía dual.
+                Activa una tienda profesional dentro de MundoXYZ con servicios y plugins avanzados para crecer tu negocio.
               </p>
             </div>
             <div className="text-[11px] text-white/80">
@@ -373,21 +467,18 @@ const Market = () => {
                   ? [
                       'Hasta 100 productos',
                       'Motor SEO básico',
-                      'Integración básica con Telegram',
-                      '1 tienda activa'
+                      'Integración básica con Telegram'
                     ]
                   : key === 'professional'
                   ? [
                       'Hasta 500 productos',
                       'SEO avanzado con IA',
                       'Integración Telegram Pro',
-                      '3 tiendas activas',
                       'Dual economy (Coins + Fires)'
                     ]
                   : [
                       'Productos ilimitados',
                       'SEO enterprise con IA',
-                      'Tiendas ilimitadas',
                       'Gamificación avanzada',
                       'API y white-label'
                     ];
@@ -444,42 +535,6 @@ const Market = () => {
                 </div>
               );
             })}
-          </div>
-        </motion.div>
-      )}
-
-      {stores && stores.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="card-glass mt-6"
-        >
-          <h3 className="text-lg font-bold mb-4">Tiendas disponibles</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {stores.map((store) => (
-              <div key={store.id} className="glass-panel p-4 flex gap-3 items-center">
-                <img
-                  src={store.logo_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(store.name)}
-                  alt={store.name}
-                  className="w-12 h-12 rounded-lg object-cover bg-white/10 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-text truncate">{store.name}</h4>
-                  {store.description && (
-                    <p className="text-xs text-text/60 line-clamp-2">{store.description}</p>
-                  )}
-                  <div className="mt-2">
-                    <Link
-                      to={`/store/${store.slug}`}
-                      className="text-xs text-accent hover:underline"
-                    >
-                      Entrar a la tienda
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </motion.div>
       )}

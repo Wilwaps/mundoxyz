@@ -359,6 +359,19 @@ CREATE TABLE IF NOT EXISTS store_interest_requests (
 CREATE INDEX IF NOT EXISTS idx_store_interest_created
   ON store_interest_requests(created_at DESC);
 
+-- 31. SHORT_LINKS
+CREATE TABLE IF NOT EXISTS short_links (
+  id BIGSERIAL PRIMARY KEY,
+  code VARCHAR(6) GENERATED ALWAYS AS (LPAD(id::text, 6, '0')) STORED,
+  target_url TEXT NOT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_short_links_code ON short_links(code);
+CREATE INDEX IF NOT EXISTS idx_short_links_target_created_by ON short_links(target_url, created_by);
+
 -- FUNCIONES
 CREATE OR REPLACE FUNCTION generate_room_code() RETURNS VARCHAR(6) AS $$
 DECLARE
